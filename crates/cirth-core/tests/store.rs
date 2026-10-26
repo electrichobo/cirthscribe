@@ -223,28 +223,28 @@ fn package_saves_keep_rolling_backups_under_the_policy() {
     let versions = |dir: &std::path::Path| backup::list(dir, "tide").iter().map(|b| b.saved_version).collect::<Vec<_>>();
 
     // First save: nothing to back up yet.
-    s.save_package_with_backup(&pkg, Some(&policy), t(0), false).unwrap();
+    s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(0), false).unwrap();
     assert!(versions(&bdir).is_empty());
     // Package (v1) exists now; the next save backs it up.
     edit(&mut s, "two");
-    s.save_package_with_backup(&pkg, Some(&policy), t(60), false).unwrap();
+    s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(60), false).unwrap();
     assert_eq!(versions(&bdir), vec![1]);
     // Within min_interval: autosave does not add a backup...
     edit(&mut s, "three");
-    s.save_package_with_backup(&pkg, Some(&policy), t(120), false).unwrap();
+    s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(120), false).unwrap();
     assert_eq!(versions(&bdir), vec![1]);
     // ...but an explicit Save does (package was v2).
     edit(&mut s, "four");
-    s.save_package_with_backup(&pkg, Some(&policy), t(180), true).unwrap();
+    s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(180), true).unwrap();
     assert_eq!(versions(&bdir), vec![3, 1]);
     // Unchanged project: the backup of that version is made once, not twice.
-    s.save_package_with_backup(&pkg, Some(&policy), t(190), true).unwrap();
-    s.save_package_with_backup(&pkg, Some(&policy), t(200), true).unwrap();
+    s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(190), true).unwrap();
+    s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(200), true).unwrap();
     assert_eq!(versions(&bdir), vec![4, 3, 1]);
     // Rotation keeps the newest three.
     for (i, at) in [900u64, 1800, 2700].into_iter().enumerate() {
         edit(&mut s, &format!("later {i}"));
-        s.save_package_with_backup(&pkg, Some(&policy), t(at), false).unwrap();
+        s.save_package_with_backup(&pkg, Some((&policy, "tide")), t(at), false).unwrap();
     }
     assert_eq!(versions(&bdir), vec![6, 5, 4]);
     // Every backup is a complete project file holding its version's content.
@@ -254,6 +254,24 @@ fn package_saves_keep_rolling_backups_under_the_policy() {
         assert_eq!(info.blocks, 9 + b.saved_version - 1, "{}", b.file_name);
     }
     assert!(std::fs::read_dir(&bdir).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().ends_with(".tmp")));
+}
+
+#[test]
+fn relocate_moves_the_working_store_with_its_data_and_lock() {
+    let d = tmpdir("relocate");
+    let (a, b) = (d.join("a.work.db"), d.join("b.work.db"));
+    let mut s = Store::open(&a).unwrap();
+    s.seed(&fixtures::unicode_marks().to_document().unwrap()).unwrap();
+    let before = s.load().unwrap();
+    s.relocate(&b).unwrap();
+    assert_eq!(s.path(), b.as_path());
+    assert_eq!(s.load().unwrap().blocks, before.blocks);
+    assert_eq!(s.version().unwrap(), before.version);
+    assert!(!a.exists() && !d.join("a.work.db-wal").exists(), "nothing left at the old path");
+    assert!(matches!(Store::open(&b), Err(StoreError::Locked)), "the lock moved too");
+    // Still writable after the move.
+    let v = s.version().unwrap();
+    s.apply(&batch(v, vec![Op::Put { block: Block::new(BlockKind::Action, "after move"), after: None }])).unwrap();
 }
 
 #[test]

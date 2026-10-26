@@ -1,11 +1,16 @@
 // Home: the project library shown at startup and after closing a project
 // (modelled on a project manager page). Lists the projects in the app's
-// library folder, creates new ones, and opens the samples.
+// library folder and recently opened files elsewhere, creates new ones,
+// opens files through the system Open dialog, and opens the samples.
 
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 export interface ProjectEntry {
   name: string;
+  path: string;
+  location: "library" | "elsewhere";
+  missing: boolean;
   title: string;
   sample: boolean;
   modified_ms: number;
@@ -21,7 +26,7 @@ export interface ProjectEntry {
 }
 
 interface Actions {
-  openProject(name: string): Promise<boolean>;
+  openPath(path: string): Promise<boolean>;
   openSample(name: string): Promise<boolean>;
   createProject(title: string): Promise<boolean>;
 }
@@ -87,7 +92,14 @@ export function createHome(root: HTMLElement, actions: Actions) {
     samples.append(el("li", {}, b));
   }
 
-  const side = el("aside", { className: "home-side" }, form, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "Opening files from elsewhere on disk is not available yet; projects live in the app's library folder."));
+  const openBtn = el("button", { type: "button", id: "open-file" }, "Open a project file…");
+  openBtn.addEventListener("click", () =>
+    void guard(async () => {
+      const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "CirthScribe project", extensions: ["cirth"] }] });
+      return typeof path === "string" ? actions.openPath(path) : false;
+    }),
+  );
+  const side = el("aside", { className: "home-side" }, form, el("h2", {}, "Open"), openBtn, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."));
   const main = el("section", { className: "home-main" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, "CirthScribe"), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 
@@ -104,6 +116,8 @@ export function createHome(root: HTMLElement, actions: Actions) {
     if (p.recoverable) badges.append(el("span", { className: "tag warn" }, "Unsaved work will be recovered"));
     if (p.older_format) badges.append(el("span", { className: "tag", title: "Upgraded when opened; the original file is kept as a backup" }, `Older format (v${p.schema})`));
     if (p.open) badges.append(el("span", { className: "tag" }, "Open"));
+    if (p.location === "elsewhere") badges.append(el("span", { className: "tag" }, "Outside library"));
+    if (p.missing) badges.append(el("span", { className: "tag bad" }, "File not found"));
     if (p.error) badges.append(el("span", { className: "tag bad" }, "Cannot read"));
     const b = el(
       "button",
@@ -113,16 +127,28 @@ export function createHome(root: HTMLElement, actions: Actions) {
         "div",
         { className: "meta" },
         el("strong", {}, title),
-        el("span", { className: "file" }, `${p.name}.cirth`),
+        el("span", { className: "file", title: p.path }, p.location === "library" ? `${p.name}.cirth` : p.path),
         el("span", {}, p.error ? p.error : `${plural(p.scenes, "scene")} · ${plural(p.blocks, "block")}`),
         el("span", {}, `Modified ${when(p.modified_ms)}${p.backups ? ` · ${plural(p.backups, "backup")}` : ""}`),
         badges,
       ),
     );
     b.dataset.project = p.name;
-    b.disabled = !!p.error;
-    b.addEventListener("click", () => void guard(() => actions.openProject(p.name)));
-    return el("div", { role: "listitem" }, b);
+    b.dataset.path = p.path;
+    b.disabled = !!p.error || p.missing;
+    b.addEventListener("click", () => void guard(() => actions.openPath(p.path)));
+    const item = el("div", { role: "listitem", className: "project-item" }, b);
+    if (p.missing) {
+      // A remembered file that is gone: offer to drop it from the list.
+      const forget = el("button", { type: "button", className: "forget" }, "Remove from list");
+      forget.dataset.forget = p.path;
+      forget.addEventListener("click", async () => {
+        await invoke("forget_recent", { path: p.path });
+        await refresh();
+      });
+      item.append(forget);
+    }
+    return item;
   }
 
   async function refresh(): Promise<ProjectEntry[]> {

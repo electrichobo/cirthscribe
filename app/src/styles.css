@@ -99,6 +99,10 @@ button.primary { padding: 7px 12px; background: var(--accent); color: var(--on-a
 .project .thumb span { font: 600 34px "Courier Prime", monospace; color: color-mix(in srgb, var(--ink) 70%, transparent); }
 .project .meta { display: grid; gap: 3px; padding: 9px 11px 11px; }
 .project .meta span { color: var(--muted); font-size: 12px; }
+#open-file { width: 100%; padding: 7px 12px; margin-bottom: 18px; }
+.project-item { display: grid; gap: 4px; }
+.forget { justify-self: start; font-size: 12px; }
+.project .meta .file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
 .tag.warn { color: var(--warn); border-color: currentColor; }

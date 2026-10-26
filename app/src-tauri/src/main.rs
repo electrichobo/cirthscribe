@@ -1,26 +1,38 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! M0 spike shell. The Rust side owns the canonical document (the working
+//! CirthScribe shell. The Rust side owns the canonical document (the working
 //! store); the web UI is an editing projection that submits versioned
 //! batches. Pagination and PDF are computed here from the canonical store,
 //! never from the WebView's DOM.
+//!
+//! Project files: a project is a `.cirth` file anywhere on disk (the app's
+//! library folder, or any folder via Open / Save As). Each open file has a
+//! working store in the app's data folder, keyed by the file's path, which
+//! is the crash-recovery journal. Writing the file is conflict-safe: if the
+//! file changed outside CirthScribe since we last read or wrote it, our
+//! version goes to a "(conflict ...)" copy beside it and the other version
+//! is left untouched.
 
 use cirth_core::fixtures::Fixture;
+use cirth_core::fsutil::FileStamp;
 use cirth_core::layout::{self, PageMap, Profile};
 use cirth_core::model::{Beat, Document};
 use cirth_core::ops::{Ack, Batch};
 use cirth_core::store::{Store, StoreError};
-use cirth_core::{fontcheck, pdf};
-use serde::Serialize;
-use std::path::PathBuf;
+use cirth_core::{backup, fontcheck, pdf};
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
 use tauri::{Manager, State};
 
 struct Session {
-    name: String,
+    /// Key for this file's working store and backups (see `key_of`).
+    key: String,
     store: Store,
     package: PathBuf,
+    /// The file as we last read or wrote it; `None` until first written.
+    stamp: Option<FileStamp>,
 }
 
 #[derive(Default)]
@@ -31,6 +43,7 @@ struct App {
 
 #[derive(Serialize)]
 struct Opened {
+    /// Key of the project (library projects: the file name without extension).
     name: String,
     doc: Document,
     beats: Vec<Beat>,
@@ -61,18 +74,126 @@ fn err(e: StoreError) -> String {
     }
 }
 
+fn io_err(e: std::io::Error) -> String {
+    e.to_string()
+}
+
 fn profile(name: &str) -> Profile {
     if name == "a4" { Profile::a4() } else { Profile::us_letter() }
 }
 
-fn paths(app: &App, name: &str) -> (PathBuf, PathBuf) {
-    let dir = app.data_dir.lock().unwrap().clone();
-    (dir.join("work").join(format!("{name}.work.db")), dir.join("projects").join(format!("{name}.cirth")))
+// --- Paths and keys -----------------------------------------------------------
+
+fn data_dir(app: &App) -> PathBuf {
+    app.data_dir.lock().unwrap().clone()
 }
+
+fn library_dir(app: &App) -> PathBuf {
+    data_dir(app).join("projects")
+}
+
+fn library_path(app: &App, name: &str) -> PathBuf {
+    library_dir(app).join(format!("{name}.cirth"))
+}
+
+/// Absolute path for comparisons and display: the parent folder is
+/// canonicalized (it exists even when the file does not yet), and the
+/// Windows verbatim prefix (`\\?\`) is removed so paths read normally.
+fn normalize(p: &Path) -> PathBuf {
+    let abs = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
+    let joined = match (abs.parent(), abs.file_name()) {
+        (Some(dir), Some(name)) => std::fs::canonicalize(dir).map(|d| d.join(name)).unwrap_or(abs.clone()),
+        _ => abs.clone(),
+    };
+    let s = joined.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{rest}"))
+    } else if let Some(rest) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(rest)
+    } else {
+        joined
+    }
+}
+
+fn in_library(app: &App, pkg: &Path) -> bool {
+    normalize(pkg).parent() == Some(normalize(&library_dir(app)).as_path())
+}
+
+/// Library projects keep their file name as key (unchanged since M0, so old
+/// recovery files still match). Files elsewhere get `<name>-<path hash>` so
+/// two `draft.cirth` in different folders never share recovery files.
+fn key_of(app: &App, pkg: &Path) -> String {
+    let stem = pkg.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    if in_library(app, pkg) {
+        return stem;
+    }
+    let mut p = normalize(pkg).to_string_lossy().to_string();
+    if cfg!(windows) {
+        p = p.to_lowercase();
+    }
+    format!("{stem}-{:016x}", cirth_core::fsutil::fnv1a(p.as_bytes()))
+}
+
+fn work_path(app: &App, key: &str) -> PathBuf {
+    data_dir(app).join("work").join(format!("{key}.work.db"))
+}
+
+/// Backup rules (see cirth_core::backup): keep 20, at most one per 10
+/// minutes from autosave; an explicit Save always backs up a changed file.
+fn backup_policy(app: &App) -> backup::BackupPolicy {
+    backup::BackupPolicy { dir: data_dir(app).join("backups"), keep: 20, min_interval: std::time::Duration::from_secs(600) }
+}
+
+// --- Recent files ---------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Recent {
+    path: String,
+    opened_ms: u64,
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+fn recents_file(app: &App) -> PathBuf {
+    data_dir(app).join("recent.json")
+}
+
+fn load_recents(app: &App) -> Vec<Recent> {
+    std::fs::read(recents_file(app)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
+fn store_recents(app: &App, list: &[Recent]) -> Result<(), String> {
+    let path = recents_file(app);
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, serde_json::to_vec_pretty(list).unwrap_or_default()).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)
+}
+
+/// Remember a file opened from outside the library (newest first, 30 kept).
+fn remember(app: &App, pkg: &Path) -> Result<(), String> {
+    if in_library(app, pkg) {
+        return Ok(());
+    }
+    let path = normalize(pkg).display().to_string();
+    let mut list: Vec<Recent> = load_recents(app).into_iter().filter(|r| r.path != path).collect();
+    list.insert(0, Recent { path, opened_ms: now_ms() });
+    list.truncate(30);
+    store_recents(app, &list)
+}
+
+#[tauri::command]
+async fn forget_recent(app: State<'_, App>, path: String) -> Result<(), String> {
+    let list: Vec<Recent> = load_recents(&app).into_iter().filter(|r| r.path != path).collect();
+    store_recents(&app, &list)
+}
+
+// --- Opening --------------------------------------------------------------------
 
 fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migration_backup: Option<PathBuf>, t0: Instant) -> Result<Opened, String> {
     Ok(Opened {
-        name: s.name.clone(),
+        name: s.key.clone(),
         doc: s.store.load().map_err(err)?,
         beats: s.store.beats().map_err(err)?,
         recovered,
@@ -85,114 +206,80 @@ fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migratio
     })
 }
 
-/// Open the project for a fixture. If its package exists it is reopened
-/// (with recovery of unsaved work); otherwise, or with `reset`, a new
-/// project is seeded from the fixture.
-#[tauri::command]
-async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<Opened, String> {
-    let t0 = Instant::now();
+/// Open an existing project file, recovering unsaved working-store commits
+/// and upgrading older formats (with a kept copy).
+fn open_file(app: &App, pkg: &Path, t0: Instant) -> Result<Opened, String> {
     let mut guard = app.session.lock().unwrap();
     *guard = None; // release any lock on a previous project
-    let (work, package) = paths(&app, &name);
-    std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(package.parent().unwrap()).map_err(|e| e.to_string())?;
-    if package.exists() && !reset {
-        let o = Store::open_package(&package, &work, Some(&backup_policy(&app).dir)).map_err(err)?;
-        let s = Session { name, store: o.store, package };
-        let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
-        *guard = Some(s);
-        return Ok(out);
+    if !pkg.exists() {
+        return Err(format!("file not found: {}", pkg.display()));
     }
+    let key = key_of(app, pkg);
+    let work = work_path(app, &key);
+    std::fs::create_dir_all(work.parent().unwrap()).map_err(io_err)?;
+    let o = Store::open_package(pkg, &work, Some(&backup_policy(app).dir)).map_err(err)?;
+    let s = Session { key, store: o.store, package: normalize(pkg), stamp: Some(FileStamp::of(pkg).map_err(io_err)?) };
+    let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
+    remember(app, &s.package)?;
+    *guard = Some(s);
+    Ok(out)
+}
+
+#[tauri::command]
+async fn open_path(app: State<'_, App>, path: String) -> Result<Opened, String> {
+    open_file(&app, Path::new(&path), Instant::now())
+}
+
+/// Open a project from the library by name.
+#[tauri::command]
+async fn open_project(app: State<'_, App>, name: String) -> Result<Opened, String> {
+    open_file(&app, &library_path(&app, &name), Instant::now())
+}
+
+/// Start a new project file from a fresh working store and write it.
+fn start_new(app: &App, pkg: PathBuf, doc: &Document, beats: &[Beat], t0: Instant) -> Result<Opened, String> {
+    let mut guard = app.session.lock().unwrap();
+    *guard = None;
+    let key = key_of(app, &pkg);
+    let work = work_path(app, &key);
+    std::fs::create_dir_all(work.parent().unwrap()).map_err(io_err)?;
+    std::fs::create_dir_all(pkg.parent().unwrap()).map_err(io_err)?;
     cirth_core::store::remove_store_files(&work).map_err(err)?;
-    let fx: Fixture = serde_json::from_str(fixture_source(&name)?).map_err(|e| e.to_string())?;
-    let doc = fx.to_document()?;
     let mut store = Store::open(&work).map_err(err)?;
-    store.seed(&doc).map_err(err)?;
-    // Starter beats for the first scenes so the board has something to show.
-    for (i, sc) in doc.scenes().iter().take(12).enumerate() {
-        store
-            .put_beat(&Beat { id: cirth_core::model::new_id(), summary: format!("Beat {}: (summary is authored planning text)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
-            .map_err(err)?;
+    store.seed(doc).map_err(err)?;
+    for b in beats {
+        store.put_beat(b).map_err(err)?;
     }
-    store.save_package(&package).map_err(err)?;
-    let s = Session { name, store, package };
+    store.save_package(&pkg).map_err(err)?;
+    let s = Session { key, store, stamp: Some(FileStamp::of(&pkg).map_err(io_err)?), package: normalize(&pkg) };
     let out = opened(&s, false, None, None, t0)?;
     *guard = Some(s);
     Ok(out)
 }
 
-const SAMPLES: [&str; 3] = ["unicode-marks", "page-boundaries", "long-120"];
-
-#[derive(Serialize)]
-struct ProjectEntry {
-    /// File stem; the project's key in the library folder.
-    name: String,
-    title: String,
-    sample: bool,
-    modified_ms: u64,
-    blocks: u64,
-    scenes: u64,
-    saved_version: u64,
-    /// The working store holds commits newer than the last package save.
-    recoverable: bool,
-    backups: usize,
-    /// Schema of the file; older ones are upgraded (with a kept copy) when opened.
-    schema: i64,
-    older_format: bool,
-    /// Open in this window right now.
-    open: bool,
-    error: Option<String>,
-}
-
-/// The project library: every `.cirth` in the app's projects folder, newest first.
+/// Open a sample. If its file exists it is reopened (with recovery);
+/// otherwise, or with `reset`, it is seeded from the fixture.
 #[tauri::command]
-async fn list_projects(app: State<'_, App>) -> Result<Vec<ProjectEntry>, String> {
-    let dir = app.data_dir.lock().unwrap().join("projects");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let current = app.session.lock().unwrap().as_ref().map(|s| s.name.clone());
-    let mut out = Vec::new();
-    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("cirth") {
-            continue;
-        }
-        let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-        let modified_ms = entry
-            .metadata()
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
-        let open = current.as_deref() == Some(name.as_str());
-        let (work, _) = paths(&app, &name);
-        let mut e = ProjectEntry { sample: SAMPLES.contains(&name.as_str()), name, title: String::new(), modified_ms, blocks: 0, scenes: 0, saved_version: 0, recoverable: false, backups: 0, schema: 0, older_format: false, open, error: None };
-        e.backups = cirth_core::backup::list(&backup_policy(&app).dir, &e.name).len();
-        match Store::inspect(&path) {
-            Ok(info) => {
-                e.title = info.title;
-                e.schema = info.schema;
-                e.older_format = info.schema < cirth_core::store::SCHEMA_VERSION;
-                e.blocks = info.blocks;
-                e.scenes = info.scenes;
-                e.saved_version = info.saved_version;
-                if !open && work.exists() {
-                    if let Ok(w) = Store::inspect(&work) {
-                        e.recoverable = w.project_id == info.project_id && w.version > w.saved_version;
-                        if e.recoverable {
-                            e.blocks = w.blocks;
-                            e.scenes = w.scenes;
-                        }
-                    }
-                }
-            }
-            Err(err) => e.error = Some(err.to_string()),
-        }
-        out.push(e);
+async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let pkg = library_path(&app, &name);
+    if pkg.exists() && !reset {
+        return open_file(&app, &pkg, t0);
     }
-    out.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
-    Ok(out)
+    let fx: Fixture = serde_json::from_str(fixture_source(&name)?).map_err(|e| e.to_string())?;
+    let doc = fx.to_document()?;
+    // Starter beats for the first scenes so the board has something to show.
+    let beats: Vec<Beat> = doc
+        .scenes()
+        .iter()
+        .take(12)
+        .enumerate()
+        .map(|(i, sc)| Beat { id: cirth_core::model::new_id(), summary: format!("Beat {}: (summary is authored planning text)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
+        .collect();
+    start_new(&app, pkg, &doc, &beats, t0)
 }
+
+const SAMPLES: [&str; 3] = ["unicode-marks", "page-boundaries", "long-120"];
 
 fn slug(title: &str) -> String {
     let s: String = title.trim().chars().map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
@@ -200,8 +287,8 @@ fn slug(title: &str) -> String {
     if s.is_empty() { "untitled".into() } else { s.chars().take(60).collect() }
 }
 
-/// New empty project starting with one scene heading. Never overwrites:
-/// a name already in the library gets a numeric suffix.
+/// New empty project in the library, starting with one scene heading. Never
+/// overwrites: a name already in the library gets a numeric suffix.
 #[tauri::command]
 async fn create_project(app: State<'_, App>, title: String) -> Result<Opened, String> {
     let t0 = Instant::now();
@@ -209,51 +296,126 @@ async fn create_project(app: State<'_, App>, title: String) -> Result<Opened, St
     let base = slug(&title);
     let mut name = base.clone();
     let mut n = 2;
-    while paths(&app, &name).1.exists() || SAMPLES.contains(&name.as_str()) {
+    while library_path(&app, &name).exists() || SAMPLES.contains(&name.as_str()) {
         name = format!("{base}-{n}");
         n += 1;
     }
-    let mut guard = app.session.lock().unwrap();
-    *guard = None;
-    let (work, package) = paths(&app, &name);
-    std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(package.parent().unwrap()).map_err(|e| e.to_string())?;
-    cirth_core::store::remove_store_files(&work).map_err(err)?;
-    let mut store = Store::open(&work).map_err(err)?;
     let doc = Document { title, version: 0, blocks: vec![cirth_core::model::Block::new(cirth_core::model::BlockKind::Heading, "")] };
-    store.seed(&doc).map_err(err)?;
-    store.save_package(&package).map_err(err)?;
-    let s = Session { name, store, package };
-    let out = opened(&s, false, None, None, t0)?;
-    *guard = Some(s);
-    Ok(out)
+    start_new(&app, library_path(&app, &name), &doc, &[], t0)
 }
 
-/// Open a project from the library, recovering unsaved working-store commits.
-#[tauri::command]
-async fn open_project(app: State<'_, App>, name: String) -> Result<Opened, String> {
-    let t0 = Instant::now();
-    let mut guard = app.session.lock().unwrap();
-    *guard = None;
-    let (work, package) = paths(&app, &name);
-    if !package.exists() {
-        return Err(format!("project {name} is not in the library"));
-    }
-    std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
-    let o = Store::open_package(&package, &work, Some(&backup_policy(&app).dir)).map_err(err)?;
-    let s = Session { name, store: o.store, package };
-    let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
-    *guard = Some(s);
-    Ok(out)
-}
-
-/// Release the project (and its lock). The working store stays for recovery
-/// only if it holds unsaved commits; the UI saves before closing.
+/// Release the project (and its lock). The UI saves before closing.
 #[tauri::command]
 async fn close_project(app: State<'_, App>) -> Result<(), String> {
     *app.session.lock().unwrap() = None;
     Ok(())
 }
+
+// --- Library listing --------------------------------------------------------------
+
+#[derive(Serialize)]
+struct ProjectEntry {
+    /// Key: for library projects the file name without extension.
+    name: String,
+    path: String,
+    /// "library" or "elsewhere" (opened or saved outside the library).
+    location: &'static str,
+    title: String,
+    sample: bool,
+    modified_ms: u64,
+    blocks: u64,
+    scenes: u64,
+    saved_version: u64,
+    /// The working store holds commits newer than the last file save.
+    recoverable: bool,
+    backups: usize,
+    /// Schema of the file; older ones are upgraded (with a kept copy) when opened.
+    schema: i64,
+    older_format: bool,
+    /// Open in this window right now.
+    open: bool,
+    /// A remembered file that no longer exists at its path.
+    missing: bool,
+    error: Option<String>,
+}
+
+fn entry_for(app: &App, path: &Path, location: &'static str, current: Option<&Path>) -> ProjectEntry {
+    let key = key_of(app, path);
+    let open = current == Some(normalize(path).as_path());
+    let mut e = ProjectEntry {
+        sample: location == "library" && SAMPLES.contains(&key.as_str()),
+        name: key.clone(),
+        path: path.display().to_string(),
+        location,
+        title: path.file_stem().unwrap_or_default().to_string_lossy().to_string(),
+        modified_ms: 0,
+        blocks: 0,
+        scenes: 0,
+        saved_version: 0,
+        recoverable: false,
+        backups: backup::list(&backup_policy(app).dir, &key).len(),
+        schema: 0,
+        older_format: false,
+        open,
+        missing: !path.exists(),
+        error: None,
+    };
+    if e.missing {
+        return e;
+    }
+    e.modified_ms = std::fs::metadata(path).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+    match Store::inspect(path) {
+        Ok(info) => {
+            e.title = info.title;
+            e.schema = info.schema;
+            e.older_format = info.schema < cirth_core::store::SCHEMA_VERSION;
+            e.blocks = info.blocks;
+            e.scenes = info.scenes;
+            e.saved_version = info.saved_version;
+            let work = work_path(app, &key);
+            if !open && work.exists() {
+                if let Ok(w) = Store::inspect(&work) {
+                    e.recoverable = w.project_id == info.project_id && w.version > w.saved_version;
+                    if e.recoverable {
+                        e.blocks = w.blocks;
+                        e.scenes = w.scenes;
+                    }
+                }
+            }
+        }
+        Err(err) => e.error = Some(err.to_string()),
+    }
+    e
+}
+
+/// Library projects plus recently opened files elsewhere, newest first.
+#[tauri::command]
+async fn list_projects(app: State<'_, App>) -> Result<Vec<ProjectEntry>, String> {
+    let dir = library_dir(&app);
+    std::fs::create_dir_all(&dir).map_err(io_err)?;
+    let current = app.session.lock().unwrap().as_ref().map(|s| s.package.clone());
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(io_err)?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("cirth") {
+            out.push(entry_for(&app, &path, "library", current.as_deref()));
+        }
+    }
+    for r in load_recents(&app) {
+        let p = PathBuf::from(&r.path);
+        if !in_library(&app, &p) {
+            let mut e = entry_for(&app, &p, "elsewhere", current.as_deref());
+            if e.missing {
+                e.modified_ms = r.opened_ms;
+            }
+            out.push(e);
+        }
+    }
+    out.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+    Ok(out)
+}
+
+// --- Editing ------------------------------------------------------------------------
 
 fn with_session<T>(app: &App, f: impl FnOnce(&mut Session) -> Result<T, String>) -> Result<T, String> {
     let mut guard = app.session.lock().unwrap();
@@ -276,30 +438,135 @@ async fn put_beat(app: State<'_, App>, beat: Beat) -> Result<(), String> {
     with_session(&app, |s| s.store.put_beat(&beat).map_err(err))
 }
 
-#[tauri::command]
-async fn save_package(app: State<'_, App>, explicit: Option<bool>) -> Result<Saved, String> {
-    save_current(&app, explicit.unwrap_or(false))
-}
-
-/// Backup rules (see cirth_core::backup): keep 20, at most one per 10
-/// minutes from autosave; an explicit Save always backs up a changed file.
-fn backup_policy(app: &App) -> cirth_core::backup::BackupPolicy {
-    cirth_core::backup::BackupPolicy { dir: app.data_dir.lock().unwrap().join("backups"), keep: 20, min_interval: std::time::Duration::from_secs(600) }
-}
+// --- Saving -------------------------------------------------------------------------
 
 #[derive(Serialize)]
 struct Saved {
     version: u64,
     backups: usize,
+    /// Where the project now lives (changes after Save As or a conflict).
+    path: String,
+    name: String,
+    /// The file had changed outside CirthScribe: our version was written here
+    /// instead, and the other version was left untouched at `other`.
+    conflict: Option<String>,
+    other: Option<String>,
+    /// The file was missing (moved or deleted outside) and was written again.
+    recreated: bool,
 }
 
-fn save_current(app: &App, explicit: bool) -> Result<Saved, String> {
+/// Point the session at another file: move the working store to that file's
+/// key so crash recovery follows the project.
+fn rekey(app: &App, s: &mut Session, new_pkg: &Path) -> Result<(), String> {
+    let new_key = key_of(app, new_pkg);
+    if new_key != s.key {
+        s.store.relocate(&work_path(app, &new_key)).map_err(err)?;
+        s.key = new_key;
+    }
+    s.package = normalize(new_pkg);
+    Ok(())
+}
+
+/// Unique "<name> (conflict YYYY-MM-DD HHMM).cirth" beside `pkg`.
+fn conflict_path(pkg: &Path) -> PathBuf {
+    let stem = pkg.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let dir = pkg.parent().unwrap_or(Path::new("."));
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let t = backup::readable_utc(secs);
+    let mut p = dir.join(format!("{stem} (conflict {t}).cirth"));
+    let mut n = 2;
+    while p.exists() {
+        p = dir.join(format!("{stem} (conflict {t} {n}).cirth"));
+        n += 1;
+    }
+    p
+}
+
+fn write_session(app: &App, s: &mut Session, explicit: bool) -> Result<Saved, String> {
     let policy = backup_policy(app);
-    with_session(app, |s| {
-        let version = s.store.save_package_with_backup(&s.package, Some(&policy), std::time::SystemTime::now(), explicit).map_err(err)?;
-        Ok(Saved { version, backups: cirth_core::backup::list(&policy.dir, &s.name).len() })
+    let (mut conflict, mut other, mut recreated) = (None, None, false);
+    if let Some(stamp) = &s.stamp {
+        if !s.package.exists() {
+            recreated = true;
+        } else if stamp.changed(&s.package).map_err(io_err)? {
+            // Someone else's version is at the path: keep it, write ours beside it.
+            let ours = conflict_path(&s.package);
+            other = Some(s.package.display().to_string());
+            rekey(app, s, &ours)?;
+            conflict = Some(ours.display().to_string());
+        }
+    }
+    let version = s.store.save_package_with_backup(&s.package, Some((&policy, &s.key)), std::time::SystemTime::now(), explicit).map_err(err)?;
+    s.stamp = Some(FileStamp::of(&s.package).map_err(io_err)?);
+    if conflict.is_some() {
+        remember(app, &s.package)?;
+    }
+    Ok(Saved { version, backups: backup::list(&policy.dir, &s.key).len(), path: s.package.display().to_string(), name: s.key.clone(), conflict, other, recreated })
+}
+
+#[tauri::command]
+async fn save_package(app: State<'_, App>, explicit: Option<bool>) -> Result<Saved, String> {
+    with_session(&app, |s| write_session(&app, s, explicit.unwrap_or(false)))
+}
+
+/// Write the project to another file (chosen in the Save As dialog) and
+/// continue there. The copy gets a new project identity; the original file
+/// keeps its last saved state. An existing file at the target is backed up
+/// first; a target with unsaved recovery work of its own is refused.
+#[tauri::command]
+async fn save_as(app: State<'_, App>, path: String) -> Result<Saved, String> {
+    let target = normalize(Path::new(&path));
+    with_session(&app, |s| {
+        if target == s.package {
+            return write_session(&app, s, true);
+        }
+        let target_work = work_path(&app, &key_of(&app, &target));
+        if target_work.exists() {
+            if let Ok(w) = Store::inspect(&target_work) {
+                if w.version > w.saved_version {
+                    return Err(format!("{} has unsaved work waiting to be recovered; open it first, or choose another name", target.display()));
+                }
+            }
+            cirth_core::store::remove_store_files(&target_work).map_err(err)?;
+        }
+        let old_id = s.store.project_id().map_err(err)?;
+        s.store.set_project_id(&cirth_core::model::new_id()).map_err(err)?;
+        let policy = backup_policy(&app);
+        let target_key = key_of(&app, &target);
+        // An existing file at the target is backed up before it is replaced.
+        if let Err(e) = std::fs::create_dir_all(target.parent().unwrap_or(Path::new("."))).map_err(io_err).and_then(|_| {
+            s.store.save_package_with_backup(&target, Some((&policy, &target_key)), std::time::SystemTime::now(), true).map(|_| ()).map_err(err)
+        }) {
+            s.store.set_project_id(&old_id).map_err(err)?;
+            return Err(e);
+        }
+        rekey(&app, s, &target)?;
+        s.stamp = Some(FileStamp::of(&s.package).map_err(io_err)?);
+        remember(&app, &s.package)?;
+        let version = s.store.saved_version().map_err(err)?;
+        Ok(Saved { version, backups: backup::list(&policy.dir, &target_key).len(), path: s.package.display().to_string(), name: s.key.clone(), conflict: None, other: None, recreated: false })
     })
 }
+
+#[derive(Serialize)]
+struct OutsideChange {
+    changed: bool,
+    missing: bool,
+    path: String,
+}
+
+/// Has the open project's file changed outside CirthScribe since we last
+/// read or wrote it? (The UI checks on focus and before autosave.)
+#[tauri::command]
+async fn check_outside_change(app: State<'_, App>) -> Result<OutsideChange, String> {
+    with_session(&app, |s| {
+        let missing = !s.package.exists();
+        let changed = !missing && s.stamp.as_ref().map(|st| st.changed(&s.package)).transpose().map_err(io_err)?.unwrap_or(false);
+        Ok(OutsideChange { changed, missing, path: s.package.display().to_string() })
+    })
+}
+
+// --- Pagination and PDF ---------------------------------------------------------------
 
 #[derive(Serialize)]
 struct Paginated {
@@ -345,11 +612,11 @@ async fn export_pdf(app: State<'_, App>, profile_name: String) -> Result<Exporte
     let t0 = Instant::now();
     let bytes = pdf::render(&p.map, &prof, &doc.title)?;
     let pdf_ms = t0.elapsed().as_secs_f64() * 1e3;
-    let name = with_session(&app, |s| Ok(s.name.clone()))?;
-    let dir = app.data_dir.lock().unwrap().join("exports");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let name = with_session(&app, |s| Ok(s.key.clone()))?;
+    let dir = data_dir(&app).join("exports");
+    std::fs::create_dir_all(&dir).map_err(io_err)?;
     let path = dir.join(format!("{name}-v{}-{}.pdf", doc.version, prof.name));
-    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    std::fs::write(&path, &bytes).map_err(io_err)?;
     Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs })
 }
 
@@ -360,8 +627,15 @@ fn process_id() -> u32 {
     std::process::id()
 }
 
+/// For tests and the UI: where the library and app data live.
+#[tauri::command]
+async fn library_folder(app: State<'_, App>) -> Result<String, String> {
+    Ok(library_dir(&app).display().to_string())
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(App::default())
         .setup(|app| {
             // CIRTH_DATA_DIR lets tests use a throwaway folder.
@@ -369,11 +643,29 @@ fn main() {
                 Some(d) => PathBuf::from(d),
                 None => app.path().app_local_data_dir()?,
             };
-            std::fs::create_dir_all(&dir)?;
+            std::fs::create_dir_all(dir.join("projects"))?;
             *app.state::<App>().data_dir.lock().unwrap() = dir;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![open_fixture, list_projects, create_project, open_project, close_project, apply_batch, load_document, put_beat, save_package, paginate, export_pdf, process_id])
+        .invoke_handler(tauri::generate_handler![
+            open_fixture,
+            list_projects,
+            create_project,
+            open_project,
+            open_path,
+            forget_recent,
+            close_project,
+            apply_batch,
+            load_document,
+            put_beat,
+            save_package,
+            save_as,
+            check_outside_change,
+            paginate,
+            export_pdf,
+            process_id,
+            library_folder
+        ])
         .build(tauri::generate_context!())
         .expect("error while building CirthScribe")
         .run(|handle, event| {
@@ -382,8 +674,9 @@ fn main() {
             // Edits still waiting in the UI's debounce are not in the store.
             if let tauri::RunEvent::Exit = event {
                 let app = handle.state::<App>();
-                if app.session.lock().unwrap().is_some() {
-                    let _ = save_current(&app, false);
+                let mut guard = app.session.lock().unwrap();
+                if let Some(s) = guard.as_mut() {
+                    let _ = write_session(&app, s, false);
                 }
             }
         });

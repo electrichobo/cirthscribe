@@ -4,7 +4,7 @@
 // honestly throw Skip with the reason; skips are reported, never counted as
 // passes.
 
-import { writeFileSync, mkdirSync, copyFileSync, readdirSync, readFileSync } from "node:fs";
+import { writeFileSync, mkdirSync, copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -536,6 +536,96 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(lo.recovered === false, "opened from the file, not recovered");
     assert(text(b.at(-2)) === "AUTOSAVED SAVED" && text(b.at(-1)) === "LAST WORDS", `reopened '${text(b.at(-2))}' / '${text(b.at(-1))}'`);
     return { card };
+  });
+
+  const elsewhereDir = join(dataDir, "elsewhere folder");
+  const elsewhere = join(elsewhereDir, "My Draft.cirth");
+  const cardFor = (p) => `#home [data-path="${p.replaceAll("\\", "\\\\")}"]`;
+
+  await test("Save As outside the library; recent files on Home; missing files can be removed", async () => {
+    mkdirSync(elsewhereDir, { recursive: true });
+    await openFixture("unicode-marks");
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await press("Enter");
+    await typeText("BEFORE SAVE AS");
+    assert(await app.evaluate(`__cirth.saveAs(${JSON.stringify(elsewhere)})`), "save as returned true");
+    const lo = await app.evaluate("__cirth.lastOpen");
+    assert(lo.package_path.endsWith("My Draft.cirth"), `now editing ${lo.package_path}`);
+    await press("Enter");
+    await typeText("AFTER SAVE AS");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    const path = lo.package_path;
+    const card = await app.evaluate(`document.querySelector(${JSON.stringify(cardFor(path))})?.textContent ?? ""`);
+    assert(/Outside library/.test(card) && card.includes("My Draft.cirth"), `elsewhere card '${card}'`);
+    // The library original keeps its last saved state (without the later edits).
+    await clickHome(app, '[data-project="unicode-marks"]');
+    await waitOpen(app);
+    assert(!(await blocks()).some((b) => text(b) === "AFTER SAVE AS"), "original file untouched by edits after Save As");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    // Reopen the copy from Home: both edits are there.
+    await clickHome(app, cardFor(path));
+    await waitOpen(app);
+    let b = await blocks();
+    assert(text(b.at(-2)) === "BEFORE SAVE AS" && text(b.at(-1)) === "AFTER SAVE AS", `copy has '${text(b.at(-2))}' / '${text(b.at(-1))}'`);
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    // Move the file away: Home says so and lets you drop it from the list.
+    const parked = join(dataDir, "parked.cirth");
+    copyFileSync(path, parked);
+    rmSync(path);
+    await app.evaluate("__cirth.home.refresh()");
+    const missing = await app.evaluate(`(() => { const c = document.querySelector(${JSON.stringify(cardFor(path))}); return { text: c.textContent, disabled: c.disabled }; })()`);
+    assert(/File not found/.test(missing.text) && missing.disabled, `missing card ${JSON.stringify(missing)}`);
+    await screenshot(app, "home-missing-file");
+    await app.evaluate(`(() => { document.querySelector(${JSON.stringify(`[data-forget="${path.replaceAll("\\", "\\\\")}"]`)}).click(); return true; })()`);
+    await sleep(300);
+    await waitHome(app);
+    assert(!(await app.evaluate(`!!document.querySelector(${JSON.stringify(cardFor(path))})`)), "removed from the list");
+    copyFileSync(parked, path);
+    return { path };
+  });
+
+  await test("Outside change: warned early; Save keeps the other version and writes ours to a conflict copy", async () => {
+    await app.evaluate(`__cirth.openPath(${JSON.stringify(elsewhere)})`);
+    await waitOpen(app);
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await press("Enter");
+    await typeText("MINE");
+    await waitSynced();
+    // Another program replaces the file (here: a different project's file).
+    const theirs = join(dataDir, "projects", "page-boundaries.cirth");
+    copyFileSync(theirs, elsewhere);
+    const before = readFileSync(elsewhere);
+    const c = await app.evaluate("__cirth.checkOutside()");
+    assert(c.changed, `outside change noticed: ${JSON.stringify(c)}`);
+    let banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(/changed outside CirthScribe. It will not be overwritten/.test(banner), `early warning '${banner}'`);
+    await app.evaluate("(() => { document.getElementById('save').click(); return true; })()");
+    await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.package_path.includes('(conflict ')", "conflict copy");
+    const conflictPath = await app.evaluate("__cirth.lastOpen.package_path");
+    banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(/To keep both, your version was saved as/.test(banner), `conflict banner '${banner}'`);
+    assert(Buffer.compare(readFileSync(elsewhere), before) === 0, "the other version is untouched");
+    assert(readdirSync(elsewhereDir).some((n) => n.startsWith("My Draft (conflict ")), "conflict copy beside the original");
+    await screenshot(app, "conflict-banner");
+    // Our version is in the conflict copy.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, cardFor(conflictPath));
+    await waitOpen(app);
+    assert(text((await blocks()).at(-1)) === "MINE", "conflict copy holds our edit");
+    // Rewriting the same bytes (as sync tools do) is not a change.
+    writeFileSync(conflictPath, readFileSync(conflictPath));
+    assert(!(await app.evaluate("__cirth.checkOutside()")).changed, "identical rewrite is not a change");
+    await typeText(" again");
+    await app.evaluate("(() => { document.getElementById('save').click(); return true; })()");
+    await sleep(800);
+    assert((await app.evaluate("__cirth.lastOpen.package_path")) === conflictPath, "no second conflict for an identical rewrite");
+    return { conflictPath };
   });
 
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {

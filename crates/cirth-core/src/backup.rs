@@ -28,6 +28,13 @@ pub struct BackupEntry {
     pub saved_version: u64,
 }
 
+/// `YYYY-MM-DD HH.MM UTC`, for file names people read (no colons, and the
+/// time cannot be mistaken for a year).
+pub fn readable_utc(secs: u64) -> String {
+    let s = utc_stamp(secs);
+    format!("{}-{}-{} {}.{} UTC", &s[0..4], &s[4..6], &s[6..8], &s[9..11], &s[11..13])
+}
+
 /// UTC civil date and time from Unix seconds (proleptic Gregorian).
 pub(crate) fn utc_stamp(secs: u64) -> String {
     let days = (secs / 86_400) as i64;
@@ -88,12 +95,12 @@ pub fn list(dir: &Path, stem: &str) -> Vec<BackupEntry> {
 
 /// Copy `current` into the backup folder if the policy calls for it, then
 /// prune. Returns the new backup's path, if one was made.
-pub fn before_replace(current: &Path, saved_version: u64, policy: &BackupPolicy, now: SystemTime, force: bool) -> std::io::Result<Option<PathBuf>> {
+pub fn before_replace(current: &Path, name: &str, saved_version: u64, policy: &BackupPolicy, now: SystemTime, force: bool) -> std::io::Result<Option<PathBuf>> {
     if !current.exists() {
         return Ok(None);
     }
     std::fs::create_dir_all(&policy.dir)?;
-    let stem = current.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let stem = name.to_string();
     let now_s = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     let existing = list(&policy.dir, &stem);
     if let Some(newest) = existing.first() {
@@ -130,5 +137,6 @@ mod tests {
             assert_eq!(parse_stamp(&utc_stamp(s)), Some(s), "{s} -> {}", utc_stamp(s));
         }
         assert_eq!(utc_stamp(951_782_400), "20000229-000000"); // leap day
+        assert_eq!(readable_utc(1_761_510_361), "2025-10-26 20.26 UTC");
     }
 }

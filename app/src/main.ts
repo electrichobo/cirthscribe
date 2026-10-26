@@ -6,6 +6,7 @@ import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
@@ -226,15 +227,39 @@ function showFileStatus() {
       : `File at v${fileSavedVersion}`;
 }
 
+interface Saved {
+  version: number;
+  backups: number;
+  path: string;
+  name: string;
+  conflict: string | null;
+  other: string | null;
+  recreated: boolean;
+}
+
+/** After any file write: track where the project lives and report surprises. */
+function afterWrite(r: Saved) {
+  fileSavedVersion = r.version;
+  fileSavedAt = new Date();
+  outsideWarned = false;
+  if (lastOpen) {
+    lastOpen.name = r.name;
+    lastOpen.package_path = r.path;
+  }
+  showFileStatus();
+  if (r.conflict) {
+    showBanner(`This project's file was changed outside CirthScribe since you opened it. To keep both, your version was saved as ${r.conflict}, and the other version is unchanged at ${r.other}. You are now editing ${r.conflict}.`);
+  } else if (r.recreated) {
+    showBanner(`The project file was missing (moved or deleted outside CirthScribe), so it was written again at ${r.path}.`);
+  }
+}
+
 /** Flush pending edits, then write the project file. Throws on failure. */
 async function saveFile(explicit: boolean): Promise<void> {
   while (saving) await saving;
   saving = (async () => {
     await syncer.flush();
-    const r = await invoke<{ version: number; backups: number }>("save_package", { explicit });
-    fileSavedVersion = r.version;
-    fileSavedAt = new Date();
-    showFileStatus();
+    afterWrite(await invoke<Saved>("save_package", { explicit }));
   })();
   try {
     await saving;
@@ -243,10 +268,58 @@ async function saveFile(explicit: boolean): Promise<void> {
   }
 }
 
+/** Write the project to another file and continue there. */
+async function saveAs(path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target =
+    path ??
+    (await saveDialog({ defaultPath: lastOpen.package_path, filters: [{ name: "CirthScribe project", extensions: ["cirth"] }] }));
+  if (!target) return false;
+  while (saving) await saving;
+  saving = (async () => {
+    await syncer.flush();
+    afterWrite(await invoke<Saved>("save_as", { path: target }));
+  })();
+  try {
+    await saving;
+    showBanner(`Saved as ${lastOpen.package_path}. The previous file keeps its last saved state.`);
+    return true;
+  } catch (e) {
+    showBanner(`Save As failed: ${e}. Nothing changed; your edits are kept in the recovery store.`);
+    return false;
+  } finally {
+    saving = null;
+  }
+}
+
+// Outside changes: warn as soon as we notice (window focus, autosave tick),
+// before any save turns it into a conflict copy.
+let outsideWarned = false;
+async function checkOutside(): Promise<{ changed: boolean; missing: boolean; path: string } | null> {
+  if (!lastOpen) return null;
+  try {
+    const c = await invoke<{ changed: boolean; missing: boolean; path: string }>("check_outside_change");
+    if ((c.changed || c.missing) && !outsideWarned) {
+      outsideWarned = true;
+      showBanner(
+        c.missing
+          ? `The project file is no longer at ${c.path} (moved or deleted outside CirthScribe). Your edits are safe; the next save writes it again.`
+          : `The project file ${c.path} was changed outside CirthScribe. It will not be overwritten: your next save goes to a separate "(conflict …)" copy beside it.`,
+      );
+    }
+    return c;
+  } catch {
+    return null;
+  }
+}
+window.addEventListener("focus", () => void checkOutside());
+
 function scheduleAutosave() {
   window.clearInterval(autosaveTimer);
   autosaveTimer = window.setInterval(() => {
-    if (!lastOpen || saving || syncer.currentVersion <= fileSavedVersion) return;
+    if (!lastOpen || saving) return;
+    void checkOutside();
+    if (syncer.currentVersion <= fileSavedVersion) return;
     saveFile(false).catch((e) => showBanner(`Autosave of the project file failed: ${e}. Your edits are still kept in the recovery store.`));
   }, autosaveMs);
 }
@@ -286,7 +359,7 @@ async function goHome() {
 }
 
 const home = createHome($("home"), {
-  openProject: (name) => openWith("open_project", { name }),
+  openPath: (path) => openWith("open_path", { path }),
   openSample: (name) => open(name, false),
   createProject: (title) => openWith("create_project", { title }),
 });
@@ -300,6 +373,7 @@ $("save").addEventListener("click", async () => {
     showBanner(`Save failed: ${e}. Your edits are still kept in the recovery store.`);
   }
 });
+$("save-as").addEventListener("click", () => void saveAs());
 $("pdf").addEventListener("click", async () => {
   await syncer.flush();
   try {
@@ -362,6 +436,10 @@ $("structural").addEventListener("change", (e) => {
     if (lastOpen) scheduleAutosave();
   },
   closeWindow: () => getCurrentWindow().close(),
+  saveAs: (path: string) => saveAs(path),
+  openPath: (path: string) => openWith("open_path", { path }),
+  checkOutside,
+  libraryFolder: () => invoke<string>("library_folder"),
   flush: () => syncer.flush(),
   repaginate,
   loadStored: () => invoke<{ version: number; blocks: Block[] }>("load_document"),

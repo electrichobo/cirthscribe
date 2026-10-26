@@ -13,3 +13,4 @@ cirth-core = { path = "../../crates/cirth-core" }
 tauri = { version = "2", features = ["custom-protocol"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-dialog = "2"

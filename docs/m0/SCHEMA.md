@@ -11,6 +11,10 @@ Status: proposed. Schema v1 below is what the spike implements; the M1 additions
 - The working copy never lives in a cloud-synced folder; the package may. The package holds no absolute paths or credentials.
 - Package files are written in rollback-journal mode, so a copied `.cirth` is a single self-contained file.
 
+Project files anywhere (M1, 2026-10-26): a project may live in the app's library folder or anywhere on disk (Open / Save As through native dialogs). Each file's working copy is keyed by its path (library files by name, unchanged from M0; other files by `<name>-<path hash>`), and recently opened files outside the library are listed on Home (`recent.json` in the app data folder, 30 kept). Save As gives the copy a new project identity and moves the working copy with it, so recovery follows the file; the previous file keeps its last saved state.
+
+Outside changes: the app records each file's size, modified time and content hash when it reads or writes it. Before every write it checks again; if the content changed (identical rewrites by sync tools do not count), our version is written to `<name> (conflict YYYY-MM-DD HH.MM UTC).cirth` beside it, the other version is left untouched, and editing continues in the conflict copy. A missing file is written again. The UI warns as soon as it notices (window focus, autosave tick).
+
 Implemented in M1 (2026-10-26):
 - The package is written on Save, on Home, on window close (the close handler flushes pending edits first; if saving fails the window stays open once and says so), and by autosave every 60 s when the store has moved past the last file save. A Rust exit hook saves again as a safety net. The working copy remains the crash-recovery journal.
 - Package replacement is crash-safe: Windows `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`; Unix `rename` plus a directory fsync (`cirth-core/src/fsutil.rs`).

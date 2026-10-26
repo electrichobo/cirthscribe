@@ -13,7 +13,9 @@ M1 progress:
 
 - 2 Schema v2 and migrations: older project files are upgraded on open, with the untouched original kept in backups; Home flags older files.
 
-Next: file dialogs (Open/Save As anywhere), outside-change detection, then the macOS manual pass and the real-IME checklist on test machines.
+- 2 Files anywhere: Open and Save As through native dialogs; recent files on Home; outside changes never overwritten (conflict copy beside the file).
+
+Next: native menus and shortcuts, restore-from-backup in the UI, then editor completeness (find/replace, autocomplete, word counts, spell check), then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

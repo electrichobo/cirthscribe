@@ -38,9 +38,76 @@ pub fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::File::open(dir)?.sync_all()
 }
 
+/// What a file looked like when we last read or wrote it, to detect changes
+/// made outside CirthScribe (sync tools, other programs, a copy pasted over
+/// it). Size and modified time are a fast first check; the content hash
+/// decides, so a rewrite with identical bytes is not a change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileStamp {
+    pub len: u64,
+    pub modified_ns: u128,
+    pub hash: u64,
+}
+
+/// FNV-1a 64-bit: a fast non-cryptographic content fingerprint.
+pub fn fnv1a(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+fn modified_ns(meta: &std::fs::Metadata) -> u128 {
+    meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0)
+}
+
+impl FileStamp {
+    pub fn of(path: &Path) -> io::Result<FileStamp> {
+        let bytes = std::fs::read(path)?;
+        let meta = std::fs::metadata(path)?;
+        Ok(FileStamp { len: bytes.len() as u64, modified_ns: modified_ns(&meta), hash: fnv1a(&bytes) })
+    }
+
+    /// Has the file at `path` changed since this stamp? A missing file counts
+    /// as changed.
+    pub fn changed(&self, path: &Path) -> io::Result<bool> {
+        let meta = match std::fs::metadata(path) {
+            Ok(m) => m,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(true),
+            Err(e) => return Err(e),
+        };
+        if meta.len() == self.len && modified_ns(&meta) == self.modified_ns {
+            return Ok(false);
+        }
+        Ok(fnv1a(&std::fs::read(path)?) != self.hash)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_stamp_detects_content_changes_not_touches() {
+        let d = std::env::temp_dir().join(format!("cirth-stamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let p = d.join("p.cirth");
+        std::fs::write(&p, b"version one").unwrap();
+        let s = FileStamp::of(&p).unwrap();
+        assert!(!s.changed(&p).unwrap());
+        // Same bytes rewritten later (sync tools do this): not a change.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(&p, b"version one").unwrap();
+        assert!(!s.changed(&p).unwrap());
+        // Same length, different bytes: a change.
+        std::fs::write(&p, b"version two").unwrap();
+        assert!(s.changed(&p).unwrap());
+        std::fs::remove_file(&p).unwrap();
+        assert!(s.changed(&p).unwrap(), "a deleted file counts as changed");
+    }
 
     #[test]
     fn replaces_existing_file_and_leaves_no_temp() {

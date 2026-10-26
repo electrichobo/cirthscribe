@@ -376,10 +376,11 @@ impl Store {
 
     /// Like `save_package`, but first copies the current package into the
     /// backup folder when the policy calls for it (`force` = explicit Save).
-    pub fn save_package_with_backup(&self, dest: &Path, policy: Option<&crate::backup::BackupPolicy>, now: std::time::SystemTime, force: bool) -> Result<u64> {
-        if let Some(policy) = policy {
+    /// `backup` is the policy and the name backups of this file go under.
+    pub fn save_package_with_backup(&self, dest: &Path, backup: Option<(&crate::backup::BackupPolicy, &str)>, now: std::time::SystemTime, force: bool) -> Result<u64> {
+        if let Some((policy, name)) = backup {
             let current = if dest.exists() { Store::inspect(dest).map(|i| i.saved_version).unwrap_or(0) } else { 0 };
-            crate::backup::before_replace(dest, current, policy, now, force)?;
+            crate::backup::before_replace(dest, name, current, policy, now, force)?;
         }
         let version = self.version()?;
         let tmp = dest.with_extension("cirth.tmp");
@@ -458,6 +459,27 @@ impl Store {
         })
     }
 
+    /// Move this working store to `to` (Save As, conflict copy): close the
+    /// connection (checkpointing the WAL), move the files, reopen with the lock.
+    pub fn relocate(&mut self, to: &Path) -> Result<()> {
+        let old = std::mem::replace(&mut self.conn, Connection::open_in_memory()?);
+        old.close().map_err(|(_, e)| StoreError::from(e))?;
+        move_store_files(&self.path, to)?;
+        *self = Store::open(to)?;
+        Ok(())
+    }
+
+    pub fn project_id(&self) -> Result<Id> {
+        Ok(self.meta("project_id")?.unwrap_or_default())
+    }
+
+    /// Change the project's identity. Save As gives the copy a new one, so
+    /// two copies never share recovery files; it restores the old id if the
+    /// save fails.
+    pub fn set_project_id(&self, id: &str) -> Result<()> {
+        Self::set_meta(&self.conn, "project_id", id)
+    }
+
     pub fn integrity_ok(&self) -> Result<bool> {
         let ok: String = self.conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
         Ok(ok == "ok")
@@ -510,6 +532,18 @@ pub struct PackageInfo {
     pub saved_version: u64,
     pub blocks: u64,
     pub scenes: u64,
+}
+
+/// Move a closed working store (and any WAL/SHM files) to a new path.
+pub fn move_store_files(from: &Path, to: &Path) -> Result<()> {
+    remove_store_files(to)?;
+    for suffix in ["", "-wal", "-shm"] {
+        let src = PathBuf::from(format!("{}{suffix}", from.display()));
+        if src.exists() {
+            crate::fsutil::replace_file(&src, &PathBuf::from(format!("{}{suffix}", to.display())))?;
+        }
+    }
+    Ok(())
 }
 
 pub fn remove_store_files(work: &Path) -> Result<()> {

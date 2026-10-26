@@ -22,6 +22,17 @@ Build: `cargo test -p cirth-core`, `cd app && npm ci && npm run build`, `cargo b
 | M10 | Type a marker, wait for "Stored", Force Quit the app, reopen. | Recovery notice; the marker is present. |
 | M11 | Open a second copy of the app. | It reports the project is open elsewhere. |
 
+## 1b. Native Open and Save As dialogs (all platforms)
+
+The e2e suite calls the same open/save-as commands with a path; it cannot drive the OS dialogs. Check by hand on each OS:
+
+| # | Steps | Expected |
+| - | - | - |
+| D1 | Home, "Open a project file…" | System dialog filtered to `.cirth`; choosing a file opens it; Cancel does nothing. |
+| D2 | In a project, "Save As…", pick a new folder and name | The toolbar title stays; the file appears there; Home lists it with "Outside library". |
+| D3 | Save As over an existing `.cirth` | The dialog asks to confirm overwrite; after confirming, the old file is in the app's backups folder. |
+| D4 | Open a project from a synced folder (OneDrive, Dropbox, iCloud), edit it on another machine, then save here | "changed outside" warning; Save writes "(conflict …)" beside it; the synced version is untouched. |
+
 ## 2. Real input methods (all platforms)
 
 Automated IME coverage is simulated composition (DevTools, Windows only). Real IMEs need a test machine where adding input languages is allowed (not the owner's production machine).
