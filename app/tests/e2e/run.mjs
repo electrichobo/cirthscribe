@@ -30,6 +30,23 @@ const results = {
   measurements: {},
 };
 
+function writeResults() {
+  results.finished = new Date().toISOString();
+  mkdirSync(dirname(resolve(args.out)), { recursive: true });
+  // Keep results free of machine-specific temp paths.
+  writeFileSync(args.out, JSON.stringify(results, null, 2).split(tmpdir().replaceAll("\\", "\\\\")).join("<tmp>"));
+}
+
+// Whole-suite deadline: a hang becomes a readable failure naming the test.
+const deadlineMin = Number(args["deadline-min"] ?? 25);
+setTimeout(async () => {
+  results.tests.push({ name: "harness", ok: false, error: `deadline of ${deadlineMin} min reached during: ${results.current}` });
+  console.log(`FAIL harness: deadline of ${deadlineMin} min reached during "${results.current}"`);
+  writeResults();
+  await driver.shutdown().catch(() => {});
+  process.exit(1);
+}, deadlineMin * 60_000).unref();
+
 try {
   await runSuite({ driver, results, screensDir: args.screens && resolve(args.screens) });
 } catch (e) {
@@ -39,10 +56,7 @@ try {
   await driver.shutdown();
 }
 
-results.finished = new Date().toISOString();
-mkdirSync(dirname(resolve(args.out)), { recursive: true });
-// Keep results free of machine-specific temp paths.
-writeFileSync(args.out, JSON.stringify(results, null, 2).split(tmpdir().replaceAll("\\", "\\\\")).join("<tmp>"));
+writeResults();
 const ran = results.tests.filter((t) => !t.skipped);
 const failed = ran.filter((t) => !t.ok).length;
 const skipped = results.tests.length - ran.length;

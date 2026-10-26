@@ -71,6 +71,8 @@ export async function runSuite({ driver, results, screensDir }) {
 
   async function test(name, fn) {
     const t0 = performance.now();
+    results.current = name;
+    console.log(`RUN  ${name}`);
     try {
       const detail = await fn();
       results.tests.push({ name, ok: true, ms: Math.round(performance.now() - t0), detail });

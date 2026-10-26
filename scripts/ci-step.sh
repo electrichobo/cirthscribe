@@ -15,5 +15,12 @@ if [ "$status" -ne 0 ]; then
   body="${body//$'\r'/}"
   body="${body//$'\n'/'%0A'}"
   echo "::error title=${title}::${body}"
+else
+  # Test summaries (e.g. "webdriver on linux: 14/14 passed, 1 skipped") as a notice.
+  summary="$(grep -E '^(SKIP |.* passed, [0-9]+ skipped)' "$log" | head -n 20)"
+  if [ -n "$summary" ]; then
+    summary="${summary//$'\r'/}"
+    echo "::notice title=${title}::${summary//$'\n'/'%0A'}"
+  fi
 fi
 exit "$status"

@@ -52,17 +52,30 @@ export function createDriver({ exe, dataDir }) {
       const port = nextPort++;
       const child = spawn(exe, [], {
         env: { ...process.env, CIRTH_DATA_DIR: dataDir, WEBVIEW2_USER_DATA_FOLDER: join(dataDir, `wv-${label}-${port}`), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
-        stdio: "ignore",
+        stdio: ["ignore", "pipe", "pipe"],
       });
+      let output = "";
+      let exited = null;
+      child.stdout.on("data", (d) => (output += d));
+      child.stderr.on("data", (d) => (output += d));
+      child.on("exit", (code, signal) => (exited = { code, signal }));
       let c;
-      for (let i = 0; i < 100 && !c; i++) {
+      let lastError = "";
+      for (let i = 0; i < 150 && !c && !exited; i++) {
         try {
           const page = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === "page");
           if (page) c = connectWs(page.webSocketDebuggerUrl);
-        } catch {}
+        } catch (e) {
+          lastError = String(e?.cause?.code ?? e);
+        }
         if (!c) await sleep(200);
       }
-      if (!c) throw new Error("WebView2 debugging endpoint did not appear");
+      if (!c) {
+        hardKill(child.pid);
+        throw new Error(
+          `WebView2 debugging endpoint did not appear on port ${port}; app ${exited ? `exited (${JSON.stringify(exited)})` : "still running"}; last fetch error: ${lastError}; app output: ${output.slice(-1500) || "(none)"}`,
+        );
+      }
       const evaluate = async (expr) => {
         const r = await c.send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
         if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);

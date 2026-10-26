@@ -41,7 +41,8 @@ export function createDriver({ exe, dataDir, nativeDriverDir }) {
       drivers.push(driver);
       const base = `http://127.0.0.1:${port}`;
       const call = async (method, path, body) => {
-        const r = await fetch(base + path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+        // A hung driver call becomes a readable failure instead of a stuck job.
+        const r = await fetch(base + path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(90_000) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || j.value?.error) throw new Error(`${method} ${path}: ${JSON.stringify(j.value ?? j).slice(0, 400)}`);
         return j.value;

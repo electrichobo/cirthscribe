@@ -12,6 +12,11 @@ defaults:
   run:
     shell: bash
 
+# A newer push to the same branch cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 # Build and test steps go through scripts/ci-step.sh, which turns a failure's
 # output into an error annotation (visible without signing in to GitHub).
 
@@ -19,6 +24,7 @@ jobs:
   linux:
     name: Linux (WebKitGTK, WebDriver e2e)
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: System packages
@@ -43,6 +49,7 @@ jobs:
       - name: tauri-driver
         run: cargo install tauri-driver --locked
       - name: End-to-end (WebDriver)
+        timeout-minutes: 30
         working-directory: app
         run: ../scripts/ci-step.sh "End-to-end (Linux WebDriver)" xvfb-run -a node tests/e2e/run.mjs --driver webdriver --exe ../target/release/cirthscribe --out ../out/e2e-linux.json --screens ../out/screens-linux
       - uses: actions/upload-artifact@v4
@@ -55,6 +62,7 @@ jobs:
   windows:
     name: Windows (MSVC, WebView2, DevTools e2e)
     runs-on: windows-2025
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -78,7 +86,15 @@ jobs:
           $deps = & $dumpbin.FullName /dependents target\release\cirthscribe.exe | Select-String '\.dll' | ForEach-Object { $_.Line.Trim() }
           $deps
           "::notice title=MSVC binary imports::$($deps -join ', ')"
+      - name: WebView2 runtime on this runner
+        shell: pwsh
+        run: |
+          $keys = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $v = $keys | ForEach-Object { (Get-ItemProperty $_ -ErrorAction SilentlyContinue).pv } | Where-Object { $_ } | Select-Object -First 1
+          if (-not $v) { $v = 'not installed' }
+          "::notice title=WebView2 runtime::$v"
       - name: End-to-end (DevTools)
+        timeout-minutes: 30
         working-directory: app
         run: ../scripts/ci-step.sh "End-to-end (Windows DevTools)" node tests/e2e/run.mjs --driver cdp --exe ../target/release/cirthscribe.exe --out ../out/e2e-windows.json --screens ../out/screens-windows
       - uses: actions/upload-artifact@v4
@@ -91,6 +107,7 @@ jobs:
   macos:
     name: macOS (build and core tests; e2e is manual)
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
