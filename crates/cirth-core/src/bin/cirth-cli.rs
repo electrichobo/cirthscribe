@@ -46,6 +46,26 @@ fn main() {
                 map.warnings
             );
         }
+        // make-package <fixture.json> <out.cirth>: a project file from a fixture,
+        // with one beat per scene (used to freeze old-schema test files).
+        "make-package" => {
+            let f: fixtures::Fixture = serde_json::from_slice(&std::fs::read(arg(1)).unwrap()).unwrap();
+            let doc = f.to_document().unwrap();
+            let out = arg(2);
+            let work = out.with_extension("work.tmp");
+            cirth_core::store::remove_store_files(&work).unwrap();
+            let mut store = Store::open(&work).unwrap();
+            store.seed(&doc).unwrap();
+            for (i, sc) in doc.scenes().iter().enumerate() {
+                store
+                    .put_beat(&cirth_core::model::Beat { id: cirth_core::model::new_id(), summary: format!("Beat {} (authored)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
+                    .unwrap();
+            }
+            store.save_package(&out).unwrap();
+            drop(store);
+            cirth_core::store::remove_store_files(&work).unwrap();
+            println!("wrote {}", out.display());
+        }
         "pagemap" => {
             let f: fixtures::Fixture = serde_json::from_slice(&std::fs::read(arg(1)).unwrap()).unwrap();
             let doc = f.to_document().unwrap();

@@ -4,3 +4,4 @@
 *.png binary
 *.pdf binary
 *.ps1 text eol=crlf
+*.cirth binary

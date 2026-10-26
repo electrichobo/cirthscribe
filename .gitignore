@@ -10,3 +10,4 @@ node_modules/
 .env
 CLAUDE.local.md
 /app/src-tauri/gen/
+!/crates/cirth-core/tests/data/*.cirth
