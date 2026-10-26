@@ -30,12 +30,25 @@ Implemented in M1 (2026-10-26):
 
 Inline content is stored as runs (`text`, `bold`, `italic`, `underline`), so persisted data contains no character offsets. Where offsets are needed (page map, future anchors), Rust uses Unicode scalar values and the TypeScript boundary converts to UTF-16.
 
-## Proposed for M1 (schema v2)
+## Schema v2 (implemented in M1, 2026-10-26)
 
-- `documents` (id, kind, title, profile, parent container) and `containers` (acyclic tree); `blocks.document_id`.
-- `settings` (per project: profile, key cycles, structural-permission flag per document).
-- `free_writing` lives in a separate workspace database, not in projects.
-- `backups`: retained package copies with timestamps (files, listed in meta).
-- Migration framework: copy the package to `<name>.v1.bak.cirth` before migrating; migrations are numbered and tested with stored v1 fixtures.
+Added by migration `migrate_v2` (`cirth-core/src/store.rs`):
+
+| Table / column | Notes |
+| - | - |
+| `documents` | `id`, `kind` (`screenplay`), `title`, `profile` (`us-letter`), `container_id`, `pos`. A project holds one or more documents; the UI shows the default one until multi-document work (M3). |
+| `containers` | `id`, `parent_id`, `title`, `pos`: series/season/episode grouping. Acyclicity is enforced by the commands that will edit it (none yet). |
+| `settings` | `scope` (`project` or a document id), `key`, `value`. |
+| `blocks.document_id`, `beats.document_id` | Every block and beat belongs to a document. Ordering (`ord`) is per document. |
+| `meta.default_document` | The document the editor opens. |
+
+Rules:
+- Batches carry an optional `document_id` (none = default document). Anchors and targets must be in that document; moving blocks between documents is refused for now.
+- A new database is created at v1 and run through the same migrations as old files; a test checks that new and upgraded databases have identical tables and columns.
+- All pending migrations and the `user_version` update run in one transaction (a crash leaves the old schema; not crash-tested yet).
+- Opening an older package first copies it, untouched, to `backups/<name>--pre-schema-v2--<UTC time>Z--from-v1.cirth` (outside rotation, never pruned; an identical copy is reused). The upgrade happens in the working copy; the `.cirth` file stays old until the next save. Home marks such files "Older format".
+- Tests use real v1 files frozen before the change (`crates/cirth-core/tests/data/schema-v1-*.cirth`).
+
+Still proposed: `free_writing` in a separate workspace database, not in projects.
 
 Comment anchors, revisions, page baselines, branches and alternatives get their tables with the milestones that need them; their id and anchor rules (block id + scalar offset + affinity, original quote kept) are fixed now so M1 data stays compatible.

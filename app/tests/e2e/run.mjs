@@ -48,7 +48,7 @@ setTimeout(async () => {
 }, deadlineMin * 60_000).unref();
 
 try {
-  await runSuite({ driver, results, screensDir: args.screens && resolve(args.screens) });
+  await runSuite({ driver, results, dataDir, screensDir: args.screens && resolve(args.screens) });
 } catch (e) {
   results.tests.push({ name: "harness", ok: false, error: String(e?.stack ?? e) });
   console.log(`FAIL harness: ${e}`);

@@ -4,11 +4,14 @@
 // honestly throw Skip with the reason; skips are reported, never counted as
 // passes.
 
-import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { writeFileSync, mkdirSync, copyFileSync, readdirSync, readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repo = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 import { MOD_KEY, Skip, clipboardTool, sleep } from "./platform.mjs";
 
-export async function runSuite({ driver, results, screensDir }) {
+export async function runSuite({ driver, results, dataDir, screensDir }) {
   const text = (b) => b.runs.map((r) => r.text).join("");
   const assert = (cond, msg) => {
     if (!cond) throw new Error(msg);
@@ -145,6 +148,38 @@ export async function runSuite({ driver, results, screensDir }) {
     await waitHome(app);
     await screenshot(app, "home");
     return { projects: await app.evaluate("[...document.querySelectorAll('#home [data-project]')].map(b => b.dataset.project)") };
+  });
+
+  await test("Older project file (schema v1): flagged on Home, upgraded on open, original kept", async () => {
+    const v1 = join(repo, "crates", "cirth-core", "tests", "data", "schema-v1-page-boundaries.cirth");
+    const target = join(dataDir, "projects", "legacy-draft.cirth");
+    copyFileSync(v1, target);
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    const card = await app.evaluate(`document.querySelector('#home [data-project="legacy-draft"]').textContent`);
+    assert(/Older format \(v1\)/.test(card) && /4 scenes · 20 blocks/.test(card), `card '${card}'`);
+    await clickHome(app, '[data-project="legacy-draft"]');
+    await waitOpen(app);
+    const lo = await app.evaluate("__cirth.lastOpen");
+    assert(lo.migrated_from === 1 && lo.pre_migration_backup, `migration info ${JSON.stringify({ m: lo.migrated_from, b: lo.pre_migration_backup })}`);
+    const banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(/Upgraded this project from file format 1/.test(banner), `banner '${banner}'`);
+    const b = await blocks();
+    assert(b.length === 20 && b.filter((x) => x.scene_id).length === 4, `content ${b.length} blocks`);
+    assert(await app.evaluate("__cirth.board.beats.length") === 4, "beats kept");
+    // The original sits in backups, byte for byte.
+    const kept = readdirSync(join(dataDir, "backups")).filter((n) => n.startsWith("legacy-draft--pre-schema-v"));
+    assert(kept.length === 1, `pre-migration copies ${kept}`);
+    assert(Buffer.compare(readFileSync(join(dataDir, "backups", kept[0])), readFileSync(v1)) === 0, "kept copy is identical to the original");
+    await screenshot(app, "upgraded-v1");
+    // Edit, go Home (saves): the file is now current-format.
+    await caretAtEndOf(b.length - 1);
+    await typeText(" Upgraded.");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    const after = await app.evaluate(`document.querySelector('#home [data-project="legacy-draft"]').textContent`);
+    assert(!/Older format/.test(after), `after save '${after}'`);
+    return { kept: kept[0], banner };
   });
 
   await test("Tab/Enter: default cycle, no inserted spaces, one-step undo", async () => {

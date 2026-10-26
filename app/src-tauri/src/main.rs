@@ -35,6 +35,10 @@ struct Opened {
     doc: Document,
     beats: Vec<Beat>,
     recovered: bool,
+    /// Upgraded from this older schema when opened.
+    migrated_from: Option<i64>,
+    /// Untouched copy of the older-format file, kept before upgrading.
+    pre_migration_backup: Option<String>,
     saved_version: u64,
     work_path: String,
     package_path: String,
@@ -66,12 +70,14 @@ fn paths(app: &App, name: &str) -> (PathBuf, PathBuf) {
     (dir.join("work").join(format!("{name}.work.db")), dir.join("projects").join(format!("{name}.cirth")))
 }
 
-fn opened(s: &Session, recovered: bool, t0: Instant) -> Result<Opened, String> {
+fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migration_backup: Option<PathBuf>, t0: Instant) -> Result<Opened, String> {
     Ok(Opened {
         name: s.name.clone(),
         doc: s.store.load().map_err(err)?,
         beats: s.store.beats().map_err(err)?,
         recovered,
+        migrated_from,
+        pre_migration_backup: pre_migration_backup.map(|p| p.display().to_string()),
         saved_version: s.store.saved_version().map_err(err)?,
         work_path: s.store.path().display().to_string(),
         package_path: s.package.display().to_string(),
@@ -91,9 +97,9 @@ async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<
     std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(package.parent().unwrap()).map_err(|e| e.to_string())?;
     if package.exists() && !reset {
-        let (store, recovered) = Store::open_package(&package, &work).map_err(err)?;
-        let s = Session { name, store, package };
-        let out = opened(&s, recovered, t0)?;
+        let o = Store::open_package(&package, &work, Some(&backup_policy(&app).dir)).map_err(err)?;
+        let s = Session { name, store: o.store, package };
+        let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
         *guard = Some(s);
         return Ok(out);
     }
@@ -110,7 +116,7 @@ async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<
     }
     store.save_package(&package).map_err(err)?;
     let s = Session { name, store, package };
-    let out = opened(&s, false, t0)?;
+    let out = opened(&s, false, None, None, t0)?;
     *guard = Some(s);
     Ok(out)
 }
@@ -130,6 +136,9 @@ struct ProjectEntry {
     /// The working store holds commits newer than the last package save.
     recoverable: bool,
     backups: usize,
+    /// Schema of the file; older ones are upgraded (with a kept copy) when opened.
+    schema: i64,
+    older_format: bool,
     /// Open in this window right now.
     open: bool,
     error: Option<String>,
@@ -157,11 +166,13 @@ async fn list_projects(app: State<'_, App>) -> Result<Vec<ProjectEntry>, String>
             .unwrap_or(0);
         let open = current.as_deref() == Some(name.as_str());
         let (work, _) = paths(&app, &name);
-        let mut e = ProjectEntry { sample: SAMPLES.contains(&name.as_str()), name, title: String::new(), modified_ms, blocks: 0, scenes: 0, saved_version: 0, recoverable: false, backups: 0, open, error: None };
+        let mut e = ProjectEntry { sample: SAMPLES.contains(&name.as_str()), name, title: String::new(), modified_ms, blocks: 0, scenes: 0, saved_version: 0, recoverable: false, backups: 0, schema: 0, older_format: false, open, error: None };
         e.backups = cirth_core::backup::list(&backup_policy(&app).dir, &e.name).len();
         match Store::inspect(&path) {
             Ok(info) => {
                 e.title = info.title;
+                e.schema = info.schema;
+                e.older_format = info.schema < cirth_core::store::SCHEMA_VERSION;
                 e.blocks = info.blocks;
                 e.scenes = info.scenes;
                 e.saved_version = info.saved_version;
@@ -213,7 +224,7 @@ async fn create_project(app: State<'_, App>, title: String) -> Result<Opened, St
     store.seed(&doc).map_err(err)?;
     store.save_package(&package).map_err(err)?;
     let s = Session { name, store, package };
-    let out = opened(&s, false, t0)?;
+    let out = opened(&s, false, None, None, t0)?;
     *guard = Some(s);
     Ok(out)
 }
@@ -229,9 +240,9 @@ async fn open_project(app: State<'_, App>, name: String) -> Result<Opened, Strin
         return Err(format!("project {name} is not in the library"));
     }
     std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
-    let (store, recovered) = Store::open_package(&package, &work).map_err(err)?;
-    let s = Session { name, store, package };
-    let out = opened(&s, recovered, t0)?;
+    let o = Store::open_package(&package, &work, Some(&backup_policy(&app).dir)).map_err(err)?;
+    let s = Session { name, store: o.store, package };
+    let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
     *guard = Some(s);
     Ok(out)
 }

@@ -11,7 +11,9 @@ M1 progress:
 - 2 Home screen (project library) at startup: lists projects in the app's library folder with scene/block counts, modified time, backup count and a recovery badge; creates projects (titles never overwrite an existing file); opens samples; the toolbar's Home button saves and closes the project. Opening files from elsewhere on disk (file dialogs) is not built yet.
 - 2 Saving: the project file autosaves every 60 s and on window close; rolling backups (20 kept); crash-safe file replacement. No restore-from-backup UI yet.
 
-Next: schema v2 and migrations, file dialogs (Open/Save As anywhere), outside-change detection, then the macOS manual pass and the real-IME checklist on test machines.
+- 2 Schema v2 and migrations: older project files are upgraded on open, with the untouched original kept in backups; Home flags older files.
+
+Next: file dialogs (Open/Save As anywhere), outside-change detection, then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

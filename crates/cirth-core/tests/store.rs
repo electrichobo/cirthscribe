@@ -14,7 +14,7 @@ fn tmpdir(name: &str) -> PathBuf {
 }
 
 fn batch(base: u64, ops: Vec<Op>) -> Batch {
-    Batch { tx_id: cirth_core::model::new_id(), base_version: base, ops }
+    Batch { tx_id: cirth_core::model::new_id(), base_version: base, document_id: None, ops }
 }
 
 #[test]
@@ -172,14 +172,16 @@ fn package_save_is_atomic_and_reopen_detects_recovery() {
         // Dropped here without saving: simulates closing after a crash.
     }
     // Reopen through the package: the working store has newer commits, so it wins.
-    let (s, recovered) = Store::open_package(&pkg, &work).unwrap();
+    let o = Store::open_package(&pkg, &work, None).unwrap();
+    let (s, recovered) = (o.store, o.recovered);
     assert!(recovered);
     assert_eq!(s.load().unwrap().blocks[0].text(), "unsaved at crash");
     assert_eq!(s.beats().unwrap().len(), 1);
     drop(s);
     // Without a newer working store, the package opens as saved.
     cirth_core::store::remove_store_files(&work).unwrap();
-    let (s, recovered) = Store::open_package(&pkg, &work).unwrap();
+    let o = Store::open_package(&pkg, &work, None).unwrap();
+    let (s, recovered) = (o.store, o.recovered);
     assert!(!recovered);
     let back = s.load().unwrap();
     assert_eq!(back.version, 2);

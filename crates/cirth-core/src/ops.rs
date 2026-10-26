@@ -20,6 +20,9 @@ pub struct Batch {
     /// Client-chosen id; resubmitting the same batch is a no-op.
     pub tx_id: String,
     pub base_version: u64,
+    /// Document the ops apply to; None = the project's default document.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document_id: Option<Id>,
     pub ops: Vec<Op>,
 }
 

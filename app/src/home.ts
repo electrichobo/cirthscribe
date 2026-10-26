@@ -14,6 +14,8 @@ export interface ProjectEntry {
   saved_version: number;
   recoverable: boolean;
   backups: number;
+  schema: number;
+  older_format: boolean;
   open: boolean;
   error: string | null;
 }
@@ -100,6 +102,7 @@ export function createHome(root: HTMLElement, actions: Actions) {
     const badges = el("div", { className: "badges" });
     if (p.sample) badges.append(el("span", { className: "tag" }, "Sample"));
     if (p.recoverable) badges.append(el("span", { className: "tag warn" }, "Unsaved work will be recovered"));
+    if (p.older_format) badges.append(el("span", { className: "tag", title: "Upgraded when opened; the original file is kept as a backup" }, `Older format (v${p.schema})`));
     if (p.open) badges.append(el("span", { className: "tag" }, "Open"));
     if (p.error) badges.append(el("span", { className: "tag bad" }, "Cannot read"));
     const b = el(

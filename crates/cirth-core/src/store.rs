@@ -8,13 +8,20 @@
 //! A portable package (`.cirth`) is a consistent snapshot made with
 //! `VACUUM INTO` a temp file, flushed, then renamed over the target. A
 //! failed or interrupted package write leaves the previous package intact.
+//!
+//! Schema versions: a new database is created at v1 (`SCHEMA_V1`, frozen)
+//! and brought forward by the same numbered migrations that upgrade old
+//! files, so new and upgraded projects cannot drift apart. All pending
+//! migrations run in one transaction together with the `user_version`
+//! update: a crash leaves the old schema intact. Opening an older package
+//! first copies the untouched original into the backup folder.
 
 use crate::model::{Beat, Block, BlockKind, Document, Id, Run};
 use crate::ops::{Ack, Batch, Op};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Debug)]
 pub enum StoreError {
@@ -65,9 +72,11 @@ pub type Result<T> = std::result::Result<T, StoreError>;
 pub struct Store {
     conn: Connection,
     path: PathBuf,
+    migrated_from: Option<i64>,
 }
 
-const SCHEMA: &str = "
+/// Schema v1 exactly as shipped in M0. Frozen: never edit, add a migration.
+const SCHEMA_V1: &str = "
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE blocks (
   id TEXT PRIMARY KEY,
@@ -98,25 +107,142 @@ CREATE TABLE oplog (
 );
 ";
 
+/// v1 -> v2: documents (a project can hold several), a container tree for
+/// series/season/episode grouping, per-project and per-document settings.
+/// Every existing block and beat moves into one default document titled
+/// like the project. Ids, order, text and history are unchanged.
+fn migrate_v2(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "
+        CREATE TABLE containers (
+          id TEXT PRIMARY KEY,
+          parent_id TEXT REFERENCES containers(id),
+          title TEXT NOT NULL,
+          pos REAL NOT NULL
+        );
+        CREATE TABLE documents (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          title TEXT NOT NULL,
+          profile TEXT NOT NULL,
+          container_id TEXT REFERENCES containers(id),
+          pos REAL NOT NULL
+        );
+        CREATE TABLE settings (
+          scope TEXT NOT NULL,
+          key TEXT NOT NULL,
+          value TEXT NOT NULL,
+          PRIMARY KEY (scope, key)
+        );
+        ALTER TABLE blocks ADD COLUMN document_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE beats ADD COLUMN document_id TEXT NOT NULL DEFAULT '';
+        CREATE INDEX blocks_doc_ord ON blocks(document_id, ord);
+        ",
+    )?;
+    let doc = crate::model::new_id();
+    let title: String = tx.query_row("SELECT value FROM meta WHERE key = 'title'", [], |r| r.get(0)).optional()?.unwrap_or_else(|| "Untitled".into());
+    tx.execute("INSERT INTO documents(id, kind, title, profile, container_id, pos) VALUES (?1, 'screenplay', ?2, 'us-letter', NULL, 0)", params![doc, title])?;
+    tx.execute("UPDATE blocks SET document_id = ?1", [&doc])?;
+    tx.execute("UPDATE beats SET document_id = ?1", [&doc])?;
+    tx.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('default_document', ?1)", [&doc])?;
+    Ok(())
+}
+
+type Migration = fn(&Transaction) -> Result<()>;
+
+/// (target version, step). Append only; never edit a shipped step.
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2)];
+
+/// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
+fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
+    let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    for (to, step) in MIGRATIONS.iter().filter(|(to, _)| *to > from) {
+        step(&tx)?;
+        tx.pragma_update(None, "user_version", to)?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Schema version of a database file, read without taking any lock.
+pub fn schema_of(path: &Path) -> Result<i64> {
+    let c = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    Ok(c.pragma_query_value(None, "user_version", |r| r.get(0))?)
+}
+
+/// Result of opening a package for editing.
+pub struct OpenedPackage {
+    pub store: Store,
+    /// Unsaved commits from an earlier session were recovered.
+    pub recovered: bool,
+    /// The project was in an older format and was upgraded in the working copy.
+    pub migrated_from: Option<i64>,
+    /// Untouched copy of the older-format package, kept before upgrading.
+    pub pre_migration_backup: Option<PathBuf>,
+}
+
 impl Store {
-    /// Open or create a working store and take the exclusive writer lock.
+    /// Open or create a working store, upgrade its schema if it is older,
+    /// and take the exclusive writer lock.
     pub fn open(path: &Path) -> Result<Store> {
-        let conn = Connection::open(path)?;
+        let mut conn = Connection::open(path)?;
         conn.busy_timeout(std::time::Duration::from_millis(0))?;
         conn.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
-        let user_version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        let mut user_version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
         if user_version > SCHEMA_VERSION {
             return Err(StoreError::FutureSchema(user_version));
         }
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "FULL")?;
+        let mut migrated_from = None;
         if user_version == 0 {
-            conn.execute_batch(&format!("BEGIN; {SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;"))?;
+            conn.execute_batch(&format!("BEGIN; {SCHEMA_V1} PRAGMA user_version = 1;"))?;
             conn.execute("INSERT INTO meta(key, value) VALUES ('version', '0'), ('saved_version', '0'), ('title', 'Untitled'), ('project_id', ?1)", [crate::model::new_id()])?;
+            conn.execute_batch("COMMIT;")?;
+            user_version = 1;
+        } else if user_version < SCHEMA_VERSION {
+            migrated_from = Some(user_version);
+        }
+        if user_version < SCHEMA_VERSION {
+            migrate(&mut conn, user_version)?;
         }
         // A write now takes and keeps the exclusive lock.
         conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('opened_at', strftime('%Y-%m-%dT%H:%M:%fZ','now'))", [])?;
-        Ok(Store { conn, path: path.to_path_buf() })
+        Ok(Store { conn, path: path.to_path_buf(), migrated_from })
+    }
+
+    /// Schema version this store was upgraded from when it was opened.
+    pub fn migrated_from(&self) -> Option<i64> {
+        self.migrated_from
+    }
+
+    pub fn default_document(&self) -> Result<Id> {
+        self.meta("default_document")?.ok_or_else(|| StoreError::Invalid("project has no default document".into()))
+    }
+
+    /// Add an empty document (for multi-document projects; no UI yet).
+    pub fn create_document(&self, title: &str) -> Result<Id> {
+        let id = crate::model::new_id();
+        self.conn.execute(
+            "INSERT INTO documents(id, kind, title, profile, container_id, pos) VALUES (?1, 'screenplay', ?2, 'us-letter', NULL, (SELECT COALESCE(MAX(pos), 0) + 1 FROM documents))",
+            params![id, title],
+        )?;
+        Ok(id)
+    }
+
+    pub fn documents(&self) -> Result<Vec<(Id, String)>> {
+        let mut stmt = self.conn.prepare("SELECT id, title FROM documents ORDER BY pos")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn setting(&self, scope: &str, key: &str) -> Result<Option<String>> {
+        Ok(self.conn.query_row("SELECT value FROM settings WHERE scope = ?1 AND key = ?2", [scope, key], |r| r.get(0)).optional()?)
+    }
+
+    pub fn set_setting(&self, scope: &str, key: &str, value: &str) -> Result<()> {
+        self.conn.execute("INSERT OR REPLACE INTO settings(scope, key, value) VALUES (?1, ?2, ?3)", params![scope, key, value])?;
+        Ok(())
     }
 
     pub fn path(&self) -> &Path {
@@ -146,14 +272,23 @@ impl Store {
         Ok(self.version()? > self.saved_version()?)
     }
 
+    /// Project title (also the default document's title while projects hold
+    /// one document in the UI).
     pub fn set_title(&self, title: &str) -> Result<()> {
-        Self::set_meta(&self.conn, "title", title)
+        Self::set_meta(&self.conn, "title", title)?;
+        self.conn.execute("UPDATE documents SET title = ?1 WHERE id = (SELECT value FROM meta WHERE key = 'default_document')", [title])?;
+        Ok(())
     }
 
+    /// The project's default document (the one the editor shows today).
     pub fn load(&self) -> Result<Document> {
-        let mut stmt = self.conn.prepare("SELECT id, kind, runs, scene_id, dual, break_before FROM blocks ORDER BY ord")?;
+        self.load_document(&self.default_document()?)
+    }
+
+    pub fn load_document(&self, document_id: &str) -> Result<Document> {
+        let mut stmt = self.conn.prepare("SELECT id, kind, runs, scene_id, dual, break_before FROM blocks WHERE document_id = ?1 ORDER BY ord")?;
         let blocks = stmt
-            .query_map([], |r| {
+            .query_map([document_id], |r| {
                 let kind: String = r.get(1)?;
                 let runs: String = r.get(2)?;
                 Ok(Block {
@@ -185,7 +320,7 @@ impl Store {
         }
         self.set_title(&doc.title)?;
         let base = self.version()?;
-        self.apply(&Batch { tx_id: crate::model::new_id(), base_version: base, ops })
+        self.apply(&Batch { tx_id: crate::model::new_id(), base_version: base, document_id: None, ops })
     }
 
     pub fn apply(&mut self, batch: &Batch) -> Result<Ack> {
@@ -197,9 +332,16 @@ impl Store {
         if batch.base_version != current {
             return Err(StoreError::Stale { base: batch.base_version, current });
         }
+        let doc = match &batch.document_id {
+            Some(d) => d.clone(),
+            None => tx.query_row("SELECT value FROM meta WHERE key = 'default_document'", [], |r| r.get::<_, String>(0))?,
+        };
+        if tx.query_row("SELECT 1 FROM documents WHERE id = ?1", [&doc], |_| Ok(())).optional()?.is_none() {
+            return Err(StoreError::Invalid(format!("unknown document {doc}")));
+        }
         let next = current + 1;
         for op in &batch.ops {
-            apply_op(&tx, op, next)?;
+            apply_op(&tx, &doc, op, next)?;
         }
         Self::set_meta(&tx, "version", &next.to_string())?;
         tx.execute(
@@ -221,7 +363,7 @@ impl Store {
     /// Planning edits. They never touch script text or script order.
     pub fn put_beat(&self, beat: &Beat) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO beats(id, summary, scene_id, pos) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO beats(id, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, (SELECT value FROM meta WHERE key = 'default_document'))",
             params![beat.id, beat.summary, beat.scene_id, beat.pos],
         )?;
         Ok(())
@@ -262,8 +404,18 @@ impl Store {
 
     /// Start a working store from a package. If a working store for the same
     /// project already holds unsaved commits, it is kept (recovery) and the
-    /// package is not copied over it.
-    pub fn open_package(pkg: &Path, work: &Path) -> Result<(Store, bool)> {
+    /// package is not copied over it. An older-format package is copied,
+    /// untouched, into `backup_dir` before anything is upgraded; the package
+    /// file itself stays old until the next save.
+    pub fn open_package(pkg: &Path, work: &Path, backup_dir: Option<&Path>) -> Result<OpenedPackage> {
+        let pkg_schema = schema_of(pkg)?;
+        if pkg_schema > SCHEMA_VERSION {
+            return Err(StoreError::FutureSchema(pkg_schema));
+        }
+        let pre_migration_backup = match backup_dir {
+            Some(dir) if pkg_schema < SCHEMA_VERSION => Some(keep_pre_migration_copy(pkg, pkg_schema, dir)?),
+            _ => None,
+        };
         if work.exists() {
             let candidate = Store::open(work)?;
             let same_project = {
@@ -272,20 +424,16 @@ impl Store {
                 pid == candidate.meta("project_id")?
             };
             if same_project && candidate.has_unsaved_work()? {
-                return Ok((candidate, true));
+                let migrated_from = candidate.migrated_from.or((pkg_schema < SCHEMA_VERSION).then_some(pkg_schema));
+                return Ok(OpenedPackage { store: candidate, recovered: true, migrated_from, pre_migration_backup });
             }
             drop(candidate);
             remove_store_files(work)?;
         }
-        {
-            let p = Connection::open_with_flags(pkg, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-            let v: i64 = p.pragma_query_value(None, "user_version", |r| r.get(0))?;
-            if v > SCHEMA_VERSION {
-                return Err(StoreError::FutureSchema(v));
-            }
-        }
         std::fs::copy(pkg, work)?;
-        Ok((Store::open(work)?, false))
+        let store = Store::open(work)?;
+        let migrated_from = store.migrated_from;
+        Ok(OpenedPackage { store, recovered: false, migrated_from, pre_migration_backup })
     }
 
     /// Summary of a project file without opening it for writing. Fails with
@@ -300,6 +448,7 @@ impl Store {
         }
         let meta = |k: &str| -> Result<String> { Ok(c.query_row("SELECT value FROM meta WHERE key = ?1", [k], |r| r.get(0)).optional()?.unwrap_or_default()) };
         Ok(PackageInfo {
+            schema,
             project_id: meta("project_id")?,
             title: meta("title")?,
             version: meta("version")?.parse().unwrap_or(0),
@@ -327,8 +476,34 @@ impl Store {
     }
 }
 
+/// Copy an older-format package into `dir` before upgrading, as
+/// `<stem>--pre-schema-v<new>--<UTC time>Z--from-v<old>.cirth`. These copies
+/// are outside backup rotation (never pruned). An identical copy already
+/// there is reused instead of duplicated.
+fn keep_pre_migration_copy(pkg: &Path, from: i64, dir: &Path) -> Result<PathBuf> {
+    std::fs::create_dir_all(dir)?;
+    let stem = pkg.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let prefix = format!("{stem}--pre-schema-v{SCHEMA_VERSION}--");
+    let bytes = std::fs::read(pkg)?;
+    for e in std::fs::read_dir(dir)?.flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        if name.starts_with(&prefix) && name.ends_with(".cirth") && std::fs::read(e.path())? == bytes {
+            return Ok(e.path());
+        }
+    }
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let target = dir.join(format!("{prefix}{}Z--from-v{from}.cirth", crate::backup::utc_stamp(now)));
+    let tmp = target.with_extension("cirth.tmp");
+    std::fs::write(&tmp, &bytes)?;
+    crate::fsutil::sync_file(&tmp)?;
+    crate::fsutil::replace_file(&tmp, &target)?;
+    Ok(target)
+}
+
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct PackageInfo {
+    /// Schema version of the file (older ones are upgraded when opened).
+    pub schema: i64,
     pub project_id: String,
     pub title: String,
     pub version: u64,
@@ -355,19 +530,24 @@ fn check_scene_attr(b: &Block) -> Result<()> {
     }
 }
 
-fn ord_of(tx: &Connection, id: &str) -> Result<Option<f64>> {
-    Ok(tx.query_row("SELECT ord FROM blocks WHERE id = ?1", [id], |r| r.get(0)).optional()?)
+/// Document a block belongs to, if it exists.
+fn block_document(tx: &Connection, id: &str) -> Result<Option<String>> {
+    Ok(tx.query_row("SELECT document_id FROM blocks WHERE id = ?1", [id], |r| r.get(0)).optional()?)
 }
 
-fn ord_after(tx: &Connection, after: Option<&str>, moving: &str) -> Result<f64> {
+fn ord_of(tx: &Connection, doc: &str, id: &str) -> Result<Option<f64>> {
+    Ok(tx.query_row("SELECT ord FROM blocks WHERE id = ?1 AND document_id = ?2", [id, doc], |r| r.get(0)).optional()?)
+}
+
+fn ord_after(tx: &Connection, doc: &str, after: Option<&str>, moving: &str) -> Result<f64> {
     let lo = match after {
-        Some(a) => ord_of(tx, a)?.ok_or_else(|| StoreError::Invalid(format!("unknown anchor block {a}")))?,
+        Some(a) => ord_of(tx, doc, a)?.ok_or_else(|| StoreError::Invalid(format!("unknown anchor block {a} in this document")))?,
         None => f64::NEG_INFINITY,
     };
     let hi: Option<f64> = if lo.is_finite() {
-        tx.query_row("SELECT MIN(ord) FROM blocks WHERE ord > ?1 AND id <> ?2", params![lo, moving], |r| r.get(0))?
+        tx.query_row("SELECT MIN(ord) FROM blocks WHERE document_id = ?1 AND ord > ?2 AND id <> ?3", params![doc, lo, moving], |r| r.get(0))?
     } else {
-        tx.query_row("SELECT MIN(ord) FROM blocks WHERE id <> ?1", [moving], |r| r.get(0))?
+        tx.query_row("SELECT MIN(ord) FROM blocks WHERE document_id = ?1 AND id <> ?2", params![doc, moving], |r| r.get(0))?
     };
     let pos = match (lo.is_finite(), hi) {
         (false, None) => 0.0,
@@ -376,16 +556,16 @@ fn ord_after(tx: &Connection, after: Option<&str>, moving: &str) -> Result<f64> 
         (true, Some(h)) => (lo + h) / 2.0,
     };
     if lo.is_finite() && hi.is_some_and(|h| h - lo < 1e-9) {
-        renumber(tx)?;
-        return ord_after(tx, after, moving);
+        renumber(tx, doc)?;
+        return ord_after(tx, doc, after, moving);
     }
     Ok(pos)
 }
 
-fn renumber(tx: &Connection) -> Result<()> {
+fn renumber(tx: &Connection, doc: &str) -> Result<()> {
     let ids: Vec<String> = tx
-        .prepare("SELECT id FROM blocks ORDER BY ord")?
-        .query_map([], |r| r.get(0))?
+        .prepare("SELECT id FROM blocks WHERE document_id = ?1 ORDER BY ord")?
+        .query_map([doc], |r| r.get(0))?
         .collect::<std::result::Result<_, _>>()?;
     for (i, id) in ids.iter().enumerate() {
         tx.execute("UPDATE blocks SET ord = ?1 WHERE id = ?2", params![i as f64, id])?;
@@ -393,7 +573,7 @@ fn renumber(tx: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn write_block(tx: &Connection, b: &Block, ord: f64, version: u64) -> Result<()> {
+fn write_block(tx: &Connection, doc: &str, b: &Block, ord: f64, version: u64) -> Result<()> {
     check_scene_attr(b)?;
     let old_scene: Option<Option<String>> = tx.query_row("SELECT scene_id FROM blocks WHERE id = ?1", [&b.id], |r| r.get(0)).optional()?;
     if let Some(Some(old)) = &old_scene {
@@ -405,45 +585,52 @@ fn write_block(tx: &Connection, b: &Block, ord: f64, version: u64) -> Result<()>
         tx.execute("INSERT INTO scenes(id, created_version) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET active = 1", params![sid, version as i64])?;
     }
     tx.execute(
-        "INSERT INTO blocks(id, ord, kind, runs, scene_id, dual, break_before) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        "INSERT INTO blocks(id, ord, kind, runs, scene_id, dual, break_before, document_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
          ON CONFLICT(id) DO UPDATE SET ord = excluded.ord, kind = excluded.kind, runs = excluded.runs,
            scene_id = excluded.scene_id, dual = excluded.dual, break_before = excluded.break_before",
-        params![b.id, ord, b.kind.as_str(), serde_json::to_string(&b.runs).unwrap_or_default(), b.scene_id, b.dual as i64, b.break_before as i64],
+        params![b.id, ord, b.kind.as_str(), serde_json::to_string(&b.runs).unwrap_or_default(), b.scene_id, b.dual as i64, b.break_before as i64, doc],
     )
     .map_err(|e| match &e {
         rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ErrorCode::ConstraintViolation => {
-            StoreError::Invalid(format!("block {} reuses a scene id already in the document", b.id))
+            StoreError::Invalid(format!("block {} reuses a scene id already in the project", b.id))
         }
         _ => StoreError::from(e),
     })?;
     Ok(())
 }
 
-fn apply_op(tx: &Connection, op: &Op, version: u64) -> Result<()> {
+/// The block must not exist, or must exist in `doc`.
+fn require_in_doc(tx: &Connection, doc: &str, id: &str, must_exist: bool) -> Result<()> {
+    match block_document(tx, id)? {
+        Some(d) if d != doc => Err(StoreError::Invalid(format!("block {id} belongs to another document; moving blocks between documents is not supported yet"))),
+        None if must_exist => Err(StoreError::Invalid(format!("unknown block {id} in this document"))),
+        _ => Ok(()),
+    }
+}
+
+fn apply_op(tx: &Connection, doc: &str, op: &Op, version: u64) -> Result<()> {
     match op {
         Op::Put { block, after } => {
             if after.as_deref() == Some(block.id.as_str()) {
                 return Err(StoreError::Invalid("block placed after itself".into()));
             }
-            let ord = ord_after(tx, after.as_deref(), &block.id)?;
-            write_block(tx, block, ord, version)
+            require_in_doc(tx, doc, &block.id, false)?;
+            let ord = ord_after(tx, doc, after.as_deref(), &block.id)?;
+            write_block(tx, doc, block, ord, version)
         }
         Op::Update { block } => {
-            let ord = ord_of(tx, &block.id)?.ok_or_else(|| StoreError::Invalid(format!("update of unknown block {}", block.id)))?;
-            write_block(tx, block, ord, version)
+            require_in_doc(tx, doc, &block.id, true)?;
+            let ord = ord_of(tx, doc, &block.id)?.ok_or_else(|| StoreError::Invalid(format!("update of unknown block {}", block.id)))?;
+            write_block(tx, doc, block, ord, version)
         }
         Op::Delete { id } => {
-            let scene: Option<Option<String>> = tx.query_row("SELECT scene_id FROM blocks WHERE id = ?1", [id], |r| r.get(0)).optional()?;
-            match scene {
-                None => Err(StoreError::Invalid(format!("delete of unknown block {id}"))),
-                Some(s) => {
-                    if let Some(sid) = s {
-                        tx.execute("UPDATE scenes SET active = 0 WHERE id = ?1", [sid])?;
-                    }
-                    tx.execute("DELETE FROM blocks WHERE id = ?1", [id])?;
-                    Ok(())
-                }
+            require_in_doc(tx, doc, id, true)?;
+            let scene: Option<String> = tx.query_row("SELECT scene_id FROM blocks WHERE id = ?1", [id], |r| r.get(0))?;
+            if let Some(sid) = scene {
+                tx.execute("UPDATE scenes SET active = 0 WHERE id = ?1", [sid])?;
             }
+            tx.execute("DELETE FROM blocks WHERE id = ?1", [id])?;
+            Ok(())
         }
     }
 }

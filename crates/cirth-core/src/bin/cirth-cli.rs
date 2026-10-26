@@ -88,7 +88,7 @@ fn main() {
                 let b = Block::new(BlockKind::Action, format!("acknowledged line {i}"));
                 let id = b.id.clone();
                 let base = store.version().unwrap();
-                let ack = store.apply(&Batch { tx_id: format!("crash-{i}"), base_version: base, ops: vec![Op::Put { block: b, after: prev.clone() }] }).unwrap();
+                let ack = store.apply(&Batch { tx_id: format!("crash-{i}"), base_version: base, document_id: None, ops: vec![Op::Put { block: b, after: prev.clone() }] }).unwrap();
                 prev = Some(id);
                 println!("ACK {}", ack.version);
                 std::io::stdout().flush().unwrap();

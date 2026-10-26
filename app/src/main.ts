@@ -23,6 +23,8 @@ interface Opened {
   doc: { title: string; version: number; blocks: Block[] };
   beats: Beat[];
   recovered: boolean;
+  migrated_from: number | null;
+  pre_migration_backup: string | null;
   saved_version: number;
   work_path: string;
   package_path: string;
@@ -185,7 +187,10 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   const t2 = performance.now();
   (window as any).__cirth.openTimings = { ipcAndStoreMs: t1 - t0, rustOpenMs: o.open_ms, buildAndFirstPaintMs: t2 - t1, totalMs: t2 - t0, blocks: o.doc.blocks.length };
-  showBanner(o.recovered ? `Recovered unsaved work from the working store (v${o.doc.version}; package was saved at v${o.saved_version}).` : null);
+  const notes: string[] = [];
+  if (o.recovered) notes.push(`Recovered unsaved work from the working store (v${o.doc.version}; the file was saved at v${o.saved_version}).`);
+  if (o.migrated_from) notes.push(`Upgraded this project from file format ${o.migrated_from} to the current format. The original file is kept unchanged at ${o.pre_migration_backup ?? "(no copy kept)"}; the project file is written in the new format at the next save.`);
+  showBanner(notes.length ? notes.join(" ") : null);
   fileSavedVersion = o.saved_version;
   fileSavedAt = null;
   scheduleAutosave();
