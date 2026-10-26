@@ -7,7 +7,7 @@ Updated 2026-10-25.
 M1 progress:
 - 1.1 done: End-key selection defect fixed; regression and stress tests.
 - 1.2 built: driver-neutral e2e suite with DevTools and WebDriver drivers; passes on Windows through both. Linux runs in CI (not run yet); macOS is a manual checklist (not run yet).
-- 1.3 started: CI workflow for Linux, Windows (MSVC) and macOS written, not run yet.
+- 1.3 CI: Linux green (WebKitGTK e2e 14/14, IME skipped); macOS green (core tests, build); Windows builds and core tests green with MSVC, but e2e cannot start WebView2's DevTools port on the GitHub runner (open).
 
 - 2 started: Home screen (project library) at startup: lists projects in the app's library folder with scene/block counts, modified time and a recovery badge; creates projects (titles never overwrite an existing file); opens samples; the toolbar's Home button saves and closes the project. Opening files from elsewhere on disk (file dialogs) is not built yet.
 
@@ -31,7 +31,7 @@ Fixed: native End key right after typing missed by the editor (M1, see `docs/m0/
 
 ## Untested
 
-macOS, Linux, MSVC-built Windows binaries, real IMEs, screen readers, high DPI.
+macOS editing (manual checklist not yet run), real IMEs, screen readers, high DPI. Linux is covered by CI (WebKitGTK under Xvfb on Ubuntu 24.04), not by a desktop session.
 
 ## How to run (Windows, dev machine)
 
