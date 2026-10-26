@@ -538,6 +538,110 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { card };
   });
 
+  await test("Autocomplete: cues, extensions, heading prefix/location/time, transitions; keys", async () => {
+    await openFixture("long-120");
+    const sug = () => app.evaluate("__cirth.suggestion()");
+    const menuShown = () => app.evaluate("(() => { const m = document.querySelector('.ac-menu'); return !!m && !m.hidden; })()");
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await press("Enter");
+    await press("3", [MOD_KEY]); // character cue, whatever the last block was
+    await typeText("mar");
+    let s = await sug();
+    assert(s && s.mode === "cue" && s.items[0] === "MARGIT", `cue suggestion ${JSON.stringify(s)}`);
+    assert(await menuShown(), "list visible");
+    await screenshot(app, "autocomplete-cue");
+    // Enter accepts and goes on to dialogue (like Final Draft).
+    await press("Enter");
+    let b = await blocks();
+    assert(text(b.at(-2)) === "MARGIT" && b.at(-2).kind === "character" && b.at(-1).kind === "dialogue", `after Enter: ${b.slice(-2).map((x) => x.kind + ":" + text(x))}`);
+    await typeText("Count it.");
+    await press("Enter"); // dialogue -> character
+    // Tab accepts and stays; "(" offers extensions.
+    await typeText("ine");
+    s = await sug();
+    assert(s && s.items[0] === "INES", `INES offered ${JSON.stringify(s)}`);
+    await press("Tab");
+    await typeText(" (v");
+    s = await sug();
+    assert(s && s.mode === "extension" && s.items[0] === "V.O.)", `extension ${JSON.stringify(s)}`);
+    await press("Tab");
+    b = await blocks();
+    assert(text(b.at(-1)) === "INES (V.O.)" && b.at(-1).kind === "character", `cue '${text(b.at(-1))}'`);
+    // Escape closes the list and stays in the editor; typing reopens it.
+    await press("Enter");
+    await typeText("hello");
+    await press("Enter"); // -> character
+    await typeText("oy");
+    assert((await sug())?.items[0] === "OYELARAN", "OYELARAN offered");
+    await press("Escape");
+    assert(!(await sug()) && !(await menuShown()), "Escape closes the list");
+    assert(await app.evaluate("document.activeElement === __cirth.view.dom"), "focus stays in the script");
+    await typeText("e");
+    assert((await sug())?.items[0] === "OYELARAN", "typing reopens it");
+    await press("Tab");
+    await press("Enter");
+    await typeText("Go.");
+    await press("Enter"); // -> character
+    await press("Enter"); // empty character -> action
+    // Scene heading: prefix, then a known location, then a time.
+    await press("Tab", ["shift"]); // action -> heading
+    await typeText("e");
+    s = await sug();
+    assert(s && s.mode === "prefix" && s.items[0] === "EXT. ", `prefix ${JSON.stringify(s)}`);
+    await press("Enter");
+    b = await blocks();
+    assert(b.at(-1).kind === "heading" && text(b.at(-1)) === "EXT. ", "prefix accepted, still in the heading");
+    await typeText("sig");
+    s = await sug();
+    assert(s && s.mode === "location" && s.items[0] === "SIGNAL TOWER", `location ${JSON.stringify(s)}`);
+    await press("Enter");
+    assert(text((await blocks()).at(-1)) === "EXT. SIGNAL TOWER - ", "location accepted with ' - '");
+    await typeText("n");
+    s = await sug();
+    assert(s && s.mode === "time" && s.items[0] === "NIGHT", `time ${JSON.stringify(s)}`);
+    await press("Enter");
+    b = await blocks();
+    assert(text(b.at(-2)) === "EXT. SIGNAL TOWER - NIGHT" && b.at(-2).kind === "heading" && b.at(-1).kind === "action", `heading done: ${b.slice(-2).map((x) => x.kind + ":" + text(x))}`);
+    assert(b.at(-2).scene_id, "new heading has a scene id");
+    // Transition (Ctrl/Cmd+6 sets the type directly).
+    await press("6", [MOD_KEY]);
+    await typeText("cu");
+    assert((await sug())?.items[0] === "CUT TO:", "transition offered");
+    await press("Tab");
+    assert(text((await blocks()).at(-1)) === "CUT TO:", "transition accepted");
+    assert(await storedMatchesEditor(), "store matches editor");
+  });
+
+  await test("Word counts: one documented rule; live block/selection counts; script total matches the store", async () => {
+    const cases = JSON.parse(readFileSync(join(repo, "fixtures", "word-count-cases.json"), "utf8"));
+    const got = await app.evaluate(`__cirth.countWords(${JSON.stringify(cases.map((c) => c.text))})`);
+    const wrong = cases.filter((c, i) => got[i] !== c.words).map((c, i) => `${JSON.stringify(c.text)}: ${got[i]} vs ${c.words}`);
+    assert(!wrong.length, `shared cases through the app: ${wrong.join("; ")}`);
+    await openFixture("unicode-marks");
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await press("Enter");
+    await typeText("don't stop well-known 1,000 -- 👍");
+    await waitFor(app, "__cirth.counts().live.block === 4", "live block count 4");
+    // Selection across two blocks.
+    await setCaret("[ps[1][0] + 1, ps[2][0] + ps[2][1] - 1]");
+    const selWords = await app.evaluate("(() => { const v = __cirth.view; return v.state.doc.textBetween(v.state.selection.from, v.state.selection.to, ' '); })()");
+    const [expectSel] = await app.evaluate(`__cirth.countWords([${JSON.stringify(selWords)}])`);
+    await waitFor(app, `__cirth.counts().live.selection === ${expectSel}`, "selection count");
+    // Script total (from the store) equals the sum of every block's count.
+    await waitSynced();
+    await waitFor(app, "__cirth.counts().doc && __cirth.counts().doc.doc_version === __cirth.syncer.currentVersion", "document counts for the current version");
+    const doc = await app.evaluate("__cirth.counts().doc");
+    const perBlock = await app.evaluate("__cirth.countWords(__cirth.blocks().map(b => b.runs.map(r => r.text).join('')))");
+    const sum = perBlock.reduce((a, b) => a + b, 0);
+    assert(doc.total === sum, `script total ${doc.total} vs sum of blocks ${sum}`);
+    assert(Object.values(doc.by_kind).reduce((a, b) => a + b, 0) === sum, "per-type counts add up");
+    const footer = await app.evaluate("document.getElementById('info').textContent");
+    assert(footer.includes(`script ${sum.toLocaleString()}`) && /selection \d/.test(footer), `footer '${footer}'`);
+    return { total: sum, footer };
+  });
+
   await test("Find and replace: options, block-type filter, replace one/all, one undo, marks kept", async () => {
     // Matching rules (the same function the find bar uses).
     const m = (t, q, o = {}) => app.evaluate(`__cirth.find.matchesIn(${JSON.stringify(t)}, ${JSON.stringify({ query: q, matchCase: false, wholeWord: false, kind: "all", ...o })})`);

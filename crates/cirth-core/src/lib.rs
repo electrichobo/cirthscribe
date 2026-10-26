@@ -7,3 +7,4 @@ pub mod model;
 pub mod ops;
 pub mod pdf;
 pub mod store;
+pub mod words;

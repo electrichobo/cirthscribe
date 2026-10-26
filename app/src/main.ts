@@ -21,6 +21,7 @@ import { adoptDomSelection, selSync } from "./selsync";
 import { createHome } from "./home";
 import { findPlugin, findState, matchesIn } from "./find";
 import { installFindBar } from "./findbar";
+import { completePlugin, suggestion } from "./complete";
 
 interface Opened {
   name: string;
@@ -77,13 +78,54 @@ function blockKindAtCursor(): string {
   return p.type.name === "block" ? KIND_LABEL[p.attrs.kind as Kind] : "";
 }
 
+// Word counts use one rule, in Rust (cirth_core::words): the same numbers
+// in the footer and in reports. Block and selection are counted from the
+// editor's text; the script total from the store (as of the last sync).
+interface DocCounts {
+  total: number;
+  by_kind: Record<string, number>;
+  doc_version: number;
+}
+let liveCounts = { block: 0, selection: 0 };
+let countedBlockStart = -1; // block the live count belongs to
+let docCounts: DocCounts | null = null;
+let countTimer: number | undefined;
+
+function scheduleCounts(withDocument = false) {
+  window.clearTimeout(countTimer);
+  countTimer = window.setTimeout(async () => {
+    if (!view || !lastOpen) return;
+    const sel = view.state.selection;
+    const blockText = sel.$from.parent.type.name === "block" ? sel.$from.parent.textContent : "";
+    const selText = sel.empty ? "" : view.state.doc.textBetween(sel.from, sel.to, " ");
+    try {
+      const start = sel.$from.start();
+      const [block, selection] = await invoke<number[]>("count_words", { texts: [blockText, selText] });
+      liveCounts = { block, selection };
+      countedBlockStart = start;
+      if (withDocument) docCounts = await invoke<DocCounts>("word_counts");
+    } catch {
+      // Counting is informational; never interrupt writing for it.
+    }
+    updateInfo();
+  }, 150);
+}
+
 function updateInfo() {
   const sel = view.state.selection;
-  const words = (t: string) => (t.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length;
-  const selText = view.state.doc.textBetween(sel.from, sel.to, " ");
+  const n = (v: number) => v.toLocaleString();
+  // Until the count for the block under the caret arrives, show "…" rather
+  // than the previous block's number.
+  const fresh = sel.$from.start() === countedBlockStart;
+  const counts = [`block ${fresh ? n(liveCounts.block) : "…"} words`];
+  if (!sel.empty) counts.push(`selection ${n(liveCounts.selection)}`);
+  if (docCounts) {
+    const k = docCounts.by_kind;
+    counts.push(`script ${n(docCounts.total)} (dialogue ${n(k.dialogue ?? 0)}, action ${n(k.action ?? 0)})`);
+  }
   const pages = lastPagination ? `${lastPagination.map.pages.length} pages (layout of v${lastPagination.map.doc_version}, ${lastPagination.layout_ms.toFixed(1)} ms)` : "not paginated";
   const missing = lastPagination?.missing_glyphs.length ? ` · Font lacks: ${lastPagination.missing_glyphs.join(" ")} (these break fixed pitch in PDF)` : "";
-  infoEl.textContent = `${blockKindAtCursor()} · selection ${words(selText)} words · ${pages}${missing}`;
+  infoEl.textContent = `${blockKindAtCursor()} · ${counts.join(" · ")} · ${pages}${missing}`;
 }
 
 let navTimer: number | undefined;
@@ -129,6 +171,7 @@ function dispatch(tr: Transaction) {
     window.clearTimeout(navTimer);
     navTimer = window.setTimeout(() => renderNavigator(navEl, view), 150);
   }
+  if (tr.docChanged || tr.selectionSet) scheduleCounts();
   updateInfo();
 }
 
@@ -139,6 +182,8 @@ function makeState(blocks: Block[]) {
     plugins: [
       idsPlugin(),
       history(),
+      // Before the screenplay keymap: Tab/Enter accept a suggestion when one is open.
+      completePlugin(),
       screenplayKeymap(() => (navEl.querySelector("button") as HTMLButtonElement | null)?.focus()),
       keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
       keymap(baseKeymap),
@@ -197,7 +242,12 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   // Ids may have been repaired on load (should not happen for store data).
   syncer = new Syncer(view.state.doc, o.doc.version);
   syncer.onStatus = setStatus;
-  syncer.onAck = () => schedulePaginate();
+  syncer.onAck = () => {
+    schedulePaginate();
+    scheduleCounts(true);
+  };
+  docCounts = null;
+  scheduleCounts(true);
   setStatus({ state: "saved", version: o.doc.version });
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   const t2 = performance.now();
@@ -523,6 +573,10 @@ $("structural").addEventListener("change", (e) => {
   },
   closeWindow: () => getCurrentWindow().close(),
   menu: (id: string) => runMenu(id),
+  suggestion: () => suggestion(view.state),
+  counts: () => ({ live: liveCounts, doc: docCounts }),
+  countWords: (texts: string[]) => invoke<number[]>("count_words", { texts }),
+  wordCounts: () => invoke<DocCounts>("word_counts"),
   find: {
     bar: findBar,
     matchesIn,

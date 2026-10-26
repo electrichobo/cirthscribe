@@ -620,6 +620,21 @@ async fn export_pdf(app: State<'_, App>, profile_name: String) -> Result<Exporte
     Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs })
 }
 
+// --- Word counts (one rule: cirth_core::words) ---------------------------------------
+
+/// Counts for texts the editor holds right now (current block, selection).
+#[tauri::command]
+fn count_words(texts: Vec<String>) -> Vec<u64> {
+    texts.iter().map(|t| cirth_core::words::count(t)).collect()
+}
+
+/// Counts for the stored document (what reports use), with its version.
+#[tauri::command]
+async fn word_counts(app: State<'_, App>) -> Result<cirth_core::words::DocumentCounts, String> {
+    let doc = with_session(&app, |s| s.store.load().map_err(err))?;
+    Ok(cirth_core::words::document(&doc))
+}
+
 // --- Backups -----------------------------------------------------------------------------
 
 #[derive(Serialize)]
@@ -787,7 +802,9 @@ fn main() {
             process_id,
             library_folder,
             list_backups,
-            restore_backup
+            restore_backup,
+            count_words,
+            word_counts
         ])
         .build(tauri::generate_context!())
         .expect("error while building CirthScribe")
