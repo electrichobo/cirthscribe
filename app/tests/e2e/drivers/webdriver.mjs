@@ -18,6 +18,8 @@ const KEY = {
   Escape: "",
   ArrowLeft: "",
   ArrowRight: "",
+  ArrowUp: "",
+  ArrowDown: "",
   End: "",
   Home: "",
 };

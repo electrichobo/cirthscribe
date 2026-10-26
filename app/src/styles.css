@@ -116,6 +116,15 @@ dialog.backups h2 { text-transform: none; letter-spacing: 0; font-size: 15px; co
 .ac-menu[hidden] { display: none; }
 .ac-menu li { padding: 2px 10px; cursor: pointer; white-space: nowrap; }
 .ac-menu li[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+/* Tight screenplay line height: keep the wave close to the text so it does not run into the next line. */
+.misspelled { text-decoration: underline wavy var(--bad); text-decoration-thickness: 1px; text-decoration-skip-ink: none; text-underline-offset: 1px; }
+.spell-menu { position: fixed; z-index: 11; display: grid; min-width: 22ch; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.spell-menu[hidden] { display: none; }
+.spell-menu button { border: 0; background: none; text-align: left; padding: 4px 10px; border-radius: 4px; }
+.spell-menu button:focus, .spell-menu button:hover { background: color-mix(in srgb, var(--accent) 25%, transparent); outline: none; }
+.spell-menu .suggestion { font-weight: 600; }
+.spell-menu .none { padding: 4px 10px; color: var(--muted); }
+.spell-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
 #open-file { width: 100%; padding: 7px 12px; margin-bottom: 18px; }
 .project-item { display: grid; gap: 4px; }
 .forget { justify-self: start; font-size: 12px; }

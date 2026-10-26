@@ -21,7 +21,9 @@ M1 progress:
 
 - 3 Autocomplete (cues, extensions, heading prefix/location/time, transitions) and word counts (one documented rule in Rust; block, selection, script).
 
-Next: editor completeness (spell check, dual-dialogue toggle, page view), then the macOS manual pass and the real-IME checklist on test machines.
+- 3 Spell check (ADR 0002): US/UK/off per project, project and personal dictionaries, suggestions by right-click or Ctrl/Cmd+.
+
+Next: editor completeness (dual-dialogue toggle, forced page break command, page view), then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

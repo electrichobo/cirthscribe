@@ -12,6 +12,8 @@ const KEYS = {
   Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
   ArrowLeft: { key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 },
   ArrowRight: { key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 },
+  ArrowUp: { key: "ArrowUp", code: "ArrowUp", windowsVirtualKeyCode: 38 },
+  ArrowDown: { key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 },
   End: { key: "End", code: "End", windowsVirtualKeyCode: 35 },
   Home: { key: "Home", code: "Home", windowsVirtualKeyCode: 36 },
 };

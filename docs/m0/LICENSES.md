@@ -1,12 +1,13 @@
 # Dependency, font and tool license inventory (M0)
 
-Generated 2026-10-26 (after adding tauri-plugin-dialog 2.8.3 and @tauri-apps/plugin-dialog 2.8.3, both MIT OR Apache-2.0) by `node app/scripts/license-inventory.mjs` from `Cargo.lock` / `cargo metadata` and `app/package-lock.json`. License fields are as declared by each package; they have not been audited file by file. Re-run on every dependency change.
+Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dictionaries) by `node app/scripts/license-inventory.mjs` from `Cargo.lock` / `cargo metadata` and `app/package-lock.json`. License fields are as declared by each package; they have not been audited file by file. Re-run on every dependency change.
 
 ## Not from package managers
 
 | Item | License | Shipped? | Notes |
 | - | - | - | - |
 | Courier Prime (4 styles), `assets/fonts/courier-prime/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded in the app and in PDFs) | From github.com/google/fonts `ofl/courierprime`. Font name may not be reused for modified versions. |
+| SCOWL Hunspell dictionaries en_US-large and en_GB-large 2026.02.25, `assets/dictionaries/` | Copyright 2000-2026 Kevin Atkinson; permissive notice: copy, modify, distribute, sell, provided the copyright notice and permission notice appear in copies and supporting documentation. Affix file: BSD-style (Geoff Kuenning; modified versions must be marked). Full text in each `README_*.txt` | Yes (embedded in the app) | From github.com/en-wl/wordlist releases. Keep the README files with the dictionaries and this notice in release documentation. |
 | SQLite (bundled by `libsqlite3-sys`) | Public domain | Yes | |
 | Microsoft Edge WebView2 Runtime | Microsoft proprietary | No (system component on Windows 11) | Required at runtime on Windows |
 | `WebView2Loader.dll` | Microsoft WebView2 SDK license (redistributable) | Only for GNU-toolchain builds | MSVC builds link the loader statically |
@@ -17,10 +18,10 @@ Coverage note: the Rust table resolves dependencies for Windows (x86_64-pc-windo
 
 ## Items to review
 
-- **MPL-2.0** (file-level copyleft): `cssparser`, `cssparser-macros`, `dtoa-short`, `selectors` (via Tauri), `option-ext` (via `dirs`). Distributable in binaries; modified MPL files must stay MPL. Note when choosing the project license.
+- **MPL-2.0** (file-level copyleft): `spellbook` (spell checking, chosen in ADR 0002), `cssparser`, `cssparser-macros`, `dtoa-short`, `selectors` (via Tauri), `option-ext` (via `dirs`). Distributable in binaries; modified MPL files must stay MPL. Note when choosing the project license.
 - Build-only MPL-2.0: `lightningcss` (Vite), not shipped.
 - No GPL/LGPL, unknown or proprietary packages in the Rust graph or the shipped JS.
-## Rust crates (resolved for x86_64-pc-windows-gnu): 268
+## Rust crates (resolved for x86_64-pc-windows-gnu): 269
 
 | License expression | Count | Crates (first 8) |
 | - | - | - |
@@ -30,7 +31,7 @@ Coverage note: the Rust table resolves dependencies for Windows (x86_64-pc-windo
 | Unicode-3.0 | 18 | icu_collections 2.4.0, icu_locale_core 2.4.0, icu_normalizer 2.4.0, icu_normalizer_data 2.4.0, icu_properties 2.4.0, icu_properties_data 2.4.0, icu_provider 2.4.0, litemap 0.8.3, ... |
 | MIT/Apache-2.0 | 10 | bitflags 1.3.2, bs58 0.5.1, core_detect 1.0.0, fallible-iterator 0.3.0, fallible-streaming-iterator 0.1.9, ident_case 1.0.1, json-patch 4.2.0, linked-hash-map 0.5.6, ... |
 | Unlicense OR MIT | 8 | aho-corasick 1.1.5, byteorder 1.5.0, jiff 0.2.38, jiff-core 0.1.1, jiff-tzdb 0.1.9, jiff-tzdb-platform 0.1.3, memchr 2.8.3, winapi-util 0.1.11 |
-| MPL-2.0 **review** | 5 | cssparser 0.37.0, cssparser-macros 0.7.1, dtoa-short 0.3.5, option-ext 0.2.0, selectors 0.38.0 |
+| MPL-2.0 **review** | 6 | cssparser 0.37.0, cssparser-macros 0.7.1, dtoa-short 0.3.5, option-ext 0.2.0, selectors 0.38.0, spellbook 0.4.2 |
 | BSD-3-Clause | 2 | alloc-no-stdlib 3.0.0, alloc-stdlib 0.3.0 |
 | Zlib | 2 | foldhash 0.2.0, zlib-rs 0.6.8 |
 | MIT OR Zlib OR Apache-2.0 | 2 | miniz_oxide 0.8.9, miniz_oxide 0.9.1 |

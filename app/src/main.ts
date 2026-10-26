@@ -22,6 +22,7 @@ import { createHome } from "./home";
 import { findPlugin, findState, matchesIn } from "./find";
 import { installFindBar } from "./findbar";
 import { completePlugin, suggestion } from "./complete";
+import { installSpell, spellPlugin } from "./spell";
 
 interface Opened {
   name: string;
@@ -165,6 +166,7 @@ function dispatch(tr: Transaction) {
   if (tr.docChanged) {
     syncer.changed(next.doc);
     findBar.refreshCount();
+    spell.schedule();
     window.clearTimeout(navTimer);
     navTimer = window.setTimeout(rerenderSide, 150);
   } else if (tr.selectionSet) {
@@ -189,6 +191,7 @@ function makeState(blocks: Block[]) {
       keymap(baseKeymap),
       pageMarksPlugin(),
       findPlugin(),
+      spellPlugin(),
     ],
   });
 }
@@ -235,6 +238,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
         return false;
       },
       handlePaste: (v, event) => handlePaste(v, event),
+      handleDOMEvents: { contextmenu: (v, e) => spell.onContextMenu(v, e as MouseEvent) },
       clipboardTextParser: (text) => clipboardTextParser(text),
       clipboardTextSerializer: (slice) => clipboardTextSerializer(slice),
       attributes: { "aria-label": "Screenplay text", spellcheck: "false" },
@@ -248,6 +252,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   };
   docCounts = null;
   scheduleCounts(true);
+  void spell.onOpen($("spelling") as HTMLSelectElement);
   setStatus({ state: "saved", version: o.doc.version });
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   const t2 = performance.now();
@@ -423,6 +428,8 @@ async function goHome() {
 }
 
 const findBar = installFindBar($("find-bar"), () => view, showBanner);
+const spell = installSpell(() => view, showBanner);
+$("spelling").addEventListener("change", (e) => void spell.setLang((e.target as HTMLSelectElement).value));
 
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
@@ -459,6 +466,9 @@ window.addEventListener(
     if (k === "s") {
       e.preventDefault();
       if (lastOpen) void (e.shiftKey ? saveAs() : saveNow());
+    } else if (k === "." && !e.shiftKey) {
+      e.preventDefault();
+      if (lastOpen) spell.menuAtCaret();
     } else if (k === "f" && !e.shiftKey) {
       e.preventDefault();
       if (lastOpen) findBar.open();
@@ -574,6 +584,7 @@ $("structural").addEventListener("change", (e) => {
   closeWindow: () => getCurrentWindow().close(),
   menu: (id: string) => runMenu(id),
   suggestion: () => suggestion(view.state),
+  spell,
   counts: () => ({ live: liveCounts, doc: docCounts }),
   countWords: (texts: string[]) => invoke<number[]>("count_words", { texts }),
   wordCounts: () => invoke<DocCounts>("word_counts"),

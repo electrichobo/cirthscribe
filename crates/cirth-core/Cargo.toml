@@ -12,6 +12,7 @@ rusqlite = { version = "0", features = ["bundled"] }
 unicode-width = "0.2"
 unicode-segmentation = "1"
 printpdf = "0.7"
+spellbook = "=0.4.2"
 
 [[bin]]
 name = "cirth-cli"

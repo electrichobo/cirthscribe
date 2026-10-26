@@ -1,6 +1,6 @@
 # Spell check: options compared (M1)
 
-Status: proposal, 2026-10-26. No dependency added yet; the owner decides.
+Status: decided 2026-10-26: option A (ADR 0002).
 
 Requirement (PRODUCT_SPEC 2, M1 plan 3): local spell check that works offline, US and UK English, project names (characters, places), a user dictionary, ignored words, undoable replacements. Grammar is separate and later.
 

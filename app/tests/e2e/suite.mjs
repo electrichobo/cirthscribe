@@ -642,6 +642,97 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { total: sum, footer };
   });
 
+  await test("Spelling: underlines, corrections with undo, dictionaries, ignore, US/UK/off, names", async () => {
+    const flagged = () => app.evaluate("[...new Set(__cirth.spell.misspelledWords())].sort()");
+    const settle = () => app.evaluate("__cirth.spell.run(false)");
+    await openFixture("unicode-marks");
+    await app.evaluate("__cirth.spell.reset()");
+    assert(JSON.stringify(await flagged()) === JSON.stringify(["NØRDLYS", "brûlée", "crème"]), `fixture flags ${JSON.stringify(await flagged())}`);
+    // A typed misspelling is underlined after a short pause; cue names are not.
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await press("Enter");
+    await typeText("Kaito will recieve it");
+    await waitFor(app, "__cirth.spell.misspelledWords().includes('recieve')", "underline on 'recieve'");
+    assert(!(await flagged()).includes("Kaito"), "character names are accepted");
+    assert(await app.evaluate("[...document.querySelectorAll('#editor .misspelled')].some(e => e.textContent === 'recieve')"), "drawn as a decoration");
+    // Right-click: suggestions; choosing one replaces the word; one undo restores it.
+    await app.evaluate(`(() => { const v = __cirth.view; const el = [...document.querySelectorAll('#editor .misspelled')].find(e => e.textContent === 'recieve');
+      const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 3, clientY: r.top + r.height / 2 })); return true; })()`);
+    await waitFor(app, "!!__cirth.spell.menuItems() && __cirth.spell.menuItems().includes('receive')", "suggestion menu");
+    const items = await app.evaluate("__cirth.spell.menuItems()");
+    await screenshot(app, "spell-menu");
+    await app.evaluate("(() => { [...document.querySelectorAll('.spell-menu button')].find(b => b.textContent === 'receive').click(); return true; })()");
+    let b = await blocks();
+    assert(text(b.at(-1)) === "Kaito will receive it", `corrected '${text(b.at(-1))}'`);
+    await sleep(600);
+    await press("z", [MOD_KEY]);
+    b = await blocks();
+    assert(text(b.at(-1)) === "Kaito will recieve it", `undo restored '${text(b.at(-1))}'`);
+    // Ctrl/Cmd+. opens the same menu at the caret; Escape returns to the script.
+    await settle();
+    await setCaret(`[ps.at(-1)[0] + 1 + 13]`); // inside "recieve"
+    await press(".", [MOD_KEY]);
+    await waitFor(app, "!!__cirth.spell.menuItems()", "menu from the keyboard");
+    assert(await app.evaluate("document.activeElement.closest('.spell-menu') !== null"), "focus in the menu");
+    const first = await app.evaluate("document.activeElement.textContent");
+    await press("ArrowDown");
+    assert((await app.evaluate("document.activeElement.textContent")) !== first, "ArrowDown moves through the menu");
+    await press("Escape");
+    assert((await app.evaluate("__cirth.spell.menuItems()")) === null && (await app.evaluate("document.activeElement === __cirth.view.dom")), "Escape closes and refocuses");
+    // Ignore lasts for this session; project dictionary persists with the project.
+    const openMenuFor = (word) =>
+      app.evaluate(`(() => { const el = [...document.querySelectorAll('#editor .misspelled')].find(e => e.textContent === ${JSON.stringify(word)});
+        const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 3, clientY: r.top + r.height / 2 })); return true; })()`);
+    const choose = async (label) => {
+      await waitFor(app, `!!__cirth.spell.menuItems() && __cirth.spell.menuItems().some(t => t.startsWith(${JSON.stringify(label)}))`, `menu item ${label}`);
+      await app.evaluate(`(() => { [...document.querySelectorAll('.spell-menu button')].find(b => b.textContent.startsWith(${JSON.stringify(label)})).click(); return true; })()`);
+      await sleep(300);
+      await settle();
+    };
+    await openMenuFor("crème");
+    await choose("Ignore");
+    await openMenuFor("NØRDLYS");
+    await choose("Add to project dictionary");
+    await openMenuFor("brûlée");
+    await choose("Add to my dictionary");
+    assert(JSON.stringify(await flagged()) === JSON.stringify(["recieve"]), `after ignore/add: ${JSON.stringify(await flagged())}`);
+    const settings = await app.evaluate("__TAURI_INTERNALS__.invoke('spell_settings')");
+    assert(settings.project_words.includes("NØRDLYS") && settings.user_words.includes("brûlée"), JSON.stringify(settings));
+    // Reopen: the project word and the personal word stay accepted; the ignored one returns.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, '[data-project="unicode-marks"]');
+    await waitOpen(app);
+    await app.evaluate("__cirth.spell.reset()");
+    assert(JSON.stringify(await flagged()) === JSON.stringify(["crème", "recieve"]), `after reopen: ${JSON.stringify(await flagged())}`);
+    // US / UK / off is a project setting.
+    const last = (await blocks()).length - 1;
+    await caretAtEndOf(last);
+    await typeText(" color colour");
+    await settle();
+    await sleep(500);
+    await settle();
+    let f = await flagged();
+    assert(f.includes("colour") && !f.includes("color"), `US: ${JSON.stringify(f)}`);
+    await app.evaluate("(async () => { const s = document.getElementById('spelling'); s.value = 'en_GB'; s.dispatchEvent(new Event('change')); })()");
+    await waitFor(app, "__cirth.spell.lang === 'en_GB' && __cirth.spell.misspelledWords().includes('color')", "UK spelling");
+    f = await flagged();
+    assert(!f.includes("colour"), `UK: ${JSON.stringify(f)}`);
+    await app.evaluate("(async () => { const s = document.getElementById('spelling'); s.value = 'off'; s.dispatchEvent(new Event('change')); })()");
+    await waitFor(app, "__cirth.spell.lang === 'off'", "spelling off");
+    await settle();
+    assert((await flagged()).length === 0, "off: no underlines");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, '[data-project="unicode-marks"]');
+    await waitOpen(app);
+    await waitFor(app, "document.getElementById('spelling').value === 'off'", "the setting is saved with the project");
+    await app.evaluate("(async () => { const s = document.getElementById('spelling'); s.value = 'en_US'; s.dispatchEvent(new Event('change')); })()");
+    assert(await storedMatchesEditor(), "store matches editor");
+    return { items };
+  });
+
   await test("Find and replace: options, block-type filter, replace one/all, one undo, marks kept", async () => {
     // Matching rules (the same function the find bar uses).
     const m = (t, q, o = {}) => app.evaluate(`__cirth.find.matchesIn(${JSON.stringify(t)}, ${JSON.stringify({ query: q, matchCase: false, wholeWord: false, kind: "all", ...o })})`);

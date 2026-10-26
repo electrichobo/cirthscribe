@@ -33,6 +33,8 @@ struct Session {
     package: PathBuf,
     /// The file as we last read or wrote it; `None` until first written.
     stamp: Option<FileStamp>,
+    /// Built on first use for the project's spelling language.
+    speller: Option<cirth_core::spell::Speller>,
 }
 
 #[derive(Default)]
@@ -218,7 +220,7 @@ fn open_file(app: &App, pkg: &Path, t0: Instant) -> Result<Opened, String> {
     let work = work_path(app, &key);
     std::fs::create_dir_all(work.parent().unwrap()).map_err(io_err)?;
     let o = Store::open_package(pkg, &work, Some(&backup_policy(app).dir)).map_err(err)?;
-    let s = Session { key, store: o.store, package: normalize(pkg), stamp: Some(FileStamp::of(pkg).map_err(io_err)?) };
+    let s = Session { key, store: o.store, package: normalize(pkg), stamp: Some(FileStamp::of(pkg).map_err(io_err)?), speller: None };
     let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
     remember(app, &s.package)?;
     *guard = Some(s);
@@ -251,7 +253,7 @@ fn start_new(app: &App, pkg: PathBuf, doc: &Document, beats: &[Beat], t0: Instan
         store.put_beat(b).map_err(err)?;
     }
     store.save_package(&pkg).map_err(err)?;
-    let s = Session { key, store, stamp: Some(FileStamp::of(&pkg).map_err(io_err)?), package: normalize(&pkg) };
+    let s = Session { key, store, stamp: Some(FileStamp::of(&pkg).map_err(io_err)?), package: normalize(&pkg), speller: None };
     let out = opened(&s, false, None, None, t0)?;
     *guard = Some(s);
     Ok(out)
@@ -635,6 +637,148 @@ async fn word_counts(app: State<'_, App>) -> Result<cirth_core::words::DocumentC
     Ok(cirth_core::words::document(&doc))
 }
 
+// --- Spelling (cirth_core::spell) ------------------------------------------------------
+//
+// Language is a project setting ("en_US", "en_GB" or "off"; default en_US),
+// separate from page size. Project dictionary: a JSON list in the project's
+// settings. Personal dictionary: user-dictionary.txt in the app data folder,
+// one word per line. Character cue names are accepted automatically.
+
+const SPELL_SCOPE: &str = "project";
+
+fn spelling_lang(s: &Session) -> String {
+    s.store.setting(SPELL_SCOPE, "spelling").ok().flatten().unwrap_or_else(|| "en_US".into())
+}
+
+fn project_words(s: &Session) -> Vec<String> {
+    s.store.setting(SPELL_SCOPE, "dictionary").ok().flatten().and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default()
+}
+
+fn user_dictionary(app: &App) -> PathBuf {
+    data_dir(app).join("user-dictionary.txt")
+}
+
+fn user_words(app: &App) -> Vec<String> {
+    std::fs::read_to_string(user_dictionary(app)).map(|t| t.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()).unwrap_or_default()
+}
+
+/// The session's speller, built on first use; `None` when spelling is off.
+fn speller<'a>(app: &App, s: &'a mut Session) -> Option<&'a mut cirth_core::spell::Speller> {
+    let lang = cirth_core::spell::Lang::parse(&spelling_lang(s))?;
+    if s.speller.as_ref().map(|sp| sp.lang()) != Some(lang) {
+        let mut sp = cirth_core::spell::Speller::new(lang);
+        for w in project_words(s).iter().chain(user_words(app).iter()) {
+            sp.add(w);
+        }
+        s.speller = Some(sp);
+    }
+    s.speller.as_mut()
+}
+
+#[derive(Serialize)]
+struct SpellSettings {
+    lang: String,
+    project_words: Vec<String>,
+    user_words: Vec<String>,
+}
+
+#[tauri::command]
+async fn spell_settings(app: State<'_, App>) -> Result<SpellSettings, String> {
+    with_session(&app, |s| Ok(SpellSettings { lang: spelling_lang(s), project_words: project_words(s), user_words: user_words(&app) }))
+}
+
+#[tauri::command]
+async fn set_spelling(app: State<'_, App>, lang: String) -> Result<String, String> {
+    if lang != "off" && cirth_core::spell::Lang::parse(&lang).is_none() {
+        return Err(format!("unknown spelling language {lang}"));
+    }
+    with_session(&app, |s| {
+        s.store.set_setting(SPELL_SCOPE, "spelling", &lang).map_err(err)?;
+        s.speller = None;
+        Ok(lang)
+    })
+}
+
+#[derive(Deserialize)]
+struct SpellBlock {
+    id: String,
+    text: String,
+}
+
+#[derive(Serialize)]
+struct SpellResult {
+    id: String,
+    /// Misspelled ranges, UTF-16 offsets within the block's text.
+    ranges: Vec<(usize, usize)>,
+}
+
+/// Check blocks; `names` are character cue names to accept.
+#[tauri::command]
+async fn spell_check(app: State<'_, App>, blocks: Vec<SpellBlock>, names: Vec<String>) -> Result<Vec<SpellResult>, String> {
+    with_session(&app, |s| {
+        let Some(sp) = speller(&app, s) else {
+            return Ok(blocks.into_iter().map(|b| SpellResult { id: b.id, ranges: vec![] }).collect());
+        };
+        for n in &names {
+            sp.add(n);
+        }
+        Ok(blocks.into_iter().map(|b| SpellResult { ranges: sp.misspelled(&b.text), id: b.id }).collect())
+    })
+}
+
+#[tauri::command]
+async fn spell_suggest(app: State<'_, App>, word: String) -> Result<Vec<String>, String> {
+    with_session(&app, |s| Ok(speller(&app, s).map(|sp| sp.suggest(&word)).unwrap_or_default()))
+}
+
+/// Accept a word in the project dictionary ("project") or the personal one ("user").
+#[tauri::command]
+async fn spell_add(app: State<'_, App>, word: String, scope: String) -> Result<(), String> {
+    let word = word.trim().to_string();
+    if word.is_empty() || word.contains(['/', ' ', '\t', '\n']) {
+        return Err("not a single word".into());
+    }
+    with_session(&app, |s| {
+        match scope.as_str() {
+            "project" => {
+                let mut words = project_words(s);
+                if !words.contains(&word) {
+                    words.push(word.clone());
+                    words.sort();
+                    s.store.set_setting(SPELL_SCOPE, "dictionary", &serde_json::to_string(&words).unwrap_or_default()).map_err(err)?;
+                }
+            }
+            "user" => {
+                let mut words = user_words(&app);
+                if !words.contains(&word) {
+                    words.push(word.clone());
+                    words.sort();
+                    let path = user_dictionary(&app);
+                    let tmp = path.with_extension("txt.tmp");
+                    std::fs::write(&tmp, words.join("\n") + "\n").map_err(io_err)?;
+                    cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)?;
+                }
+            }
+            _ => return Err(format!("unknown dictionary {scope}")),
+        }
+        if let Some(sp) = speller(&app, s) {
+            sp.add(&word);
+        }
+        Ok(())
+    })
+}
+
+/// Accept a word until the project is closed.
+#[tauri::command]
+async fn spell_ignore(app: State<'_, App>, word: String) -> Result<(), String> {
+    with_session(&app, |s| {
+        if let Some(sp) = speller(&app, s) {
+            sp.ignore(&word);
+        }
+        Ok(())
+    })
+}
+
 // --- Backups -----------------------------------------------------------------------------
 
 #[derive(Serialize)]
@@ -804,7 +948,13 @@ fn main() {
             list_backups,
             restore_backup,
             count_words,
-            word_counts
+            word_counts,
+            spell_settings,
+            set_spelling,
+            spell_check,
+            spell_suggest,
+            spell_add,
+            spell_ignore
         ])
         .build(tauri::generate_context!())
         .expect("error while building CirthScribe")
