@@ -24,6 +24,19 @@
     <main class="panes">
       <nav id="navigator" aria-label="Scene navigator"></nav>
       <section class="editor-wrap" aria-label="Screenplay">
+        <div id="find-bar" role="search" aria-label="Find and replace" hidden>
+          <input id="find-query" type="search" placeholder="Find" aria-label="Find" />
+          <input id="find-replace" type="text" placeholder="Replace with" aria-label="Replace with" />
+          <label><input id="find-case" type="checkbox" /> Match case</label>
+          <label><input id="find-word" type="checkbox" /> Whole word</label>
+          <select id="find-kind" aria-label="Only in block type"></select>
+          <span id="find-count" role="status" aria-live="polite"></span>
+          <button id="find-prev" type="button" title="Previous (Shift+Enter)" aria-label="Previous match">↑</button>
+          <button id="find-next" type="button" title="Next (Enter)" aria-label="Next match">↓</button>
+          <button id="find-replace-one" type="button">Replace</button>
+          <button id="find-replace-all" type="button">Replace all</button>
+          <button id="find-close" type="button" title="Close (Escape)" aria-label="Close find">✕</button>
+        </div>
         <div id="banner" role="alert" hidden></div>
         <div id="editor"></div>
       </section>

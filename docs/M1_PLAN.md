@@ -29,7 +29,7 @@ Order matters: the first three items remove M0's open risks before features grow
 ## 3. Editor completeness
 
 - Contract test that Rust `model.rs` and TS `schema.ts` agree (generate TS types from Rust, or a shared JSON fixture round trip).
-- Find and replace (block-type filters, undoable replace-all).
+- **Done 2026-10-26:** find and replace (Ctrl/Cmd+F, Edit menu): match case, Unicode-aware whole word, block-type filter (e.g. rename a character in cues only), highlights with a counter, replace one, replace all as one undo step, inline marks kept. Tested end to end, including scrolling each match into view (a bug the test caught) and replace-all on the 127-page script (about 7 ms for 70 cues). Not yet: search within a selection, regular expressions, replace preview.
 - Character and location autocomplete from the script (no bible yet), with keyboard selection.
 - Word counts per block, selection and document, using one documented rule shared with Rust (A8).
 - Local spell check with a user dictionary: evaluate Hunspell-compatible options (license and dictionary sources checked first; US and UK English).

@@ -538,6 +538,83 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { card };
   });
 
+  await test("Find and replace: options, block-type filter, replace one/all, one undo, marks kept", async () => {
+    // Matching rules (the same function the find bar uses).
+    const m = (t, q, o = {}) => app.evaluate(`__cirth.find.matchesIn(${JSON.stringify(t)}, ${JSON.stringify({ query: q, matchCase: false, wholeWord: false, kind: "all", ...o })})`);
+    assert((await m("Café café CAFÉ", "café", { wholeWord: true })).length === 3, "case-insensitive with accents");
+    assert((await m("Café café CAFÉ", "café", { matchCase: true })).length === 1, "match case");
+    assert((await m("Zoë Zoëy xZoë", "Zoë", { wholeWord: true })).length === 1, "whole word treats letters with accents as letters");
+    assert((await m("a.b axb (x) a*b", "a.b")).length === 1 && (await m("a.b axb (x) a*b", "(x)")).length === 1, "regex characters are literal");
+    assert(JSON.stringify(await m("👍🏽 and 👍🏽", "👍🏽")) === "[[0,4],[9,13]]", "emoji offsets in UTF-16 units");
+
+    await openFixture("long-120");
+    const before = await blocks();
+    const re = /MARGIT/gi;
+    const countIn = (bs, kind) => bs.filter((b) => !kind || b.kind === kind).reduce((n, b) => n + (text(b).match(re) ?? []).length, 0);
+    const cues = countIn(before, "character");
+    const all = countIn(before);
+    assert(cues > 10 && all > cues, `fixture has cues (${cues}) and other mentions (${all - cues})`);
+    // Ctrl/Cmd+F opens the bar with focus in the query field.
+    await caretAtEndOf(0);
+    await press("f", [MOD_KEY]);
+    await waitFor(app, "!document.getElementById('find-bar').hidden && document.activeElement.id === 'find-query'", "find bar to open");
+    await typeText("margit");
+    await sleep(300);
+    assert((await app.evaluate("__cirth.find.state()")).matches === all, "all block types");
+    await app.evaluate("(() => { const k = document.getElementById('find-kind'); k.value = 'character'; k.dispatchEvent(new Event('change')); })()");
+    let st = await app.evaluate("__cirth.find.state()");
+    assert(st.matches === cues, `cues only: ${st.matches} vs ${cues}`);
+    await press("Enter");
+    st = await app.evaluate("__cirth.find.state()");
+    assert(st.current === 0, `Enter selects the first match (current ${st.current})`);
+    assert((await app.evaluate("document.getElementById('find-count').textContent")) === `1 of ${cues}`, "counter");
+    // The selected match is scrolled into view below the bar (focus stays in the find field).
+    const seen = async () =>
+      app.evaluate(`(() => { const v = __cirth.view; const c = v.coordsAtPos(v.state.selection.from); const bar = document.getElementById('find-bar').getBoundingClientRect(); const wrap = document.querySelector('.editor-wrap').getBoundingClientRect();
+        return c.top >= bar.bottom && c.bottom <= wrap.bottom && document.activeElement.id === 'find-query'; })()`);
+    assert(await seen(), "first match visible");
+    for (let i = 0; i < 5; i++) await press("Enter");
+    await sleep(100);
+    assert(await seen(), "sixth match visible");
+    await screenshot(app, "find-bar");
+    // Rename the character in cues only: one transaction.
+    await app.evaluate("(() => { document.getElementById('find-replace').value = 'MARGUERITE'; })()");
+    const ms = await app.evaluate("(() => { const t = performance.now(); document.getElementById('find-replace-all').click(); return performance.now() - t; })()");
+    let after = await blocks();
+    assert(countIn(after, "character") === 0, "no cue still says MARGIT");
+    assert(after.filter((b) => b.kind === "character" && /MARGUERITE/.test(text(b))).length > 0, "cues renamed");
+    assert(countIn(after) === all - cues, "action, dialogue and parentheticals untouched");
+    assert(/Replaced \d+ match/.test(await app.evaluate("document.getElementById('banner').textContent")), "replace-all reported");
+    // Escape returns to the script; one undo restores every cue.
+    await press("Escape");
+    assert(await app.evaluate("document.getElementById('find-bar').hidden"), "Escape closes");
+    await sleep(600);
+    await press("z", [MOD_KEY]);
+    after = await blocks();
+    assert(JSON.stringify(after.map(text)) === JSON.stringify(before.map(text)), "one undo restores all replacements");
+    assert(await storedMatchesEditor(), "store matches editor after replace-all and undo");
+    // Replace one: first click selects the nearest match, second replaces it.
+    await press("f", [MOD_KEY]);
+    await app.evaluate("(() => { const q = document.getElementById('find-query'); q.value = 'tide'; q.dispatchEvent(new Event('input')); const k = document.getElementById('find-kind'); k.value = 'all'; k.dispatchEvent(new Event('change')); document.getElementById('find-replace').value = 'sea'; })()");
+    await sleep(300);
+    const n0 = (await app.evaluate("__cirth.find.state()")).matches;
+    await app.evaluate("document.getElementById('find-replace-one').click()");
+    await app.evaluate("document.getElementById('find-replace-one').click()");
+    assert((await app.evaluate("__cirth.find.state()")).matches === n0 - 1, "replace one changed exactly one match");
+    await press("Escape");
+    // Marks survive replacement.
+    await openFixture("unicode-marks");
+    await press("f", [MOD_KEY]);
+    await app.evaluate("(() => { const q = document.getElementById('find-query'); q.value = 'bold'; q.dispatchEvent(new Event('input')); const w = document.getElementById('find-word'); w.checked = true; w.dispatchEvent(new Event('change')); document.getElementById('find-replace').value = 'heavy'; })()");
+    await sleep(300);
+    await app.evaluate("document.getElementById('find-replace-all').click()");
+    const runs = (await blocks()).flatMap((b) => b.runs);
+    assert(runs.some((r) => r.text === "heavy" && r.bold), `bold kept: ${JSON.stringify(runs.filter((r) => r.bold))}`);
+    await press("Escape");
+    assert(await storedMatchesEditor(), "store matches editor");
+    return { cues, otherMentions: all - cues, replaceAllMs: ms };
+  });
+
   await test("Shortcuts and menu actions; restore a backup as a new project; switching projects saves first", async () => {
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);

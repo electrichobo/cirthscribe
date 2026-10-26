@@ -17,7 +17,9 @@ M1 progress:
 
 - 2 Menus and backups: native File menu (plus the standard macOS app and Edit menus), Ctrl/Cmd+S, Ctrl/Cmd+Shift+S, Ctrl/Cmd+O; restore any backup as a new project from Home; switching projects saves the current one first.
 
-Next: editor completeness (find/replace, autocomplete, word counts, spell check), then the macOS manual pass and the real-IME checklist on test machines.
+- 3 Find and replace: Ctrl/Cmd+F, match case, whole word, block-type filter, replace one/all (one undo).
+
+Next: editor completeness (character/location autocomplete, word counts, spell check), then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

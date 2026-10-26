@@ -728,11 +728,24 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
     #[cfg(target_os = "macos")]
     {
         let app_menu = SubmenuBuilder::new(app, "CirthScribe").about(None).separator().services().separator().hide().hide_others().show_all().build()?;
-        let edit = SubmenuBuilder::new(app, "Edit").text("undo", "Undo").text("redo", "Redo").separator().cut().copy().paste().select_all().build()?;
+        let edit = SubmenuBuilder::new(app, "Edit")
+            .text("undo", "Undo")
+            .text("redo", "Redo")
+            .separator()
+            .cut()
+            .copy()
+            .paste()
+            .select_all()
+            .separator()
+            .text("find", "Find and Replace…")
+            .build()?;
         return MenuBuilder::new(app).items(&[&app_menu, &file, &edit]).build();
     }
     #[cfg(not(target_os = "macos"))]
-    MenuBuilder::new(app).items(&[&file]).build()
+    {
+        let edit = SubmenuBuilder::new(app, "Edit").text("find", "Find and Replace…").build()?;
+        MenuBuilder::new(app).items(&[&file, &edit]).build()
+    }
 }
 
 fn main() {

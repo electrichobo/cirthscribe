@@ -19,6 +19,8 @@ import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
 import { adoptDomSelection, selSync } from "./selsync";
 import { createHome } from "./home";
+import { findPlugin, findState, matchesIn } from "./find";
+import { installFindBar } from "./findbar";
 
 interface Opened {
   name: string;
@@ -120,6 +122,7 @@ function dispatch(tr: Transaction) {
   view.updateState(next);
   if (tr.docChanged) {
     syncer.changed(next.doc);
+    findBar.refreshCount();
     window.clearTimeout(navTimer);
     navTimer = window.setTimeout(rerenderSide, 150);
   } else if (tr.selectionSet) {
@@ -140,6 +143,7 @@ function makeState(blocks: Block[]) {
       keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
       keymap(baseKeymap),
       pageMarksPlugin(),
+      findPlugin(),
     ],
   });
 }
@@ -171,6 +175,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   }
   const t1 = performance.now();
   setView("editor");
+  $("find-bar").hidden = true; // a new editor state has no search
   $("project-title").textContent = o.doc.title || o.name;
   board.beats = o.beats;
   const state = makeState(o.doc.blocks);
@@ -367,6 +372,8 @@ async function goHome() {
   await home.refresh();
 }
 
+const findBar = installFindBar($("find-bar"), () => view, showBanner);
+
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
   restoreBackup: (path) => openWith("restore_backup", { path }),
@@ -402,6 +409,9 @@ window.addEventListener(
     if (k === "s") {
       e.preventDefault();
       if (lastOpen) void (e.shiftKey ? saveAs() : saveNow());
+    } else if (k === "f" && !e.shiftKey) {
+      e.preventDefault();
+      if (lastOpen) findBar.open();
     } else if (k === "o" && !e.shiftKey) {
       e.preventDefault();
       void openViaDialog();
@@ -434,6 +444,9 @@ async function runMenu(id: string): Promise<void> {
       break;
     case "quit":
       await getCurrentWindow().close();
+      break;
+    case "find":
+      if (lastOpen) findBar.open();
       break;
     case "undo":
       if (view) undo(view.state, view.dispatch);
@@ -510,6 +523,14 @@ $("structural").addEventListener("change", (e) => {
   },
   closeWindow: () => getCurrentWindow().close(),
   menu: (id: string) => runMenu(id),
+  find: {
+    bar: findBar,
+    matchesIn,
+    state: () => {
+      const fs = findState(view.state);
+      return { matches: fs.matches.length, current: fs.current, open: !$("find-bar").hidden };
+    },
+  },
   saveAs: (path: string) => saveAs(path),
   openPath: (path: string) => openWith("open_path", { path }),
   checkOutside,

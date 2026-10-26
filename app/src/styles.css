@@ -106,6 +106,12 @@ dialog.backups h2 { text-transform: none; letter-spacing: 0; font-size: 15px; co
 .backup-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
 .backup-list span { color: var(--muted); }
 .dialog-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+#find-bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; max-width: 8.5in; margin: 0 auto 10px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+#find-bar[hidden] { display: none; }
+#find-bar input[type="search"], #find-bar input[type="text"] { min-width: 14ch; flex: 1; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+#find-count { min-width: 9ch; color: var(--muted); font-variant-numeric: tabular-nums; }
+.find-hit { background: color-mix(in srgb, var(--warn) 30%, transparent); border-radius: 2px; }
+.find-hit.current { background: color-mix(in srgb, var(--accent) 45%, transparent); outline: 1px solid var(--accent); }
 #open-file { width: 100%; padding: 7px 12px; margin-bottom: 18px; }
 .project-item { display: grid; gap: 4px; }
 .forget { justify-self: start; font-size: 12px; }
