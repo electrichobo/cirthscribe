@@ -4,6 +4,8 @@ A free, open-source screenplay writing and story-production app for Windows, mac
 
 Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)). "CirthScribe" is a working title.
 
+Free and open source under GPL-3.0 ([details](#license)).
+
 > **Early development.** CirthScribe is not ready to use yet: there is no download and no release. The features marked done below work in development builds and are covered by automated tests, but your scripts are not safe in it yet. Don't trust it with real work until a release says otherwise.
 
 ## What it is
@@ -138,11 +140,21 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 
 ### Contributing
 
-The project is not taking outside contributions yet; that will open once a license is chosen (see below). Issues and suggestions are welcome.
+Issues and suggestions are welcome. Contributions are accepted under the same license as the project (GPL-3.0-only, below).
 
 ### License
 
-**No license has been chosen yet.** Until a `LICENSE` file is added to this repository, the code is visible but no rights to use, copy, modify or distribute it are granted. The project will be released under an open-source license, with no fees and with attribution to the original author.
+CirthScribe is free and open-source software under the **GNU General Public License, version 3 only** ([LICENSE](LICENSE)), with one additional term under section 7(b) ([NOTICE](NOTICE)).
+
+In plain terms (the license text is what counts):
+
+- **Use it for free, for anything**, including professional and commercial writing. Your scripts are yours; the license covers the app, not what you write with it.
+- **Change it and share it.** Forks and modified versions are welcome.
+- **Keep it open.** Anyone who distributes CirthScribe or a modified version must give it out under the same license, with its full source code.
+- **Keep the credit.** Copies and modified versions must keep the attribution "Based on CirthScribe by Jared Hoy", in the NOTICE file and on any About or credits screen.
+- **No warranty.** It is provided as is.
+
+The GPL does not forbid charging for copies; no open-source license can. But anyone who sells CirthScribe or a version of it must hand buyers the full source under the GPL, and buyers may then share it for free. CirthScribe itself will always be free.
 
 ### Third-party components
 

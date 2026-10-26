@@ -6,6 +6,9 @@ members = ["crates/cirth-core", "app/src-tauri"]
 version = "0.0.1"
 edition = "2024"
 publish = false
+license = "GPL-3.0-only"
+authors = ["Jared Hoy"]
+repository = "https://github.com/electrichobo/cirthscribe"
 
 [profile.dev.package."*"]
 opt-level = 2

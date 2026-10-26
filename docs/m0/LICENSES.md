@@ -18,7 +18,7 @@ Coverage note: the Rust table resolves dependencies for Windows (x86_64-pc-windo
 
 ## Items to review
 
-- **MPL-2.0** (file-level copyleft): `spellbook` (spell checking, chosen in ADR 0002), `cssparser`, `cssparser-macros`, `dtoa-short`, `selectors` (via Tauri), `option-ext` (via `dirs`). Distributable in binaries; modified MPL files must stay MPL. Note when choosing the project license.
+- **MPL-2.0** (file-level copyleft): `spellbook` (spell checking, chosen in ADR 0002), `cssparser`, `cssparser-macros`, `dtoa-short`, `selectors` (via Tauri), `option-ext` (via `dirs`). Distributable in binaries; modified MPL files must stay MPL. Compatible with the project license (GPL-3.0-only): MPL-2.0 section 3.3 allows combination with the GPL, and none of these packages carries the "Incompatible With Secondary Licenses" notice (checked in the spellbook 0.4.2 source).
 - Build-only MPL-2.0: `lightningcss` (Vite), not shipped.
 - No GPL/LGPL, unknown or proprietary packages in the Rust graph or the shipped JS.
 ## Rust crates (resolved for x86_64-pc-windows-gnu): 269

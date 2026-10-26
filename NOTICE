@@ -1,0 +1,46 @@
+CirthScribe
+Copyright (C) 2026 Jared Hoy (electrichobo)
+https://github.com/electrichobo/cirthscribe
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, version 3 of the License only (GPL-3.0-only).
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details. You should have received a copy of the GNU General Public
+License along with this program (the LICENSE file). If not, see
+<https://www.gnu.org/licenses/>.
+
+
+ADDITIONAL TERMS UNDER SECTION 7(b) OF THE GNU GPL VERSION 3
+
+As permitted by section 7(b) of the GNU General Public License version 3,
+the following author attribution must be preserved in all copies of this
+program, in modified versions, and in any work based on it:
+
+    Based on CirthScribe by Jared Hoy
+    https://github.com/electrichobo/cirthscribe
+
+1. In source form: keep this NOTICE file, including this attribution,
+   with every copy or modified version of the source code.
+
+2. In any interactive user interface: where the work displays Appropriate
+   Legal Notices (section 5(d) of the GPL), for example an About, Credits
+   or Legal screen, include this attribution there.
+
+Modified versions may add their own names and credits, but must not remove
+or obscure this attribution. This term does not require a modified version
+to use the name "CirthScribe", and it does not imply that the original
+author endorses a modified version.
+
+
+THIRD-PARTY COMPONENTS
+
+This program includes third-party components that remain under their own
+licenses, including the Courier Prime font (SIL Open Font License 1.1), the
+SCOWL English dictionaries (permissive notices in each README_*.txt file),
+the spellbook spell checker (MPL-2.0), SQLite (public domain), and Rust and
+JavaScript libraries mostly under the MIT and/or Apache-2.0 licenses. See
+docs/m0/LICENSES.md for the full inventory.

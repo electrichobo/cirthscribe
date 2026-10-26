@@ -9,7 +9,7 @@ The following defaults allow progress without pretending the owner has already s
 | Web UI/editor | ProseMirror, single undo stack, Rust-owned canonical document (ADR 0001) | M0 (done) |
 | Pagination authority | Rust fixed-pitch layout engine; WebView never measures pages; PDF draws the same page map (ADR 0001) | M0 (done); production rules M2 |
 | Product model | Free/open-source, offline-first, no account required | Owner requirement |
-| Project license | Unselected; permissive versus reciprocal licensing needs owner choice | Before public source release |
+| Project license | GPL-3.0-only with a section 7(b) author-attribution term (see `NOTICE`); chosen by the owner 2026-10-26. Selling is allowed by any open-source license, but sellers must pass on the full source under the GPL. | Done |
 | Dependency policy | Core must build/run without paid proprietary components or secret licenses | Every adoption |
 | Native extension | .cirth proposed (SQLite file); owner confirmation pending | M1 |
 | Working storage | SQLite working copy (WAL, exclusive lock) plus atomic package save; proposal in docs/m0/SCHEMA.md | M0 prototype (done); schema v2 in M1 |
@@ -25,7 +25,6 @@ The following defaults allow progress without pretending the owner has already s
 
 ## Later questions that do not block drafting or M0
 
-- Preferred open-source license and whether derivative distributions must publish changes.
 - Exact visual identity, keyboard cycle variants, and preferred default page profile.
 - Which production revision conventions should ship as presets.
 - Whether immersive storytelling first targets branching prose, interactive screenplay annotations, or another output engine.
