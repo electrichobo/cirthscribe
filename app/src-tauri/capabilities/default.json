@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "M0 spike: only core events and the app's own commands. No shell, no fs plugin, no http.",
+  "description": "Core events, the app's own commands, and closing the main window (the close handler saves first). No shell, no fs plugin, no http.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-destroy"]
 }

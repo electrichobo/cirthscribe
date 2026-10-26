@@ -205,6 +205,56 @@ fn inspect_reads_a_package_and_reports_a_locked_working_store() {
 }
 
 #[test]
+fn package_saves_keep_rolling_backups_under_the_policy() {
+    use cirth_core::backup::{self, BackupPolicy};
+    use std::time::{Duration, UNIX_EPOCH};
+    let d = tmpdir("backups");
+    let (work, pkg, bdir) = (d.join("w.db"), d.join("tide.cirth"), d.join("backups"));
+    let policy = BackupPolicy { dir: bdir.clone(), keep: 3, min_interval: Duration::from_secs(600) };
+    let t = |s: u64| UNIX_EPOCH + Duration::from_secs(1_761_454_800 + s);
+    let mut s = Store::open(&work).unwrap();
+    s.seed(&fixtures::unicode_marks().to_document().unwrap()).unwrap();
+    let edit = |s: &mut Store, text: &str| {
+        let v = s.version().unwrap();
+        s.apply(&batch(v, vec![Op::Put { block: Block::new(BlockKind::Action, text), after: None }])).unwrap();
+    };
+    let versions = |dir: &std::path::Path| backup::list(dir, "tide").iter().map(|b| b.saved_version).collect::<Vec<_>>();
+
+    // First save: nothing to back up yet.
+    s.save_package_with_backup(&pkg, Some(&policy), t(0), false).unwrap();
+    assert!(versions(&bdir).is_empty());
+    // Package (v1) exists now; the next save backs it up.
+    edit(&mut s, "two");
+    s.save_package_with_backup(&pkg, Some(&policy), t(60), false).unwrap();
+    assert_eq!(versions(&bdir), vec![1]);
+    // Within min_interval: autosave does not add a backup...
+    edit(&mut s, "three");
+    s.save_package_with_backup(&pkg, Some(&policy), t(120), false).unwrap();
+    assert_eq!(versions(&bdir), vec![1]);
+    // ...but an explicit Save does (package was v2).
+    edit(&mut s, "four");
+    s.save_package_with_backup(&pkg, Some(&policy), t(180), true).unwrap();
+    assert_eq!(versions(&bdir), vec![3, 1]);
+    // Unchanged project: the backup of that version is made once, not twice.
+    s.save_package_with_backup(&pkg, Some(&policy), t(190), true).unwrap();
+    s.save_package_with_backup(&pkg, Some(&policy), t(200), true).unwrap();
+    assert_eq!(versions(&bdir), vec![4, 3, 1]);
+    // Rotation keeps the newest three.
+    for (i, at) in [900u64, 1800, 2700].into_iter().enumerate() {
+        edit(&mut s, &format!("later {i}"));
+        s.save_package_with_backup(&pkg, Some(&policy), t(at), false).unwrap();
+    }
+    assert_eq!(versions(&bdir), vec![6, 5, 4]);
+    // Every backup is a complete project file holding its version's content.
+    for b in backup::list(&bdir, "tide") {
+        let info = Store::inspect(&b.path).unwrap();
+        assert_eq!(info.saved_version, b.saved_version, "{}", b.file_name);
+        assert_eq!(info.blocks, 9 + b.saved_version - 1, "{}", b.file_name);
+    }
+    assert!(std::fs::read_dir(&bdir).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().ends_with(".tmp")));
+}
+
+#[test]
 fn future_schema_is_refused() {
     let d = tmpdir("future");
     let path = d.join("w.db");

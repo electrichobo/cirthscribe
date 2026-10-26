@@ -11,7 +11,10 @@ Status: proposed. Schema v1 below is what the spike implements; the M1 additions
 - The working copy never lives in a cloud-synced folder; the package may. The package holds no absolute paths or credentials.
 - Package files are written in rollback-journal mode, so a copied `.cirth` is a single self-contained file.
 
-Proposed M1 change: autosave also writes the package on a timer and on close (so the user-visible file is current), while the working copy remains the crash-recovery journal.
+Implemented in M1 (2026-10-26):
+- The package is written on Save, on Home, on window close (the close handler flushes pending edits first; if saving fails the window stays open once and says so), and by autosave every 60 s when the store has moved past the last file save. A Rust exit hook saves again as a safety net. The working copy remains the crash-recovery journal.
+- Package replacement is crash-safe: Windows `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`; Unix `rename` plus a directory fsync (`cirth-core/src/fsutil.rs`).
+- Rolling backups (`cirth-core/src/backup.rs`) in the app's `backups` folder: before a package is replaced, the current file is copied as `<name>--<UTC time>Z--v<version>.cirth`; at most one per 10 minutes from autosave, always on an explicit Save of a changed file, never two of the same version; the newest 20 are kept. Each backup is a complete project file. A restore command in the UI is not built yet.
 
 ## Schema v1 (implemented)
 

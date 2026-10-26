@@ -1,4 +1,6 @@
+pub mod backup;
 pub mod fixtures;
+pub mod fsutil;
 pub mod fontcheck;
 pub mod layout;
 pub mod model;

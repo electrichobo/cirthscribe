@@ -94,7 +94,7 @@ Run-to-run variance (added in M1, four suite runs on the same machine, same fixt
 | Glyph coverage | Courier Prime lacks CJK, Hebrew, Arabic, emoji and U+0301; PDF drops them; fixed-pitch layout assumes 1 or 2 columns | Decide a fallback font strategy with its own metrics, and block production PDF when glyphs are missing |
 | RTL and bidi | Layout engine treats text as LTR columns | Out of scope until a non-Latin profile; keep the missing-glyph warning |
 | Layout profile accuracy | Margins and widths follow common guidance, not checked against industry PDFs | M2 fixture comparison |
-| Atomic rename durability | `std::fs::rename` does not request write-through; no directory fsync on Windows | Use `MoveFileExW(MOVEFILE_REPLACE_EXISTING \| MOVEFILE_WRITE_THROUGH)` in M1 |
+| Atomic rename durability | `std::fs::rename` does not request write-through; no directory fsync on Windows | **Done in M1:** `MoveFileExW(MOVEFILE_REPLACE_EXISTING \| MOVEFILE_WRITE_THROUGH)` on Windows, rename + directory fsync on Unix (`fsutil.rs`). Power-loss behavior itself is not tested. |
 | Whole-document scene moves | Diff uses LIS so only moved blocks are written; editor side took 70 ms for a full-length move | Acceptable; recheck on slower hardware |
 | GNU-built Windows exe | Needs `WebView2Loader.dll` beside the exe (MSVC links it statically) | Release builds use MSVC in CI |
 | printpdf | Embeds whole fonts (no subsetting); no tagged PDF | Evaluate subsetting/tagging or another writer in M2 |

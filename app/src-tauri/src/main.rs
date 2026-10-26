@@ -129,6 +129,7 @@ struct ProjectEntry {
     saved_version: u64,
     /// The working store holds commits newer than the last package save.
     recoverable: bool,
+    backups: usize,
     /// Open in this window right now.
     open: bool,
     error: Option<String>,
@@ -156,7 +157,8 @@ async fn list_projects(app: State<'_, App>) -> Result<Vec<ProjectEntry>, String>
             .unwrap_or(0);
         let open = current.as_deref() == Some(name.as_str());
         let (work, _) = paths(&app, &name);
-        let mut e = ProjectEntry { sample: SAMPLES.contains(&name.as_str()), name, title: String::new(), modified_ms, blocks: 0, scenes: 0, saved_version: 0, recoverable: false, open, error: None };
+        let mut e = ProjectEntry { sample: SAMPLES.contains(&name.as_str()), name, title: String::new(), modified_ms, blocks: 0, scenes: 0, saved_version: 0, recoverable: false, backups: 0, open, error: None };
+        e.backups = cirth_core::backup::list(&backup_policy(&app).dir, &e.name).len();
         match Store::inspect(&path) {
             Ok(info) => {
                 e.title = info.title;
@@ -264,8 +266,28 @@ async fn put_beat(app: State<'_, App>, beat: Beat) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn save_package(app: State<'_, App>) -> Result<u64, String> {
-    with_session(&app, |s| s.store.save_package(&s.package).map_err(err))
+async fn save_package(app: State<'_, App>, explicit: Option<bool>) -> Result<Saved, String> {
+    save_current(&app, explicit.unwrap_or(false))
+}
+
+/// Backup rules (see cirth_core::backup): keep 20, at most one per 10
+/// minutes from autosave; an explicit Save always backs up a changed file.
+fn backup_policy(app: &App) -> cirth_core::backup::BackupPolicy {
+    cirth_core::backup::BackupPolicy { dir: app.data_dir.lock().unwrap().join("backups"), keep: 20, min_interval: std::time::Duration::from_secs(600) }
+}
+
+#[derive(Serialize)]
+struct Saved {
+    version: u64,
+    backups: usize,
+}
+
+fn save_current(app: &App, explicit: bool) -> Result<Saved, String> {
+    let policy = backup_policy(app);
+    with_session(app, |s| {
+        let version = s.store.save_package_with_backup(&s.package, Some(&policy), std::time::SystemTime::now(), explicit).map_err(err)?;
+        Ok(Saved { version, backups: cirth_core::backup::list(&policy.dir, &s.name).len() })
+    })
 }
 
 #[derive(Serialize)]
@@ -341,6 +363,17 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![open_fixture, list_projects, create_project, open_project, close_project, apply_batch, load_document, put_beat, save_package, paginate, export_pdf, process_id])
-        .run(tauri::generate_context!())
-        .expect("error while running CirthScribe");
+        .build(tauri::generate_context!())
+        .expect("error while building CirthScribe")
+        .run(|handle, event| {
+            // Safety net: the window's close handler saves first; if it could
+            // not (e.g. the UI was unresponsive), save what the store holds.
+            // Edits still waiting in the UI's debounce are not in the store.
+            if let tauri::RunEvent::Exit = event {
+                let app = handle.state::<App>();
+                if app.session.lock().unwrap().is_some() {
+                    let _ = save_current(&app, false);
+                }
+            }
+        });
 }

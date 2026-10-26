@@ -1,17 +1,17 @@
 # Status
 
-Updated 2026-10-25.
+Updated 2026-10-26.
 
 **Current milestone: M1 in progress (plan: `docs/M1_PLAN.md`). M0 complete on Windows only.**
 
 M1 progress:
 - 1.1 done: End-key selection defect fixed; regression and stress tests.
-- 1.2 built: driver-neutral e2e suite with DevTools and WebDriver drivers; passes on Windows through both. Linux runs in CI (not run yet); macOS is a manual checklist (not run yet).
-- 1.3 CI: Linux green (WebKitGTK e2e 14/14, IME skipped); macOS green (core tests, build); Windows builds and core tests green with MSVC, but e2e cannot start WebView2 on the GitHub runner. Windows e2e steps are non-blocking in CI (10-minute cap); Windows e2e is run locally on a desktop session until this is solved.
+- 1.2 done: driver-neutral e2e suite with DevTools and WebDriver drivers; passes on Windows through both and on Linux in CI. macOS is a manual checklist (not run yet).
+- 1.3 CI: Linux green (WebKitGTK e2e, IME skipped); macOS green (core tests, build); Windows builds and core tests green with MSVC, but e2e cannot start WebView2 on the GitHub runner. Windows e2e steps are non-blocking in CI (10-minute cap); Windows e2e is run locally on a desktop session until this is solved.
+- 2 Home screen (project library) at startup: lists projects in the app's library folder with scene/block counts, modified time, backup count and a recovery badge; creates projects (titles never overwrite an existing file); opens samples; the toolbar's Home button saves and closes the project. Opening files from elsewhere on disk (file dialogs) is not built yet.
+- 2 Saving: the project file autosaves every 60 s and on window close; rolling backups (20 kept); crash-safe file replacement. No restore-from-backup UI yet.
 
-- 2 started: Home screen (project library) at startup: lists projects in the app's library folder with scene/block counts, modified time and a recovery badge; creates projects (titles never overwrite an existing file); opens samples; the toolbar's Home button saves and closes the project. Opening files from elsewhere on disk (file dialogs) is not built yet.
-
-Next: green CI on all three platforms, then the macOS manual pass and the real-IME checklist on test machines.
+Next: schema v2 and migrations, file dialogs (Open/Save As anywhere), outside-change detection, then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

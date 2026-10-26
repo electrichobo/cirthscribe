@@ -229,6 +229,16 @@ impl Store {
 
     /// Write a consistent snapshot to `dest` via temp file and rename.
     pub fn save_package(&self, dest: &Path) -> Result<u64> {
+        self.save_package_with_backup(dest, None, std::time::SystemTime::now(), false)
+    }
+
+    /// Like `save_package`, but first copies the current package into the
+    /// backup folder when the policy calls for it (`force` = explicit Save).
+    pub fn save_package_with_backup(&self, dest: &Path, policy: Option<&crate::backup::BackupPolicy>, now: std::time::SystemTime, force: bool) -> Result<u64> {
+        if let Some(policy) = policy {
+            let current = if dest.exists() { Store::inspect(dest).map(|i| i.saved_version).unwrap_or(0) } else { 0 };
+            crate::backup::before_replace(dest, current, policy, now, force)?;
+        }
         let version = self.version()?;
         let tmp = dest.with_extension("cirth.tmp");
         if tmp.exists() {
@@ -244,9 +254,8 @@ impl Store {
                 return Err(StoreError::Invalid(format!("package snapshot failed integrity check: {ok}")));
             }
         }
-        // FlushFileBuffers needs a writable handle on Windows.
-        std::fs::OpenOptions::new().write(true).open(&tmp)?.sync_all()?;
-        std::fs::rename(&tmp, dest)?;
+        crate::fsutil::sync_file(&tmp)?;
+        crate::fsutil::replace_file(&tmp, dest)?;
         Self::set_meta(&self.conn, "saved_version", &version.to_string())?;
         Ok(version)
     }

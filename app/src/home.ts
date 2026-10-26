@@ -13,6 +13,7 @@ export interface ProjectEntry {
   scenes: number;
   saved_version: number;
   recoverable: boolean;
+  backups: number;
   open: boolean;
   error: string | null;
 }
@@ -111,7 +112,7 @@ export function createHome(root: HTMLElement, actions: Actions) {
         el("strong", {}, title),
         el("span", { className: "file" }, `${p.name}.cirth`),
         el("span", {}, p.error ? p.error : `${plural(p.scenes, "scene")} · ${plural(p.blocks, "block")}`),
-        el("span", {}, `Modified ${when(p.modified_ms)}`),
+        el("span", {}, `Modified ${when(p.modified_ms)}${p.backups ? ` · ${plural(p.backups, "backup")}` : ""}`),
         badges,
       ),
     );

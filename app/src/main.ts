@@ -5,6 +5,7 @@ import { history, undo, redo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
@@ -185,7 +186,11 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   const t2 = performance.now();
   (window as any).__cirth.openTimings = { ipcAndStoreMs: t1 - t0, rustOpenMs: o.open_ms, buildAndFirstPaintMs: t2 - t1, totalMs: t2 - t0, blocks: o.doc.blocks.length };
   showBanner(o.recovered ? `Recovered unsaved work from the working store (v${o.doc.version}; package was saved at v${o.saved_version}).` : null);
+  fileSavedVersion = o.saved_version;
+  fileSavedAt = null;
+  scheduleAutosave();
   lastOpen = o; // set last: tests treat it as "open finished"
+  showFileStatus();
   rerenderSide();
   void repaginate();
   view.focus();
@@ -196,12 +201,70 @@ function setView(v: "home" | "editor") {
   document.body.dataset.view = v;
 }
 
+// --- Saving the project file -------------------------------------------------
+// Every edit is durable in the working store once acknowledged. The project
+// file (.cirth) is written from it: on Save, on Home, on window close, and by
+// autosave when the store has moved past the last file save.
+
+let fileSavedVersion = 0;
+let fileSavedAt: Date | null = null;
+let saving: Promise<void> | null = null;
+let autosaveMs = 60_000;
+let autosaveTimer: number | undefined;
+const fileStatusEl = $("file-status");
+
+function showFileStatus() {
+  fileStatusEl.textContent = !lastOpen
+    ? ""
+    : fileSavedAt
+      ? `File saved v${fileSavedVersion} at ${fileSavedAt.toLocaleTimeString()}`
+      : `File at v${fileSavedVersion}`;
+}
+
+/** Flush pending edits, then write the project file. Throws on failure. */
+async function saveFile(explicit: boolean): Promise<void> {
+  while (saving) await saving;
+  saving = (async () => {
+    await syncer.flush();
+    const r = await invoke<{ version: number; backups: number }>("save_package", { explicit });
+    fileSavedVersion = r.version;
+    fileSavedAt = new Date();
+    showFileStatus();
+  })();
+  try {
+    await saving;
+  } finally {
+    saving = null;
+  }
+}
+
+function scheduleAutosave() {
+  window.clearInterval(autosaveTimer);
+  autosaveTimer = window.setInterval(() => {
+    if (!lastOpen || saving || syncer.currentVersion <= fileSavedVersion) return;
+    saveFile(false).catch((e) => showBanner(`Autosave of the project file failed: ${e}. Your edits are still kept in the recovery store.`));
+  }, autosaveMs);
+}
+
+// Closing the window: save the file first. If that fails, keep the window
+// open once and say so; a second close quits (edits stay recoverable).
+let closeFailedOnce = false;
+void getCurrentWindow().onCloseRequested(async (event) => {
+  if (!lastOpen || closeFailedOnce) return;
+  try {
+    await saveFile(false);
+  } catch (e) {
+    event.preventDefault();
+    closeFailedOnce = true;
+    showBanner(`Could not save the project file before closing: ${e}. Your edits are kept in the recovery store. Close again to quit anyway.`);
+  }
+});
+
 /** Save and close the open project (if any), then show the project library. */
 async function goHome() {
   if (lastOpen) {
     try {
-      await syncer.flush();
-      await invoke("save_package");
+      await saveFile(false);
       await invoke("close_project");
     } catch (e) {
       // Do not leave the project if it could not be saved.
@@ -210,6 +273,8 @@ async function goHome() {
     }
     lastOpen = null;
     window.clearTimeout(pageTimer);
+    window.clearInterval(autosaveTimer);
+    showFileStatus();
   }
   setView("home");
   await home.refresh();
@@ -224,12 +289,10 @@ const home = createHome($("home"), {
 $("go-home").addEventListener("click", () => void goHome());
 $("profile").addEventListener("change", () => void repaginate());
 $("save").addEventListener("click", async () => {
-  await syncer.flush();
   try {
-    const v = await invoke<number>("save_package");
-    statusEl.textContent = `Package saved at v${v}`;
+    await saveFile(true);
   } catch (e) {
-    showBanner(`Save failed: ${e}`);
+    showBanner(`Save failed: ${e}. Your edits are still kept in the recovery store.`);
   }
 });
 $("pdf").addEventListener("click", async () => {
@@ -248,7 +311,6 @@ $("structural").addEventListener("change", (e) => {
   board.structural = (e.target as HTMLInputElement).checked;
   rerenderSide();
 });
-window.addEventListener("beforeunload", () => void syncer?.flush());
 
 // Test and measurement hooks (used by app/tests via the WebView DevTools protocol).
 (window as any).__cirth = {
@@ -287,6 +349,14 @@ window.addEventListener("beforeunload", () => void syncer?.flush());
   open,
   goHome,
   home,
+  get fileSavedVersion() {
+    return fileSavedVersion;
+  },
+  setAutosaveMs: (ms: number) => {
+    autosaveMs = ms;
+    if (lastOpen) scheduleAutosave();
+  },
+  closeWindow: () => getCurrentWindow().close(),
   flush: () => syncer.flush(),
   repaginate,
   loadStored: () => invoke<{ version: number; blocks: Block[] }>("load_document"),

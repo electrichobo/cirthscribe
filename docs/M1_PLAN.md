@@ -20,9 +20,7 @@ Order matters: the first three items remove M0's open risks before features grow
 
 - **Done 2026-10-25:** Home screen (project library) with New project, Samples, library cards (title, file, counts, modified, recovery badge), open, and save-and-close back to Home. Tested by e2e (create, reopen, no overwrite, recovery badge, locked project).
 - Native menus and shortcuts; New, Open, Save, Save As, Close, Recent projects (file dialogs via `tauri-plugin-dialog`; add after a dependency review).
-- Autosave on a timer and on close, writing the package as well as the working copy (SCHEMA.md); visible save status including "not stored" errors.
-- Backups: rolling package copies (count configurable).
-- Durable rename: `MoveFileExW` with write-through on Windows; fsync of the directory on Unix.
+- **Done 2026-10-26:** autosave of the project file every 60 s and on window close (flushes pending edits first), file-save status in the toolbar; rolling backups (20 kept, 10-minute spacing, always on explicit Save); crash-safe replacement (`MoveFileExW` write-through on Windows, rename + directory fsync on Unix). Tests: core rotation/replace tests; e2e "autosave, Save backs up, closing saves the last edits". **Still to do:** a restore-from-backup command in the UI; configurable counts.
 - Schema v2 and the migration framework with backup-before-migrate and stored v1 fixtures (A7).
 - Detect external changes to the package and conflicting writers (A6), keeping both versions.
 

@@ -457,6 +457,52 @@ export async function runSuite({ driver, results, screensDir }) {
     return m;
   });
 
+  await test("Project file: autosave writes it, Save backs it up, closing the window saves the last edits", async () => {
+    await openFixture("unicode-marks");
+    await app.evaluate("__cirth.setAutosaveMs(1000)");
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await press("Enter");
+    await typeText("AUTOSAVED");
+    await waitSynced();
+    await waitFor(app, "__cirth.fileSavedVersion === __cirth.syncer.currentVersion", "autosave to write the project file");
+    const autosaved = await app.evaluate("__cirth.fileSavedVersion");
+    // Explicit Save after another edit: the previous file goes to backups.
+    await typeText(" SAVED");
+    await app.evaluate("(() => { document.getElementById('save').click(); return true; })()");
+    await waitFor(app, "__cirth.fileSavedVersion > " + autosaved, "explicit save");
+    const fileStatus = await app.evaluate("document.getElementById('file-status').textContent");
+    assert(/^File saved v\d+ at /.test(fileStatus), `file status '${fileStatus}'`);
+    // Type and close the window at once: the close handler flushes and saves.
+    await press("Enter");
+    await typeText("LAST WORDS");
+    const pid = await app.evaluate("__cirth.pid()");
+    await app.evaluate("__cirth.closeWindow()").catch(() => {});
+    let alive = true;
+    for (let i = 0; i < 100 && alive; i++) {
+      await sleep(100);
+      try {
+        process.kill(pid, 0);
+      } catch {
+        alive = false;
+      }
+    }
+    assert(!alive, "the app exited after the window closed");
+    await app.close().catch(() => {});
+    app = await driver.launch("after-close");
+    await waitHome(app);
+    const card = await app.evaluate(`document.querySelector('#home [data-project="unicode-marks"]').textContent`);
+    assert(!/recovered/.test(card), `closing saved the file, nothing to recover: '${card}'`);
+    assert(/\d+ backups?/.test(card), `backup count shown: '${card}'`);
+    await clickHome(app, '[data-project="unicode-marks"]');
+    await waitOpen(app);
+    const lo = await app.evaluate("__cirth.lastOpen");
+    const b = await blocks();
+    assert(lo.recovered === false, "opened from the file, not recovered");
+    assert(text(b.at(-2)) === "AUTOSAVED SAVED" && text(b.at(-1)) === "LAST WORDS", `reopened '${text(b.at(-2))}' / '${text(b.at(-1))}'`);
+    return { card };
+  });
+
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {
     await openFixture("unicode-marks");
     const n0 = (await blocks()).length;
