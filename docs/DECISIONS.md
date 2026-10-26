@@ -5,20 +5,21 @@ The following defaults allow progress without pretending the owner has already s
 | Topic | Current position | When to settle |
 | --- | --- | --- |
 | Working title | CirthScribe | Revisit before public naming/branding |
-| Desktop stack | Prefer Rust + Tauri; C# + Avalonia allowed if evidence favors it | M0 ADR |
-| Web UI/editor | TypeScript structured editor such as ProseMirror is a candidate | M0 |
+| Desktop stack | Rust + Tauri 2, accepted for M1 on Windows evidence (ADR 0001); macOS/Linux verification is an M1 gate | M0 ADR (done) |
+| Web UI/editor | ProseMirror, single undo stack, Rust-owned canonical document (ADR 0001) | M0 (done) |
+| Pagination authority | Rust fixed-pitch layout engine; WebView never measures pages; PDF draws the same page map (ADR 0001) | M0 (done); production rules M2 |
 | Product model | Free/open-source, offline-first, no account required | Owner requirement |
 | Project license | Unselected; permissive versus reciprocal licensing needs owner choice | Before public source release |
 | Dependency policy | Core must build/run without paid proprietary components or secret licenses | Every adoption |
-| Native extension | Propose .cirth | M0 schema/container decision |
-| Working storage | Evaluate local SQLite; portable versioned package | M0 recovery prototype |
+| Native extension | .cirth proposed (SQLite file); owner confirmation pending | M1 |
+| Working storage | SQLite working copy (WAL, exclusive lock) plus atomic package save; proposal in docs/m0/SCHEMA.md | M0 prototype (done); schema v2 in M1 |
 | Formatting priority | US screenplay first; UK and other templates retained in roadmap | Fixed priority, refinable with owner |
 | Structural sync | Off by default; explicit per-document permission | M3 behavior |
 | Timing language | Estimates separate from measured on-screen duration | Fixed semantic rule |
 | Google support | Tested DOCX/XLSX/CSV profiles first; live feedback later | M2/M4, integration ADR later |
 | AI | Optional BYO provider/endpoint, disabled by default | M7 |
 | OS support | Windows/Mac/Linux; exact versions/architectures not yet selected | M0/M1 platform matrix |
-| Fonts/dictionaries | Redistributable and reproducibly available, exact choices unselected | M0/M1 |
+| Fonts/dictionaries | Courier Prime (OFL 1.1) for the screenplay profile; non-Latin fallback and dictionaries unselected | Font M0 (done); fallback and dictionaries M1/M2 |
 | Signing/installers | Plan separately; no promise that every release can be signed at no cost | Before distribution |
 | Git-like history | In-app snapshots/branches, no Git installation requirement | M5 implementation ADR |
 

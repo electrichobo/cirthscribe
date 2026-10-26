@@ -1,0 +1,69 @@
+/* Spike styling: plain and functional. Visual identity is not an M0 goal. */
+@font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; }
+@font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; }
+@font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; }
+
+:root {
+  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1f; --muted: #5d5d66; --line: #d6d3cc; --accent: #2b5fb3; --warn: #8a4b00; --bad: #a3141c;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1b1c1f; --panel: #26272b; --ink: #ececef; --muted: #a8a8b3; --line: #3a3b41; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
+body { display: grid; grid-template-rows: auto 1fr auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { padding: 3px 9px; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer; }
+button:focus-visible, select:focus-visible, textarea:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#status { margin-left: auto; font-variant-numeric: tabular-nums; }
+#status[data-state="error"] { color: var(--bad); font-weight: 600; }
+#status[data-state="pending"]::before, #status[data-state="saving"]::before { content: "● "; color: var(--warn); }
+.panes { display: grid; grid-template-columns: 260px 1fr 320px; min-height: 0; }
+nav, aside { overflow: auto; padding: 8px 10px; background: var(--panel); border-right: 1px solid var(--line); }
+aside { border-right: 0; border-left: 1px solid var(--line); }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 0 8px; }
+.nav-list { list-style: none; margin: 0; padding: 0; }
+.nav-list li { display: flex; gap: 2px; align-items: stretch; }
+.nav-list li.current .nav-go { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.nav-go { flex: 1; text-align: left; border: 0; background: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 3px 4px; }
+.nav-go .num { color: var(--muted); display: inline-block; min-width: 2.2em; }
+.nav-move { padding: 0 5px; }
+.editor-wrap { overflow: auto; padding: 16px 0 40vh; }
+#banner { margin: 0 auto 10px; max-width: 8.5in; padding: 8px 10px; border: 1px solid var(--warn); color: var(--warn); background: var(--panel); border-radius: 4px; }
+footer { padding: 4px 12px; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+
+/* The editable "page": 8.5in wide, Courier Prime 12pt, 6 lines per inch. 1ch = 0.1in.
+   These offsets mirror the layout profile for a close visual match; the
+   authoritative page map comes from Rust, not from this CSS. */
+#editor { width: 8.5in; margin: 0 auto; background: var(--panel); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.ProseMirror { font-family: "Courier Prime", monospace; font-size: 12pt; line-height: 12pt; padding: 1in 0; outline: none; white-space: pre-wrap; word-wrap: break-word; }
+.ProseMirror p { margin: 12pt 0 0; }
+.ProseMirror p:first-child { margin-top: 0; }
+.b-heading, .b-action, .b-shot, .b-section { margin-left: 1.5in !important; width: 60ch; }
+.b-heading, .b-shot, .b-section, .b-character, .b-transition { text-transform: uppercase; }
+.b-character { margin-left: 3.7in !important; width: 38ch; }
+.b-parenthetical { margin-left: 3.1in !important; width: 25ch; margin-top: 0 !important; }
+.b-dialogue, .b-lyric { margin-left: 2.5in !important; width: 35ch; margin-top: 0 !important; }
+.b-lyric { font-style: italic; }
+.b-transition { margin-left: 5.5in !important; width: 20ch; text-align: right; }
+.b-character[data-dual]::after { content: " ⇆ dual"; color: var(--muted); font-size: 9pt; text-transform: none; }
+.ProseMirror p.b:has(> br:only-child)::before { content: attr(data-kind); color: var(--muted); opacity: .5; position: absolute; font-size: 9pt; text-transform: none; }
+.page-mark { margin: 12pt 0 0 0; border-top: 1px dashed var(--accent); color: var(--accent); font: 10px system-ui, sans-serif; text-align: right; padding-right: .5in; user-select: none; }
+.page-mark.inline { border: 0; border-left: 2px solid var(--accent); padding: 0 3px; margin: 0 2px; font-size: 9px; vertical-align: super; }
+.page-mark.stale { opacity: .45; }
+.board-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid currentColor; }
+.badge.planning { color: var(--muted); }
+.badge.live { color: var(--warn); }
+.cards { display: grid; gap: 8px; }
+.card { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--bg); }
+.card-link { display: block; width: 100%; text-align: left; font-weight: 600; border: 0; background: none; padding: 0 0 4px; }
+.card-link.missing { color: var(--warn); }
+.summary { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 3px 5px; }
+.excerpt { margin: 4px 0; color: var(--muted); font-family: "Courier Prime", monospace; font-size: 11px; }
+.card-moves { display: flex; gap: 4px; justify-content: flex-end; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

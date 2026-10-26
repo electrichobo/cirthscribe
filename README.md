@@ -4,7 +4,7 @@ Version 0.1 | 2026-10-25 | Owner: Jared Hoy
 
 A practical starting brief for an AI-assisted, free/open-source screenplay and story-production application.
 
-This pack is specification only. It contains no implemented editor, tested compatibility guarantee, or chosen project license.
+This pack began as specification only. The repository now also holds the M0 feasibility spike (see STATUS.md); it is not a usable application, and there is still no tested compatibility guarantee or chosen project license.
 
 ## Put this into a repository
 

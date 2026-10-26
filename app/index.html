@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CirthScribe M0 spike</title>
+  </head>
+  <body>
+    <header class="toolbar" role="toolbar" aria-label="Project">
+      <label>Fixture
+        <select id="fixture">
+          <option value="unicode-marks">Unicode and marks</option>
+          <option value="page-boundaries">Page boundary cases</option>
+          <option value="long-120">Long script (120+ pages)</option>
+        </select>
+      </label>
+      <button id="reset" type="button" title="Discard the project and reseed it from the fixture">Reset</button>
+      <button id="save" type="button">Save package</button>
+      <label>Profile
+        <select id="profile"><option value="letter">US Letter</option><option value="a4">A4</option></select>
+      </label>
+      <button id="pdf" type="button">Export PDF (proof)</button>
+      <label>Zoom <input id="zoom" type="range" min="60" max="160" value="100" step="10" aria-label="Editor zoom" /></label>
+      <label class="toggle"><input id="structural" type="checkbox" /> Board may reorder script</label>
+      <span id="status" role="status" aria-live="polite"></span>
+    </header>
+    <main class="panes">
+      <nav id="navigator" aria-label="Scene navigator"></nav>
+      <section class="editor-wrap" aria-label="Screenplay">
+        <div id="banner" role="alert" hidden></div>
+        <div id="editor"></div>
+      </section>
+      <aside id="board" aria-label="Board"></aside>
+    </main>
+    <footer id="info"></footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

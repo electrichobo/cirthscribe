@@ -9,6 +9,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 cirth-core = { path = "../../crates/cirth-core" }
-tauri = { version = "2", features = [] }
+# custom-protocol: serve the built frontend from the binary; no dev server needed.
+tauri = { version = "2", features = ["custom-protocol"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

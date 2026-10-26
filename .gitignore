@@ -9,3 +9,4 @@ node_modules/
 *.cirth.lock
 .env
 CLAUDE.local.md
+/app/src-tauri/gen/
