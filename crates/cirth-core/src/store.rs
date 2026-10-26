@@ -279,6 +279,27 @@ impl Store {
         Ok((Store::open(work)?, false))
     }
 
+    /// Summary of a project file without opening it for writing. Fails with
+    /// `Locked` if another connection holds the exclusive lock.
+    pub fn inspect(path: &Path) -> Result<PackageInfo> {
+        let c = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+        c.busy_timeout(std::time::Duration::from_millis(0))?;
+        c.pragma_update(None, "query_only", true)?;
+        let schema: i64 = c.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        if schema > SCHEMA_VERSION {
+            return Err(StoreError::FutureSchema(schema));
+        }
+        let meta = |k: &str| -> Result<String> { Ok(c.query_row("SELECT value FROM meta WHERE key = ?1", [k], |r| r.get(0)).optional()?.unwrap_or_default()) };
+        Ok(PackageInfo {
+            project_id: meta("project_id")?,
+            title: meta("title")?,
+            version: meta("version")?.parse().unwrap_or(0),
+            saved_version: meta("saved_version")?.parse().unwrap_or(0),
+            blocks: c.query_row("SELECT COUNT(*) FROM blocks", [], |r| r.get::<_, i64>(0))? as u64,
+            scenes: c.query_row("SELECT COUNT(*) FROM blocks WHERE scene_id IS NOT NULL", [], |r| r.get::<_, i64>(0))? as u64,
+        })
+    }
+
     pub fn integrity_ok(&self) -> Result<bool> {
         let ok: String = self.conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
         Ok(ok == "ok")
@@ -295,6 +316,16 @@ impl Store {
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct PackageInfo {
+    pub project_id: String,
+    pub title: String,
+    pub version: u64,
+    pub saved_version: u64,
+    pub blocks: u64,
+    pub scenes: u64,
 }
 
 pub fn remove_store_files(work: &Path) -> Result<()> {

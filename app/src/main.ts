@@ -15,8 +15,10 @@ import { renderBoard, renderNavigator, moveCard, type BoardState } from "./views
 import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
 import { adoptDomSelection, selSync } from "./selsync";
+import { createHome } from "./home";
 
 interface Opened {
+  name: string;
   doc: { title: string; version: number; blocks: Block[] };
   beats: Beat[];
   recovered: boolean;
@@ -137,19 +139,26 @@ function makeState(blocks: Block[]) {
   });
 }
 
-async function open(name: string, reset: boolean) {
+/** Opens a sample fixture (seeding it the first time, or again with `reset`). */
+const open = (name: string, reset: boolean) => openWith("open_fixture", { name, reset });
+
+/** Every way into the editor: samples, library projects, new projects. */
+async function openWith(command: string, args: Record<string, unknown>): Promise<boolean> {
   if (syncer?.hasUnsynced) await syncer.flush();
   const t0 = performance.now();
   let o: Opened;
   try {
-    o = await invoke<Opened>("open_fixture", { name, reset });
+    o = await invoke<Opened>(command, args);
   } catch (e) {
-    showBanner(`Could not open project: ${e}`);
+    const msg = `Could not open project: ${e}`;
+    if (document.body.dataset.view === "home") home.message(msg);
+    else showBanner(msg);
     statusEl.textContent = "No project open";
-    return;
+    return false;
   }
   const t1 = performance.now();
-  ($("fixture") as HTMLSelectElement).value = name;
+  setView("editor");
+  $("project-title").textContent = o.doc.title || o.name;
   board.beats = o.beats;
   const state = makeState(o.doc.blocks);
   if (view) view.updateState(state);
@@ -180,10 +189,39 @@ async function open(name: string, reset: boolean) {
   rerenderSide();
   void repaginate();
   view.focus();
+  return true;
 }
 
-$("fixture").addEventListener("change", (e) => void open((e.target as HTMLSelectElement).value, false));
-$("reset").addEventListener("click", () => void open(($("fixture") as HTMLSelectElement).value, true));
+function setView(v: "home" | "editor") {
+  document.body.dataset.view = v;
+}
+
+/** Save and close the open project (if any), then show the project library. */
+async function goHome() {
+  if (lastOpen) {
+    try {
+      await syncer.flush();
+      await invoke("save_package");
+      await invoke("close_project");
+    } catch (e) {
+      // Do not leave the project if it could not be saved.
+      showBanner(`Could not save before closing: ${e}. The project stays open.`);
+      return;
+    }
+    lastOpen = null;
+    window.clearTimeout(pageTimer);
+  }
+  setView("home");
+  await home.refresh();
+}
+
+const home = createHome($("home"), {
+  openProject: (name) => openWith("open_project", { name }),
+  openSample: (name) => open(name, false),
+  createProject: (title) => openWith("create_project", { title }),
+});
+
+$("go-home").addEventListener("click", () => void goHome());
 $("profile").addEventListener("change", () => void repaginate());
 $("save").addEventListener("click", async () => {
   await syncer.flush();
@@ -247,6 +285,8 @@ window.addEventListener("beforeunload", () => void syncer?.flush());
     rerenderSide();
   },
   open,
+  goHome,
+  home,
   flush: () => syncer.flush(),
   repaginate,
   loadStored: () => invoke<{ version: number; blocks: Block[] }>("load_document"),
@@ -256,4 +296,5 @@ window.addEventListener("beforeunload", () => void syncer?.flush());
   keyConfig: { get: getKeyConfig, set: setKeyConfig, defaults: defaultKeyConfig },
 };
 
-void open(($("fixture") as HTMLSelectElement).value, false);
+// The app starts on Home (project library), like a project manager.
+void goHome();

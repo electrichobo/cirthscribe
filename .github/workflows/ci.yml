@@ -6,7 +6,14 @@ on:
   workflow_dispatch:
 
 env:
-  CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: never
+
+defaults:
+  run:
+    shell: bash
+
+# Build and test steps go through scripts/ci-step.sh, which turns a failure's
+# output into an error annotation (visible without signing in to GitHub).
 
 jobs:
   linux:
@@ -27,22 +34,23 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Core tests
-        run: cargo test -p cirth-core
+        run: scripts/ci-step.sh "Core tests (Linux)" cargo test -p cirth-core
       - name: Frontend build
         working-directory: app
-        run: npm ci && npm run build
+        run: ../scripts/ci-step.sh "Frontend build (Linux)" bash -c "npm ci && npm run build"
       - name: App build
-        run: cargo build -p cirthscribe --release
+        run: scripts/ci-step.sh "App build (Linux)" cargo build -p cirthscribe --release
       - name: tauri-driver
         run: cargo install tauri-driver --locked
       - name: End-to-end (WebDriver)
         working-directory: app
-        run: xvfb-run -a node tests/e2e/run.mjs --driver webdriver --exe ../target/release/cirthscribe --out ../out/e2e-linux.json --screens ../out/screens-linux
+        run: ../scripts/ci-step.sh "End-to-end (Linux WebDriver)" xvfb-run -a node tests/e2e/run.mjs --driver webdriver --exe ../target/release/cirthscribe --out ../out/e2e-linux.json --screens ../out/screens-linux
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-linux
           path: out/
+          if-no-files-found: ignore
 
   windows:
     name: Windows (MSVC, WebView2, DevTools e2e)
@@ -57,25 +65,28 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Core tests
-        run: cargo test -p cirth-core
+        run: scripts/ci-step.sh "Core tests (Windows)" cargo test -p cirth-core
       - name: Frontend build
         working-directory: app
-        run: npm ci && npm run build
+        run: ../scripts/ci-step.sh "Frontend build (Windows)" bash -c "npm ci && npm run build"
       - name: App build
-        run: cargo build -p cirthscribe --release
+        run: scripts/ci-step.sh "App build (Windows)" cargo build -p cirthscribe --release
       - name: Binary imports (expect no WebView2Loader.dll with MSVC)
         shell: pwsh
         run: |
           $dumpbin = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue | Where-Object FullName -match 'Hostx64\\x64' | Select-Object -First 1
-          & $dumpbin.FullName /dependents target\release\cirthscribe.exe
+          $deps = & $dumpbin.FullName /dependents target\release\cirthscribe.exe | Select-String '\.dll' | ForEach-Object { $_.Line.Trim() }
+          $deps
+          "::notice title=MSVC binary imports::$($deps -join ', ')"
       - name: End-to-end (DevTools)
         working-directory: app
-        run: node tests/e2e/run.mjs --driver cdp --exe ../target/release/cirthscribe.exe --out ../out/e2e-windows.json --screens ../out/screens-windows
+        run: ../scripts/ci-step.sh "End-to-end (Windows DevTools)" node tests/e2e/run.mjs --driver cdp --exe ../target/release/cirthscribe.exe --out ../out/e2e-windows.json --screens ../out/screens-windows
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-windows
           path: out/
+          if-no-files-found: ignore
 
   macos:
     name: macOS (build and core tests; e2e is manual)
@@ -90,9 +101,9 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Core tests
-        run: cargo test -p cirth-core
+        run: scripts/ci-step.sh "Core tests (macOS)" cargo test -p cirth-core
       - name: Frontend build
         working-directory: app
-        run: npm ci && npm run build
+        run: ../scripts/ci-step.sh "Frontend build (macOS)" bash -c "npm ci && npm run build"
       - name: App build
-        run: cargo build -p cirthscribe --release
+        run: scripts/ci-step.sh "App build (macOS)" cargo build -p cirthscribe --release

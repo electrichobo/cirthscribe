@@ -187,6 +187,24 @@ fn package_save_is_atomic_and_reopen_detects_recovery() {
 }
 
 #[test]
+fn inspect_reads_a_package_and_reports_a_locked_working_store() {
+    let d = tmpdir("inspect");
+    let work = d.join("w.db");
+    let pkg = d.join("p.cirth");
+    let doc = fixtures::page_boundaries().to_document().unwrap();
+    let mut s = Store::open(&work).unwrap();
+    s.seed(&doc).unwrap();
+    s.save_package(&pkg).unwrap();
+    let info = Store::inspect(&pkg).unwrap();
+    assert_eq!(info.title, "Page boundary cases");
+    assert_eq!((info.blocks, info.scenes, info.version, info.saved_version), (20, 4, 1, 1));
+    // The open working store is exclusively locked: inspect must not wait or write.
+    assert!(matches!(Store::inspect(&work), Err(StoreError::Locked)));
+    drop(s);
+    assert_eq!(Store::inspect(&work).unwrap().version, 1);
+}
+
+#[test]
 fn future_schema_is_refused() {
     let d = tmpdir("future");
     let path = d.join("w.db");

@@ -1,7 +1,7 @@
 // Writes a plain placeholder icon (solid square, no artwork) so tauri-build has an .ico to embed.
 // Usage: node scripts/make-icon.mjs <out.ico>
 import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { deflateSync } from "node:zlib";
 
 const size = 64;
@@ -56,3 +56,5 @@ header.writeUInt32LE(22, 18);
 const out = process.argv[2];
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, Buffer.concat([header, png]));
+// Linux and macOS builds need a PNG window icon.
+writeFileSync(join(dirname(out), "icon.png"), png);

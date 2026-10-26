@@ -14,15 +14,23 @@ export async function runSuite({ driver, results, screensDir }) {
     if (!cond) throw new Error(msg);
   };
 
-  async function waitOpen(app) {
+  async function waitFor(target, expr, what) {
     for (let i = 0; i < 150; i++) {
-      if (await app.evaluate("!!(window.__cirth && __cirth.view && __cirth.lastOpen)").catch(() => false)) return;
+      if (await target.evaluate(expr).catch(() => false)) return;
       await sleep(100);
     }
-    throw new Error("app did not finish opening");
+    throw new Error(`timed out waiting for ${what}`);
   }
+  const waitOpen = (target) => waitFor(target, "!!(window.__cirth && __cirth.view && __cirth.lastOpen)", "a project to open");
+  const waitHome = (target) => waitFor(target, "document.body.dataset.view === 'home' && document.getElementById('home').dataset.loaded === '1'", "Home");
+  /** Click a Home button like a user would (a card or a sample). */
+  const clickHome = (target, selector) => target.evaluate(`(() => { const b = document.querySelector(${JSON.stringify(selector)}); if (!b) throw new Error('missing ' + ${JSON.stringify(selector)}); b.click(); return true; })()`);
 
   let app = await driver.launch("main");
+  await waitHome(app);
+  // The app starts on Home; open the first sample by clicking it, then type at
+  // once (the busiest moment, for the End-key regression test below).
+  await clickHome(app, '[data-sample="unicode-marks"]');
   await waitOpen(app);
   results.measurements.userAgent = await app.evaluate("navigator.userAgent");
   results.measurements.observerEntryTypes = await app.evaluate("PerformanceObserver.supportedEntryTypes");
@@ -78,9 +86,9 @@ export async function runSuite({ driver, results, screensDir }) {
     }
   }
 
-  // Must run first: it uses the app's own startup open, when the main thread
-  // is busiest (regression for the End-key selection race, FINDINGS defect 1).
-  await test("End then Enter right after startup acts on the visible caret", async () => {
+  // Must run first: it types right after the first project opens, when the
+  // main thread is busiest (regression for the End-key selection race).
+  await test("End then Enter right after opening a project acts on the visible caret", async () => {
     const n0 = (await blocks()).length;
     await caretAtEndOf(n0 - 1);
     await press("Enter");
@@ -95,6 +103,46 @@ export async function runSuite({ driver, results, screensDir }) {
     assert(text(b.at(-2)) === "(softly)" && b.at(-2).kind === "parenthetical", `parenthetical '${text(b.at(-2))}'`);
     assert(b.at(-1).kind === "dialogue" && text(b.at(-1)) === "", `new block ${b.at(-1).kind} '${text(b.at(-1))}'`);
     return { adoptedSelections: await app.evaluate("__cirth.selSync.adopted") };
+  });
+
+  await test("Home: create a project, write, close to Home, reopen; titles never overwrite", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    const before = await app.evaluate("[...document.querySelectorAll('#home [data-project]')].map(b => b.dataset.project)");
+    assert(before.includes("unicode-marks"), `library lists the opened sample: ${before}`);
+    const create = async (title) => {
+      await app.evaluate(`(() => { const i = document.getElementById('new-title'); i.value = ${JSON.stringify(title)}; i.form.requestSubmit(); return true; })()`);
+      await waitOpen(app);
+      return app.evaluate("__cirth.lastOpen");
+    };
+    const o = await create("Harbor Lights: Draft 1");
+    assert(o.name === "harbor-lights-draft-1", `project key ${o.name}`);
+    assert((await app.evaluate("document.getElementById('project-title').textContent")) === "Harbor Lights: Draft 1", "toolbar shows the title");
+    let b = await blocks();
+    assert(b.length === 1 && b[0].kind === "heading" && b[0].scene_id, `new project starts with one scene heading: ${JSON.stringify(b)}`);
+    await caretAtEndOf(0);
+    await typeText("INT. LIGHTHOUSE - NIGHT");
+    await press("Enter");
+    await typeText("The lamp turns.");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    const cardText = await app.evaluate(`document.querySelector('#home [data-project="harbor-lights-draft-1"]').textContent`);
+    assert(/Harbor Lights: Draft 1/.test(cardText) && /1 scene · 2 blocks/.test(cardText), `card '${cardText}'`);
+    assert(!/recovered/.test(cardText), "closing saved the package (no recovery badge)");
+    // Same title again: a second project, the first one untouched.
+    const o2 = await create("Harbor Lights: Draft 1");
+    assert(o2.name === "harbor-lights-draft-1-2", `second key ${o2.name}`);
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, '[data-project="harbor-lights-draft-1"]');
+    await waitOpen(app);
+    b = await blocks();
+    assert(b.map(text).join("|") === "INT. LIGHTHOUSE - NIGHT|The lamp turns.", `reopened '${b.map(text).join("|")}'`);
+    await screenshot(app, "project-reopened");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await screenshot(app, "home");
+    return { projects: await app.evaluate("[...document.querySelectorAll('#home [data-project]')].map(b => b.dataset.project)") };
   });
 
   await test("Tab/Enter: default cycle, no inserted spaces, one-step undo", async () => {
@@ -420,6 +468,11 @@ export async function runSuite({ driver, results, screensDir }) {
     await app.kill();
     await sleep(1500);
     app = await driver.launch("after-crash");
+    await waitHome(app);
+    const badge = await app.evaluate(`document.querySelector('#home [data-project="unicode-marks"]').textContent`);
+    assert(/Unsaved work will be recovered/.test(badge), `Home shows the recovery badge: '${badge}'`);
+    await screenshot(app, "home-recovery");
+    await clickHome(app, '[data-project="unicode-marks"]');
     await waitOpen(app);
     const lo = await app.evaluate("__cirth.lastOpen");
     const b = await blocks();
@@ -434,6 +487,8 @@ export async function runSuite({ driver, results, screensDir }) {
     await app.kill();
     await sleep(1500);
     app = await driver.launch("after-save");
+    await waitHome(app);
+    await clickHome(app, '[data-project="unicode-marks"]');
     await waitOpen(app);
     const lo2 = await app.evaluate("__cirth.lastOpen");
     assert(lo2.recovered === false && text((await blocks()).at(-1)) === "ACKED-MARKER", "clean reopen after package save");
@@ -442,9 +497,11 @@ export async function runSuite({ driver, results, screensDir }) {
 
   await test("Second app instance cannot open the same project for writing", async () => {
     const second = await driver.launch("second");
+    await waitHome(second);
+    await clickHome(second, '[data-project="unicode-marks"]');
     let banner = "";
     for (let i = 0; i < 80; i++) {
-      banner = await second.evaluate("document.getElementById('banner').textContent").catch(() => "");
+      banner = await second.evaluate("document.querySelector('#home .home-message').textContent").catch(() => "");
       if (banner) break;
       await sleep(100);
     }

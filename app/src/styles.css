@@ -5,11 +5,11 @@
 @font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; }
 
 :root {
-  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1f; --muted: #5d5d66; --line: #d6d3cc; --accent: #2b5fb3; --warn: #8a4b00; --bad: #a3141c;
+  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1f; --muted: #5d5d66; --line: #d6d3cc; --accent: #2b5fb3; --warn: #8a4b00; --bad: #a3141c; --on-accent: #ffffff;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1b1c1f; --panel: #26272b; --ink: #ececef; --muted: #a8a8b3; --line: #3a3b41; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; }
+  :root { --bg: #1b1c1f; --panel: #26272b; --ink: #ececef; --muted: #a8a8b3; --line: #3a3b41; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; --on-accent: #10131a; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
@@ -66,4 +66,42 @@ footer { padding: 4px 12px; border-top: 1px solid var(--line); background: var(-
 .summary { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 3px 5px; }
 .excerpt { margin: 4px 0; color: var(--muted); font-family: "Courier Prime", monospace; font-size: 11px; }
 .card-moves { display: flex; gap: 4px; justify-content: flex-end; }
+/* View switching: Home (project library) or the editor. */
+body[data-view="home"] > .toolbar, body[data-view="home"] > .panes, body[data-view="home"] > footer { display: none; }
+body[data-view="editor"] > #home { display: none; }
+body[data-view="home"] { grid-template-rows: 1fr; }
+#project-title { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#home { display: grid; grid-template-rows: auto 1fr; min-height: 0; background: var(--bg); }
+.home-brand { display: flex; align-items: baseline; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.home-brand h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+.home-brand span { color: var(--muted); }
+.home-body { display: grid; grid-template-columns: 300px 1fr; min-height: 0; }
+.home-side { overflow: auto; padding: 18px 20px; border-right: 1px solid var(--line); background: var(--panel); }
+.home-main { overflow: auto; padding: 18px 24px; }
+.home-head { display: flex; align-items: baseline; gap: 10px; }
+.home-count { color: var(--muted); }
+.home-new { display: grid; gap: 8px; margin-bottom: 22px; }
+.home-new input { padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); }
+button.primary { padding: 7px 12px; background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+.project .meta .file { font: 11px "Courier Prime", monospace; }
+.home-samples { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.sample { width: 100%; text-align: left; display: grid; gap: 2px; padding: 8px 10px; border-radius: 6px; }
+.sample span { color: var(--muted); font-size: 12px; }
+.home-note { color: var(--muted); font-size: 12px; }
+.home-message { color: var(--bad); border: 1px solid var(--bad); border-radius: 5px; padding: 8px 10px; background: var(--panel); }
+.home-empty { color: var(--muted); }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; margin-top: 10px; }
+.project { width: 100%; padding: 0; text-align: left; border-radius: 8px; overflow: hidden; background: var(--panel); display: grid; }
+.project:hover:not(:disabled) { border-color: var(--accent); }
+.project:disabled { opacity: .6; cursor: not-allowed; }
+.project .thumb { aspect-ratio: 8.5 / 5.5; display: grid; place-items: center; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--bg)), var(--bg)); border-bottom: 1px solid var(--line); }
+.project .thumb span { font: 600 34px "Courier Prime", monospace; color: color-mix(in srgb, var(--ink) 70%, transparent); }
+.project .meta { display: grid; gap: 3px; padding: 9px 11px 11px; }
+.project .meta span { color: var(--muted); font-size: 12px; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+.tag.warn { color: var(--warn); border-color: currentColor; }
+.tag.bad { color: var(--bad); border-color: currentColor; }
+
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

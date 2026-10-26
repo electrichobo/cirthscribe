@@ -31,6 +31,7 @@ struct App {
 
 #[derive(Serialize)]
 struct Opened {
+    name: String,
     doc: Document,
     beats: Vec<Beat>,
     recovered: bool,
@@ -67,6 +68,7 @@ fn paths(app: &App, name: &str) -> (PathBuf, PathBuf) {
 
 fn opened(s: &Session, recovered: bool, t0: Instant) -> Result<Opened, String> {
     Ok(Opened {
+        name: s.name.clone(),
         doc: s.store.load().map_err(err)?,
         beats: s.store.beats().map_err(err)?,
         recovered,
@@ -111,6 +113,133 @@ async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<
     let out = opened(&s, false, t0)?;
     *guard = Some(s);
     Ok(out)
+}
+
+const SAMPLES: [&str; 3] = ["unicode-marks", "page-boundaries", "long-120"];
+
+#[derive(Serialize)]
+struct ProjectEntry {
+    /// File stem; the project's key in the library folder.
+    name: String,
+    title: String,
+    sample: bool,
+    modified_ms: u64,
+    blocks: u64,
+    scenes: u64,
+    saved_version: u64,
+    /// The working store holds commits newer than the last package save.
+    recoverable: bool,
+    /// Open in this window right now.
+    open: bool,
+    error: Option<String>,
+}
+
+/// The project library: every `.cirth` in the app's projects folder, newest first.
+#[tauri::command]
+async fn list_projects(app: State<'_, App>) -> Result<Vec<ProjectEntry>, String> {
+    let dir = app.data_dir.lock().unwrap().join("projects");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let current = app.session.lock().unwrap().as_ref().map(|s| s.name.clone());
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("cirth") {
+            continue;
+        }
+        let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        let modified_ms = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let open = current.as_deref() == Some(name.as_str());
+        let (work, _) = paths(&app, &name);
+        let mut e = ProjectEntry { sample: SAMPLES.contains(&name.as_str()), name, title: String::new(), modified_ms, blocks: 0, scenes: 0, saved_version: 0, recoverable: false, open, error: None };
+        match Store::inspect(&path) {
+            Ok(info) => {
+                e.title = info.title;
+                e.blocks = info.blocks;
+                e.scenes = info.scenes;
+                e.saved_version = info.saved_version;
+                if !open && work.exists() {
+                    if let Ok(w) = Store::inspect(&work) {
+                        e.recoverable = w.project_id == info.project_id && w.version > w.saved_version;
+                        if e.recoverable {
+                            e.blocks = w.blocks;
+                            e.scenes = w.scenes;
+                        }
+                    }
+                }
+            }
+            Err(err) => e.error = Some(err.to_string()),
+        }
+        out.push(e);
+    }
+    out.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+    Ok(out)
+}
+
+fn slug(title: &str) -> String {
+    let s: String = title.trim().chars().map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
+    let s = s.split('-').filter(|p| !p.is_empty()).collect::<Vec<_>>().join("-");
+    if s.is_empty() { "untitled".into() } else { s.chars().take(60).collect() }
+}
+
+/// New empty project starting with one scene heading. Never overwrites:
+/// a name already in the library gets a numeric suffix.
+#[tauri::command]
+async fn create_project(app: State<'_, App>, title: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let title = if title.trim().is_empty() { "Untitled".to_string() } else { title.trim().to_string() };
+    let base = slug(&title);
+    let mut name = base.clone();
+    let mut n = 2;
+    while paths(&app, &name).1.exists() || SAMPLES.contains(&name.as_str()) {
+        name = format!("{base}-{n}");
+        n += 1;
+    }
+    let mut guard = app.session.lock().unwrap();
+    *guard = None;
+    let (work, package) = paths(&app, &name);
+    std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(package.parent().unwrap()).map_err(|e| e.to_string())?;
+    cirth_core::store::remove_store_files(&work).map_err(err)?;
+    let mut store = Store::open(&work).map_err(err)?;
+    let doc = Document { title, version: 0, blocks: vec![cirth_core::model::Block::new(cirth_core::model::BlockKind::Heading, "")] };
+    store.seed(&doc).map_err(err)?;
+    store.save_package(&package).map_err(err)?;
+    let s = Session { name, store, package };
+    let out = opened(&s, false, t0)?;
+    *guard = Some(s);
+    Ok(out)
+}
+
+/// Open a project from the library, recovering unsaved working-store commits.
+#[tauri::command]
+async fn open_project(app: State<'_, App>, name: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let mut guard = app.session.lock().unwrap();
+    *guard = None;
+    let (work, package) = paths(&app, &name);
+    if !package.exists() {
+        return Err(format!("project {name} is not in the library"));
+    }
+    std::fs::create_dir_all(work.parent().unwrap()).map_err(|e| e.to_string())?;
+    let (store, recovered) = Store::open_package(&package, &work).map_err(err)?;
+    let s = Session { name, store, package };
+    let out = opened(&s, recovered, t0)?;
+    *guard = Some(s);
+    Ok(out)
+}
+
+/// Release the project (and its lock). The working store stays for recovery
+/// only if it holds unsaved commits; the UI saves before closing.
+#[tauri::command]
+async fn close_project(app: State<'_, App>) -> Result<(), String> {
+    *app.session.lock().unwrap() = None;
+    Ok(())
 }
 
 fn with_session<T>(app: &App, f: impl FnOnce(&mut Session) -> Result<T, String>) -> Result<T, String> {
@@ -211,7 +340,7 @@ fn main() {
             *app.state::<App>().data_dir.lock().unwrap() = dir;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![open_fixture, apply_batch, load_document, put_beat, save_package, paginate, export_pdf, process_id])
+        .invoke_handler(tauri::generate_handler![open_fixture, list_projects, create_project, open_project, close_project, apply_batch, load_document, put_beat, save_package, paginate, export_pdf, process_id])
         .run(tauri::generate_context!())
         .expect("error while running CirthScribe");
 }

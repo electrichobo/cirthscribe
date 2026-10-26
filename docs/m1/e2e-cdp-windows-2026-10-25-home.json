@@ -1,0 +1,243 @@
+{
+  "started": "2026-10-26T03:25:15.142Z",
+  "driver": "cdp",
+  "platform": {
+    "os": "win32",
+    "release": "10.0.26100",
+    "arch": "x64"
+  },
+  "tests": [
+    {
+      "name": "End then Enter right after opening a project acts on the visible caret",
+      "ok": true,
+      "ms": 42,
+      "detail": {
+        "adoptedSelections": 1
+      }
+    },
+    {
+      "name": "Home: create a project, write, close to Home, reopen; titles never overwrite",
+      "ok": true,
+      "ms": 868,
+      "detail": {
+        "projects": [
+          "harbor-lights-draft-1",
+          "harbor-lights-draft-1-2",
+          "unicode-marks"
+        ]
+      }
+    },
+    {
+      "name": "Tab/Enter: default cycle, no inserted spaces, one-step undo",
+      "ok": true,
+      "ms": 1074,
+      "detail": {
+        "blocksAdded": 4
+      }
+    },
+    {
+      "name": "Stress: End then Enter under a busy main thread (500 trials, fix on; control with fix off)",
+      "ok": true,
+      "ms": 95882,
+      "detail": {
+        "control": "32/50 missed with the fix off (shows whether the test detects the bug here)",
+        "fixed": "0/500 missed"
+      }
+    },
+    {
+      "name": "Selection across blocks, split/join, ids follow documented rules",
+      "ok": true,
+      "ms": 398
+    },
+    {
+      "name": "Paste: plain multi-line screenplay text, single line, HTML from another app",
+      "ok": true,
+      "ms": 367,
+      "detail": {
+        "kinds": "heading,action,character,parenthetical,dialogue,transition"
+      }
+    },
+    {
+      "name": "OS clipboard: native copy and paste shortcuts",
+      "ok": true,
+      "ms": 1581,
+      "detail": {
+        "clip": "KAITO\n\nThe clipboard came from the OS."
+      }
+    },
+    {
+      "name": "Unicode: accents, emoji ZWJ, combining marks, CJK, RTL inserted and stored intact",
+      "ok": true,
+      "ms": 387,
+      "detail": {
+        "insertedVia": "Input.insertText",
+        "backspaceOverZwjFamily": "removed whole cluster"
+      }
+    },
+    {
+      "name": "IME composition (simulated): no duplicate or lost characters",
+      "ok": true,
+      "ms": 501,
+      "detail": {
+        "note": "Simulated composition events only; not an OS input method."
+      }
+    },
+    {
+      "name": "Navigator, board and editor show one scene; summary stays authored; structural toggle",
+      "ok": true,
+      "ms": 1234
+    },
+    {
+      "name": "Page markers come from the Rust page map; zoom does not change it",
+      "ok": true,
+      "ms": 560,
+      "detail": {
+        "pages": 9,
+        "inlineMarkers": 3
+      }
+    },
+    {
+      "name": "Long document: open, typing latency, autosave pauses, scene move",
+      "ok": true,
+      "ms": 20615,
+      "detail": {
+        "driver": "cdp",
+        "blocks": 2048,
+        "coldOpen": {
+          "ipcAndStoreMs": 116.40000000037253,
+          "rustOpenMs": 109.50659999999999,
+          "buildAndFirstPaintMs": 47.5,
+          "totalMs": 163.90000000037253,
+          "blocks": 2048
+        },
+        "warmOpen": {
+          "ipcAndStoreMs": 41.5,
+          "rustOpenMs": 35.359300000000005,
+          "buildAndFirstPaintMs": 20,
+          "totalMs": 61.5,
+          "blocks": 2048
+        },
+        "pagination": {
+          "pages": 127,
+          "layout_ms": 14.4474,
+          "load_ms": 2.5158
+        },
+        "inputToPaint": {
+          "n": 530,
+          "p50": 19.300000000745058,
+          "p95": 32.09999999962747,
+          "p99": 66.69999999925494,
+          "max": 139.09999999962747,
+          "longTasks": 0,
+          "longestTask": 0
+        },
+        "longTasks": [],
+        "sync": {
+          "batches": 12,
+          "ops": 34,
+          "lastDiffMs": 0.40000000037252903,
+          "roundTripP50": 6.199999999254942,
+          "roundTripMax": 174.5
+        },
+        "sceneMove": {
+          "editorMs": 83,
+          "storeCommitMs": 11.100000001490116
+        }
+      }
+    },
+    {
+      "name": "Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed",
+      "ok": true,
+      "ms": 5942,
+      "detail": {
+        "banner": "Recovered unsaved work from the working store (v2; package was saved at v1).",
+        "window": "Edits are durable once acknowledged: after 300 ms idle, or at most 1.5 s into continuous typing, plus the commit round trip."
+      }
+    },
+    {
+      "name": "Second app instance cannot open the same project for writing",
+      "ok": true,
+      "ms": 751,
+      "detail": {
+        "banner": "Could not open project: project is open in another CirthScribe window or process"
+      }
+    },
+    {
+      "name": "PDF proof export from the canonical store",
+      "ok": true,
+      "ms": 435,
+      "detail": {
+        "banner": "PDF proof (not production-ready) written: <tmp>\\cirth-e2e-EivspD\\exports\\page-boundaries-v1-us-feature-letter-draft.pdf · 9 pages from v1 · layout 3.7 ms, PDF 11.9 ms"
+      }
+    }
+  ],
+  "measurements": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+    "observerEntryTypes": [
+      "element",
+      "event",
+      "first-input",
+      "interaction-contentful-paint",
+      "largest-contentful-paint",
+      "layout-shift",
+      "long-animation-frame",
+      "longtask",
+      "mark",
+      "measure",
+      "navigation",
+      "paint",
+      "resource",
+      "soft-navigation",
+      "visibility-state"
+    ],
+    "caretKeyStress": {
+      "controlFixOff": "32/50 missed",
+      "fixOn": "0/500 missed"
+    },
+    "longDocument": {
+      "driver": "cdp",
+      "blocks": 2048,
+      "coldOpen": {
+        "ipcAndStoreMs": 116.40000000037253,
+        "rustOpenMs": 109.50659999999999,
+        "buildAndFirstPaintMs": 47.5,
+        "totalMs": 163.90000000037253,
+        "blocks": 2048
+      },
+      "warmOpen": {
+        "ipcAndStoreMs": 41.5,
+        "rustOpenMs": 35.359300000000005,
+        "buildAndFirstPaintMs": 20,
+        "totalMs": 61.5,
+        "blocks": 2048
+      },
+      "pagination": {
+        "pages": 127,
+        "layout_ms": 14.4474,
+        "load_ms": 2.5158
+      },
+      "inputToPaint": {
+        "n": 530,
+        "p50": 19.300000000745058,
+        "p95": 32.09999999962747,
+        "p99": 66.69999999925494,
+        "max": 139.09999999962747,
+        "longTasks": 0,
+        "longestTask": 0
+      },
+      "longTasks": [],
+      "sync": {
+        "batches": 12,
+        "ops": 34,
+        "lastDiffMs": 0.40000000037252903,
+        "roundTripP50": 6.199999999254942,
+        "roundTripMax": 174.5
+      },
+      "sceneMove": {
+        "editorMs": 83,
+        "storeCommitMs": 11.100000001490116
+      }
+    }
+  },
+  "finished": "2026-10-26T03:27:27.035Z"
+}

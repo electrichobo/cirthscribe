@@ -5,16 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CirthScribe M0 spike</title>
   </head>
-  <body>
+  <body data-view="home">
+    <main id="home" aria-label="Home"></main>
     <header class="toolbar" role="toolbar" aria-label="Project">
-      <label>Fixture
-        <select id="fixture">
-          <option value="unicode-marks">Unicode and marks</option>
-          <option value="page-boundaries">Page boundary cases</option>
-          <option value="long-120">Long script (120+ pages)</option>
-        </select>
-      </label>
-      <button id="reset" type="button" title="Discard the project and reseed it from the fixture">Reset</button>
+      <button id="go-home" type="button" title="Save, close this project and return to the project library">⌂ Home</button>
+      <strong id="project-title"></strong>
       <button id="save" type="button">Save package</button>
       <label>Profile
         <select id="profile"><option value="letter">US Letter</option><option value="a4">A4</option></select>
