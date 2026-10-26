@@ -7,9 +7,10 @@ Order matters: the first three items remove M0's open risks before features grow
 ## 1. Close M0 risks (first)
 
 1. ~~**Root-cause the End-key selection defect**~~ **Done 2026-10-25.** Cause: async `selectionchange` delivery vs. high-priority key input. Fix: adopt the DOM selection before key commands (`app/src/selsync.ts`). Exit met: 0/500 stress trials missed (control without the fix: 28/50), plus a startup regression test. Still to do on other platforms: rerun the stress test on WKWebView and WebKitGTK in item 2.
-2. **Cross-platform harness.** Replace the DevTools-only driver with WebDriver (`tauri-driver`: WebView2 on Windows, WebKitGTK on Linux) plus a manual checklist for macOS WKWebView, where Tauri has no WebDriver. Run the A2/A3/B tests on all three. Exit: results recorded per OS and WebView version.
-3. **MSVC CI build** for Windows (GitHub Actions), Linux and macOS builds; Rust tests, TypeScript typecheck and the e2e suite where available. Confirm the manifest warning is gone and the binary needs no loader DLL.
-4. **Real IME checklist**: Microsoft Japanese, Chinese (Pinyin) and Korean IMEs on Windows; macOS Japanese/Pinyin; IBus or Fcitx on Linux. Run on test machines, not VADER, since enabling input languages changes system settings.
+2. **Cross-platform harness.** Built 2026-10-25: one driver-neutral suite (`app/tests/e2e/suite.mjs`) with a DevTools driver (WebView2) and a WebDriver driver (`tauri-driver`: msedgedriver on Windows, WebKitWebDriver on Linux); skips are reported with reasons. macOS WKWebView has no WebDriver: manual checklist in `docs/testing/MANUAL_CHECKS.md`. Verified on Windows through both drivers (14/14 DevTools; 13/13 WebDriver with IME skipped). **Remaining:** first Linux run in CI; first macOS manual pass.
+3. **CI builds.** Workflow `.github/workflows/ci.yml` written: Linux (WebKitGTK e2e under Xvfb), Windows (MSVC, DevTools e2e, binary import check), macOS (core tests and build). **Remaining:** first run on GitHub; confirm the manifest warning is gone and the MSVC binary needs no loader DLL; add lint and typecheck steps.
+4. **Real IME checklist** (`docs/testing/MANUAL_CHECKS.md` section 2): Microsoft Japanese, Chinese (Pinyin) and Korean IMEs on Windows; macOS Japanese/Pinyin; IBus or Fcitx on Linux. Run on test machines, not the owner's production machine, since enabling input languages changes system settings.
+5. **Tail latency.** p99 input-to-paint varies 33 to 134 ms between runs with no long tasks (FINDINGS). Find the cause before relying on p99.
 
 ## 2. App shell and project lifecycle
 

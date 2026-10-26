@@ -1,0 +1,98 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Linux (WebKitGTK, WebDriver e2e)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev webkit2gtk-driver xvfb xclip
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Core tests
+        run: cargo test -p cirth-core
+      - name: Frontend build
+        working-directory: app
+        run: npm ci && npm run build
+      - name: App build
+        run: cargo build -p cirthscribe --release
+      - name: tauri-driver
+        run: cargo install tauri-driver --locked
+      - name: End-to-end (WebDriver)
+        working-directory: app
+        run: xvfb-run -a node tests/e2e/run.mjs --driver webdriver --exe ../target/release/cirthscribe --out ../out/e2e-linux.json --screens ../out/screens-linux
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-linux
+          path: out/
+
+  windows:
+    name: Windows (MSVC, WebView2, DevTools e2e)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Core tests
+        run: cargo test -p cirth-core
+      - name: Frontend build
+        working-directory: app
+        run: npm ci && npm run build
+      - name: App build
+        run: cargo build -p cirthscribe --release
+      - name: Binary imports (expect no WebView2Loader.dll with MSVC)
+        shell: pwsh
+        run: |
+          $dumpbin = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue | Where-Object FullName -match 'Hostx64\\x64' | Select-Object -First 1
+          & $dumpbin.FullName /dependents target\release\cirthscribe.exe
+      - name: End-to-end (DevTools)
+        working-directory: app
+        run: node tests/e2e/run.mjs --driver cdp --exe ../target/release/cirthscribe.exe --out ../out/e2e-windows.json --screens ../out/screens-windows
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-windows
+          path: out/
+
+  macos:
+    name: macOS (build and core tests; e2e is manual)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Core tests
+        run: cargo test -p cirth-core
+      - name: Frontend build
+        working-directory: app
+        run: npm ci && npm run build
+      - name: App build
+        run: cargo build -p cirthscribe --release

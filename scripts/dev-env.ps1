@@ -4,5 +4,5 @@
 #   . .\scripts\dev-env.ps1
 $root = Split-Path -Parent $PSScriptRoot
 $node = Get-ChildItem "$root\.tools" -Directory -Filter "node-v*-win-x64" -ErrorAction SilentlyContinue | Select-Object -First 1
-$env:PATH = "$($node.FullName);$root\.tools\mingw64\bin;$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:PATH = "$($node.FullName);$root\.tools\mingw64\bin;$root\.tools\msedgedriver;$env:USERPROFILE\.cargo\bin;$env:PATH"
 $env:CARGO_TARGET_DIR = "$root\target"

@@ -4,7 +4,12 @@ Updated 2026-10-25.
 
 **Current milestone: M1 in progress (plan: `docs/M1_PLAN.md`). M0 complete on Windows only.**
 
-M1 progress: item 1.1 done (End-key selection defect fixed, regression and stress tests added). Next: 1.2 cross-platform harness, 1.3 CI builds.
+M1 progress:
+- 1.1 done: End-key selection defect fixed; regression and stress tests.
+- 1.2 built: driver-neutral e2e suite with DevTools and WebDriver drivers; passes on Windows through both. Linux runs in CI (not run yet); macOS is a manual checklist (not run yet).
+- 1.3 started: CI workflow for Linux, Windows (MSVC) and macOS written, not run yet.
+
+Next: first CI run, then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 
@@ -36,5 +41,6 @@ cargo test -p cirth-core
 cd app; npm ci; npm run build; cd ..
 cargo build -p cirthscribe --release
 target\release\cirthscribe.exe
-cd app; node tests/e2e.mjs ..\target\release\cirthscribe.exe ..\out\e2e-results.json ..\out\screens
+cd app; npm run e2e:cdp
+npm run e2e:webdriver   # needs tauri-driver (cargo install tauri-driver) and msedgedriver matching your WebView2 version on PATH
 ```

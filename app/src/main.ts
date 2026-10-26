@@ -250,6 +250,7 @@ window.addEventListener("beforeunload", () => void syncer?.flush());
   flush: () => syncer.flush(),
   repaginate,
   loadStored: () => invoke<{ version: number; blocks: Block[] }>("load_document"),
+  pid: () => invoke<number>("process_id"),
   diff,
   parsePlainText,
   keyConfig: { get: getKeyConfig, set: setKeyConfig, defaults: defaultKeyConfig },

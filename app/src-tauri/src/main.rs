@@ -191,6 +191,13 @@ async fn export_pdf(app: State<'_, App>, profile_name: String) -> Result<Exporte
     Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs })
 }
 
+/// For the test harness: hard-kill this process in crash tests under any
+/// driver (WebDriver does not expose the app's process id).
+#[tauri::command]
+fn process_id() -> u32 {
+    std::process::id()
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(App::default())
@@ -204,7 +211,7 @@ fn main() {
             *app.state::<App>().data_dir.lock().unwrap() = dir;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![open_fixture, apply_batch, load_document, put_beat, save_package, paginate, export_pdf])
+        .invoke_handler(tauri::generate_handler![open_fixture, apply_batch, load_document, put_beat, save_package, paginate, export_pdf, process_id])
         .run(tauri::generate_context!())
         .expect("error while running CirthScribe");
 }

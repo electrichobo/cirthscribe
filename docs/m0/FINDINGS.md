@@ -72,6 +72,8 @@ All times are from one run on the reference machine; sample method in brackets.
 
 The pixel-level latency of physical keystrokes was not measured.
 
+Run-to-run variance (added in M1, four suite runs on the same machine, same fixture): p95 29.4 to 34.6 ms, but p99 33 to 134 ms and max 65 to 266 ms. No long tasks were recorded in any run, so the tail spikes are not blocking JavaScript; cause not yet identified (compositor or OS scheduling are guesses). Treat single-run p99 figures as unreliable until the tail is explained.
+
 ## Failures found and fixed during the spike
 
 1. `File::sync_all` on a read-only handle fails on Windows (Access denied). Package flush now opens the temp file writable.
@@ -80,7 +82,7 @@ The pixel-level latency of physical keystrokes was not measured.
 
 ## Open defects
 
-1. ~~Native End key right after typing can be missed by the editor.~~ **Fixed in M1 (2026-10-25).** Root cause: Chromium reports native caret moves through an asynchronous `selectionchange` event, and ProseMirror adopts the DOM selection only when that event runs. With a busy main thread (right after open) it arrived ~50 ms late, so an Enter in between split the block at the old caret. Fix: `app/src/selsync.ts` adopts the DOM selection before every key command. Evidence: the original repro (3/3 runs), a startup regression test, and a stress test under an ~80% busy main thread (fix off: 28/50 trials wrong; fix on: 0/500). Typing latency unchanged (p95 29.4 ms). See `docs/m1/e2e-results-2026-10-25.json`. Physical keystrokes not tested; the mechanism applies to them too.
+1. ~~Native End key right after typing can be missed by the editor.~~ **Fixed in M1 (2026-10-25).** Root cause: Chromium reports native caret moves through an asynchronous `selectionchange` event, and ProseMirror adopts the DOM selection only when that event runs. With a busy main thread (right after open) it arrived ~50 ms late, so an Enter in between split the block at the old caret. Fix: `app/src/selsync.ts` adopts the DOM selection before every key command. Evidence: the original repro (3/3 runs), a startup regression test, and a stress test under an ~80% busy main thread (fix off: 28/50 trials wrong; fix on: 0/500). Typing latency unchanged (p95 29.4 ms). See `docs/m1/e2e-*-2026-10-25.json` (the stress control also detects the bug under WebDriver: 42/50). Physical keystrokes not tested; the mechanism applies to them too.
 2. Linker warning on the GNU build: ".rsrc merge failure: multiple non-default manifests". The app runs; consequence unknown (possible missing common-controls manifest). Expected to disappear with MSVC builds; verify.
 
 ## Unresolved risks
