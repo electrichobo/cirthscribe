@@ -61,7 +61,8 @@ export function createDriver({ exe, dataDir }) {
       child.on("exit", (code, signal) => (exited = { code, signal }));
       let c;
       let lastError = "";
-      for (let i = 0; i < 150 && !c && !exited; i++) {
+      // Up to 90 s: WebView2's first start on a fresh CI runner can be slow.
+      for (let i = 0; i < 450 && !c && !exited; i++) {
         try {
           const page = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === "page");
           if (page) c = connectWs(page.webSocketDebuggerUrl);

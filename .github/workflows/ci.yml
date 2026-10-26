@@ -86,14 +86,24 @@ jobs:
           $deps = & $dumpbin.FullName /dependents target\release\cirthscribe.exe | Select-String '\.dll' | ForEach-Object { $_.Line.Trim() }
           $deps
           "::notice title=MSVC binary imports::$($deps -join ', ')"
-      - name: WebView2 runtime on this runner
+      - name: WebView2 runtime and matching msedgedriver
         shell: pwsh
         run: |
           $keys = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
           $v = $keys | ForEach-Object { (Get-ItemProperty $_ -ErrorAction SilentlyContinue).pv } | Where-Object { $_ } | Select-Object -First 1
           if (-not $v) { $v = 'not installed' }
           "::notice title=WebView2 runtime::$v"
+          New-Item -ItemType Directory -Force edgedriver | Out-Null
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$v/edgedriver_win64.zip" -OutFile edgedriver.zip
+          Expand-Archive edgedriver.zip edgedriver -Force
+      - name: tauri-driver
+        run: cargo install tauri-driver --locked
+      - name: End-to-end (WebDriver)
+        timeout-minutes: 30
+        working-directory: app
+        run: ../scripts/ci-step.sh "End-to-end (Windows WebDriver)" node tests/e2e/run.mjs --driver webdriver --exe ../target/release/cirthscribe.exe --out ../out/e2e-windows-webdriver.json --screens ../out/screens-windows-webdriver --native-driver-dir ../edgedriver
       - name: End-to-end (DevTools)
+        if: always()
         timeout-minutes: 30
         working-directory: app
         run: ../scripts/ci-step.sh "End-to-end (Windows DevTools)" node tests/e2e/run.mjs --driver cdp --exe ../target/release/cirthscribe.exe --out ../out/e2e-windows.json --screens ../out/screens-windows

@@ -32,15 +32,18 @@ function has(cmd) {
 export function clipboardTool() {
   if (platform === "win32") {
     return {
-      set: (s) => execFileSync("powershell", ["-NoProfile", "-Command", "Set-Clipboard -Value $env:CIRTH_CLIP"], { env: { ...process.env, CIRTH_CLIP: s } }),
-      get: () => execFileSync("powershell", ["-NoProfile", "-Command", "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"]).toString("utf8").replace(/\r?\n$/, ""),
+      set: (s) => execFileSync("powershell", ["-NoProfile", "-Command", "Set-Clipboard -Value $env:CIRTH_CLIP"], { env: { ...process.env, CIRTH_CLIP: s }, timeout: 20_000 }),
+      get: () => execFileSync("powershell", ["-NoProfile", "-Command", "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"], { timeout: 20_000 }).toString("utf8").replace(/\r?\n$/, ""),
     };
   }
-  if (platform === "darwin") return { set: (s) => execFileSync("pbcopy", { input: s }), get: () => execFileSync("pbpaste").toString("utf8") };
+  if (platform === "darwin") return { set: (s) => execFileSync("pbcopy", { input: s, timeout: 10_000 }), get: () => execFileSync("pbpaste", { timeout: 10_000 }).toString("utf8") };
   if (has("xclip")) {
     return {
-      set: (s) => execFileSync("xclip", ["-selection", "clipboard"], { input: s }),
-      get: () => execFileSync("xclip", ["-selection", "clipboard", "-o"]).toString("utf8"),
+      // xclip forks a child that keeps serving the selection; if it inherits a
+      // stdout pipe, execFileSync waits forever and blocks the event loop
+      // (the likely cause of the first Linux CI hang). Give it no pipes but stdin.
+      set: (s) => execFileSync("xclip", ["-selection", "clipboard"], { input: s, stdio: ["pipe", "ignore", "ignore"], timeout: 10_000 }),
+      get: () => execFileSync("xclip", ["-selection", "clipboard", "-o"], { timeout: 10_000 }).toString("utf8"),
     };
   }
   return null;
