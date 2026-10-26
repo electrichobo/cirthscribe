@@ -1,47 +1,157 @@
-# CirthScribe planning pack
+# CirthScribe
 
-Version 0.1 | 2026-10-25 | Owner: Jared Hoy
+A free, open-source screenplay writing and story-production app for Windows, macOS and Linux. It works offline, needs no account, and has no subscription.
 
-A practical starting brief for an AI-assisted, free/open-source screenplay and story-production application.
+Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)). "CirthScribe" is a working title.
 
-This pack began as specification only. The repository now also holds the M0 feasibility spike (see STATUS.md); it is not a usable application, and there is still no tested compatibility guarantee or chosen project license.
+> **Early development.** CirthScribe is not ready to use yet: there is no download and no release. The features marked done below work in development builds and are covered by automated tests, but your scripts are not safe in it yet. Don't trust it with real work until a release says otherwise.
 
-## Put this into a repository
+## What it is
 
-Extract the archive into the root of a new CirthScribe repository. Keep CLAUDE.md at the root and the supporting files under docs/. Open the folder in your coding agent and give it START_HERE.md as the first task.
+CirthScribe is one app for the whole path from first idea to shooting script:
 
-CLAUDE.md contains operating rules. Supporting files hold the details so the agent does not need a giant instruction file on every turn.
+- **Write.** A screenplay editor that formats as you type: scene headings, action, characters, dialogue and transitions, with industry-standard pages.
+- **Plan.** Outlines, index cards, a story timeline, and a "bible" of your characters, locations and world. These are all views of the same script, so they never drift out of sync.
+- **Prepare for production.** Breakdowns, reports and a stripboard, built straight from the script.
+- **Exchange files.** Import and export the formats other tools use (PDF, Final Draft, Word and more), with an honest report of anything a format can't carry.
 
-| File | Purpose |
-| --- | --- |
-| CLAUDE.md | Coding-agent instructions and non-negotiable rules |
-| START_HERE.md | First prompt to paste into Claude Code or another coding agent |
-| docs/PRODUCT_SPEC.md | Requested behavior, feature boundaries, and user interactions |
-| docs/ARCHITECTURE.md | Proposed data model, stack decision, persistence, and layout strategy |
-| docs/ROADMAP.md | Implementation sequence and milestone exit gates |
-| docs/ACCEPTANCE.md | Observable acceptance scenarios |
-| docs/INTEROPERABILITY.md | Export matrix, fidelity rules, and Google compatibility |
-| docs/DECISIONS.md | Proposed defaults and decisions still open |
-| docs/SOURCES.md | Primary technical references checked for this pack |
+It is built around a few promises:
 
-## Reading the priorities
+- **Free, with no catches.** No subscriptions, paywalls or paid tiers.
+- **Your work stays on your computer.** Nothing is uploaded, nothing phones home, and no cloud account is needed.
+- **Your work is protected.** Autosave, backups, crash recovery and undo are built into the foundation, not added later.
+- **AI is optional and off by default.** If you turn it on, you choose the provider, and it never changes your script without showing you first.
 
-- M0 is feasibility and architecture selection.
-- M1 builds a usable, safely saved screenplay editor.
-- M2 establishes dependable script interchange and production pagination.
-- Later milestones add story planning, production analysis, branches, richer formats, and optional integrations.
+## Roadmap
 
-Later does not mean rejected. Every requested feature is retained; difficult features have explicit prerequisites.
+Each stage builds on the one before. Stages are goals, not dates.
 
-## Important defaults
+### ✅ Stage 0: Proof of concept (done)
 
-Tauri/Rust is a provisional recommendation, not a permanent commitment. The chosen framework must pass the editing and pagination spike first.
+Proved the hard parts before building on them: an editor that keeps up with a 120-page script, accurate page layout, safe saving, and crash recovery. The app framework was chosen with measurements: Rust and Tauri.
 
-The proposed native project extension is .cirth. The exact extension, storage container, release license, minimum OS versions, and visual identity are still decisions.
+### 🔨 Stage 1: A writing app you can rely on (in progress)
 
-"Google compatible" means verified DOCX and spreadsheet exchange profiles with documented limits. It does not mean exact screenplay pagination inside Google Docs or automatic live collaboration.
+Done:
+- [x] Screenplay editor with automatic formatting, keyboard shortcuts and undo
+- [x] Home screen listing your projects, with sample scripts
+- [x] Save, Save As, and open files from anywhere
+- [x] Autosave, rolling backups, crash recovery, and protection when a file changes outside the app
+- [x] Older project files upgraded safely, with the original kept
+- [x] Find and replace
+- [x] Autocomplete for character names, locations and transitions
+- [x] Word counts
+- [x] Spell check (US and UK English) with your own dictionary
+- [x] Dual dialogue, forced page breaks, and a page view
+- [x] Free Writing: notes and brain dumps outside any project, with a Flow mode that turns off editing so you just keep writing
+- [x] Draft PDF export
 
-"Screen time" means separately labeled character dialogue, scene presence, estimated duration, and manually supplied measured duration.
+Still to do:
+- [ ] Plain-text export
+- [ ] US Letter / A4 choice per document
+- [ ] Accessibility: keyboard-only use, screen readers, high contrast, UI scaling
+- [ ] Hands-on testing on macOS and with Asian-language input methods
 
-A beat card references a scene. It does not contain an editable duplicate of the scene's script prose.
+### Stage 2: Professional pages and file exchange
 
+- [ ] Final production-quality PDF and title pages
+- [ ] Scene numbers, revision colours, locked pages (A/B pages)
+- [ ] Import and export Final Draft (FDX), Word (DOCX), RTF, HTML and text, each with a report of what carried over
+
+### Stage 3: Story planning
+
+- [ ] Episodes and series sharing one story bible
+- [ ] Outline, index-card board, and mind map
+- [ ] Reordering scenes from the board (only with your permission, and undoable)
+- [ ] Story timeline, kept separate from script order
+- [ ] Character, location and world profiles
+
+### Stage 4: Production tools
+
+- [ ] Script breakdown tags (props, wardrobe, cast and more)
+- [ ] Separate reports for characters, scenes, locations and props
+- [ ] Stripboard and shooting schedule
+- [ ] Page counts in eighths, and character appearance charts
+- [ ] Reports in PDF, spreadsheet (XLSX/CSV) and HTML
+
+### Stage 5: Notes, alternatives and versions
+
+- [ ] Comments attached to the text
+- [ ] Alternative takes on a scene or line
+- [ ] Snapshots and version history, with compare, restore and merge
+
+### Stage 6: More formats and language tools
+
+- [ ] TV and UK formats, stage plays, comics and graphic novels
+- [ ] Interactive and branching stories
+- [ ] Offline grammar checking and more dictionaries
+
+### Stage 7: Optional extras
+
+- [ ] Bring-your-own AI (a cloud provider or a model running on your computer), off by default
+- [ ] Optional Google Docs and Sheets sharing workflows
+
+---
+
+## Details
+
+### Current status
+
+[STATUS.md](STATUS.md) lists what works, what was tested on which platform, open defects and what is untested. Highlights:
+
+- Windows: built and tested locally (two end-to-end test drivers plus core tests).
+- Linux: tested in CI (WebKitGTK under Xvfb).
+- macOS: builds and passes core tests in CI. Hands-on editing tests have not been run yet.
+
+### Building from source
+
+Requirements: Rust (stable), Node.js 24, and the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS.
+
+```
+cargo test -p cirth-core
+cd app && npm ci && npm run build && cd ..
+cargo build -p cirthscribe --release
+```
+
+Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1`. End-to-end tests: `cd app; npm run e2e:cdp` (Windows) or `npm run e2e:webdriver` (needs `tauri-driver` and the platform's WebDriver). See [STATUS.md](STATUS.md) for details.
+
+### How it is built
+
+- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, PDF, word counts, spell check and Free Writing. It has no UI code.
+- **App** (`app/`, Tauri 2 + TypeScript + ProseMirror): the desktop shell and editor. The editor is a view of the core's document and sends versioned edits to it, so there is one saved copy of the script.
+- **Tests**: Rust unit and integration tests, plus an end-to-end suite that drives the real app through two drivers (DevTools and WebDriver).
+
+### Documentation
+
+| File | What it covers |
+| - | - |
+| [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
+| [docs/M1_PLAN.md](docs/M1_PLAN.md) | Current milestone plan and what is done |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, persistence and layout strategy |
+| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Observable acceptance scenarios |
+| [docs/INTEROPERABILITY.md](docs/INTEROPERABILITY.md) | Export matrix and fidelity rules |
+| [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/adr/](docs/adr/) | Accepted decisions and open questions |
+| [docs/m0/FINDINGS.md](docs/m0/FINDINGS.md) | Proof-of-concept measurements and risks |
+| [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person (macOS, input methods, screen readers) |
+| [CLAUDE.md](CLAUDE.md) and [START_HERE.md](START_HERE.md) | Rules and first brief for AI coding agents working on this repository |
+
+### Contributing
+
+The project is not taking outside contributions yet; that will open once a license is chosen (see below). Issues and suggestions are welcome.
+
+### License
+
+**No license has been chosen yet.** Until a `LICENSE` file is added to this repository, the code is visible but no rights to use, copy, modify or distribute it are granted. The project will be released under an open-source license, with no fees and with attribution to the original author.
+
+### Third-party components
+
+CirthScribe ships with these components under their own licenses:
+
+- **Courier Prime** font: SIL Open Font License 1.1 (`assets/fonts/courier-prime/OFL.txt`)
+- **SCOWL** English dictionaries: © Kevin Atkinson and others, under permissive notices (`assets/dictionaries/*/README_*.txt`)
+- **spellbook** spell checker: MPL-2.0
+- **SQLite**: public domain
+- **Tauri**, **ProseMirror** and other Rust and JavaScript libraries: mostly MIT and/or Apache-2.0
+
+The full inventory, generated from the lock files, is in [docs/m0/LICENSES.md](docs/m0/LICENSES.md).
