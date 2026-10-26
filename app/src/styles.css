@@ -199,3 +199,21 @@ dialog.backups h2 { text-transform: none; letter-spacing: 0; font-size: 15px; co
 .tag.bad { color: var(--bad); border-color: currentColor; }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* About and licences */
+dialog.about { width: min(760px, 92vw); max-height: 86vh; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; display: none; flex-direction: column; }
+dialog.about[open] { display: flex; }
+dialog.about::backdrop { background: rgba(0, 0, 0, .45); }
+dialog.about h2 { margin: 0 0 10px; font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+dialog.about h3 { font-size: 13px; margin: 14px 0 6px; }
+.about-version { font-weight: normal; font-size: 13px; color: var(--muted); }
+.about-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.about-tabs button { border: none; background: none; color: var(--ink); padding: 6px 10px; border-bottom: 2px solid transparent; cursor: pointer; }
+.about-tabs button.current { border-bottom-color: var(--accent); font-weight: 600; }
+.about-page { overflow: auto; min-height: 0; flex: 1; }
+.about-main p { margin: 0 0 8px; line-height: 1.45; }
+.about-attribution { font-size: 15px; font-weight: 600; }
+.about-url { user-select: all; }
+.about-text { white-space: pre-wrap; font: 12px/1.4 ui-monospace, Consolas, monospace; margin: 0; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+.about-text.short { max-height: 30vh; overflow: auto; }
+button.link { background: none; border: none; padding: 4px 0; color: var(--accent); cursor: pointer; text-decoration: underline; margin-top: 12px; }

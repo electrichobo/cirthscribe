@@ -39,11 +39,13 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 
 | # | Steps | Expected |
 | - | - | - |
-| N1 | Open the File menu | New Project…, Open…, Save, Save As…, Export PDF (proof), Close Project, Quit. Each does what its button does. |
+| N1 | Open the File menu | New Project…, Open…, Save, Save As…, Export PDF (proof), Export Plain Text…, Close Project, Quit. Each does what its button does. |
 | N2 | File > Quit right after typing | The last words are in the file on reopen (same path as closing the window). |
 | N3 | macOS: Edit menu, then Cmd+C / Cmd+V / Cmd+X / Cmd+A in the script | Copy, paste, cut and select-all work; Cmd+Z / Cmd+Shift+Z undo and redo editor changes (not a WebView-level undo). |
 | N4 | macOS: CirthScribe app menu | About, Services, Hide, Hide Others, Show All are present. |
 | N5 | Click and arrow-key through a dual-dialogue pair (left column, then right) | The caret moves through the left speech, then the right; typing stays in the column you are in. |
+| N7 | Help > About CirthScribe and Licences (Windows/Linux); CirthScribe > About CirthScribe (macOS) | The About screen opens with the attribution, GPL tab and third-party licences tab. |
+| N8 | Export Plain Text, open the file in Notepad / TextEdit / gedit | Indents line up in a fixed-pitch font; pages are separated by a form feed (some editors show it as a symbol or nothing). |
 | N6 | Free Writing, Flow mode on: type with a real IME (Japanese, Pinyin), then try the trackpad/mouse to select and drag text | Composed text lands at the end; nothing already written is selected, moved or deleted. Esc turns editing back on. |
 
 ## 2. Real input methods (all platforms)

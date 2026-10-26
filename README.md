@@ -47,10 +47,11 @@ Done:
 - [x] Dual dialogue, forced page breaks, and a page view
 - [x] Free Writing: notes and brain dumps outside any project, with a Flow mode that turns off editing so you just keep writing
 - [x] Draft PDF export
+- [x] Plain-text export with the same pages and layout
+- [x] US Letter / A4 page size, saved with each document
+- [x] About screen with the licence and every third-party licence
 
 Still to do:
-- [ ] Plain-text export
-- [ ] US Letter / A4 choice per document
 - [ ] Accessibility: keyboard-only use, screen readers, high contrast, UI scaling
 - [ ] Hands-on testing on macOS and with Asian-language input methods
 

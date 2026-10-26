@@ -288,3 +288,25 @@ fn future_schema_is_refused() {
 fn rusqlite_conn(p: &std::path::Path) -> rusqlite::Connection {
     rusqlite::Connection::open(p).unwrap()
 }
+
+#[test]
+fn page_profile_is_stored_per_document_and_saved_with_the_package() {
+    let d = tmpdir("profile");
+    let work = d.join("w.db");
+    let pkg = d.join("script.cirth");
+    {
+        let mut s = Store::open(&work).unwrap();
+        s.seed(&fixtures::unicode_marks().to_document().unwrap()).unwrap();
+        let main = s.default_document().unwrap();
+        let other = s.create_document("Episode 2").unwrap();
+        assert_eq!(s.document_profile(&main).unwrap(), "us-letter");
+        s.set_document_profile(&main, "a4").unwrap();
+        assert_eq!(s.document_profile(&other).unwrap(), "us-letter", "only that document changes");
+        assert!(matches!(s.set_document_profile(&main, "legal"), Err(StoreError::Invalid(_))));
+        assert!(matches!(s.set_document_profile("no-such-doc", "a4"), Err(StoreError::Invalid(_))));
+        s.save_package(&pkg).unwrap();
+    }
+    cirth_core::store::remove_store_files(&work).unwrap();
+    let s = Store::open_package(&pkg, &work, None).unwrap().store;
+    assert_eq!(s.document_profile(&s.default_document().unwrap()).unwrap(), "a4");
+}

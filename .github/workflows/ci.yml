@@ -44,6 +44,8 @@ jobs:
       - name: Frontend build
         working-directory: app
         run: ../scripts/ci-step.sh "Frontend build (Linux)" bash -c "npm ci && npm run build"
+      - name: Third-party notices up to date
+        run: scripts/ci-step.sh "Third-party notices (Linux)" node app/scripts/third-party-notices.mjs --check
       - name: App build
         run: scripts/ci-step.sh "App build (Linux)" cargo build -p cirthscribe --release
       - name: tauri-driver

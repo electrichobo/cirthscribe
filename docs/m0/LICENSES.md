@@ -16,6 +16,10 @@ Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dicti
 
 Coverage note: the Rust table resolves dependencies for Windows (x86_64-pc-windows-gnu). Linux and macOS builds pull different platform crates (for example `rfd`'s XDG portal or GTK backend for file dialogs); run the script with their target triples before a release.
 
+## Notices shipped with the app
+
+`assets/legal/THIRD-PARTY-NOTICES.txt` lists every component shipped in the app (Rust crates resolved for Windows MSVC, Linux and both macOS targets, the shipped npm packages, the font and the dictionaries) with the license and notice files from each package; the About screen shows it. Regenerate with `node app/scripts/third-party-notices.mjs`; CI (Linux) runs it with `--check`. Known gap: 19 crates publish no license file in their package (mostly `objc2-*` and `webview2-com*`); for those the file lists the declared license and authors. Before a release, add those projects' license texts from their repositories.
+
 ## Items to review
 
 - **MPL-2.0** (file-level copyleft): `spellbook` (spell checking, chosen in ADR 0002), `cssparser`, `cssparser-macros`, `dtoa-short`, `selectors` (via Tauri), `option-ext` (via `dirs`). Distributable in binaries; modified MPL files must stay MPL. Compatible with the project license (GPL-3.0-only): MPL-2.0 section 3.3 allows combination with the GPL, and none of these packages carries the "Incompatible With Secondary Licenses" notice (checked in the spellbook 0.4.2 source).

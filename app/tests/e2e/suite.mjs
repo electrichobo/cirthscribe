@@ -1174,6 +1174,67 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.body.dataset.view === 'editor'", "Back returns to the open project");
   });
 
+  await test("About shows the attribution, GPL notice, full GPL text and third-party licences (Home and menu)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, "#open-about");
+    await waitFor(app, "document.getElementById('about-dialog')?.open === true", "About open");
+    const pageText = () => app.evaluate("document.querySelector('#about-dialog .about-page').textContent");
+    const t = await pageText();
+    assert(t.includes("Based on CirthScribe by Jared Hoy"), "attribution");
+    assert(/GNU General Public License, version 3 only/.test(t) && /no warranty/i.test(t), "GPL notice and no warranty");
+    assert(t.includes("ADDITIONAL TERMS UNDER SECTION 7(b)"), "NOTICE text with the 7(b) term");
+    await clickHome(app, '[data-about-tab="gpl"]');
+    assert((await pageText()).includes("GNU GENERAL PUBLIC LICENSE") && (await pageText()).includes("Version 3, 29 June 2007"), "full GPL text");
+    await clickHome(app, '[data-about-tab="third"]');
+    const third = await pageText();
+    for (const name of ["Courier Prime", "SCOWL dictionary en_US-large", "spellbook 0.4.2", "prosemirror-view", "tauri "]) assert(third.includes(name), `third-party list has ${name}`);
+    assert(third.includes("SIL OPEN FONT LICENSE"), "OFL text included");
+    await screenshot(app, "about");
+    await app.evaluate("(() => { document.getElementById('about-close').click(); return true; })()");
+    assert(!(await app.evaluate("document.getElementById('about-dialog').open")), "closed");
+    await app.evaluate("__cirth.menu('about')");
+    await waitFor(app, "document.getElementById('about-dialog').open && document.getElementById('about-dialog').dataset.tab === 'about'", "About from the menu");
+    await app.evaluate("__cirth.about.close()");
+  });
+
+  await test("Page size is stored per document and survives reopening; text export matches the page map", async () => {
+    await openFixture("page-boundaries");
+    assert((await app.evaluate("document.getElementById('profile').value")) === "letter", "new documents are US Letter");
+    const pagesOf = (profile) => app.evaluate(`window.__TAURI_INTERNALS__.invoke('paginate', { profile: ${JSON.stringify(profile)} }).then(p => p.map.pages.length)`);
+    await app.evaluate("(() => { const s = document.getElementById('profile'); s.value = 'a4'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "__cirth.pagination && __cirth.pagination.map.profile.includes('a4')", "repaginated as A4");
+    // Close and reopen (without resetting the sample): still A4.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, "!!__cirth.lastOpen", "reopened");
+    assert((await app.evaluate("document.getElementById('profile').value")) === "a4", "A4 kept after reopening");
+    await waitFor(app, "__cirth.pagination && __cirth.pagination.map.profile.includes('a4')", "A4 pagination after reopening");
+    // Text export uses the document's page size and the same pages.
+    const out = join(dataDir, "page boundaries.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out)})`), "exported");
+    const txt = readFileSync(out, "utf8");
+    const pages = await pagesOf("a4");
+    assert(txt.split("\f").length === pages, `${txt.split("\f").length} text pages vs ${pages} in the A4 page map`);
+    const banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(banner.includes("(A4)") && banner.includes("form feed"), `export reported with its limits: ${banner}`);
+    // Cues sit 22 columns in from the action margin, as in the PDF.
+    const cue = (await blocks()).find((b) => b.kind === "character" && !b.dual);
+    const name = text(cue).toUpperCase();
+    assert(txt.split("\n").some((l) => l.startsWith(" ".repeat(22) + name)), `cue ${name} at column 22`);
+    // Every scene heading is in the text, in order (long ones wrap, so match the start).
+    let at = 0;
+    for (const h of (await blocks()).filter((b) => b.kind === "heading")) {
+      const i = txt.indexOf(text(h).toUpperCase().slice(0, 30), at);
+      assert(i >= at, `heading ${text(h)} in order`);
+      at = i;
+    }
+    // Back to Letter for the tests that follow.
+    await app.evaluate("(() => { const s = document.getElementById('profile'); s.value = 'letter'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "__cirth.pagination && !__cirth.pagination.map.profile.includes('a4')", "back to Letter");
+  });
+
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {
     await openFixture("unicode-marks");
     const n0 = (await blocks()).length;

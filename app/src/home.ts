@@ -39,6 +39,7 @@ interface Actions {
   restoreBackup(path: string): Promise<boolean>;
   openSample(name: string): Promise<boolean>;
   openFreeWriting(): void;
+  openAbout(): void;
   createProject(title: string): Promise<boolean>;
 }
 
@@ -113,7 +114,9 @@ export function createHome(root: HTMLElement, actions: Actions) {
   const freeBtn = el("button", { type: "button", id: "open-free" }, "Free Writing");
   freeBtn.title = "Notes and brain dumps outside any project";
   freeBtn.addEventListener("click", () => actions.openFreeWriting());
-  const side = el("aside", { className: "home-side" }, form, el("h2", {}, "Open"), openBtn, el("h2", {}, "Free Writing"), freeBtn, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."));
+  const aboutBtn = el("button", { type: "button", id: "open-about", className: "link" }, "About CirthScribe and licences");
+  aboutBtn.addEventListener("click", () => actions.openAbout());
+  const side = el("aside", { className: "home-side" }, form, el("h2", {}, "Open"), openBtn, el("h2", {}, "Free Writing"), freeBtn, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
   const main = el("section", { className: "home-main" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, "CirthScribe"), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 

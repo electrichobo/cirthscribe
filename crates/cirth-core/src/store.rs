@@ -220,6 +220,22 @@ impl Store {
         self.meta("default_document")?.ok_or_else(|| StoreError::Invalid("project has no default document".into()))
     }
 
+    /// Page profile of a document: "us-letter" or "a4".
+    pub fn document_profile(&self, document_id: &str) -> Result<String> {
+        Ok(self.conn.query_row("SELECT profile FROM documents WHERE id = ?1", [document_id], |r| r.get(0))?)
+    }
+
+    pub fn set_document_profile(&self, document_id: &str, profile: &str) -> Result<()> {
+        if !matches!(profile, "us-letter" | "a4") {
+            return Err(StoreError::Invalid(format!("unknown page profile {profile}")));
+        }
+        let n = self.conn.execute("UPDATE documents SET profile = ?2 WHERE id = ?1", [document_id, profile])?;
+        if n == 0 {
+            return Err(StoreError::Invalid(format!("no document {document_id}")));
+        }
+        Ok(())
+    }
+
     /// Add an empty document (for multi-document projects; no UI yet).
     pub fn create_document(&self, title: &str) -> Result<Id> {
         let id = crate::model::new_id();

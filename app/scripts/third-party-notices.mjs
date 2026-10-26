@@ -1,0 +1,124 @@
+// Writes assets/legal/THIRD-PARTY-NOTICES.txt: every third-party component
+// shipped in the app, with its license and the license/notice files from its
+// own package (identical texts printed once). The app embeds this file in its
+// About screen. Re-run on every dependency change; `--check` fails if the
+// committed file is out of date (used in CI).
+// Usage: node scripts/third-party-notices.mjs [--check]
+import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+
+const root = new URL("../..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const out = join(root, "assets", "legal", "THIRD-PARTY-NOTICES.txt");
+// Release targets; Linux/macOS pull different platform crates than Windows.
+const TARGETS = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-apple-darwin"];
+const NOTICE_FILE = /^(licen[cs]e|copying|notice|copyright|authors|unlicense)([-_.].*)?$/i;
+// Upstream test data shipped inside some crate sources, not in our binary.
+const SKIP_DIRS = new Set(["tests", "test", "benches", "examples", "vendor", "fuzz"]);
+
+const norm = (t) => t.replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").trim();
+
+function licenseFiles(dir) {
+  const files = [];
+  const walk = (d, depth) => {
+    for (const e of readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (e.isDirectory() && depth < 1 && !SKIP_DIRS.has(e.name) && /^licen[cs]es?$/i.test(e.name)) walk(join(d, e.name), depth + 1);
+      else if (e.isFile() && (NOTICE_FILE.test(e.name) || depth > 0)) files.push(join(d, e.name));
+    }
+  };
+  walk(dir, 0);
+  return files;
+}
+
+const components = new Map(); // key -> { name, version, license, source, files: [path] }
+for (const target of TARGETS) {
+  const meta = JSON.parse(execFileSync("cargo", ["metadata", "--format-version", "1", "--filter-platform", target], { cwd: root, maxBuffer: 1 << 28 }).toString());
+  const reachable = new Set(meta.resolve.nodes.map((n) => n.id));
+  // Only normal (shipped) dependencies, starting from the app binary.
+  const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
+  const app = meta.packages.find((p) => p.name === "cirthscribe");
+  const shipped = new Set();
+  const stack = [app.id];
+  while (stack.length) {
+    const id = stack.pop();
+    if (shipped.has(id)) continue;
+    shipped.add(id);
+    for (const d of nodes.get(id)?.deps ?? []) if (d.dep_kinds.some((k) => k.kind === null)) stack.push(d.pkg);
+  }
+  for (const p of meta.packages) {
+    if (!p.source || !reachable.has(p.id) || !shipped.has(p.id)) continue;
+    const key = `${p.name} ${p.version}`;
+    if (components.has(key)) continue;
+    components.set(key, { name: p.name, version: p.version, license: p.license ?? (p.license_file ? `see ${p.license_file}` : "UNKNOWN"), source: p.repository ?? "", authors: p.authors ?? [], files: licenseFiles(dirname(p.manifest_path)) });
+  }
+}
+
+const appDir = join(root, "app");
+const lock = JSON.parse(readFileSync(join(appDir, "package-lock.json"), "utf8"));
+for (const [path, info] of Object.entries(lock.packages)) {
+  if (!path || info.dev) continue;
+  const dir = join(appDir, path);
+  const pj = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+  const name = path.replace(/^.*node_modules\//, "");
+  const repo = typeof pj.repository === "string" ? pj.repository : pj.repository?.url ?? "";
+  components.set(`${name} ${info.version} (npm)`, { name, version: info.version, license: pj.license ?? "UNKNOWN", source: repo, files: existsSync(dir) ? licenseFiles(dir) : [] });
+}
+
+// Bundled assets that do not come from a package manager.
+const assets = [
+  { name: "Courier Prime (font)", version: "", license: "OFL-1.1", source: "https://github.com/google/fonts/tree/main/ofl/courierprime", files: [join(root, "assets/fonts/courier-prime/OFL.txt")] },
+  ...["en_US-large", "en_GB-large"].map((d) => {
+    const dir = join(root, "assets/dictionaries", d);
+    return { name: `SCOWL dictionary ${d}`, version: "2026.02.25", license: "SCOWL notice (permissive)", source: "https://github.com/en-wl/wordlist", files: readdirSync(dir).filter((f) => /^README/i.test(f)).map((f) => join(dir, f)) };
+  }),
+  { name: "SQLite (bundled by libsqlite3-sys)", version: "", license: "Public domain", source: "https://sqlite.org/copyright.html", files: [], note: "SQLite is in the public domain; no license text is required." },
+];
+
+const texts = new Map(); // normalized text -> id
+const entries = [...assets, ...[...components.values()].sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version))];
+const lines = [
+  "THIRD-PARTY NOTICES",
+  "",
+  "CirthScribe includes the components below. Each remains under its own",
+  "license. CirthScribe itself is licensed under GPL-3.0-only; see LICENSE",
+  "and NOTICE. Generated by app/scripts/third-party-notices.mjs.",
+  "",
+  "Components without a license file in their package are listed with their",
+  "declared license; the standard text of that license applies.",
+  "",
+];
+const body = [];
+for (const c of entries) {
+  const head = `${c.name}${c.version ? " " + c.version : ""}`;
+  lines.push(`- ${head}: ${c.license}${c.source ? ` (${c.source.replace(/^git\+/, "")})` : ""}`);
+  const refs = [];
+  for (const f of c.files) {
+    const t = norm(readFileSync(f, "utf8"));
+    if (!t) continue;
+    if (!texts.has(t)) {
+      const id = `[T${texts.size + 1}]`;
+      texts.set(t, id);
+      body.push("", "=".repeat(72), `${id} from ${head}: ${f.split(/[\\/]/).pop()}`, "=".repeat(72), "", t);
+    }
+    refs.push(texts.get(t));
+  }
+  if (refs.length) lines.push(`    text: ${[...new Set(refs)].join(" ")}`);
+  // No license file in the published package: name the copyright holders
+  // the package declares; the license's standard text applies.
+  else if (c.authors?.length) lines.push(`    copyright: ${c.authors.join(", ")}`);
+  if (c.note) lines.push(`    ${c.note}`);
+}
+const content = [...lines, "", "LICENSE TEXTS", ...body, ""].join("\n");
+
+if (process.argv.includes("--check")) {
+  const cur = existsSync(out) ? readFileSync(out, "utf8").replace(/\r\n/g, "\n") : "";
+  if (cur !== content) {
+    console.error("assets/legal/THIRD-PARTY-NOTICES.txt is out of date: run node app/scripts/third-party-notices.mjs and commit it.");
+    process.exit(1);
+  }
+  console.log(`third-party notices up to date (${entries.length} components, ${texts.size} texts)`);
+} else {
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, content);
+  console.log(`wrote ${out}: ${entries.length} components, ${texts.size} distinct texts, ${Math.round(content.length / 1024)} KB`);
+}

@@ -25,6 +25,7 @@ import { completePlugin, suggestion } from "./complete";
 import { installSpell, spellPlugin } from "./spell";
 import { dualPlugin, toggleDual, togglePageBreak } from "./format";
 import { createFreeWriting } from "./freewrite";
+import { createAbout } from "./about";
 
 interface Opened {
   name: string;
@@ -257,6 +258,8 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   docCounts = null;
   scheduleCounts(true);
   void spell.onOpen($("spelling") as HTMLSelectElement);
+  // Page size is stored per document; pagination, PDF and text use it.
+  ($("profile") as HTMLSelectElement).value = await invoke<string>("document_profile").catch(() => "letter");
   setStatus({ state: "saved", version: o.doc.version });
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   const t2 = performance.now();
@@ -479,16 +482,28 @@ const free = createFreeWriting($("freewrite"), {
 });
 $("go-free").addEventListener("click", () => void openFreeWriting());
 
+const about = createAbout();
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
   restoreBackup: (path) => openWith("restore_backup", { path }),
   openSample: (name) => open(name, false),
   openFreeWriting: () => void openFreeWriting(),
+  openAbout: () => void about.open(),
   createProject: (title) => openWith("create_project", { title }),
 });
 
 $("go-home").addEventListener("click", () => void goHome());
-$("profile").addEventListener("change", () => void repaginate());
+$("profile").addEventListener("change", async (e) => {
+  const sel = e.target as HTMLSelectElement;
+  try {
+    sel.value = await invoke<string>("set_document_profile", { profile: sel.value });
+    await saveFile(false);
+  } catch (err) {
+    showBanner(`Could not change the page size: ${err}`);
+    sel.value = await invoke<string>("document_profile").catch(() => sel.value);
+  }
+  await repaginate();
+});
 async function saveNow() {
   try {
     await saveFile(true);
@@ -548,6 +563,9 @@ async function runMenu(id: string): Promise<void> {
     case "export_pdf":
       if (lastOpen) $("pdf").click();
       break;
+    case "export_txt":
+      await exportText();
+      break;
     case "home":
       await goHome();
       break;
@@ -569,6 +587,9 @@ async function runMenu(id: string): Promise<void> {
     case "redo":
       if (view) redo(view.state, view.dispatch);
       break;
+    case "about":
+      await about.open();
+      break;
   }
 }
 void listen<string>("menu", (e) => void runMenu(e.payload));
@@ -584,6 +605,22 @@ $("pdf").addEventListener("click", async () => {
     showBanner(`PDF export failed: ${e}`);
   }
 });
+/** Plain text with the PDF's line breaks and pages (cirth_core::txt). */
+async function exportText(path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".txt"), filters: [{ name: "Plain text", extensions: ["txt"] }] }));
+  if (!target) return false;
+  await syncer.flush();
+  try {
+    const r = await invoke<{ path: string; pages: number; doc_version: number; profile: string; notes: string[] }>("export_txt", { path: target });
+    showBanner(`Plain text written: ${r.path} · ${r.pages} pages (${r.profile === "a4" ? "A4" : "US Letter"}) from v${r.doc_version}. ${r.notes.join(" ")}`);
+    return true;
+  } catch (e) {
+    showBanner(`Text export failed: ${e}`);
+    return false;
+  }
+}
+$("txt").addEventListener("click", () => void exportText());
 $("zoom").addEventListener("input", (e) => {
   editorEl.style.zoom = `${(e.target as HTMLInputElement).value}%`;
 });
@@ -594,6 +631,8 @@ $("structural").addEventListener("change", (e) => {
 
 // Test and measurement hooks (used by app/tests via the WebView DevTools protocol).
 (window as any).__cirth = {
+  about,
+  exportText,
   get view() {
     return view;
   },
