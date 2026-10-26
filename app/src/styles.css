@@ -96,10 +96,44 @@ body[data-pageview="pages"] .page-mark.inline { margin: .4in 0; padding-right: 6
 .summary { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 3px 5px; }
 .excerpt { margin: 4px 0; color: var(--muted); font-family: "Courier Prime", monospace; font-size: 11px; }
 .card-moves { display: flex; gap: 4px; justify-content: flex-end; }
-/* View switching: Home (project library) or the editor. */
+/* View switching: Home (project library), the editor, or Free Writing. */
 body[data-view="home"] > .toolbar, body[data-view="home"] > .panes, body[data-view="home"] > footer { display: none; }
-body[data-view="editor"] > #home { display: none; }
-body[data-view="home"] { grid-template-rows: 1fr; }
+body[data-view="free"] > .toolbar, body[data-view="free"] > .panes, body[data-view="free"] > footer, body[data-view="free"] > #home { display: none; }
+body[data-view="editor"] > #home, body[data-view="home"] > #freewrite, body[data-view="editor"] > #freewrite { display: none; }
+body[data-view="home"], body[data-view="free"] { grid-template-rows: 1fr; }
+
+/* Free Writing */
+#freewrite { display: grid; grid-template-rows: auto 1fr; min-height: 0; background: var(--bg); }
+.fw-head { display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.fw-head h1 { margin: 0; font-size: 18px; }
+#fw-search { margin-left: auto; width: min(320px, 40vw); padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); }
+.fw-body { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+.fw-side { overflow: auto; padding: 14px; border-right: 1px solid var(--line); background: var(--panel); display: grid; align-content: start; gap: 12px; }
+.fw-new { display: flex; gap: 8px; }
+.fw-scopes, .fw-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.fw-scopes button { width: 100%; text-align: left; border: 0; background: none; padding: 4px 6px; }
+.fw-scopes button.current { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.fw-list button { width: 100%; text-align: left; display: grid; gap: 2px; padding: 6px 8px; border-radius: 6px; }
+.fw-list button.current { border-color: var(--accent); }
+.fw-list span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-list small { color: var(--muted); font-size: 11px; }
+.fw-none { color: var(--muted); padding: 6px; }
+.fw-main { overflow: auto; padding: 16px 24px; display: grid; align-content: start; }
+.fw-empty { color: var(--muted); }
+.fw-editor { display: grid; gap: 10px; max-width: 760px; width: 100%; margin: 0 auto; }
+.fw-editor[hidden] { display: none; }
+.fw-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#fw-status { margin-left: auto; color: var(--muted); }
+#fw-title { font: 600 18px system-ui, sans-serif; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
+#fw-body { min-height: 60vh; resize: vertical; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); font: 15px/1.6 Georgia, "Times New Roman", serif; }
+.fw-prov { color: var(--muted); font-size: 12px; }
+.fw-msg { margin: 0 auto 10px; max-width: 760px; width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
+.fw-flow-note { margin: 0; color: var(--accent); font-size: 13px; }
+.fw-flow-note[hidden], .fw-msg[hidden] { display: none; }
+/* Flow mode: only the writing. */
+#freewrite[data-flow="on"] .fw-side, #freewrite[data-flow="on"] .fw-head, #freewrite[data-flow="on"] .fw-tools > :not(#fw-flow):not(#fw-status) { display: none; }
+#freewrite[data-flow="on"] .fw-body { grid-template-columns: 1fr; }
+#freewrite[data-flow="on"] #fw-body { min-height: 75vh; font-size: 17px; }
 #project-title { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #home { display: grid; grid-template-rows: auto 1fr; min-height: 0; background: var(--bg); }

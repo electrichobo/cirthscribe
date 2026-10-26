@@ -12,7 +12,7 @@ import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, 
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
 import { Syncer, diff, type SyncStatus } from "./sync";
-import { clipboardTextParser, clipboardTextSerializer, handlePaste, parsePlainText } from "./paste";
+import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks, parsePlainText } from "./paste";
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
 import { renderBoard, renderNavigator, moveCard, type BoardState } from "./views";
 import { scenesOf, moveScene } from "./scenes";
@@ -24,6 +24,7 @@ import { installFindBar } from "./findbar";
 import { completePlugin, suggestion } from "./complete";
 import { installSpell, spellPlugin } from "./spell";
 import { dualPlugin, toggleDual, togglePageBreak } from "./format";
+import { createFreeWriting } from "./freewrite";
 
 interface Opened {
   name: string;
@@ -275,8 +276,13 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   return true;
 }
 
-function setView(v: "home" | "editor") {
+function setView(v: "home" | "editor" | "free") {
   document.body.dataset.view = v;
+}
+
+async function openFreeWriting() {
+  setView("free");
+  await free.show();
 }
 
 // --- Saving the project file -------------------------------------------------
@@ -400,6 +406,7 @@ function scheduleAutosave() {
 // open once and say so; a second close quits (edits stay recoverable).
 let closeFailedOnce = false;
 void getCurrentWindow().onCloseRequested(async (event) => {
+  await free.flush().catch(() => {});
   if (!lastOpen || closeFailedOnce) return;
   try {
     await saveFile(false);
@@ -451,10 +458,32 @@ try {
   setViewMode("continuous");
 }
 
+const free = createFreeWriting($("freewrite"), {
+  back: () => {
+    if (lastOpen) {
+      setView("editor");
+      view.focus();
+    } else {
+      setView("home");
+      void home.refresh();
+    }
+  },
+  projectOpen: () => !!lastOpen,
+  insertIntoProject: async (paras) => {
+    if (!view || !lastOpen) return false;
+    view.focus();
+    const nodes = paras.map((p) => schema.nodes.block.create({ kind: "action" }, schema.text(p)));
+    return insertBlocks(view, nodes);
+  },
+  notify: (m) => showBanner(m),
+});
+$("go-free").addEventListener("click", () => void openFreeWriting());
+
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
   restoreBackup: (path) => openWith("restore_backup", { path }),
   openSample: (name) => open(name, false),
+  openFreeWriting: () => void openFreeWriting(),
   createProject: (title) => openWith("create_project", { title }),
 });
 
@@ -611,6 +640,8 @@ $("structural").addEventListener("change", (e) => {
   menu: (id: string) => runMenu(id),
   suggestion: () => suggestion(view.state),
   setViewMode,
+  free,
+  openFreeWriting,
   spell,
   counts: () => ({ live: liveCounts, doc: docCounts }),
   countWords: (texts: string[]) => invoke<number[]>("count_words", { texts }),

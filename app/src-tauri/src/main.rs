@@ -41,6 +41,8 @@ struct Session {
 struct App {
     session: Mutex<Option<Session>>,
     data_dir: Mutex<PathBuf>,
+    /// Free Writing workspace, opened on first use.
+    free: Mutex<Option<cirth_core::freewrite::FreeStore>>,
 }
 
 #[derive(Serialize)]
@@ -637,6 +639,111 @@ async fn word_counts(app: State<'_, App>) -> Result<cirth_core::words::DocumentC
     Ok(cirth_core::words::document(&doc))
 }
 
+// --- Free Writing (cirth_core::freewrite) ------------------------------------------------
+//
+// A workspace of pieces independent of projects, in freewriting.db in the
+// app data folder. Nothing here is attached to a project unless the writer
+// copies or moves a piece into the open project; both sides record it.
+
+use cirth_core::freewrite::{Folder, FreeStore, Piece, PieceSummary};
+
+fn with_free<T>(app: &App, f: impl FnOnce(&FreeStore) -> Result<T, String>) -> Result<T, String> {
+    let mut guard = app.free.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(FreeStore::open(&data_dir(app).join("freewriting.db")).map_err(|e| e.to_string())?);
+    }
+    f(guard.as_ref().unwrap())
+}
+
+fn fe(e: cirth_core::freewrite::FreeError) -> String {
+    e.to_string()
+}
+
+#[derive(Serialize)]
+struct FreeList {
+    folders: Vec<Folder>,
+    pieces: Vec<PieceSummary>,
+}
+
+#[tauri::command]
+async fn fw_list(app: State<'_, App>, folder: Option<String>, trash: bool, query: Option<String>) -> Result<FreeList, String> {
+    with_free(&app, |s| {
+        let pieces = match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+            Some(q) => s.search(q).map_err(fe)?,
+            None => s.list(folder.as_deref(), trash).map_err(fe)?,
+        };
+        Ok(FreeList { folders: s.folders().map_err(fe)?, pieces })
+    })
+}
+
+#[tauri::command]
+async fn fw_create_folder(app: State<'_, App>, name: String) -> Result<Folder, String> {
+    with_free(&app, |s| s.create_folder(&name).map_err(fe))
+}
+
+#[tauri::command]
+async fn fw_rename_folder(app: State<'_, App>, id: String, name: String) -> Result<(), String> {
+    with_free(&app, |s| s.rename_folder(&id, &name).map_err(fe))
+}
+
+#[tauri::command]
+async fn fw_create(app: State<'_, App>, folder_id: Option<String>, title: String) -> Result<Piece, String> {
+    with_free(&app, |s| s.create(folder_id.as_deref(), &title).map_err(fe))
+}
+
+#[tauri::command]
+async fn fw_get(app: State<'_, App>, id: String) -> Result<Piece, String> {
+    with_free(&app, |s| s.get(&id).map_err(fe))
+}
+
+#[tauri::command]
+async fn fw_save(app: State<'_, App>, id: String, title: String, body: String) -> Result<String, String> {
+    with_free(&app, |s| s.save(&id, &title, &body).map_err(fe))
+}
+
+#[tauri::command]
+async fn fw_move(app: State<'_, App>, id: String, folder_id: Option<String>) -> Result<(), String> {
+    with_free(&app, |s| s.move_to(&id, folder_id.as_deref()).map_err(fe))
+}
+
+#[tauri::command]
+async fn fw_trash(app: State<'_, App>, id: String, trashed: bool) -> Result<(), String> {
+    with_free(&app, |s| s.set_trashed(&id, trashed).map_err(fe))
+}
+
+/// Write a piece as a UTF-8 text file (path from the Save dialog).
+#[tauri::command]
+async fn fw_export(app: State<'_, App>, id: String, path: String) -> Result<String, String> {
+    let p = with_free(&app, |s| s.get(&id).map_err(fe))?;
+    let target = normalize(Path::new(&path));
+    let tmp = target.with_extension("txt.tmp");
+    std::fs::write(&tmp, format!("{}\n\n{}\n", p.title, p.body.trim_end())).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
+    Ok(target.display().to_string())
+}
+
+/// Record that a piece was copied (or moved) into the open project. The UI
+/// has already inserted the text as an ordinary, undoable edit. A move also
+/// sends the piece to the trash; it is never deleted.
+#[tauri::command]
+async fn fw_note_copied(app: State<'_, App>, id: String, moved: bool) -> Result<(), String> {
+    let (title, file) = with_session(&app, |s| Ok((s.store.load().map_err(err)?.title, s.package.display().to_string())))?;
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let when = backup::readable_utc(secs);
+    let piece = with_free(&app, |s| {
+        s.add_provenance(&id, &format!("{} into \"{}\" ({}) on {}", if moved { "Moved" } else { "Copied" }, title, file, when)).map_err(fe)?;
+        if moved {
+            s.set_trashed(&id, true).map_err(fe)?;
+        }
+        s.get(&id).map_err(fe)
+    })?;
+    with_session(&app, |s| {
+        let mut list: Vec<serde_json::Value> = s.store.setting("project", "free_writing_imports").ok().flatten().and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        list.push(serde_json::json!({ "piece_id": piece.id, "title": piece.title, "at": when, "moved": moved }));
+        s.store.set_setting("project", "free_writing_imports", &serde_json::to_string(&list).unwrap_or_default()).map_err(err)
+    })
+}
+
 // --- Spelling (cirth_core::spell) ------------------------------------------------------
 //
 // Language is a project setting ("en_US", "en_GB" or "off"; default en_US),
@@ -957,7 +1064,17 @@ fn main() {
             spell_check,
             spell_suggest,
             spell_add,
-            spell_ignore
+            spell_ignore,
+            fw_list,
+            fw_create_folder,
+            fw_rename_folder,
+            fw_create,
+            fw_get,
+            fw_save,
+            fw_move,
+            fw_trash,
+            fw_export,
+            fw_note_copied
         ])
         .build(tauri::generate_context!())
         .expect("error while building CirthScribe")

@@ -16,6 +16,9 @@ const KEYS = {
   ArrowDown: { key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 },
   End: { key: "End", code: "End", windowsVirtualKeyCode: 35 },
   Home: { key: "Home", code: "Home", windowsVirtualKeyCode: 36 },
+  Delete: { key: "Delete", code: "Delete", windowsVirtualKeyCode: 46 },
+  PageUp: { key: "PageUp", code: "PageUp", windowsVirtualKeyCode: 33 },
+  PageDown: { key: "PageDown", code: "PageDown", windowsVirtualKeyCode: 34 },
 };
 const MOD = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 const NATIVE_COMMAND = { v: "paste", c: "copy", x: "cut" };

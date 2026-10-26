@@ -39,6 +39,8 @@ Order matters: the first three items remove M0's open risks before features grow
 
 Separate workspace database with folders, search, autosave and recovery; explicit copy or move into a project, with provenance (A4).
 
+- **Done 2026-10-26:** Free Writing (Home, toolbar, no project needed). Pieces live in `freewriting.db` in the app data folder (`cirth-core/src/freewrite.rs`), not in any project. Folders (double-click to rename), case-insensitive search, Trash with Restore (nothing is deleted), autosave 0.5 s after typing stops and on leaving, plain-text export. Copy into project inserts each paragraph as an action block at the script cursor as one undoable edit and keeps the piece; Move does the same and puts the piece in Trash. Both are recorded on the piece and in the project's settings. **Flow mode** turns off editing for brain dumps: Backspace, Delete, arrows, Home/End, undo, cut and select-all do nothing; clicks and paste cannot move the insertion point from the end; spelling underlines and the sidebar are hidden; Esc turns editing back on. Tested end to end with both drivers, including a hard kill after autosave. Not yet: rich text in pieces, a timed or word-goal session, a bulk export.
+
 ## 5. Export and profiles
 
 - TXT export through a real serializer, with a small capability note.

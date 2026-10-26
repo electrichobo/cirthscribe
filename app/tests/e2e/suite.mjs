@@ -73,6 +73,8 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
   };
 
   async function test(name, fn) {
+    // E2E_ONLY=<text> runs only tests whose name contains it (for debugging).
+    if (process.env.E2E_ONLY && !name.includes(process.env.E2E_ONLY)) return;
     const t0 = performance.now();
     results.current = name;
     console.log(`RUN  ${name}`);
@@ -1018,6 +1020,158 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await sleep(800);
     assert((await app.evaluate("__cirth.lastOpen.package_path")) === conflictPath, "no second conflict for an identical rewrite");
     return { conflictPath };
+  });
+
+  const fwOpen = async () => {
+    await app.evaluate("__cirth.openFreeWriting()");
+    await waitFor(app, "document.body.dataset.view === 'free' && document.getElementById('freewrite').dataset.loaded === '1'", "Free Writing");
+  };
+  const fwBody = () => app.evaluate("document.getElementById('fw-body').value");
+  const fwFocusBody = () => app.evaluate("(() => { const b = document.getElementById('fw-body'); b.focus(); b.setSelectionRange(b.value.length, b.value.length); return true; })()");
+  // Saved means the stored copy equals what is on screen, not just the label.
+  const fwSaved = () =>
+    waitFor(app, "(() => { const c = __cirth.free.current; return !!c && document.getElementById('fw-status').textContent.startsWith('Saved') && c.body === document.getElementById('fw-body').value; })()", "Free Writing autosave");
+
+  await test("Free Writing without a project: autosave survives a hard kill; search, folders, trash, export", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, "#open-free");
+    await waitFor(app, "document.body.dataset.view === 'free' && document.getElementById('freewrite').dataset.loaded === '1'", "Free Writing from Home");
+    await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
+    await waitFor(app, "document.activeElement && document.activeElement.id === 'fw-title'", "new piece title focused");
+    await typeText("Night notes");
+    await fwFocusBody();
+    await typeText("The harbor smells of oranges.");
+    await press("Enter");
+    await press("Enter");
+    await typeText("Second thought here.");
+    await fwSaved();
+    const id = await app.evaluate("__cirth.free.current.id");
+    // Hard kill right after the save, then restart: the piece is there.
+    await app.kill();
+    await sleep(1500);
+    app = await driver.launch("after-free-kill");
+    await waitHome(app);
+    await clickHome(app, "#open-free");
+    await waitFor(app, "document.getElementById('freewrite').dataset.loaded === '1'", "Free Writing after restart");
+    await clickHome(app, `[data-piece="${id}"]`);
+    await waitFor(app, `__cirth.free.current && __cirth.free.current.id === ${JSON.stringify(id)}`, "piece open");
+    assert((await fwBody()) === "The harbor smells of oranges.\n\nSecond thought here.", `restored '${await fwBody()}'`);
+    assert((await app.evaluate("document.getElementById('fw-title').value")) === "Night notes", "title restored");
+    // Search (case-insensitive) across all writing.
+    const listIds = () => app.evaluate("[...document.querySelectorAll('#fw-list [data-piece]')].map(b => b.dataset.piece)");
+    await app.evaluate("(() => { const s = document.getElementById('fw-search'); s.value = 'ORANGES'; s.dispatchEvent(new Event('input')); return true; })()");
+    await sleep(400);
+    assert((await listIds()).includes(id), "search finds it");
+    await app.evaluate("(() => { const s = document.getElementById('fw-search'); s.value = 'zzzz'; s.dispatchEvent(new Event('input')); return true; })()");
+    await sleep(400);
+    assert((await listIds()).length === 0, "no false matches");
+    await app.evaluate("(() => { const s = document.getElementById('fw-search'); s.value = ''; s.dispatchEvent(new Event('input')); return true; })()");
+    // A folder holds it; Trash keeps it; Restore brings it back.
+    await app.evaluate("(() => { document.getElementById('fw-new-folder').click(); return true; })()");
+    await sleep(400);
+    const folderId = await app.evaluate("[...document.querySelectorAll('.fw-scopes [data-scope]')].map(b => b.dataset.scope).find(s => s !== 'all' && s !== 'trash')");
+    await app.evaluate(`(() => { const f = document.getElementById('fw-folder'); f.value = ${JSON.stringify(folderId)}; f.dispatchEvent(new Event('change')); return true; })()`);
+    await sleep(400);
+    await clickHome(app, `[data-scope="${folderId}"]`);
+    await sleep(300);
+    assert((await listIds()).includes(id), "listed in its folder");
+    await app.evaluate("(() => { document.getElementById('fw-trash').click(); return true; })()");
+    await sleep(400);
+    await clickHome(app, '[data-scope="trash"]');
+    await sleep(300);
+    assert((await listIds()).includes(id), "in Trash");
+    await clickHome(app, '[data-scope="all"]');
+    await sleep(300);
+    assert(!(await listIds()).includes(id), "not in All while trashed");
+    await app.evaluate("(() => { document.getElementById('fw-trash').click(); return true; })()");
+    await sleep(400);
+    assert((await listIds()).includes(id), "restored");
+    // Export to a text file.
+    const out = join(dataDir, "exported notes.txt");
+    await app.evaluate(`__cirth.free.exportTo(${JSON.stringify(out)})`);
+    assert(readFileSync(out, "utf8") === "Night notes\n\nThe harbor smells of oranges.\n\nSecond thought here.\n", `export '${readFileSync(out, "utf8")}'`);
+    await screenshot(app, "free-writing");
+    return { id };
+  });
+
+  await test("Flow mode: text only grows at the end; editing keys, undo, clicks do nothing; Esc restores editing", async () => {
+    await fwOpen();
+    await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
+    await waitFor(app, "document.activeElement && document.activeElement.id === 'fw-title'", "new piece");
+    await typeText("Flow test");
+    await fwFocusBody();
+    await typeText("abc");
+    await app.evaluate("(() => { document.getElementById('fw-flow').click(); return true; })()");
+    assert(await app.evaluate("__cirth.free.flow === true"), "flow on");
+    assert(await app.evaluate("getComputedStyle(document.querySelector('.fw-side')).display === 'none'"), "sidebar hidden");
+    for (const k of ["Backspace", "Delete", "ArrowLeft", "Home", "ArrowUp"]) await press(k);
+    await press("z", [MOD_KEY]);
+    await press("a", [MOD_KEY]);
+    assert((await fwBody()) === "abc", `editing keys ignored: '${await fwBody()}'`);
+    await typeText("X");
+    assert((await fwBody()) === "abcX", `typing appends: '${await fwBody()}'`);
+    // Clicking in the middle does not move the insertion point.
+    await app.evaluate("(() => { const b = document.getElementById('fw-body'); const r = b.getBoundingClientRect(); b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + 10 })); b.setSelectionRange(1, 1); b.dispatchEvent(new Event('select')); return b.selectionStart; })()");
+    await typeText("Y");
+    assert((await fwBody()) === "abcXY", `after a click in the middle: '${await fwBody()}'`);
+    // Paste appends.
+    await app.evaluate("(() => { const b = document.getElementById('fw-body'); b.setSelectionRange(0, 2); const dt = new DataTransfer(); dt.setData('text/plain', ' pasted'); b.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()");
+    assert((await fwBody()) === "abcXY pasted", `paste appends: '${await fwBody()}'`);
+    if (driver.capabilities.ime) {
+      await app.imeCompose(["に", "にほ"], "日本");
+      assert((await fwBody()) === "abcXY pasted日本", `IME at the end: '${await fwBody()}'`);
+    }
+    await screenshot(app, "flow-mode");
+    await press("Escape");
+    assert(await app.evaluate("__cirth.free.flow === false"), "Esc turns editing back on");
+    await fwFocusBody();
+    const before = await fwBody();
+    await press("Backspace");
+    assert((await fwBody()) === before.slice(0, -1), `Backspace works again: '${await fwBody()}'`);
+    await fwSaved();
+  });
+
+  await test("Free Writing into a project: copy keeps the piece; move sends it to Trash; both recorded; undo removes text", async () => {
+    await openFixture("unicode-marks");
+    const n0 = (await blocks()).length;
+    await caretAtEndOf(n0 - 1);
+    await fwOpen();
+    await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
+    await waitFor(app, "document.activeElement && document.activeElement.id === 'fw-title'", "new piece");
+    await typeText("Cold open idea");
+    await fwFocusBody();
+    await typeText("A gull lands on the ledger.");
+    await press("Enter");
+    await press("Enter");
+    await typeText("Nobody moves.");
+    const id = await app.evaluate("__cirth.free.current.id");
+    assert(!(await app.evaluate("document.getElementById('fw-copy').disabled")), "copy enabled with a project open");
+    await app.evaluate("(() => { document.getElementById('fw-copy').click(); return true; })()");
+    await waitFor(app, "document.body.dataset.view === 'editor'", "back in the script");
+    await waitFor(app, `__cirth.blocks().length === ${n0 + 2}`, "two paragraphs inserted");
+    let b = await blocks();
+    assert(b.slice(-2).map((x) => `${x.kind}:${text(x)}`).join("|") === "action:A gull lands on the ledger.|action:Nobody moves.", `inserted ${JSON.stringify(b.slice(-2).map(text))}`);
+    assert(/Copied "Cold open idea"/.test(await app.evaluate("document.getElementById('banner').textContent")), "copy reported");
+    await sleep(600);
+    await press("z", [MOD_KEY]);
+    assert((await blocks()).length === n0, "one undo removes the copy");
+    // The piece stayed, with provenance.
+    await fwOpen();
+    await clickHome(app, `[data-piece="${id}"]`);
+    await waitFor(app, `__cirth.free.current && __cirth.free.current.id === ${JSON.stringify(id)}`, "piece open");
+    assert(/Copied into "Unicode and marks"/.test(await app.evaluate("document.getElementById('fw-prov').textContent")), "provenance on the piece");
+    // Move: inserted, and the piece goes to Trash (not deleted).
+    await app.evaluate("(() => { document.getElementById('fw-move').click(); return true; })()");
+    await waitFor(app, "document.body.dataset.view === 'editor'", "back in the script after move");
+    await waitFor(app, `__cirth.blocks().length === ${n0 + 2}`, "moved paragraphs inserted");
+    await fwOpen();
+    await clickHome(app, '[data-scope="trash"]');
+    await sleep(300);
+    assert(await app.evaluate(`!!document.querySelector('#fw-list [data-piece="${id}"]')`), "moved piece is in Trash");
+    assert(await storedMatchesEditor(), "store matches editor");
+    await app.evaluate("(() => { document.getElementById('fw-back').click(); return true; })()");
+    await waitFor(app, "document.body.dataset.view === 'editor'", "Back returns to the open project");
   });
 
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {

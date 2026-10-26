@@ -22,6 +22,9 @@ const KEY = {
   ArrowDown: "",
   End: "",
   Home: "",
+  Delete: "",
+  PageUp: "",
+  PageDown: "",
 };
 const MODKEY = { shift: "", ctrl: "", alt: "", meta: "" };
 
