@@ -733,6 +733,72 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { items };
   });
 
+  await test("Dual dialogue toggle, forced page break, page view: editor and Rust page map agree", async () => {
+    await openFixture("unicode-marks");
+    const kinds = (await blocks()).map((x) => x.kind);
+    const kaito = kinds.indexOf("character", kinds.indexOf("character") + 1); // second cue (KAITO)
+    const abena = kinds.indexOf("character", kaito + 1); // third cue (ABENA)
+    const caretIn = (i) => setCaret(`[ps[${i}][0] + 1]`);
+    const banner = () => app.evaluate("document.getElementById('banner').textContent");
+    // First speech: nothing before it to pair with.
+    await caretIn(kinds.indexOf("character"));
+    await press("d", [MOD_KEY]);
+    assert(/there is none/.test(await banner()), `refused for the first speech: '${await banner()}'`);
+    assert(!(await blocks()).some((x) => x.dual), "nothing changed");
+    // Second cue pairs with ZOË's speech.
+    await caretIn(kaito);
+    await press("d", [MOD_KEY]);
+    assert((await blocks())[kaito].dual === true, "KAITO is the right side");
+    const geo = await app.evaluate(`(() => { const L = document.querySelector('#editor p.dual-left.b-character'), R = document.querySelector('#editor p.dual-right.b-character');
+      return { lt: Math.round(L.getBoundingClientRect().top), rt: Math.round(R.getBoundingClientRect().top), lx: L.getBoundingClientRect().left, rx: R.getBoundingClientRect().left, left: L.textContent, right: R.textContent }; })()`);
+    assert(geo.lt === geo.rt && geo.rx > geo.lx + 100 && geo.left === "ZOË" && geo.right === "KAITO", `side by side ${JSON.stringify(geo)}`);
+    // Third cue cannot pair: the speech before it is already a right side.
+    await caretIn(abena);
+    await press("d", [MOD_KEY]);
+    assert(/already the right side/.test(await banner()), `refused when chained: '${await banner()}'`);
+    // Rust lays the pair out side by side too.
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    await app.evaluate("__cirth.repaginate()");
+    const ids = (await blocks()).map((x) => x.id);
+    const row = (id) => app.evaluate(`(() => { for (const p of __cirth.pagination.map.pages) for (const l of p.lines) if (l.block_id === ${JSON.stringify(id)}) return [p.number, l.row, l.x_in]; return null; })()`);
+    const [z, k] = [await row(ids[kinds.indexOf("character")]), await row(ids[kaito])];
+    assert(z && k && z[0] === k[0] && z[1] === k[1] && k[2] > z[2], `page map pair ${JSON.stringify({ z, k })}`);
+    assert(await storedMatchesEditor(), "store has the dual flag");
+    await caretIn(kaito);
+    await sleep(600);
+    await press("z", [MOD_KEY]);
+    assert(!(await blocks())[kaito].dual, "one undo unpairs");
+    // Forced page break before the action block.
+    const action = kinds.lastIndexOf("action");
+    await caretIn(action);
+    await press("Enter", [MOD_KEY]);
+    assert((await blocks())[action].break_before === true, "page break set");
+    assert(await app.evaluate(`!!document.querySelectorAll('#editor p')[${action}].hasAttribute('data-break')`), "shown in the editor");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    await app.evaluate("__cirth.repaginate()");
+    let starts = await app.evaluate("__cirth.pagination.map.page_starts");
+    assert(starts.some((s) => s.block_id === ids[action] && s.offset === 0 && s.page === 2), `a new page starts there: ${JSON.stringify(starts)}`);
+    // Page view shows the gap; the page map does not change with the view.
+    const before = JSON.stringify(starts);
+    await app.evaluate("__cirth.setViewMode('pages')");
+    await app.evaluate("__cirth.repaginate()");
+    assert(JSON.stringify(await app.evaluate("__cirth.pagination.map.page_starts")) === before, "page map identical in page view");
+    const band = await app.evaluate("(() => { const m = document.querySelector('#editor .page-mark'); return { h: m.getBoundingClientRect().height, t: m.textContent }; })()");
+    assert(band.h > 30 && band.t === "page 2", `page gap ${JSON.stringify(band)}`);
+    await screenshot(app, "page-view");
+    await app.evaluate("__cirth.setViewMode('continuous')");
+    // Menu actions use the same commands.
+    await caretIn(action);
+    await app.evaluate("__cirth.menu('page_break')");
+    assert(!(await blocks())[action].break_before, "menu toggles the break off");
+    await caretIn(kaito);
+    await app.evaluate("__cirth.menu('dual')");
+    assert((await blocks())[kaito].dual === true, "menu toggles dual on");
+    assert(await storedMatchesEditor(), "store matches editor");
+  });
+
   await test("Find and replace: options, block-type filter, replace one/all, one undo, marks kept", async () => {
     // Matching rules (the same function the find bar uses).
     const m = (t, q, o = {}) => app.evaluate(`__cirth.find.matchesIn(${JSON.stringify(t)}, ${JSON.stringify({ query: q, matchCase: false, wholeWord: false, kind: "all", ...o })})`);

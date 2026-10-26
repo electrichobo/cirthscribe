@@ -43,6 +43,7 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 | N2 | File > Quit right after typing | The last words are in the file on reopen (same path as closing the window). |
 | N3 | macOS: Edit menu, then Cmd+C / Cmd+V / Cmd+X / Cmd+A in the script | Copy, paste, cut and select-all work; Cmd+Z / Cmd+Shift+Z undo and redo editor changes (not a WebView-level undo). |
 | N4 | macOS: CirthScribe app menu | About, Services, Hide, Hide Others, Show All are present. |
+| N5 | Click and arrow-key through a dual-dialogue pair (left column, then right) | The caret moves through the left speech, then the right; typing stays in the column you are in. |
 
 ## 2. Real input methods (all platforms)
 

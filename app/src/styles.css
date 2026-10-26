@@ -50,11 +50,41 @@ footer { padding: 4px 12px; border-top: 1px solid var(--line); background: var(-
 .b-dialogue, .b-lyric { margin-left: 2.5in !important; width: 35ch; margin-top: 0 !important; }
 .b-lyric { font-style: italic; }
 .b-transition { margin-left: 5.5in !important; width: 20ch; text-align: right; }
-.b-character[data-dual]::after { content: " ⇆ dual"; color: var(--muted); font-size: 9pt; text-transform: none; }
+/* Dual dialogue: left speech floats, right speech sits beside it at the
+   layout profile's dual columns (cirth_core::layout::Profile::dual_*). */
+.ProseMirror p.dual-left { float: left; clear: left; }
+.ProseMirror p.dual-left.b-character { margin-left: 2.2in !important; width: 25ch; }
+.ProseMirror p.dual-left.b-parenthetical { margin-left: 1.8in !important; width: 20ch; }
+.ProseMirror p.dual-left.b-dialogue, .ProseMirror p.dual-left.b-lyric { margin-left: 1.5in !important; width: 28ch; }
+.ProseMirror p.dual-left + p.dual-left { margin-top: 0; }
+.ProseMirror p.dual-left.b-character + p.dual-left, .ProseMirror p.dual-left.b-dialogue + p.dual-left.b-dialogue { margin-top: 0 !important; }
+.ProseMirror p.dual-right.b-character { margin-left: 5.2in !important; width: 23ch; }
+.ProseMirror p.dual-right.b-parenthetical { margin-left: 4.8in !important; width: 20ch; }
+.ProseMirror p.dual-right.b-dialogue, .ProseMirror p.dual-right.b-lyric { margin-left: 4.5in !important; width: 28ch; }
+/* Floats do not collapse margins; normal blocks do. Use padding for the
+   blank line above each cue of a pair and above the block after it, so both
+   columns start on the same line in every view. */
+.ProseMirror p.dual-left.b-character, .ProseMirror p.dual-right.b-character { margin-top: 0 !important; padding-top: 12pt; }
+.ProseMirror p.dual-after { clear: both; margin-top: 0 !important; padding-top: 12pt; }
+.b-character[data-dual]::after { content: " ⇆"; color: var(--muted); font-size: 9pt; text-transform: none; }
+/* Forced page break before a block. */
+.ProseMirror p[data-break] { border-top: 1px dashed var(--warn); padding-top: 4pt; position: relative; }
+.ProseMirror p[data-break]::before { content: "page break"; position: absolute; right: .5in; top: -8pt; font: 9px system-ui, sans-serif; color: var(--warn); background: var(--panel); padding: 0 4px; text-transform: none; }
 .ProseMirror p.b:has(> br:only-child)::before { content: attr(data-kind); color: var(--muted); opacity: .5; position: absolute; font-size: 9pt; text-transform: none; }
 .page-mark { margin: 12pt 0 0 0; border-top: 1px dashed var(--accent); color: var(--accent); font: 10px system-ui, sans-serif; text-align: right; padding-right: .5in; user-select: none; }
 .page-mark.inline { border: 0; border-left: 2px solid var(--accent); padding: 0 3px; margin: 0 2px; font-size: 9px; vertical-align: super; }
 .page-mark.stale { opacity: .45; }
+/* Page view: each page boundary from the Rust page map becomes a gap
+   between sheets. Only the display changes; pagination does not. */
+body[data-pageview="pages"] .editor-wrap { background: color-mix(in srgb, var(--bg) 70%, #000); }
+/* Between blocks the band spans the page; inside a block (a page break in
+   the middle of a speech) it spans that block's column. */
+body[data-pageview="pages"] .page-mark {
+  display: block; margin: .6in 0; height: .45in; border: 0; padding: 0 .5in 0 0;
+  background: color-mix(in srgb, var(--bg) 70%, #000); box-shadow: inset 0 6px 6px -6px rgba(0,0,0,.5), inset 0 -6px 6px -6px rgba(0,0,0,.5);
+  color: var(--muted); font: 11px/0.45in system-ui, sans-serif; text-align: right;
+}
+body[data-pageview="pages"] .page-mark.inline { margin: .4in 0; padding-right: 6px; border-left: 0; vertical-align: baseline; }
 .board-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
 .badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid currentColor; }
 .badge.planning { color: var(--muted); }

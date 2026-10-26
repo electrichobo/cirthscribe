@@ -23,7 +23,9 @@ M1 progress:
 
 - 3 Spell check (ADR 0002): US/UK/off per project, project and personal dictionaries, suggestions by right-click or Ctrl/Cmd+.
 
-Next: editor completeness (dual-dialogue toggle, forced page break command, page view), then the macOS manual pass and the real-IME checklist on test machines.
+- 3 Dual dialogue toggle (side by side in the editor), forced page break, page view (gaps from the Rust page map).
+
+Next: Free Writing workspace (M1 item 4), TXT export and Letter/A4 per document (item 5), accessibility pass (item 6), then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

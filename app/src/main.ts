@@ -23,6 +23,7 @@ import { findPlugin, findState, matchesIn } from "./find";
 import { installFindBar } from "./findbar";
 import { completePlugin, suggestion } from "./complete";
 import { installSpell, spellPlugin } from "./spell";
+import { dualPlugin, toggleDual, togglePageBreak } from "./format";
 
 interface Opened {
   name: string;
@@ -187,11 +188,13 @@ function makeState(blocks: Block[]) {
       // Before the screenplay keymap: Tab/Enter accept a suggestion when one is open.
       completePlugin(),
       screenplayKeymap(() => (navEl.querySelector("button") as HTMLButtonElement | null)?.focus()),
+      keymap({ "Mod-d": toggleDual(showBanner), "Mod-Enter": togglePageBreak }),
       keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
       keymap(baseKeymap),
       pageMarksPlugin(),
       findPlugin(),
       spellPlugin(),
+      dualPlugin(),
     ],
   });
 }
@@ -431,6 +434,23 @@ const findBar = installFindBar($("find-bar"), () => view, showBanner);
 const spell = installSpell(() => view, showBanner);
 $("spelling").addEventListener("change", (e) => void spell.setLang((e.target as HTMLSelectElement).value));
 
+// View mode is a personal display preference (not stored in projects).
+function setViewMode(mode: string) {
+  document.body.dataset.pageview = mode === "pages" ? "pages" : "continuous";
+  ($("view-mode") as HTMLSelectElement).value = document.body.dataset.pageview;
+  try {
+    localStorage.setItem("cirth.viewMode", document.body.dataset.pageview);
+  } catch {
+    // storage unavailable: the choice lasts for this session
+  }
+}
+$("view-mode").addEventListener("change", (e) => setViewMode((e.target as HTMLSelectElement).value));
+try {
+  setViewMode(localStorage.getItem("cirth.viewMode") ?? "continuous");
+} catch {
+  setViewMode("continuous");
+}
+
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
   restoreBackup: (path) => openWith("restore_backup", { path }),
@@ -508,6 +528,12 @@ async function runMenu(id: string): Promise<void> {
     case "find":
       if (lastOpen) findBar.open();
       break;
+    case "dual":
+      if (view && lastOpen) toggleDual(showBanner)(view.state, view.dispatch);
+      break;
+    case "page_break":
+      if (view && lastOpen) togglePageBreak(view.state, view.dispatch);
+      break;
     case "undo":
       if (view) undo(view.state, view.dispatch);
       break;
@@ -584,6 +610,7 @@ $("structural").addEventListener("change", (e) => {
   closeWindow: () => getCurrentWindow().close(),
   menu: (id: string) => runMenu(id),
   suggestion: () => suggestion(view.state),
+  setViewMode,
   spell,
   counts: () => ({ live: liveCounts, doc: docCounts }),
   countWords: (texts: string[]) => invoke<number[]>("count_words", { texts }),

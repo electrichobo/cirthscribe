@@ -897,12 +897,15 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
             .select_all()
             .separator()
             .text("find", "Find and Replace…")
+            .separator()
+            .text("dual", "Dual Dialogue")
+            .text("page_break", "Page Break Before")
             .build()?;
         return MenuBuilder::new(app).items(&[&app_menu, &file, &edit]).build();
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let edit = SubmenuBuilder::new(app, "Edit").text("find", "Find and Replace…").build()?;
+        let edit = SubmenuBuilder::new(app, "Edit").text("find", "Find and Replace…").separator().text("dual", "Dual Dialogue").text("page_break", "Page Break Before").build()?;
         MenuBuilder::new(app).items(&[&file, &edit]).build()
     }
 }
