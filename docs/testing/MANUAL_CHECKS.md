@@ -33,6 +33,17 @@ The e2e suite calls the same open/save-as commands with a path; it cannot drive 
 | D3 | Save As over an existing `.cirth` | The dialog asks to confirm overwrite; after confirming, the old file is in the app's backups folder. |
 | D4 | Open a project from a synced folder (OneDrive, Dropbox, iCloud), edit it on another machine, then save here | "changed outside" warning; Save writes "(conflict …)" beside it; the synced version is untouched. |
 
+## 1c. Native menus (all platforms)
+
+Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS menus themselves are checked by hand.
+
+| # | Steps | Expected |
+| - | - | - |
+| N1 | Open the File menu | New Project…, Open…, Save, Save As…, Export PDF (proof), Close Project, Quit. Each does what its button does. |
+| N2 | File > Quit right after typing | The last words are in the file on reopen (same path as closing the window). |
+| N3 | macOS: Edit menu, then Cmd+C / Cmd+V / Cmd+X / Cmd+A in the script | Copy, paste, cut and select-all work; Cmd+Z / Cmd+Shift+Z undo and redo editor changes (not a WebView-level undo). |
+| N4 | macOS: CirthScribe app menu | About, Services, Hide, Hide Others, Show All are present. |
+
 ## 2. Real input methods (all platforms)
 
 Automated IME coverage is simulated composition (DevTools, Windows only). Real IMEs need a test machine where adding input languages is allowed (not the owner's production machine).

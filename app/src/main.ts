@@ -6,7 +6,8 @@ import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
@@ -148,7 +149,15 @@ const open = (name: string, reset: boolean) => openWith("open_fixture", { name, 
 
 /** Every way into the editor: samples, library projects, new projects. */
 async function openWith(command: string, args: Record<string, unknown>): Promise<boolean> {
-  if (syncer?.hasUnsynced) await syncer.flush();
+  // Switching projects: write the current one's file first, as going Home does.
+  if (lastOpen) {
+    try {
+      await saveFile(false);
+    } catch (e) {
+      showBanner(`Could not save this project before opening another: ${e}. It stays open.`);
+      return false;
+    }
+  }
   const t0 = performance.now();
   let o: Opened;
   try {
@@ -360,19 +369,83 @@ async function goHome() {
 
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
+  restoreBackup: (path) => openWith("restore_backup", { path }),
   openSample: (name) => open(name, false),
   createProject: (title) => openWith("create_project", { title }),
 });
 
 $("go-home").addEventListener("click", () => void goHome());
 $("profile").addEventListener("change", () => void repaginate());
-$("save").addEventListener("click", async () => {
+async function saveNow() {
   try {
     await saveFile(true);
   } catch (e) {
     showBanner(`Save failed: ${e}. Your edits are still kept in the recovery store.`);
   }
-});
+}
+
+/** Open a project file through the system dialog (from Home or the editor). */
+async function openViaDialog(): Promise<boolean> {
+  const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "CirthScribe project", extensions: ["cirth"] }] });
+  return typeof path === "string" ? openWith("open_path", { path }) : false;
+}
+
+// Shortcuts: handled here, not as OS menu accelerators, so they work the same
+// on every platform and can be exercised by the test drivers.
+const isMac = /Mac/i.test(navigator.userAgent);
+window.addEventListener(
+  "keydown",
+  (e) => {
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (!mod || e.altKey || e.isComposing) return;
+    const k = e.key.toLowerCase();
+    if (k === "s") {
+      e.preventDefault();
+      if (lastOpen) void (e.shiftKey ? saveAs() : saveNow());
+    } else if (k === "o" && !e.shiftKey) {
+      e.preventDefault();
+      void openViaDialog();
+    }
+  },
+  true,
+);
+
+/** Native menu choices (and tests) run the same actions as the buttons. */
+async function runMenu(id: string): Promise<void> {
+  switch (id) {
+    case "new":
+      await goHome();
+      ($("new-title") as HTMLInputElement).focus();
+      break;
+    case "open":
+      await openViaDialog();
+      break;
+    case "save":
+      if (lastOpen) await saveNow();
+      break;
+    case "save_as":
+      if (lastOpen) await saveAs();
+      break;
+    case "export_pdf":
+      if (lastOpen) $("pdf").click();
+      break;
+    case "home":
+      await goHome();
+      break;
+    case "quit":
+      await getCurrentWindow().close();
+      break;
+    case "undo":
+      if (view) undo(view.state, view.dispatch);
+      break;
+    case "redo":
+      if (view) redo(view.state, view.dispatch);
+      break;
+  }
+}
+void listen<string>("menu", (e) => void runMenu(e.payload));
+
+$("save").addEventListener("click", () => void saveNow());
 $("save-as").addEventListener("click", () => void saveAs());
 $("pdf").addEventListener("click", async () => {
   await syncer.flush();
@@ -436,6 +509,7 @@ $("structural").addEventListener("change", (e) => {
     if (lastOpen) scheduleAutosave();
   },
   closeWindow: () => getCurrentWindow().close(),
+  menu: (id: string) => runMenu(id),
   saveAs: (path: string) => saveAs(path),
   openPath: (path: string) => openWith("open_path", { path }),
   checkOutside,

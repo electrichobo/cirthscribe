@@ -15,7 +15,9 @@ M1 progress:
 
 - 2 Files anywhere: Open and Save As through native dialogs; recent files on Home; outside changes never overwritten (conflict copy beside the file).
 
-Next: native menus and shortcuts, restore-from-backup in the UI, then editor completeness (find/replace, autocomplete, word counts, spell check), then the macOS manual pass and the real-IME checklist on test machines.
+- 2 Menus and backups: native File menu (plus the standard macOS app and Edit menus), Ctrl/Cmd+S, Ctrl/Cmd+Shift+S, Ctrl/Cmd+O; restore any backup as a new project from Home; switching projects saves the current one first.
+
+Next: editor completeness (find/replace, autocomplete, word counts, spell check), then the macOS manual pass and the real-IME checklist on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

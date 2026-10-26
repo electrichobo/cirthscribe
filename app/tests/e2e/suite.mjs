@@ -538,6 +538,60 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { card };
   });
 
+  await test("Shortcuts and menu actions; restore a backup as a new project; switching projects saves first", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await app.evaluate(`(() => { const i = document.getElementById('new-title'); i.value = 'Restore Test'; i.form.requestSubmit(); return true; })()`);
+    await waitOpen(app);
+    await caretAtEndOf(0);
+    await typeText("INT. VAULT - NIGHT");
+    await press("Enter");
+    await typeText("VERSION ONE");
+    // Ctrl/Cmd+S saves (explicit save: the previous file is backed up).
+    let v0 = await app.evaluate("__cirth.fileSavedVersion");
+    await press("s", [MOD_KEY]);
+    await waitFor(app, `__cirth.fileSavedVersion > ${v0}`, "Mod+S to save");
+    await typeText(" TWO");
+    v0 = await app.evaluate("__cirth.fileSavedVersion");
+    await press("s", [MOD_KEY]);
+    await waitFor(app, `__cirth.fileSavedVersion > ${v0}`, "second Mod+S");
+    // Menu Undo runs the editor's undo (same handler the native menu uses).
+    // Pause first: edits less than 500 ms apart form one undo step.
+    await sleep(700);
+    await typeText(" UNDO-ME");
+    await app.evaluate("__cirth.menu('undo')");
+    let b = await blocks();
+    assert(text(b.at(-1)) === "VERSION ONE TWO", `menu undo left '${text(b.at(-1))}'`);
+    const name = await app.evaluate("__cirth.lastOpen.name");
+    // Menu "Close Project" goes Home; the card offers its backups.
+    await app.evaluate("__cirth.menu('home')");
+    await waitHome(app);
+    await clickHome(app, `[data-backups="${name}"]`);
+    await waitFor(app, "document.getElementById('backups-dialog').open && document.querySelectorAll('[data-restore]').length > 0", "backups dialog");
+    const rows = await app.evaluate("[...document.querySelectorAll('#backups-dialog li')].map(li => li.textContent)");
+    await screenshot(app, "backups-dialog");
+    // Newest backup first: the file as it was before the second save ("VERSION ONE").
+    await clickHome(app, "[data-restore]");
+    await waitOpen(app);
+    const restored = await app.evaluate("__cirth.lastOpen");
+    assert(/Restore Test \(restored \d{4}-\d\d-\d\d \d\d\.\d\d UTC\)/.test(restored.doc.title), `restored title '${restored.doc.title}'`);
+    b = await blocks();
+    assert(text(b.at(-1)) === "VERSION ONE", `restored content '${text(b.at(-1))}'`);
+    assert(restored.name !== name, "restored into a new project");
+    // Switch straight to the original (no Home in between) after an edit: the
+    // restored project's file is written first, so nothing waits for recovery.
+    await caretAtEndOf(b.length - 1);
+    await typeText(" (edited copy)");
+    await app.evaluate(`__cirth.openPath(${JSON.stringify(join(dataDir, "projects", name + ".cirth"))})`);
+    await waitFor(app, `__cirth.lastOpen && __cirth.lastOpen.name === ${JSON.stringify(name)}`, "switch to the original");
+    assert(text((await blocks()).at(-1)) === "VERSION ONE TWO", "original keeps its latest text");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    const copyCard = await app.evaluate(`document.querySelector('#home [data-project="${restored.name}"]').textContent`);
+    assert(!/recovered/.test(copyCard), `switching saved the copy first: '${copyCard}'`);
+    return { rows, restoredTitle: restored.doc.title };
+  });
+
   const elsewhereDir = join(dataDir, "elsewhere folder");
   const elsewhere = join(elsewhereDir, "My Draft.cirth");
   const cardFor = (p) => `#home [data-path="${p.replaceAll("\\", "\\\\")}"]`;

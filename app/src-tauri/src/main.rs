@@ -620,6 +620,79 @@ async fn export_pdf(app: State<'_, App>, profile_name: String) -> Result<Exporte
     Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs })
 }
 
+// --- Backups -----------------------------------------------------------------------------
+
+#[derive(Serialize)]
+struct BackupItem {
+    path: String,
+    /// "backup" (rolling) or "pre-upgrade" (original kept before a format upgrade).
+    kind: &'static str,
+    created_s: u64,
+    saved_version: u64,
+    title: String,
+    blocks: u64,
+}
+
+/// Backups of one project (by key), newest first, then any pre-upgrade originals.
+#[tauri::command]
+async fn list_backups(app: State<'_, App>, name: String) -> Result<Vec<BackupItem>, String> {
+    let dir = backup_policy(&app).dir;
+    let mut out: Vec<BackupItem> = backup::list(&dir, &name)
+        .into_iter()
+        .map(|b| BackupItem { path: b.path.display().to_string(), kind: "backup", created_s: b.created_s, saved_version: b.saved_version, title: String::new(), blocks: 0 })
+        .collect();
+    let prefix = format!("{name}--pre-schema-v");
+    for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+        let file = e.file_name().to_string_lossy().to_string();
+        if file.starts_with(&prefix) && file.ends_with(".cirth") {
+            let created_s = e.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+            out.push(BackupItem { path: e.path().display().to_string(), kind: "pre-upgrade", created_s, saved_version: 0, title: String::new(), blocks: 0 });
+        }
+    }
+    for b in &mut out {
+        if let Ok(info) = Store::inspect(Path::new(&b.path)) {
+            b.title = info.title;
+            b.blocks = info.blocks;
+            if b.kind == "pre-upgrade" {
+                b.saved_version = info.saved_version;
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Open a backup as a new library project "<title> (restored <time>)" with its
+/// own identity. The backup file and the current project are left unchanged.
+#[tauri::command]
+async fn restore_backup(app: State<'_, App>, path: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let src = PathBuf::from(&path);
+    if normalize(&src).parent() != Some(normalize(&backup_policy(&app).dir).as_path()) {
+        return Err("only files in the backups folder can be restored here".into());
+    }
+    let info = Store::inspect(&src).map_err(err)?;
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let title = format!("{} (restored {})", if info.title.is_empty() { "Untitled" } else { &info.title }, backup::readable_utc(secs));
+    let base = slug(&title);
+    let mut name = base.clone();
+    let mut n = 2;
+    while library_path(&app, &name).exists() {
+        name = format!("{base}-{n}");
+        n += 1;
+    }
+    let dest = library_path(&app, &name);
+    std::fs::copy(&src, &dest).map_err(io_err)?;
+    let mut out = open_file(&app, &dest, t0)?;
+    with_session(&app, |s| {
+        s.store.set_project_id(&cirth_core::model::new_id()).map_err(err)?;
+        s.store.set_title(&title).map_err(err)?;
+        write_session(&app, s, false)?;
+        Ok(())
+    })?;
+    out.doc.title = title;
+    Ok(out)
+}
+
 /// For the test harness: hard-kill this process in crash tests under any
 /// driver (WebDriver does not expose the app's process id).
 #[tauri::command]
@@ -633,11 +706,46 @@ async fn library_folder(app: State<'_, App>) -> Result<String, String> {
     Ok(library_dir(&app).display().to_string())
 }
 
+/// Native menu. Items carry no OS accelerators: shortcuts are handled in the
+/// web UI so they behave the same on every platform and in tests. Choices are
+/// sent to the UI as a "menu" event and run the same actions as the buttons.
+/// macOS also gets the standard app menu and an Edit menu (WKWebView needs
+/// it for Cmd+C/V); Undo/Redo there are custom so they reach the editor's
+/// history, not the WebView's native undo.
+fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{MenuBuilder, SubmenuBuilder};
+    let file = SubmenuBuilder::new(app, "File")
+        .text("new", "New Project…")
+        .text("open", "Open…")
+        .separator()
+        .text("save", "Save")
+        .text("save_as", "Save As…")
+        .text("export_pdf", "Export PDF (proof)")
+        .separator()
+        .text("home", "Close Project")
+        .text("quit", "Quit")
+        .build()?;
+    #[cfg(target_os = "macos")]
+    {
+        let app_menu = SubmenuBuilder::new(app, "CirthScribe").about(None).separator().services().separator().hide().hide_others().show_all().build()?;
+        let edit = SubmenuBuilder::new(app, "Edit").text("undo", "Undo").text("redo", "Redo").separator().cut().copy().paste().select_all().build()?;
+        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit]).build();
+    }
+    #[cfg(not(target_os = "macos"))]
+    MenuBuilder::new(app).items(&[&file]).build()
+}
+
 fn main() {
+    use tauri::Emitter;
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(App::default())
+        .on_menu_event(|app, event| {
+            let _ = app.emit("menu", event.id().0.clone());
+        })
         .setup(|app| {
+            let menu = build_menu(app)?;
+            app.set_menu(menu)?;
             // CIRTH_DATA_DIR lets tests use a throwaway folder.
             let dir = match std::env::var_os("CIRTH_DATA_DIR") {
                 Some(d) => PathBuf::from(d),
@@ -664,7 +772,9 @@ fn main() {
             paginate,
             export_pdf,
             process_id,
-            library_folder
+            library_folder,
+            list_backups,
+            restore_backup
         ])
         .build(tauri::generate_context!())
         .expect("error while building CirthScribe")

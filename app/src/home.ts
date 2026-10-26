@@ -25,8 +25,18 @@ export interface ProjectEntry {
   error: string | null;
 }
 
+interface BackupItem {
+  path: string;
+  kind: "backup" | "pre-upgrade";
+  created_s: number;
+  saved_version: number;
+  title: string;
+  blocks: number;
+}
+
 interface Actions {
   openPath(path: string): Promise<boolean>;
+  restoreBackup(path: string): Promise<boolean>;
   openSample(name: string): Promise<boolean>;
   createProject(title: string): Promise<boolean>;
 }
@@ -103,6 +113,43 @@ export function createHome(root: HTMLElement, actions: Actions) {
   const main = el("section", { className: "home-main" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, "CirthScribe"), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 
+  // Backups dialog: lists one project's backups; each can be restored as a copy.
+  const backupsDialog = el("dialog", { className: "backups", id: "backups-dialog" });
+  backupsDialog.setAttribute("aria-label", "Backups");
+  root.append(backupsDialog);
+
+  async function showBackups(p: ProjectEntry) {
+    let items: BackupItem[] = [];
+    try {
+      items = await invoke<BackupItem[]>("list_backups", { name: p.name });
+    } catch (e) {
+      message(`Could not list backups: ${e}`);
+      return;
+    }
+    const close = el("button", { type: "button" }, "Close");
+    close.addEventListener("click", () => backupsDialog.close());
+    const rows = items.map((b) => {
+      const restore = el("button", { type: "button" }, "Restore as a copy");
+      restore.dataset.restore = b.path;
+      restore.addEventListener("click", () =>
+        void guard(async () => {
+          backupsDialog.close();
+          return actions.restoreBackup(b.path);
+        }),
+      );
+      const when = b.created_s ? new Date(b.created_s * 1000).toLocaleString() : "unknown time";
+      const what = b.kind === "pre-upgrade" ? "Original before a format upgrade" : `Saved version ${b.saved_version}`;
+      return el("li", {}, el("div", {}, el("strong", {}, when), el("span", {}, ` · ${what} · ${plural(b.blocks, "block")}`)), restore);
+    });
+    backupsDialog.replaceChildren(
+      el("h2", {}, `Backups of ${p.title || p.name}`),
+      el("p", { className: "home-note" }, "Restoring opens the backup as a new project in the library. The current project and the backup are not changed."),
+      items.length ? el("ul", { className: "backup-list" }, ...rows) : el("p", {}, "No backups yet."),
+      el("div", { className: "dialog-actions" }, close),
+    );
+    backupsDialog.showModal();
+  }
+
   function message(text: string | null) {
     msg.hidden = !text;
     msg.textContent = text ?? "";
@@ -138,6 +185,12 @@ export function createHome(root: HTMLElement, actions: Actions) {
     b.disabled = !!p.error || p.missing;
     b.addEventListener("click", () => void guard(() => actions.openPath(p.path)));
     const item = el("div", { role: "listitem", className: "project-item" }, b);
+    if (p.backups && !p.missing) {
+      const bk = el("button", { type: "button", className: "forget" }, `Backups (${p.backups})…`);
+      bk.dataset.backups = p.name;
+      bk.addEventListener("click", () => void showBackups(p));
+      item.append(bk);
+    }
     if (p.missing) {
       // A remembered file that is gone: offer to drop it from the list.
       const forget = el("button", { type: "button", className: "forget" }, "Remove from list");

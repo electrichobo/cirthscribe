@@ -99,6 +99,13 @@ button.primary { padding: 7px 12px; background: var(--accent); color: var(--on-a
 .project .thumb span { font: 600 34px "Courier Prime", monospace; color: color-mix(in srgb, var(--ink) 70%, transparent); }
 .project .meta { display: grid; gap: 3px; padding: 9px 11px 11px; }
 .project .meta span { color: var(--muted); font-size: 12px; }
+dialog.backups { width: min(620px, 90vw); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+dialog.backups::backdrop { background: rgba(0, 0, 0, .45); }
+dialog.backups h2 { text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink); }
+.backup-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.backup-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.backup-list span { color: var(--muted); }
+.dialog-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 #open-file { width: 100%; padding: 7px 12px; margin-bottom: 18px; }
 .project-item { display: grid; gap: 4px; }
 .forget { justify-self: start; font-size: 12px; }
