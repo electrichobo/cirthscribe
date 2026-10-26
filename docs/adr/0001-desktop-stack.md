@@ -38,7 +38,7 @@ Shipped JavaScript is MIT or Apache-2.0/MIT. Rust dependencies are permissive ex
 ## Consequences and remaining limitations
 
 - Editor behavior depends on three WebView engines; each needs its own test pass.
-- One intermittent selection defect is open (native End right after typing; FINDINGS, open defect 1).
+- WebView selection events are asynchronous; editor commands must not assume the editor's selection is current. M1 fixed one such defect by adopting the DOM selection before key commands (FINDINGS, defect 1). Each WebView engine needs the same stress test.
 - Fixed-pitch layout makes cross-platform pagination deterministic but means non-Latin scripts need a fallback-font plan with known metrics before they can be paginated honestly.
 - TypeScript and Rust both hold block structure; the boundary types are mirrored by hand (`app/src/schema.ts`, `crates/cirth-core/src/model.rs`) and need a contract test.
 

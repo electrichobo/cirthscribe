@@ -75,6 +75,7 @@ const KEYS = {
   ArrowLeft: { key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 },
   ArrowRight: { key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 },
   End: { key: "End", code: "End", windowsVirtualKeyCode: 35 },
+  Home: { key: "Home", code: "Home", windowsVirtualKeyCode: 36 },
 };
 const MOD = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 
@@ -165,6 +166,29 @@ for (let i = 0; i < 100 && !(await c.evaluate("!!(window.__cirth && __cirth.view
 results.measurements.userAgent = await c.evaluate("navigator.userAgent");
 results.measurements.observerEntryTypes = await c.evaluate("PerformanceObserver.supportedEntryTypes");
 
+// Regression for the M0 End-key defect. Root cause: Chromium reports native
+// caret moves through an async "selectionchange"; while the main thread is
+// busy, a following key (Enter) ran on ProseMirror's stale selection. Fix:
+// app/src/selsync.ts adopts the DOM selection before every key command.
+// This test must run first: it uses the app's own startup open, when the
+// main thread is busiest.
+await test("End then Enter right after startup acts on the visible caret", async () => {
+  const n0 = (await blocks(c)).length;
+  await caretAtEndOf(c, n0 - 1);
+  await press(c, "Enter");
+  await press(c, "Tab");
+  await typeText(c, "Noor");
+  await press(c, "Enter");
+  await press(c, "Tab");
+  await typeText(c, "softly");
+  await press(c, "End");
+  await press(c, "Enter");
+  const b = await blocks(c);
+  assert(text(b.at(-2)) === "(softly)" && b.at(-2).kind === "parenthetical", `parenthetical '${text(b.at(-2))}'`);
+  assert(b.at(-1).kind === "dialogue" && text(b.at(-1)) === "", `new block ${b.at(-1).kind} '${text(b.at(-1))}'`);
+  return { adoptedSelections: await c.evaluate("__cirth.selSync.adopted") };
+});
+
 await test("Tab/Enter: default cycle, no inserted spaces, one-step undo", async () => {
   await openFixture(c, "unicode-marks");
   const n0 = (await blocks(c)).length;
@@ -221,43 +245,40 @@ await test("Tab/Enter: default cycle, no inserted spaces, one-step undo", async 
   return { blocksAdded: b.length - n0 };
 });
 
-// Known defect, tracked rather than hidden: recorded with its outcome, not
-// counted as a pass or a failure of the suite.
-async function knownDefect(name, fn) {
+// Busy main thread (startup-like): background tasks of 40 ms every 50 ms.
+async function caretKeyTrials(trials, enabled) {
+  await openFixture(c, "unicode-marks");
+  await c.evaluate(`__cirth.selSync.enabled = ${enabled}; window.__jank = setInterval(() => { const t = performance.now(); while (performance.now() - t < 40) {} }, 50)`);
+  const n0 = (await blocks(c)).length;
+  await caretAtEndOf(c, n0 - 1);
+  let missed = 0;
   try {
-    const detail = await fn();
-    results.tests.push({ name, knownDefect: true, reproduced: detail.reproduced, detail });
-    console.log(`KNOWN DEFECT ${name}: ${detail.reproduced ? "still reproduces" : "did not reproduce this run"}`);
-  } catch (e) {
-    results.tests.push({ name, knownDefect: true, error: String(e) });
-    console.log(`KNOWN DEFECT ${name}: probe error ${e}`);
+    for (let t = 0; t < trials; t++) {
+      await press(c, "Enter");
+      await typeText(c, "abc");
+      await press(c, "Home");
+      await sleep(120); // let Home settle so only End can be stale
+      await press(c, "End");
+      await press(c, "Enter");
+      const r = await c.evaluate("(() => { const b = __cirth.blocks(); const t = x => x.runs.map(r => r.text).join(''); return [t(b.at(-2)), t(b.at(-1))]; })()");
+      if (r[0] !== "abc" || r[1] !== "") missed++;
+      // Reset to a single empty block at the end for the next trial.
+      await c.evaluate(`(() => { const v = __cirth.view; let p0 = 0; v.state.doc.forEach((n, p, i) => { if (i === ${n0}) p0 = p; });
+        const tr = v.state.tr.delete(p0, v.state.doc.content.size); v.dispatch(tr); })()`);
+      await caretAtEndOf(c, n0 - 1);
+    }
+  } finally {
+    await c.evaluate("clearInterval(window.__jank); __cirth.selSync.enabled = true");
   }
+  return missed;
 }
 
-await knownDefect("Native End right after typing in a new parenthetical", async () => {
-  // Found in M0 with DevTools-synthesized keys: soon after a document opens,
-  // End moves the DOM caret but ProseMirror keeps its old selection, so the
-  // next Enter splits the block. After ~1.5 s of settling it does not
-  // reproduce. Not root-caused; not tried with physical keystrokes.
-  const runs = [];
-  for (const [settle, gap] of [[0, 0], [1500, 0], [1500, 200]]) {
-    await openFixture(c, "unicode-marks");
-    await sleep(settle);
-    const n0 = (await blocks(c)).length;
-    await caretAtEndOf(c, n0 - 1);
-    await press(c, "Enter");
-    await press(c, "Tab");
-    await typeText(c, "Noor");
-    await press(c, "Enter");
-    await press(c, "Tab");
-    await typeText(c, "softly");
-    if (gap) await sleep(gap);
-    await press(c, "End");
-    await sleep(100);
-    const off = await c.evaluate("__cirth.view.state.selection.$from.parentOffset");
-    runs.push({ settleAfterOpenMs: settle, gapMs: gap, editorOffsetAfterEnd: off, expected: 8, ok: off === 8 });
-  }
-  return { reproduced: runs.some((r) => !r.ok), runs };
+await test("Stress: End then Enter under a busy main thread (500 trials, fix on; control with fix off)", async () => {
+  const control = await caretKeyTrials(50, false);
+  const fixed = await caretKeyTrials(500, true);
+  results.measurements.caretKeyStress = { controlFixOff: `${control}/50 missed`, fixOn: `${fixed}/500 missed` };
+  assert(fixed === 0, `fix on: ${fixed}/500 missed`);
+  return { control: `${control}/50 missed with the fix off (shows whether the test detects the bug)`, fixed: `${fixed}/500 missed` };
 });
 
 await test("Selection across blocks, split/join, ids follow documented rules", async () => {

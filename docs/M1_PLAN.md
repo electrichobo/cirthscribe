@@ -6,7 +6,7 @@ Order matters: the first three items remove M0's open risks before features grow
 
 ## 1. Close M0 risks (first)
 
-1. **Root-cause the End-key selection defect** (FINDINGS open defect 1). Instrument ProseMirror's DOM observer around open; try physical keys; fix or work around; turn the repro into a regular test. Exit: 0 misses in 500 scripted trials including right after open.
+1. ~~**Root-cause the End-key selection defect**~~ **Done 2026-10-25.** Cause: async `selectionchange` delivery vs. high-priority key input. Fix: adopt the DOM selection before key commands (`app/src/selsync.ts`). Exit met: 0/500 stress trials missed (control without the fix: 28/50), plus a startup regression test. Still to do on other platforms: rerun the stress test on WKWebView and WebKitGTK in item 2.
 2. **Cross-platform harness.** Replace the DevTools-only driver with WebDriver (`tauri-driver`: WebView2 on Windows, WebKitGTK on Linux) plus a manual checklist for macOS WKWebView, where Tauri has no WebDriver. Run the A2/A3/B tests on all three. Exit: results recorded per OS and WebView version.
 3. **MSVC CI build** for Windows (GitHub Actions), Linux and macOS builds; Rust tests, TypeScript typecheck and the e2e suite where available. Confirm the manifest warning is gone and the binary needs no loader DLL.
 4. **Real IME checklist**: Microsoft Japanese, Chinese (Pinyin) and Korean IMEs on Windows; macOS Japanese/Pinyin; IBus or Fcitx on Linux. Run on test machines, not VADER, since enabling input languages changes system settings.

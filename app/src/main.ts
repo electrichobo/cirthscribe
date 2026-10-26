@@ -14,6 +14,7 @@ import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pa
 import { renderBoard, renderNavigator, moveCard, type BoardState } from "./views";
 import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
+import { adoptDomSelection, selSync } from "./selsync";
 
 interface Opened {
   doc: { title: string; version: number; blocks: Block[] };
@@ -156,6 +157,11 @@ async function open(name: string, reset: boolean) {
     view = new EditorView(editorEl, {
       state,
       dispatchTransaction: (tr) => dispatch(tr),
+      // Runs before the keymaps: commands see the caret the user sees.
+      handleKeyDown: (v) => {
+        adoptDomSelection(v);
+        return false;
+      },
       handlePaste: (v, event) => handlePaste(v, event),
       clipboardTextParser: (text) => clipboardTextParser(text),
       clipboardTextSerializer: (slice) => clipboardTextSerializer(slice),
@@ -222,6 +228,7 @@ window.addEventListener("beforeunload", () => void syncer?.flush());
   },
   board,
   perf,
+  selSync,
   blocks: () => {
     const out: Block[] = [];
     view.state.doc.forEach((n) => out.push(nodeToBlock(n)));

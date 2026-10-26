@@ -80,7 +80,7 @@ The pixel-level latency of physical keystrokes was not measured.
 
 ## Open defects
 
-1. **Native End key right after typing can be missed by the editor (intermittent, not root-caused).** In early probes (7 of 7 runs, all just after app start), End pressed right after typing inside a new parenthetical moved the DOM caret but ProseMirror kept the old selection, so Enter split the block. It did not reproduce in the final suite run, nor with 40 timed trials later in a session. Not tried with physical keys. Repro: `node app/tests/debug.mjs <exe> app/tests/repro-end-key.js`. **M1 blocker** until explained.
+1. ~~Native End key right after typing can be missed by the editor.~~ **Fixed in M1 (2026-10-25).** Root cause: Chromium reports native caret moves through an asynchronous `selectionchange` event, and ProseMirror adopts the DOM selection only when that event runs. With a busy main thread (right after open) it arrived ~50 ms late, so an Enter in between split the block at the old caret. Fix: `app/src/selsync.ts` adopts the DOM selection before every key command. Evidence: the original repro (3/3 runs), a startup regression test, and a stress test under an ~80% busy main thread (fix off: 28/50 trials wrong; fix on: 0/500). Typing latency unchanged (p95 29.4 ms). See `docs/m1/e2e-results-2026-10-25.json`. Physical keystrokes not tested; the mechanism applies to them too.
 2. Linker warning on the GNU build: ".rsrc merge failure: multiple non-default manifests". The app runs; consequence unknown (possible missing common-controls manifest). Expected to disappear with MSVC builds; verify.
 
 ## Unresolved risks
