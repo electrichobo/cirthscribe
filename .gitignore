@@ -1,0 +1,11 @@
+/.tools/
+/target/
+node_modules/
+/app/dist/
+/out/
+*.cirth
+*.cirth-wal
+*.cirth-shm
+*.cirth.lock
+.env
+CLAUDE.local.md

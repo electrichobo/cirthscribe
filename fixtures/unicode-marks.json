@@ -1,0 +1,76 @@
+{
+  "title": "Unicode and marks",
+  "note": "Original synthetic fixture: accents, emoji ZWJ sequences, combining marks, CJK, RTL, inline marks. CJK, RTL and emoji are outside Courier Prime's coverage on purpose.",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "INT. CAFÉ NØRDLYS - DAY"
+    },
+    {
+      "t": "action",
+      "x": "Zoë orders a crème brûlée; the naïve barista says “certainly” and means it. Ellipsis… em dash—here."
+    },
+    {
+      "t": "character",
+      "x": "ZOË"
+    },
+    {
+      "t": "dialogue",
+      "x": "Emoji survive: 👍🏽 🎬 👩‍👩‍👧. Combining: é (e + U+0301)."
+    },
+    {
+      "t": "character",
+      "x": "KAITO"
+    },
+    {
+      "t": "dialogue",
+      "x": "日本語の台詞もあります。漢字とかな。"
+    },
+    {
+      "t": "character",
+      "x": "ABENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Right-to-left sample: שלום and مرحبا, mixed with English."
+    },
+    {
+      "t": "action",
+      "runs": [
+        {
+          "text": "Marks: "
+        },
+        {
+          "text": "bold",
+          "bold": true
+        },
+        {
+          "text": ", "
+        },
+        {
+          "text": "italic",
+          "italic": true
+        },
+        {
+          "text": ", "
+        },
+        {
+          "text": "underlined",
+          "underline": true
+        },
+        {
+          "text": " and "
+        },
+        {
+          "text": "all three",
+          "bold": true,
+          "italic": true,
+          "underline": true
+        },
+        {
+          "text": "."
+        }
+      ]
+    }
+  ]
+}

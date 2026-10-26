@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "M0 spike: only core events and the app's own commands. No shell, no fs plugin, no http.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

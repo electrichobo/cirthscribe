@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = ["crates/cirth-core", "app/src-tauri"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[profile.dev.package."*"]
+opt-level = 2
