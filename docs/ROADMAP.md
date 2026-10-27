@@ -41,13 +41,18 @@ Exit: a user can write and safely recover a complete screenplay. Editing smoke t
 
 Exit: locked-page editing and PDF rendering pass boundary fixtures. Imports do not silently discard content. External editor/Google results are labeled by actual tests, not assumed from file extensions.
 
-## Owner requests, 2026-10-26 (proposed placement, not yet accepted)
+## M1b: Writing workspace (accepted by the owner 2026-10-26)
 
-Jared raised these after the M1 feature work, which so far covered only the script window. Each is recorded here so nothing is lost. Placement is a proposal until the owner agrees.
+Jared raised these after the M1 feature work, which so far covered only the script window. Each is recorded here so nothing is lost. The owner accepted M1b as proposed and chose font option A(1). Decisions B and C are still open. Build order: focus mode and the View menu and panel toggles first.
 
-**Proposed M1b, "writing workspace"** (after M1's exit, before M2; the app shell around the editor):
-1. **Focus mode:** full screen with only the script page. Everything else is hidden; one key or Esc returns. This is the spec's "distraction-reduced mode", which no milestone covered.
-2. **View menu and a panel toggle:** show or hide the scene list, board, toolbar and status line from View, and from a toolbar dropdown like the "View" options in Windows File Explorer. Choices persist per user, not per project.
+**M1b, "writing workspace"** (after M1's exit, before M2; the app shell around the editor):
+1. **Focus mode:** full screen with only the script page. Everything else is hidden; one key or Esc returns. This is the spec's "distraction-reduced mode", which no milestone covered. **Built 2026-10-26:** View > Focus Mode, the toolbar's View dropdown, or Ctrl/Cmd+Shift+F. The window goes full screen; on Windows and Linux the menu bar is hidden too. Escape, the same menu item or going Home leaves, and leaving full screen from the OS ends it. Not stored.
+2. **View menu and a panel toggle:** show or hide the scene list, board, toolbar and status line from View, and from a toolbar dropdown like the "View" options in Windows File Explorer. Choices persist per user, not per project. **Built 2026-10-26:**
+   - Native View menu check items: Scene List, Board, Toolbar, Status Bar.
+   - A toolbar "View ▾" dropdown with the same items, keyboard-operable.
+   - Hidden panels take no space.
+   - Choices are stored in `preferences.json` and survive a hard kill.
+   - The toolbar's page-layout dropdown is now labelled "Page view".
 3. **Everything in the menus:** File, Edit, View, Format, Help on every OS (the macOS app menu as well), covering save, export, Free Writing, Home, undo/redo, cut/copy/paste and formatting. The toolbar becomes an optional shortcut, never the only route.
 4. **Island toolbar:** compact floating groups rather than a full-width bar. Story Architect is the reference for layout ideas only; no copying of its look or assets.
 5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A).
@@ -60,7 +65,7 @@ Jared raised these after the M1 feature work, which so far covered only the scri
 
 **Decisions needed (they affect data and pagination):**
 - **A. Fonts.** Screenplay pages are fixed-pitch Courier Prime 12 pt, and page count depends on it. Options:
-  - (1) Font and size change only how the script looks on screen; pages and exports stay standard. This is the recommended option for screenplays.
+  - (1) Font and size change only how the script looks on screen; pages and exports stay standard. **Chosen by the owner 2026-10-26.**
   - (2) A per-document font that also changes pages and exports. This breaks the one-page-per-minute convention and needs bundled, licensed fonts.
   - (3) (1) for screenplays, plus free font choice in non-screenplay documents (M6 rich text).
 - **B. Colours.** Should text colour and highlight print in PDF exports, or show on screen only (writer's markup)? Either way they are stored as marks with stable meaning, never as the only signal: the rule "colour cannot be the only identifier" applies. Plain text cannot keep them, and FDX keeps them only partly; the export reports say so.

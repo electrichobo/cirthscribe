@@ -48,6 +48,7 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 | N5 | Click and arrow-key through a dual-dialogue pair (left column, then right) | The caret moves through the left speech, then the right; typing stays in the column you are in. |
 | N7 | Help > About CirthScribe and Licences (Windows/Linux); CirthScribe > About CirthScribe (macOS) | The About screen opens with the attribution, GPL tab and third-party licences tab. |
 | N8 | Export Plain Text, open the file in Notepad / TextEdit / gedit | Indents line up in a fixed-pitch font; pages are separated by a form feed (some editors show it as a symbol or nothing). |
+| N10 | View menu: untick Scene List, Board, Toolbar, Status Bar one at a time; then View > Focus Mode; Escape | Each panel disappears and the script widens; the menu's check marks match what is shown after using the toolbar's View dropdown too. Focus mode is full screen with only the page (no menu bar on Windows and Linux; macOS hides its menu bar itself); Escape restores everything. |
 | N9 | macOS: type a word, then press Cmd+Q at once; reopen | The app quits (CirthScribe > Quit CirthScribe), and the word is in the file. File has no Quit on macOS. (Added after the 2026-10-26 pass.) |
 | N6 | Free Writing, Flow mode on: type with a real IME (Japanese, Pinyin), then try the trackpad/mouse to select and drag text | Composed text lands at the end; nothing already written is selected, moved or deleted. Esc turns editing back on. |
 

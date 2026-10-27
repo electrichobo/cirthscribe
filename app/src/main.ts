@@ -27,7 +27,9 @@ import { dualPlugin, toggleDual, togglePageBreak } from "./format";
 import { createFreeWriting } from "./freewrite";
 import { createAbout } from "./about";
 import { createLatency } from "./latency";
-import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
+import { createFocusMode } from "./focus";
+import { createViewMenu } from "./viewmenu";
+import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
   name: string;
@@ -208,7 +210,8 @@ function makeState(blocks: Block[]) {
       history(),
       // Before the screenplay keymap: Tab/Enter accept a suggestion when one is open.
       completePlugin(),
-      screenplayKeymap(() => focusRegion(navEl)),
+      // Escape: leave focus mode, else go to the scene list (or the board if the list is hidden).
+      screenplayKeymap(() => void (focusMode.on ? focusMode.leave() : focusRegion(navEl) || focusRegion(boardEl))),
       keymap({ "Mod-d": toggleDual(showBanner), "Mod-Enter": togglePageBreak }),
       keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
       keymap(baseKeymap),
@@ -303,6 +306,7 @@ function setView(v: "home" | "editor" | "free") {
 }
 
 async function openFreeWriting() {
+  await focusMode.leave();
   setView("free");
   await free.show();
 }
@@ -441,6 +445,7 @@ void getCurrentWindow().onCloseRequested(async (event) => {
 
 /** Save and close the open project (if any), then show the project library. */
 async function goHome() {
+  await focusMode.leave();
   if (lastOpen) {
     try {
       await saveFile(false);
@@ -502,6 +507,16 @@ const free = createFreeWriting($("freewrite"), {
 $("go-free").addEventListener("click", () => void openFreeWriting());
 
 const about = createAbout();
+const focusMode = createFocusMode(() => view?.focus());
+createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle());
+// Escape leaves focus mode wherever focus is (the editor's own Escape key
+// handles it first and marks the event handled).
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && focusMode.on && !e.defaultPrevented && !document.querySelector("dialog[open]")) {
+    e.preventDefault();
+    void focusMode.leave();
+  }
+});
 const latency = createLatency(
   perf,
   () => (window as any).__cirth.openTimings,
@@ -585,6 +600,9 @@ window.addEventListener(
     } else if (k === "f" && !e.shiftKey) {
       e.preventDefault();
       if (lastOpen) findBar.open();
+    } else if (k === "f" && e.shiftKey) {
+      e.preventDefault();
+      if (lastOpen) void focusMode.toggle();
     } else if (k === "o" && !e.shiftKey) {
       e.preventDefault();
       void openViaDialog();
@@ -669,6 +687,15 @@ async function runMenu(id: string): Promise<void> {
     case "focus_next":
       cycleRegions(regions(), false);
       break;
+    case "focus_mode":
+      if (lastOpen) await focusMode.toggle();
+      break;
+    case "view_nav":
+    case "view_board":
+    case "view_toolbar":
+    case "view_status":
+      await togglePanel(id.slice(5) as "nav" | "board" | "toolbar" | "status");
+      break;
   }
 }
 void listen<string>("menu", (e) => void runMenu(e.payload));
@@ -731,6 +758,7 @@ $("structural").addEventListener("change", (e) => {
   board,
   perf,
   latency,
+  focusMode,
   selSync,
   blocks: () => {
     const out: Block[] = [];

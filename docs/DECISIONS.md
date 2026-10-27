@@ -13,6 +13,7 @@ The following defaults allow progress without pretending the owner has already s
 | Dependency policy | Core must build/run without paid proprietary components or secret licenses | Every adoption |
 | Native extension | `.cirth` (SQLite file); confirmed by the owner 2026-10-26 | Done |
 | Working storage | SQLite working copy (WAL, exclusive lock) plus atomic package save; proposal in docs/m0/SCHEMA.md | M0 prototype (done); schema v2 in M1 |
+| Screenplay font | Fixed: pages and exports use Courier Prime 12 pt. Font and size choices change only the on-screen editor (owner, 2026-10-26) | Done |
 | Formatting priority | US screenplay first; UK and other templates retained in roadmap | Fixed priority, refinable with owner |
 | Structural sync | Off by default; explicit per-document permission | M3 behavior |
 | Timing language | Estimates separate from measured on-screen duration | Fixed semantic rule |

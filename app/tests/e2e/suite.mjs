@@ -1622,6 +1622,80 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(after[i + 1].kind !== "heading" && text(after[i + 1]) === "", `Enter adds an empty ${after[i + 1].kind} after the heading, not a heading above it`);
   });
 
+  await test("View: panels hide from the View menu and the toolbar dropdown, survive a restart; focus mode shows only the script", async () => {
+    await openFixture("page-boundaries");
+    const shown = (sel) => app.evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.getClientRects().length > 0; })()`);
+    const editorWidth = () => app.evaluate("Math.round(document.querySelector('.editor-wrap').getBoundingClientRect().width)");
+    const w0 = await editorWidth();
+    assert((await shown("#navigator")) && (await shown("#board")) && (await shown(".toolbar")) && (await shown("footer")), "all panels shown at first");
+    // Native View menu (same handler as the menu items).
+    await app.evaluate("__cirth.menu('view_nav')");
+    await waitFor(app, "!document.getElementById('navigator').getClientRects().length", "scene list hidden");
+    await waitAnnounced("Scene list hidden", "hiding announced");
+    assert((await editorWidth()) > w0 + 200, `script takes the space: ${w0} -> ${await editorWidth()}`);
+    // Toolbar dropdown: keyboard only.
+    await app.evaluate("document.getElementById('view-menu-btn').focus()");
+    await press("Enter");
+    await waitFor(app, "!document.getElementById('view-menu').hidden", "View dropdown open");
+    assert(await app.evaluate("document.activeElement?.dataset.panel === 'focus' && document.getElementById('view-menu-btn').getAttribute('aria-expanded') === 'true'"), "first item focused");
+    await press("ArrowDown");
+    assert(await app.evaluate("document.activeElement?.dataset.panel === 'nav' && document.activeElement.getAttribute('aria-checked') === 'false'"), "Scene list item shows it is hidden");
+    await press("Enter");
+    await waitFor(app, "document.getElementById('navigator').getClientRects().length > 0", "scene list shown from the dropdown");
+    await waitFor(app, "document.querySelector('#view-menu [data-panel=nav]')?.getAttribute('aria-checked') === 'true' && document.activeElement?.dataset.panel === 'nav'", "check mark updated, menu still open");
+    await screenshot(app, "view-dropdown");
+    await press("ArrowDown");
+    await press(" ");
+    await waitFor(app, "!document.getElementById('board').getClientRects().length", "board hidden with Space");
+    await press("Escape");
+    assert(await app.evaluate("document.getElementById('view-menu').hidden && document.activeElement?.id === 'view-menu-btn'"), "Escape closes and returns to the button");
+    await app.evaluate("__cirth.menu('view_status')");
+    await app.evaluate("__cirth.menu('view_toolbar')");
+    await waitFor(app, "!document.querySelector('.toolbar').getClientRects().length && !document.querySelector('footer').getClientRects().length", "toolbar and status bar hidden");
+    const top = await app.evaluate("Math.round(document.querySelector('.editor-wrap').getBoundingClientRect().top)");
+    assert(top <= 2, `script moves up into the toolbar's space (top ${top})`);
+    // Stored app-wide: a hard kill keeps them.
+    await app.kill();
+    await sleep(1500);
+    app = await driver.launch("after-panels-kill");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, "!document.getElementById('board').getClientRects().length && !document.querySelector('.toolbar').getClientRects().length && document.getElementById('navigator').getClientRects().length > 0", "panel choices restored");
+    for (const p of ["board", "toolbar", "status"]) await app.evaluate(`__cirth.menu('view_${p}')`);
+    await waitFor(app, "['#board', '.toolbar', 'footer', '#navigator'].every(s => document.querySelector(s).getClientRects().length > 0)", "all panels back");
+    const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
+    assert(JSON.stringify(saved.panels) === JSON.stringify({ nav: true, board: true, toolbar: true, status: true }), `stored ${JSON.stringify(saved.panels)}`);
+
+    // Focus mode: Ctrl/Cmd+Shift+F, only the script, full screen; Escape leaves.
+    await caretAtEndOf(1);
+    await press("f", [MOD_KEY, "shift"]);
+    await waitFor(app, "document.body.dataset.focus === 'on'", "focus mode on");
+    await waitFor(app, "['#board', '.toolbar', 'footer', '#navigator'].every(s => !document.querySelector(s).getClientRects().length)", "only the script shown");
+    await waitAnnounced("Focus mode", "focus mode announced");
+    assert(await app.evaluate("__cirth.view.hasFocus()"), "caret stays in the script");
+    if (process.platform === "win32") await waitFor(app, "window.innerWidth >= screen.width - 2 && window.innerHeight >= screen.height - 2", "window fills the screen");
+    await press("F6");
+    assert(await app.evaluate("__cirth.view.hasFocus()"), "F6 has nowhere else to go");
+    await typeText(" FOCUSED");
+    await screenshot(app, "focus-mode");
+    await press("Escape");
+    await waitFor(app, "!document.body.dataset.focus && document.querySelector('.toolbar').getClientRects().length > 0", "Escape leaves focus mode");
+    if (process.platform === "win32") await waitFor(app, "window.innerWidth < screen.width - 2 || window.innerHeight < screen.height - 2", "window back from full screen");
+    assert(text((await blocks())[1]).endsWith(" FOCUSED"), "typing in focus mode reached the script");
+    // From the View dropdown and the native menu too.
+    await clickHome(app, "#view-menu-btn");
+    await clickHome(app, "#view-menu [data-panel=focus]");
+    await waitFor(app, "document.body.dataset.focus === 'on'", "focus mode from the dropdown");
+    await app.evaluate("__cirth.menu('focus_mode')");
+    await waitFor(app, "!document.body.dataset.focus", "View > Focus Mode turns it off");
+    // Going Home ends it.
+    await app.evaluate("__cirth.menu('focus_mode')");
+    await waitFor(app, "document.body.dataset.focus === 'on'", "on again");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    assert(!(await app.evaluate("document.body.dataset.focus")), "Home ends focus mode");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

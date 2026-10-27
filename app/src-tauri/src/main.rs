@@ -1012,18 +1012,49 @@ async fn restore_backup(app: State<'_, App>, path: String) -> Result<Opened, Str
 
 // --- Display preferences (app-wide, not per project) ----------------------------------
 
-/// UI size and contrast. Stored in the app data folder; never in projects.
+/// UI size, contrast and which panels are shown. Stored in the app data
+/// folder; never in projects.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 struct UiPrefs {
     /// Whole-window zoom: 0.8 to 2.0.
     scale: f64,
     /// "system" follows the OS (forced colors / prefers-contrast), "high" forces it.
     contrast: String,
+    /// Older preference files have no panels entry: everything shown.
+    #[serde(default)]
+    panels: Panels,
+}
+
+/// Panels of the script view the writer can hide (View menu).
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(default)]
+struct Panels {
+    nav: bool,
+    board: bool,
+    toolbar: bool,
+    status: bool,
+}
+
+impl Default for Panels {
+    fn default() -> Self {
+        Panels { nav: true, board: true, toolbar: true, status: true }
+    }
 }
 
 impl Default for UiPrefs {
     fn default() -> Self {
-        UiPrefs { scale: 1.0, contrast: "system".into() }
+        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default() }
+    }
+}
+
+/// View menu check marks follow the stored panels (a click on a check item
+/// toggles its mark natively; this puts it back in line with the setting).
+fn sync_view_checks(app: &tauri::AppHandle, p: &Panels) {
+    let Some(menu) = app.menu() else { return };
+    for (id, on) in [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status)] {
+        if let Some(item) = menu.get(id).and_then(|k| k.as_check_menuitem().cloned()) {
+            let _ = item.set_checked(on);
+        }
     }
 }
 
@@ -1036,21 +1067,48 @@ fn apply_zoom(window: &tauri::WebviewWindow, prefs: &UiPrefs) -> Result<(), Stri
 }
 
 #[tauri::command]
-async fn ui_prefs(app: State<'_, App>, window: tauri::WebviewWindow) -> Result<UiPrefs, String> {
+async fn ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<UiPrefs, String> {
     let prefs = std::fs::read_to_string(prefs_path(&app)).ok().and_then(|t| serde_json::from_str::<UiPrefs>(&t).ok()).unwrap_or_default();
     apply_zoom(&window, &prefs)?;
+    sync_view_checks(&handle, &prefs.panels);
     Ok(prefs)
 }
 
 #[tauri::command]
-async fn set_ui_prefs(app: State<'_, App>, window: tauri::WebviewWindow, prefs: UiPrefs) -> Result<UiPrefs, String> {
-    let prefs = UiPrefs { scale: (prefs.scale * 10.0).round().clamp(8.0, 20.0) / 10.0, contrast: if prefs.contrast == "high" { "high".into() } else { "system".into() } };
+async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tauri::WebviewWindow, prefs: UiPrefs) -> Result<UiPrefs, String> {
+    let prefs = UiPrefs { scale: (prefs.scale * 10.0).round().clamp(8.0, 20.0) / 10.0, contrast: if prefs.contrast == "high" { "high".into() } else { "system".into() }, panels: prefs.panels };
     let path = prefs_path(&app);
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, serde_json::to_string_pretty(&prefs).map_err(|e| e.to_string())?).map_err(io_err)?;
     cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)?;
     apply_zoom(&window, &prefs)?;
+    sync_view_checks(&handle, &prefs.panels);
     Ok(prefs)
+}
+
+/// Focus mode's window side: full screen without the menu bar (Windows and
+/// Linux keep the menu bar in full screen; macOS hides it by itself). On,
+/// returns whether this call made the window full screen; off, leaves full
+/// screen only if `restore` says focus mode made it so.
+#[tauri::command]
+fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result<bool, String> {
+    let e = |e: tauri::Error| e.to_string();
+    if on {
+        let made = !window.is_fullscreen().map_err(e)?;
+        if made {
+            window.set_fullscreen(true).map_err(e)?;
+        }
+        #[cfg(not(target_os = "macos"))]
+        window.hide_menu().map_err(e)?;
+        Ok(made)
+    } else {
+        #[cfg(not(target_os = "macos"))]
+        window.show_menu().map_err(e)?;
+        if restore {
+            window.set_fullscreen(false).map_err(e)?;
+        }
+        Ok(false)
+    }
 }
 
 /// About and licences: the app's own notice and license, plus every bundled
@@ -1092,9 +1150,23 @@ async fn library_folder(app: State<'_, App>) -> Result<String, String> {
 /// macOS also gets the standard app menu and an Edit menu (WKWebView needs
 /// it for Cmd+C/V); Undo/Redo there are custom so they reach the editor's
 /// history, not the WebView's native undo.
-/// Display: UI size and contrast (shortcuts are handled in the web UI).
+/// Display: panels, focus mode, UI size and contrast (shortcuts are handled
+/// in the web UI). Panel check marks are set from preferences at startup.
 fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::CheckMenuItemBuilder;
+    let check = |id: &str, label: &str| CheckMenuItemBuilder::with_id(id, label).checked(true).build(app);
+    #[cfg(target_os = "macos")]
+    let focus = "Focus Mode (Cmd+Shift+F)";
+    #[cfg(not(target_os = "macos"))]
+    let focus = "Focus Mode (Ctrl+Shift+F)";
     tauri::menu::SubmenuBuilder::new(app, "View")
+        .text("focus_mode", focus)
+        .separator()
+        .item(&check("view_nav", "Scene List")?)
+        .item(&check("view_board", "Board")?)
+        .item(&check("view_toolbar", "Toolbar")?)
+        .item(&check("view_status", "Status Bar")?)
+        .separator()
         .text("ui_larger", "Larger Interface")
         .text("ui_smaller", "Smaller Interface")
         .text("ui_reset", "Actual Size")
@@ -1203,6 +1275,7 @@ fn main() {
             about_info,
             ui_prefs,
             set_ui_prefs,
+            focus_window,
             document_profile,
             set_document_profile,
             export_txt,

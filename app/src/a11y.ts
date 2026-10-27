@@ -39,16 +39,34 @@ export function announce(msg: string, urgent = false) {
   window.setTimeout(() => (r.textContent = msg), 30);
 }
 
+export type Panel = "nav" | "board" | "toolbar" | "status";
+export const PANEL_LABEL: Record<Panel, string> = { nav: "Scene list", board: "Board", toolbar: "Toolbar", status: "Status bar" };
+
 export interface UiPrefs {
   scale: number;
   contrast: "system" | "high";
+  /** Panels of the script view; hidden ones take no space. */
+  panels: Record<Panel, boolean>;
 }
 
-let prefs: UiPrefs = { scale: 1, contrast: "system" };
+let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true } };
+const panelListeners: (() => void)[] = [];
 
-function applyContrast() {
+function applyPrefs() {
   if (prefs.contrast === "high") document.documentElement.dataset.contrast = "high";
   else delete document.documentElement.dataset.contrast;
+  for (const [k, on] of Object.entries(prefs.panels)) document.body.toggleAttribute(`data-hide-${k}`, !on);
+  panelListeners.forEach((f) => f());
+}
+
+/** Called after panel visibility changes (the toolbar's View menu redraws). */
+export function onPanelsChanged(f: () => void) {
+  panelListeners.push(f);
+}
+
+export async function togglePanel(p: Panel) {
+  const next = await setPrefs((cur) => ({ panels: { ...cur.panels, [p]: !cur.panels[p] } }));
+  announce(`${PANEL_LABEL[p]} ${next.panels[p] ? "shown" : "hidden"}`);
 }
 
 export async function loadPrefs(): Promise<UiPrefs> {
@@ -57,7 +75,7 @@ export async function loadPrefs(): Promise<UiPrefs> {
   } catch {
     // Defaults are fine; the window still works at 100%.
   }
-  applyContrast();
+  applyPrefs();
   return prefs;
 }
 
@@ -74,7 +92,7 @@ export function setPrefs(change: Partial<UiPrefs> | ((p: UiPrefs) => Partial<UiP
   return serial(async () => {
     const c = typeof change === "function" ? change(prefs) : change;
     prefs = await invoke<UiPrefs>("set_ui_prefs", { prefs: { ...prefs, ...c } });
-    applyContrast();
+    applyPrefs();
     return prefs;
   });
 }

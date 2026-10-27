@@ -14,7 +14,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
 body { display: grid; grid-template-rows: auto 1fr auto; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.toolbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .toolbar label { display: inline-flex; gap: 6px; align-items: center; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { padding: 3px 9px; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer; }
@@ -22,7 +22,29 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-
 #status { margin-left: auto; font-variant-numeric: tabular-nums; }
 #status[data-state="error"] { color: var(--bad); font-weight: 600; }
 #status[data-state="pending"]::before, #status[data-state="saving"]::before { content: "● "; color: var(--warn); }
-.panes { display: grid; grid-template-columns: 260px 1fr 320px; min-height: 0; }
+.panes { display: grid; grid-template-columns: var(--nav-w, 260px) minmax(0, 1fr) var(--board-w, 320px); grid-template-areas: "nav editor board"; min-height: 0; }
+#navigator { grid-area: nav; }
+.editor-wrap { grid-area: editor; }
+#board { grid-area: board; }
+/* View menu: hidden panels take no space; named areas keep the others in place. */
+body[data-view="editor"] { grid-template-areas: "toolbar" "panes" "footer"; }
+body[data-view="editor"] > .toolbar { grid-area: toolbar; }
+body[data-view="editor"] > .panes { grid-area: panes; }
+body[data-view="editor"] > footer { grid-area: footer; }
+body[data-hide-nav] { --nav-w: 0; }
+body[data-hide-board] { --board-w: 0; }
+body[data-hide-nav] #navigator, body[data-hide-board] #board, body[data-hide-toolbar] > .toolbar, body[data-hide-status] > footer { display: none; }
+.popup-menu { position: absolute; z-index: 20; min-width: 180px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .2); display: grid; }
+.popup-menu[hidden] { display: none; }
+.popup-menu [role^="menuitem"] { border: 0; background: none; text-align: left; padding: 5px 10px 5px 26px; border-radius: 4px; position: relative; }
+.popup-menu [role^="menuitem"]:hover, .popup-menu [role^="menuitem"]:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.popup-menu [aria-checked="true"]::before { content: "✓"; position: absolute; left: 9px; }
+.popup-menu [role="separator"] { border-top: 1px solid var(--line); margin: 4px 0; }
+/* Focus mode: only the script page. */
+body[data-focus] > .toolbar, body[data-focus] > footer, body[data-focus] #navigator, body[data-focus] #board { display: none; }
+body[data-focus] { --nav-w: 0; --board-w: 0; }
+body[data-focus] .editor-wrap { padding-top: 48px; }
+body[data-focus] #editor { box-shadow: none; }
 nav, aside { overflow: auto; padding: 8px 10px; background: var(--panel); border-right: 1px solid var(--line); }
 aside { border-right: 0; border-left: 1px solid var(--line); }
 h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 0 8px; }
