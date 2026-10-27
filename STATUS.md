@@ -46,7 +46,12 @@ The repository contains a feasibility spike, not a usable application. Nothing h
 
 1. GNU-toolchain linker warning about manifests (Windows dev builds only).
 2. Windows e2e on the GitHub-hosted runner: WebView2 does not start; the e2e runner's own deadline also failed to fire there. Non-blocking in CI; see `docs/M1_PLAN.md` 1.3.
-3. End then Enter right after typing, under an artificially busy main thread: **1 miss in 500** in one full-suite run on 2026-10-26 (fix on). Three reruns gave 0/1,500, and every earlier run 0/500. So the fix from M1 item 1.1 is not airtight at about 1 in 2,000 under stress; the effect is that Enter splits the line at the previous caret position (no text lost, undoable). Not yet investigated: the run did not keep per-trial detail. Next: log the failing trial's keys and selection, and loop the stress test until it reproduces.
+3. End then Enter right after typing, under an artificially busy main thread (stress test, 40 ms of blocking every 50 ms): **rare miss, about 1 in 4,000 trials, cause not found.** Investigated 2026-10-27:
+   - **Counts:** 2 misses in about 8,000 trials across 16 full-suite runs; 0 in 10,500 trials run on their own. The control without the fix still misses about 65–70%, so the test still detects the original race.
+   - **The one detailed log** shows a different failure from the original race. The editor's selection and the DOM's agreed (so the M1 fix had nothing to adopt). The editor did not take in Home's caret move, and did not handle the final Enter at all (not marked handled). The browser's own Enter then did nothing, so "abc" stayed and no new line appeared.
+   - **Likely causes:** both symptoms fit ProseMirror skipping its handlers, which happens when the keys are not delivered to the editor or while it believes an input-method composition is active.
+   - **Effect:** no text lost; Enter does not make a new line once.
+   - **Next:** the suite's stress test now records focus target, composition state and input events on any miss, so the next occurrence will say which.
 
 Fixed: native End key right after typing missed by the editor (M1, see `docs/m0/FINDINGS.md`).
 

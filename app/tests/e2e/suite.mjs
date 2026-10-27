@@ -238,14 +238,30 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
   });
 
   // Busy main thread (startup-like): background tasks of 40 ms every 50 ms.
+  // Per-trial detail for misses with the fix on, so a rare miss can be
+  // diagnosed (2026-10-26: one miss in a full-suite run that 10,500 isolated
+  // trials did not reproduce).
+  const caretMisses = [];
   async function caretKeyTrials(trials, enabled) {
     await openFixture("unicode-marks");
-    await app.evaluate(`(() => { __cirth.selSync.enabled = ${enabled}; window.__jank = setInterval(() => { const t = performance.now(); while (performance.now() - t < 40) {} }, 50); })()`);
+    await app.evaluate(`(() => {
+      if (!window.__caretLogInstalled) {
+        window.__caretLogInstalled = true;
+        // [event, key/inputType, ms, pm anchor, pm head, adoptions, defaultPrevented, window focus, view.composing, editor focused]
+        const rec = (tag) => (e) => { const v = __cirth.view; const s = v.state.selection; window.__caretLog.push([tag, (e && (e.key || e.inputType || e.data)) || '', Math.round(performance.now()), s.anchor, s.head, __cirth.selSync.adopted, e && e.defaultPrevented ? 1 : 0, document.hasFocus() ? 1 : 0, v.composing ? 1 : 0, document.activeElement === v.dom ? 1 : 0]); };
+        window.addEventListener('keydown', rec('kd'), true);
+        window.addEventListener('keydown', rec('kd-after'), false);
+        document.addEventListener('selectionchange', rec('sc'), true);
+        for (const t of ['compositionstart', 'compositionupdate', 'compositionend', 'beforeinput', 'input', 'focusin', 'focusout']) window.addEventListener(t, rec(t), true);
+      }
+      window.__caretLog = [];
+      __cirth.selSync.enabled = ${enabled}; window.__jank = setInterval(() => { const t = performance.now(); while (performance.now() - t < 40) {} }, 50); })()`);
     const n0 = (await blocks()).length;
     await caretAtEndOf(n0 - 1);
     let missed = 0;
     try {
       for (let t = 0; t < trials; t++) {
+        await app.evaluate("(window.__caretLog = [], true)");
         await press("Enter");
         await typeText("abc");
         await press("Home");
@@ -253,7 +269,10 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
         await press("End");
         await press("Enter");
         const r = await app.evaluate("(() => { const b = __cirth.blocks(); const t = x => x.runs.map(r => r.text).join(''); return [t(b.at(-2)), t(b.at(-1))]; })()");
-        if (r[0] !== "abc" || r[1] !== "") missed++;
+        if (r[0] !== "abc" || r[1] !== "") {
+          missed++;
+          if (enabled) caretMisses.push({ trial: t, result: r, lastBlocks: (await blocks()).slice(-4).map((b) => `${b.kind}:${text(b)}`), log: await app.evaluate("window.__caretLog") });
+        }
         await app.evaluate(`(() => { const v = __cirth.view; let p0 = 0; v.state.doc.forEach((n, p, i) => { if (i === ${n0}) p0 = p; });
           v.dispatch(v.state.tr.delete(p0, v.state.doc.content.size)); })()`);
         await caretAtEndOf(n0 - 1);
@@ -268,7 +287,8 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const control = await caretKeyTrials(50, false);
     const fixed = await caretKeyTrials(500, true);
     results.measurements.caretKeyStress = { controlFixOff: `${control}/50 missed`, fixOn: `${fixed}/500 missed` };
-    assert(fixed === 0, `fix on: ${fixed}/500 missed`);
+    if (caretMisses.length) results.measurements.caretKeyMisses = caretMisses;
+    assert(fixed === 0, `fix on: ${fixed}/500 missed; detail in results.measurements.caretKeyMisses: ${JSON.stringify(caretMisses).slice(0, 1500)}`);
     return { control: `${control}/50 missed with the fix off (shows whether the test detects the bug here)`, fixed: `${fixed}/500 missed` };
   });
 
@@ -457,6 +477,11 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await openFixture("page-boundaries", false);
     await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(beat0.id)})?.logline === 'The ledger goes missing' && document.querySelector('${cardSel} .logline')?.value === 'The ledger goes missing'`, "logline kept after reopening");
     await screenshot(app, "logline-cards");
+    // Typing in a logline (not yet committed) survives a board re-render.
+    await app.evaluate(`(() => { const i = document.querySelector('${cardSel} .logline'); i.focus(); i.value = 'Half-typed logline'; window.__loglineEl = i; return true; })()`);
+    await app.evaluate("__cirth.setStructural(false)");
+    assert(await app.evaluate(`document.querySelector('${cardSel} .logline') === window.__loglineEl && window.__loglineEl.value === 'Half-typed logline' && document.activeElement === window.__loglineEl`), "unsaved logline text kept through a re-render");
+    await app.evaluate("(() => { document.activeElement.blur(); return true; })()");
     const order0 = (await app.evaluate("__cirth.scenes().map(s => s.sceneId)")).join();
     await app.evaluate("__cirth.setStructural(false)");
     await app.evaluate(`__cirth.moveCard(${JSON.stringify(beat0.id)}, null)`);

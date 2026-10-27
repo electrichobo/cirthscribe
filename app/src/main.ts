@@ -146,7 +146,11 @@ let pageTimer: number | undefined;
 
 function rerenderSide() {
   renderNav();
-  if (!boardEl.contains(document.activeElement) || !(document.activeElement instanceof HTMLTextAreaElement)) {
+  // Never rebuild a card while its logline or summary is being typed in:
+  // the unsaved text would be replaced by the stored value.
+  const a = document.activeElement;
+  const typing = a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === "text");
+  if (!boardEl.contains(a) || !typing) {
     const key = focusKey(boardEl);
     renderBoard(boardBody, view, board, rerenderSide, key?.split("|")[0]);
     restoreFocus(boardEl, key);
