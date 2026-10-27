@@ -22,6 +22,7 @@ Build: `cargo test -p cirth-core`, `cd app && npm ci && npm run build`, `cargo b
 | M10 | Type a marker, wait for "Stored", Force Quit the app, reopen. | Recovery notice; the marker is present. |
 | M11 | Open a second copy of the app. | It reports the project is open elsewhere. |
 | M12 | Fixture "Long script", scroll to the top. Click a scene about halfway down in the scene list, then press Enter. | The script scrolls so that heading is visible; the caret is at the end of the heading; Enter adds an empty line after the heading, not a heading above it. (Fixed after the 2026-10-26 pass; recheck.) |
+| M13 | Copy a cue and its dialogue in the script; make an empty Action line; paste. Then on the board (linked mode) press Option+Right on a card and Cmd+Z with the card still focused. | The cue stays a Character block. Cmd+Z restores the scene order without clicking into the script. The scene list and board show headings without numbers. (Fixed after the 2026-10-26 recheck.) |
 
 ## 1b. Native Open and Save As dialogs (all platforms)
 
@@ -89,7 +90,7 @@ The automated tests check names, ids, focus movement and what is put in the anno
 | A2 | Open a sample; type a few words | Typing is not interrupted by save-status announcements. Ctrl+S says "Saved". |
 | A3 | In the editor press Tab and Shift+Tab on an empty line | The new block type is spoken ("Character", "Dialogue"...). |
 | A4 | Press F6 repeatedly | Toolbar, Scene navigator, Screenplay and Board are reached in turn and their names spoken; Shift+F6 goes back. |
-| A5 | Escape from the editor; Up/Down in the scene list; Enter | Scene numbers and headings are read; Enter puts the caret in that scene. |
+| A5 | Escape from the editor; Up/Down in the scene list; Enter | Scene headings are read (no scene numbers until scene numbers are locked); Enter puts the caret in that scene. |
 | A6 | In the scene list press Alt+Down; then Ctrl+Z in the editor | "Scene moved to position N of M" is spoken; undo restores the order. |
 | A7 | F6 to the board; arrows; Alt+Right; Enter; Escape | Cards are read with their number, linked scene and summary; the move is spoken with whether the script changed; Enter edits the summary, Escape returns. |
 | A8 | View > High Contrast; Ctrl+= twice; Ctrl+0; restart | Strong colours and focus rings; the whole window grows and shrinks; the size and contrast choices survive a restart. |

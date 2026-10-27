@@ -88,17 +88,20 @@ export function renderNavigator(root: HTMLElement, view: EditorView, focusScene?
     const item = el("li", { className: s.sceneId === current ? "current" : "" });
     item.dataset.sceneId = s.sceneId;
     item.dataset.item = s.sceneId;
-    const go = el("button", { type: "button", className: "nav-go", title: s.heading }, el("span", { className: "num" }, String(s.index)), " ", s.heading || "(empty heading)");
+    // No scene numbers: they are assigned when the writer locks scene
+    // numbers (a production feature, not built yet); order alone is shown.
+    const name = s.heading || "(empty heading)";
+    const go = el("button", { type: "button", className: "nav-go", title: s.heading }, name);
     go.dataset.part = "go";
     go.dataset.roving = "";
     if (s.sceneId === current) go.setAttribute("aria-current", "location");
     go.addEventListener("click", () => revealScene(view, s.sceneId));
     const up = el("button", { type: "button", className: "nav-move", disabled: i === 0, title: "Move scene up (Alt+Up)", tabIndex: -1 }, "↑");
-    up.setAttribute("aria-label", `Move scene ${s.index} up`);
+    up.setAttribute("aria-label", `Move ${name} up`);
     up.dataset.part = "up";
     up.addEventListener("click", () => moveSceneBy(view, s.sceneId, -1));
     const down = el("button", { type: "button", className: "nav-move", disabled: i === scenes.length - 1, title: "Move scene down (Alt+Down)", tabIndex: -1 }, "↓");
-    down.setAttribute("aria-label", `Move scene ${s.index} down`);
+    down.setAttribute("aria-label", `Move ${name} down`);
     down.dataset.part = "down";
     down.addEventListener("click", () => moveSceneBy(view, s.sceneId, 1));
     item.append(go, up, down);
@@ -199,9 +202,9 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
     card.dataset.beatId = b.id;
     card.dataset.item = b.id;
     card.dataset.roving = "";
-    card.setAttribute("aria-label", `Beat ${i + 1} of ${order.length}${s ? `, linked to scene ${s.index}` : ""}: ${b.summary}`);
+    card.setAttribute("aria-label", `Beat ${i + 1} of ${order.length}${s ? `, linked to ${s.heading || "an empty heading"}` : ""}: ${b.summary}`);
     const link = s
-      ? el("button", { type: "button", className: "card-link", title: "Go to scene" }, `Scene ${s.index}: ${s.heading}`)
+      ? el("button", { type: "button", className: "card-link", title: "Go to scene" }, s.heading || "(empty heading)")
       : el("span", { className: "card-link missing" }, b.scene_id ? "Linked scene no longer exists" : "Not linked");
     link.dataset.part = "link";
     if (s) link.addEventListener("click", () => revealScene(view, s.sceneId));

@@ -108,10 +108,11 @@ Defects found, and fixed on main after the pass. Each needs a recheck on a Mac:
 
 **Recheck on `440e982` (same Mac, 2026-10-26): M5, N7, M12 and N9 all pass**, as does the Typing Latency dialog.
 
-Still open from the passes:
-- Cmd+Z on the board while it has focus does nothing (works from the editor).
-- Pasting the app's own copy into an empty block merges the first pasted block into it, so a cue becomes Action. Plain and foreign-app paste already handle this; in-app copies go through ProseMirror's parser, which does not. Probably present since M0.
-- The About dialog changes height between tabs (cosmetic).
+Fixed after the recheck (2026-10-26; e2e on Windows, a Mac recheck is still due):
+- **Undo and redo from the scene list or board:** Cmd/Ctrl+Z, Shift+Z and Ctrl+Y now work with focus there (not in a text field). They use the script's single undo history, which includes linked (structural) board moves. Planning-only card moves change no script text and are not in that history, as before.
+- **Pasting the app's own copy:** a copy of two or more blocks now goes in as whole blocks with their types, so a cue pasted into an empty Action line stays a cue. Part of one block still pastes inline. The test reproduced the Mac bug on the old code.
+- **About dialog:** it now keeps one height on every tab.
+- **Scene numbers:** the scene list and board showed scene numbers before anything was locked. They are removed: scenes show their headings only until scene-number locking exists (M2). Moves are still announced as positions ("position 3 of 4"), which are not scene numbers. e2e checks that no "scene N" label is shown.
 
 Not run:
 - **D4:** needs a synced folder.

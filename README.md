@@ -137,6 +137,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/adr/](docs/adr/) | Accepted decisions and open questions |
 | [docs/m0/FINDINGS.md](docs/m0/FINDINGS.md) | Proof-of-concept measurements and risks |
 | [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person (macOS, input methods, screen readers) |
+| [docs/ART_ASSETS.md](docs/ART_ASSETS.md) | Art the app needs (icons, logo, installer art) and their sizes |
 | [CLAUDE.md](CLAUDE.md) and [START_HERE.md](START_HERE.md) | Rules and first brief for AI coding agents working on this repository |
 
 ### Contributing

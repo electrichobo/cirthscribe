@@ -547,6 +547,12 @@ async function openViaDialog(): Promise<boolean> {
 // on every platform and can be exercised by the test drivers.
 const isMac = /Mac/i.test(navigator.userAgent);
 
+/** Focus is in the scene list or the board, but not in a text field. */
+function inPanelNotField(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  return !!el && (navEl.contains(el) || boardEl.contains(el)) && !el.closest("textarea, input, [contenteditable]");
+}
+
 /** The regions F6 moves between in the current view, in reading order. */
 function regions(): HTMLElement[] {
   const v = document.body.dataset.view;
@@ -585,6 +591,15 @@ window.addEventListener(
     } else if (k === "=" || k === "+" || k === "-" || k === "0") {
       e.preventDefault();
       void stepScale(k === "0" ? 0 : k === "-" ? -1 : 1);
+    } else if ((k === "z" || (k === "y" && !isMac)) && view && lastOpen && inPanelNotField(e.target)) {
+      // Undo/redo from the scene list or the board: the script's one undo
+      // history (structural moves are script changes). Text fields such as a
+      // beat summary keep their own undo. Planning-only card moves are not
+      // script changes and are not in the history.
+      e.preventDefault();
+      const again = k === "y" || e.shiftKey;
+      const done = (again ? redo : undo)(view.state, view.dispatch);
+      announce(done ? (again ? "Redone" : "Undone") : again ? "Nothing to redo" : "Nothing to undo");
     }
   },
   true,

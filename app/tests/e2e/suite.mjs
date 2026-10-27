@@ -336,6 +336,32 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     b = await blocks();
     rich = b.slice(n2);
     assert(rich.map((x) => x.kind).join(",") === "character,dialogue", `mismatched HTML still typed: ${JSON.stringify(rich)}`);
+    // Our own copy of a cue and its dialogue, pasted into an empty action
+    // line: the cue stays a cue (macOS pass: it became action).
+    const own = await app.evaluate(`(() => {
+      const v = __cirth.view; const ps = []; v.state.doc.forEach((n, p) => ps.push([p, n]));
+      const at = ps.findLastIndex(([, n]) => n.attrs.kind === 'character' && n.textContent === 'KAITO');
+      const sel = v.state.selection.constructor.create(v.state.doc, ps[at][0] + 1, ps[at + 1][0] + ps[at + 1][1].nodeSize - 1);
+      const r = v.serializeForClipboard(sel.content());
+      return { html: r.dom.innerHTML, text: r.text };
+    })()`);
+    assert(own.html.includes("data-kind"), "own copy carries block types");
+    await caretAtEndOf(b.length - 1);
+    await press("Enter");
+    await press("Enter");
+    n2 = (await blocks()).length;
+    const emptyKind = (await blocks()).at(-1).kind;
+    await pasteEvent({ "text/html": own.html, "text/plain": own.text });
+    b = await blocks();
+    rich = b.slice(n2 - 1);
+    assert(rich.map((x) => `${x.kind}:${text(x)}`).join("|") === "character:KAITO|dialogue:The clipboard came from the OS.", `own copy into an empty ${emptyKind} line: ${JSON.stringify(rich.map((x) => [x.kind, text(x)]))}`);
+    assert(rich[1].runs.some((r) => r.italic && r.text === "from"), "styles kept in own copy");
+    // Part of one block still pastes inline.
+    await caretAtEndOf(b.length - 1);
+    const partial = await app.evaluate(`(() => { const v = __cirth.view; const r = v.serializeForClipboard(v.state.doc.slice(v.state.selection.from - 4, v.state.selection.from)); return { html: r.dom.innerHTML, text: r.text }; })()`);
+    await pasteEvent({ "text/html": partial.html, "text/plain": partial.text });
+    b = await blocks();
+    assert(b.length === n2 + 1 && text(b.at(-1)).endsWith("OS.OS."), `partial copy inline: ${text(b.at(-1))}`);
     const ids = b.map((x) => x.id);
     assert(new Set(ids).size === ids.length, "unique ids");
     assert(await storedMatchesEditor(), "stored equals editor");
@@ -1212,6 +1238,13 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await clickHome(app, '[data-about-tab="third"]');
     const third = await pageText();
     assert((await pageHeight()) > 150, `third-party tab visible: ${await pageHeight()} px`);
+    // The dialog keeps one height across tabs, so the tab row does not jump.
+    const dialogHeights = [];
+    for (const tab of ["about", "gpl", "third"]) {
+      await clickHome(app, `[data-about-tab="${tab}"]`);
+      dialogHeights.push(Math.round(await app.evaluate("document.getElementById('about-dialog').getBoundingClientRect().height")));
+    }
+    assert(new Set(dialogHeights).size === 1, `About dialog height per tab: ${dialogHeights}`);
     for (const name of ["Courier Prime", "SCOWL dictionary en_US-large", "spellbook 0.4.2", "prosemirror-view", "tauri "]) assert(third.includes(name), `third-party list has ${name}`);
     assert(third.includes("SIL OPEN FONT LICENSE"), "OFL text included");
     await screenshot(app, "about");
@@ -1349,8 +1382,16 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await sleep(300);
     assert((await focusedScene()) === order0[1], `focus follows the moved scene (${await focusedScene()})`);
     await waitAnnounced("position 3 of 4", "move announced");
-    await app.evaluate("__cirth.view.focus()");
+    // Undo and redo work with focus still in the scene list (macOS pass found
+    // Mod+Z did nothing there); it is the script's one undo history.
+    assert(await app.evaluate("document.getElementById('navigator').contains(document.activeElement)"), "focus in the scene list");
     await press("z", [MOD_KEY]);
+    await waitFor(app, `JSON.stringify(__cirth.scenes().map(s => s.sceneId)) === ${JSON.stringify(JSON.stringify(order0))}`, "undo from the scene list");
+    await waitAnnounced("Undone", "undo announced");
+    await press("z", [MOD_KEY, "shift"]);
+    await waitFor(app, `__cirth.scenes()[2]?.sceneId === ${JSON.stringify(order0[1])}`, "redo from the scene list");
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `JSON.stringify(__cirth.scenes().map(s => s.sceneId)) === ${JSON.stringify(JSON.stringify(order0))}`, "undo again");
     assert(JSON.stringify(await ids()) === JSON.stringify(order0), "one undo restores the order");
     // Board (planning only): arrows choose, Alt+Right moves the card, script untouched.
     await sleep(300);
@@ -1372,6 +1413,17 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(await app.evaluate("document.activeElement?.dataset.part === 'summary'"), "Enter: edit the summary");
     await press("Escape");
     assert(await app.evaluate("document.activeElement?.classList.contains('card')"), "Escape: back to the card");
+    // Linked mode: a card move changes the script; Mod+Z with the card focused undoes it.
+    await app.evaluate("__cirth.setStructural(true)");
+    await sleep(300);
+    await app.evaluate("document.querySelector('#board .card[tabindex=\"0\"]').focus()");
+    const linked0 = await ids();
+    await press("ArrowRight", ["alt"]);
+    await waitFor(app, `JSON.stringify(__cirth.scenes().map(s => s.sceneId)) !== ${JSON.stringify(JSON.stringify(linked0))}`, "linked card move changes the script");
+    assert(await app.evaluate("document.getElementById('board').contains(document.activeElement) && !document.activeElement.matches('textarea')"), "focus still on the board");
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `JSON.stringify(__cirth.scenes().map(s => s.sceneId)) === ${JSON.stringify(JSON.stringify(linked0))}`, "undo from the board");
+    await app.evaluate("__cirth.setStructural(false)");
   });
 
   await test("Display: UI size and high contrast persist across restarts; theme colours meet contrast minimums", async () => {
@@ -1536,11 +1588,20 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { scheme, requests: net.urls.length, origins: [...new Set(net.urls.map((u) => { try { return new URL(u).origin; } catch { return u.slice(0, 10); } }))] };
   });
 
-  await test("Navigator click goes to the scene: heading scrolled into view, caret at its end, Enter continues the scene", async () => {
+  await test("Navigator click goes to the scene: no scene numbers, heading scrolled into view, caret at its end, Enter continues the scene", async () => {
     await openFixture("long-120");
     await app.evaluate("(() => { document.querySelector('.editor-wrap').scrollTop = 0; return true; })()");
     const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
     const target = scenes[Math.floor(scenes.length * 0.6)];
+    // No scene numbers anywhere until scene numbers are locked (not built yet).
+    const shown = await app.evaluate(`(() => ({
+      nav: [...document.querySelectorAll('#navigator .nav-go')].map(b => b.textContent),
+      headings: __cirth.scenes().map(s => s.heading || '(empty heading)'),
+      labels: [...document.querySelectorAll('#navigator [aria-label], #board [aria-label]')].map(e => e.getAttribute('aria-label')),
+      links: [...document.querySelectorAll('#board .card-link')].map(e => e.textContent) }))()`);
+    assert(JSON.stringify(shown.nav) === JSON.stringify(shown.headings), `scene list shows headings only: ${shown.nav.slice(0, 3)}`);
+    const numbered = [...shown.labels, ...shown.links].filter((t) => /\bscene \d/i.test(t));
+    assert(!numbered.length, `scene numbers shown: ${numbered.slice(0, 3)}`);
     await clickHome(app, `#navigator [data-item="${target}"] [data-part="go"]`);
     await sleep(300);
     const where = await app.evaluate(`(() => {

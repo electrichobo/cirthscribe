@@ -30,7 +30,6 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 .nav-list li { display: flex; gap: 2px; align-items: stretch; }
 .nav-list li.current .nav-go { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .nav-go { flex: 1; text-align: left; border: 0; background: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 3px 4px; }
-.nav-go .num { color: var(--muted); display: inline-block; min-width: 2.2em; }
 .nav-move { padding: 0 5px; }
 .editor-wrap { overflow: auto; padding: 16px 0 40vh; }
 #banner { margin: 0 auto 10px; max-width: 8.5in; padding: 8px 10px; border: 1px solid var(--warn); color: var(--warn); background: var(--panel); border-radius: 4px; }
@@ -203,6 +202,8 @@ dialog.backups h2 { text-transform: none; letter-spacing: 0; font-size: 15px; co
 /* About and licences */
 dialog.about { width: min(760px, 92vw); max-height: 86vh; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; display: none; flex-direction: column; }
 dialog.about[open] { display: flex; }
+/* Same height on every tab, so the tab row does not jump when switching. */
+#about-dialog { height: min(680px, 86vh); }
 dialog.about::backdrop { background: rgba(0, 0, 0, .45); }
 dialog.about h2 { margin: 0 0 10px; font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--ink); }
 dialog.about h3 { font-size: 13px; margin: 14px 0 6px; }

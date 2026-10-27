@@ -119,8 +119,8 @@ function styledFrom(html: string, typed: { kind: Kind; text: string }[]): PMNode
 }
 
 /**
- * handlePaste prop. Our own copies (HTML with block types) go through
- * ProseMirror's parser and keep everything. Multi-line text from anywhere
+ * handlePaste prop. Our own copies (HTML with block types) keep everything
+ * (see below). Multi-line text from anywhere
  * else becomes typed blocks by the plain-text rules above, including rich
  * text from TextEdit, Word or a browser (WebKit offers RTF as HTML too),
  * keeping its inline styles when the paragraphs line up.
@@ -129,7 +129,17 @@ export function handlePaste(view: EditorView, event: ClipboardEvent): boolean {
   const data = event.clipboardData;
   if (!data) return false;
   const html = data.getData("text/html");
-  if (html.includes("data-kind")) return false;
+  if (html.includes("data-kind")) {
+    // Our own copy. Part of one block pastes inline (ProseMirror). Two or more
+    // blocks go in as whole blocks with their types, like plain text, so the
+    // first one is not merged into the block at the cursor (a cue pasted into
+    // an empty action line stays a cue). The ids plugin keeps ids unique.
+    const nodes: PMNode[] = [];
+    PMDOMParser.fromSchema(schema)
+      .parse(new DOMParser().parseFromString(html, "text/html").body, { preserveWhitespace: true })
+      .forEach((n) => nodes.push(n));
+    return nodes.length >= 2 && insertBlocks(view, nodes);
+  }
   const text = data.getData("text/plain").replace(/\r\n?/g, "\n");
   if (!text.includes("\n")) return false;
   const typed = parsePlainText(text);
