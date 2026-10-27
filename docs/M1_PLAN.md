@@ -23,12 +23,12 @@ Order matters: the first three items remove M0's open risks before features grow
 - **Done 2026-10-26:** native File menu (New Project, Open, Save, Save As, Export PDF, Close Project, Quit; macOS also gets the app menu and an Edit menu); shortcuts Ctrl/Cmd+S, Ctrl/Cmd+Shift+S, Ctrl/Cmd+O handled in the web UI (same on every platform, testable); restore-from-backup on Home ("Backups (n)…", restore as a new library project, nothing overwritten); opening another project saves the current one first. Menu appearance and the macOS Edit menu are manual checks.
 - ~~Native menus and shortcuts; New, Open, Save, Save As, Close, Recent projects~~ Done (see above). (file dialogs via `tauri-plugin-dialog`; add after a dependency review).
 - **Done 2026-10-26:** autosave of the project file every 60 s and on window close (flushes pending edits first), file-save status in the toolbar; rolling backups (20 kept, 10-minute spacing, always on explicit Save); crash-safe replacement (`MoveFileExW` write-through on Windows, rename + directory fsync on Unix). Tests: core rotation/replace tests; e2e "autosave, Save backs up, closing saves the last edits". **Still to do:** configurable counts. (Restore from backup: done, see below.)
-- **Done 2026-10-26:** schema v2 (documents, containers, settings; blocks and beats scoped to a document) and the migration framework: numbered steps in one transaction, untouched pre-migration copy kept outside rotation, upgrade in the working copy, file rewritten at next save. Tested against real v1 files frozen before the change, plus an e2e upgrade test (A7). **Not tested:** a crash during migration.
+- **Done 2026-10-26:** schema v2 (documents, containers, settings; blocks and beats scoped to a document) and the migration framework: numbered steps in one transaction, untouched pre-migration copy kept outside rotation, upgrade in the working copy, file rewritten at next save. Tested against real v1 files frozen before the change, plus an e2e upgrade test (A7). Crash during migration: tested 2026-10-26 (`killed_during_migration_leaves_the_original_and_reopens_cleanly`).
 - ~~Detect external changes to the package and conflicting writers (A6), keeping both versions.~~ Done (see above).
 
 ## 3. Editor completeness
 
-- Contract test that Rust `model.rs` and TS `schema.ts` agree (generate TS types from Rust, or a shared JSON fixture round trip).
+- ~~Contract test that Rust `model.rs` and TS `schema.ts` agree~~ **Done 2026-10-26:** shared fixture `fixtures/model-contract.json`, checked by `crates/cirth-core/tests/contract.rs` and `app/tests/contract.mjs` (the editor's real conversion and diff code under Node); in CI on all three OSes.
 - **Done 2026-10-26:** find and replace (Ctrl/Cmd+F, Edit menu): match case, Unicode-aware whole word, block-type filter (e.g. rename a character in cues only), highlights with a counter, replace one, replace all as one undo step, inline marks kept. Tested end to end, including scrolling each match into view (a bug the test caught) and replace-all on the 127-page script (about 7 ms for 70 cues). Not yet: search within a selection, regular expressions, replace preview.
 - **Done 2026-10-26:** autocomplete from the script (no bible yet): cue names (most frequent first, extensions stripped), extensions after "(", heading prefixes, known locations, times of day, transitions. Up/Down, Tab accepts, Escape closes; Enter accepts and continues Final Draft style. Not shown during IME composition. Not yet: screen-reader announcement of the list, suggestions from a bible.
 - **Done 2026-10-26:** word counts with one rule (`cirth-core/src/words.rs`, documented there; 26 shared cases in `fixtures/word-count-cases.json`): footer shows block, selection and script counts (script total from the store, with dialogue and action). The editor asks Rust for counts, so live and report numbers cannot drift (A8).
@@ -64,7 +64,7 @@ Focus order across panels, screen-reader labels and live regions (save status), 
 
 ## Decisions needed from the owner during M1 (not blocking the start)
 
-- Project license (affects how MPL-2.0 dependencies are listed, not whether they can be used).
-- Minimum OS versions and CPU architectures.
+- ~~Project license~~ GPL-3.0-only with a 7(b) attribution term (2026-10-26).
+- ~~Minimum OS versions and CPU architectures.~~ Partly settled 2026-10-26: macOS 11 Big Sur or later, Windows x64 only. Still open: minimum Windows version, Linux distributions.
 - Spell-check engine and dictionary sources once options are compared.
-- Whether `.cirth` stays the extension.
+- ~~Whether `.cirth` stays the extension.~~ Yes (owner, 2026-10-26).

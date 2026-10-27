@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "test:contract": "node tests/contract.mjs",
     "e2e:cdp": "node tests/e2e/run.mjs --driver cdp --exe ../target/release/cirthscribe --out ../out/e2e-cdp.json --screens ../out/screens-cdp",
     "e2e:webdriver": "node tests/e2e/run.mjs --driver webdriver --exe ../target/release/cirthscribe --out ../out/e2e-webdriver.json --screens ../out/screens-webdriver",
     "tauri": "tauri"

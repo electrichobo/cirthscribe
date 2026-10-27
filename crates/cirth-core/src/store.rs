@@ -23,6 +23,22 @@ use std::path::{Path, PathBuf};
 
 pub const SCHEMA_VERSION: i64 = 2;
 
+static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
+
+/// Test hook for the crash tests: `f` is called at each named point of a
+/// package save and a migration, so a child process can stop there and be
+/// killed. Never set by the app.
+#[doc(hidden)]
+pub fn set_crash_hook_for_test(f: fn(&'static str)) {
+    let _ = CRASH_HOOK.set(f);
+}
+
+fn crash_point(name: &'static str) {
+    if let Some(f) = CRASH_HOOK.get() {
+        f(name);
+    }
+}
+
 #[derive(Debug)]
 pub enum StoreError {
     /// Another connection or process holds the project.
@@ -160,6 +176,7 @@ fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
         step(&tx)?;
         tx.pragma_update(None, "user_version", to)?;
     }
+    crash_point("migration-uncommitted");
     tx.commit()?;
     Ok(())
 }
@@ -404,6 +421,7 @@ impl Store {
             std::fs::remove_file(&tmp)?;
         }
         self.conn.execute("VACUUM INTO ?1", [tmp.to_string_lossy()])?;
+        crash_point("snapshot-written");
         {
             let pkg = Connection::open(&tmp)?;
             pkg.execute("UPDATE meta SET value = ?1 WHERE key = 'saved_version'", [version.to_string()])?;
@@ -414,7 +432,9 @@ impl Store {
             }
         }
         crate::fsutil::sync_file(&tmp)?;
+        crash_point("snapshot-synced");
         crate::fsutil::replace_file(&tmp, dest)?;
+        crash_point("package-replaced");
         Self::set_meta(&self.conn, "saved_version", &version.to_string())?;
         Ok(version)
     }

@@ -1,0 +1,33 @@
+{
+  "about": "Wire-format contract between cirth-core (Rust, serde) and the editor (TypeScript, app/src/schema.ts). Both test suites must reproduce these values exactly: crates/cirth-core/tests/contract.rs and app/tests/contract.mjs. Canonical form: false flags and absent scene ids are omitted; adjacent runs never share the same marks; a block with no text has one empty run. Change this file only together with both sides.",
+  "kinds": ["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"],
+  "blocks": [
+    { "id": "b-heading", "kind": "heading", "runs": [{ "text": "INT. LIGHTHOUSE - NIGHT" }], "scene_id": "s-1" },
+    { "id": "b-action", "kind": "action", "runs": [{ "text": "Zoë " }, { "text": "slams", "bold": true }, { "text": " the door. " }, { "text": "Hard.", "italic": true, "underline": true }, { "text": " 👩‍👩‍👧 漢字 שלום" }] },
+    { "id": "b-cue", "kind": "character", "runs": [{ "text": "NOOR" }] },
+    { "id": "b-paren", "kind": "parenthetical", "runs": [{ "text": "(softly)" }] },
+    { "id": "b-dialogue", "kind": "dialogue", "runs": [{ "text": "All three marks", "bold": true, "italic": true, "underline": true }, { "text": " then none." }] },
+    { "id": "b-cue-dual", "kind": "character", "runs": [{ "text": "KAITO" }], "dual": true },
+    { "id": "b-dialogue-2", "kind": "dialogue", "runs": [{ "text": "At the same time." }] },
+    { "id": "b-transition", "kind": "transition", "runs": [{ "text": "CUT TO:" }] },
+    { "id": "b-heading-break", "kind": "heading", "runs": [{ "text": "EXT. CLIFF - DAY" }], "scene_id": "s-2", "break_before": true },
+    { "id": "b-shot", "kind": "shot", "runs": [{ "text": "ANGLE ON THE SEA" }] },
+    { "id": "b-section", "kind": "section", "runs": [{ "text": "Act two" }] },
+    { "id": "b-lyric", "kind": "lyric", "runs": [{ "text": "La la la", "italic": true }] },
+    { "id": "b-empty", "kind": "action", "runs": [{ "text": "" }] }
+  ],
+  "beats": [
+    { "id": "beat-1", "summary": "Zoë arrives", "scene_id": "s-1", "pos": 1.0 },
+    { "id": "beat-2", "summary": "Unlinked idea", "scene_id": null, "pos": 2.5 }
+  ],
+  "batch": {
+    "tx_id": "tx-1",
+    "base_version": 7,
+    "ops": [
+      { "op": "put", "block": { "id": "b-new", "kind": "action", "runs": [{ "text": "New line." }] }, "after": "b-heading" },
+      { "op": "put", "block": { "id": "b-first", "kind": "heading", "runs": [{ "text": "INT. ROOM - DAY" }], "scene_id": "s-3" }, "after": null },
+      { "op": "update", "block": { "id": "b-cue-dual", "kind": "character", "runs": [{ "text": "KAITO" }] } },
+      { "op": "delete", "id": "b-empty" }
+    ]
+  }
+}

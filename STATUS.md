@@ -29,7 +29,7 @@ M1 progress:
 - About and licences screen (attribution, GPL, third-party licences); notices file generated and checked in CI.
 - 4 Free Writing: notes outside any project (own database), folders, search, Trash, autosave that survives a hard kill, .txt export, copy or move into the open script with provenance. Flow mode turns off editing so text only grows at the end.
 
-M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run, a real kill-during-package-save test, latency on each OS, a Rust/TS model contract test and an offline test. Next: the two automatable tests, then the manual passes on test machines.
+M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run and latency measured on each OS. Closed since the review: a real kill-during-package-save test (and a crash during migration), a Rust/TypeScript model contract test, and an in-app offline test. Platforms (owner): macOS 11 or later, Windows x64 only; `.cirth` stays. Next: the manual passes on test machines.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 

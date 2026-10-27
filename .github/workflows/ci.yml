@@ -43,7 +43,7 @@ jobs:
         run: scripts/ci-step.sh "Core tests (Linux)" cargo test -p cirth-core
       - name: Frontend build
         working-directory: app
-        run: ../scripts/ci-step.sh "Frontend build (Linux)" bash -c "npm ci && npm run build"
+        run: ../scripts/ci-step.sh "Frontend build (Linux)" bash -c "npm ci && npm run build && npm run test:contract"
       - name: Third-party notices up to date
         run: scripts/ci-step.sh "Third-party notices (Linux)" node app/scripts/third-party-notices.mjs --check
       - name: App build
@@ -78,7 +78,7 @@ jobs:
         run: scripts/ci-step.sh "Core tests (Windows)" cargo test -p cirth-core
       - name: Frontend build
         working-directory: app
-        run: ../scripts/ci-step.sh "Frontend build (Windows)" bash -c "npm ci && npm run build"
+        run: ../scripts/ci-step.sh "Frontend build (Windows)" bash -c "npm ci && npm run build && npm run test:contract"
       - name: App build
         run: scripts/ci-step.sh "App build (Windows)" cargo build -p cirthscribe --release
       - name: Binary imports (expect no WebView2Loader.dll with MSVC)
@@ -126,6 +126,9 @@ jobs:
     name: macOS (build and core tests; e2e is manual)
     runs-on: macos-15
     timeout-minutes: 45
+    env:
+      # Owner decision 2026-10-26: macOS 11 Big Sur is the minimum.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -139,6 +142,10 @@ jobs:
         run: scripts/ci-step.sh "Core tests (macOS)" cargo test -p cirth-core
       - name: Frontend build
         working-directory: app
-        run: ../scripts/ci-step.sh "Frontend build (macOS)" bash -c "npm ci && npm run build"
+        run: ../scripts/ci-step.sh "Frontend build (macOS)" bash -c "npm ci && npm run build && npm run test:contract"
       - name: App build
         run: scripts/ci-step.sh "App build (macOS)" cargo build -p cirthscribe --release
+      - name: Binary targets macOS 11
+        run: |
+          vtool -show-build target/release/cirthscribe | tee out-build.txt
+          grep -Eq "minos 11\.0$" out-build.txt

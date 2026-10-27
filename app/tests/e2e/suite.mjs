@@ -1451,6 +1451,63 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { banner };
   });
 
+  await test("Offline (A1): create, write, save, reopen, export, Free Writing and About reach nothing outside the app", async () => {
+    // Record every request the page makes (resource timing, including IPC)
+    // and every Content Security Policy refusal, from page load on.
+    await app.evaluate(`(() => {
+      window.__net = { urls: performance.getEntriesByType('resource').map(e => e.name), refused: [] };
+      new PerformanceObserver(l => { for (const e of l.getEntries()) __net.urls.push(e.name); }).observe({ type: 'resource' });
+      document.addEventListener('securitypolicyviolation', e => __net.refused.push(e.effectiveDirective + ' ' + e.blockedURI));
+      return true; })()`);
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await app.evaluate(`(() => { const i = document.getElementById('new-title'); i.value = 'Offline Check'; i.form.requestSubmit(); return true; })()`);
+    await waitOpen(app);
+    const key = (await app.evaluate("__cirth.lastOpen")).name;
+    await caretAtEndOf(0);
+    await typeText("INT. CABIN - NIGHT");
+    await press("Enter");
+    await typeText("No signal. Speling still checked.");
+    const v0 = await app.evaluate("__cirth.fileSavedVersion");
+    await press("s", [MOD_KEY]);
+    await waitFor(app, `__cirth.fileSavedVersion > ${v0}`, "save");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, `[data-project="${key}"]`);
+    await waitOpen(app);
+    assert((await blocks()).some((b) => text(b).startsWith("No signal.")), "text back after reopening");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(join(dataDir, "offline.txt"))})`), "text export");
+    await app.evaluate("(() => { document.getElementById('pdf').click(); return true; })()");
+    await waitFor(app, "/PDF proof/.test(document.getElementById('banner').textContent)", "PDF export");
+    await fwOpen();
+    await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
+    await fwFocusBody();
+    await typeText("offline notes");
+    await fwSaved();
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await clickHome(app, "#open-about");
+    await waitFor(app, "document.getElementById('about-dialog')?.open === true", "About");
+    await app.evaluate("__cirth.about.close()");
+
+    // The policy must refuse an outside address (.invalid never resolves, so
+    // nothing leaves the machine even if the policy were missing).
+    const probe = await app.evaluate(`fetch('http://offline-check.invalid/x').then(() => 'reached', e => 'refused: ' + e.name)`);
+    await sleep(300);
+    const net = await app.evaluate("__net");
+    assert(probe.startsWith("refused"), `outside fetch was ${probe}`);
+    assert(net.refused.some((r) => r.startsWith("connect-src") && r.includes("offline-check.invalid")), `CSP refused the probe: ${JSON.stringify(net.refused)}`);
+    // App origins: tauri://localhost and ipc://localhost (macOS, Linux),
+    // http://tauri.localhost and http://ipc.localhost (Windows); data: and blob: are local.
+    const local = (u) => /^(data|blob):/.test(u) || (() => { try { const h = new URL(u).hostname; return h === "localhost" || h.endsWith(".localhost"); } catch { return false; } })();
+    const outside = net.urls.filter((u) => !local(u) && !u.includes("offline-check.invalid"));
+    assert(net.urls.length > 10, `requests were recorded (${net.urls.length})`);
+    assert(outside.length === 0, `requests outside the app: ${outside.join(", ")}`);
+    const otherRefusals = net.refused.filter((r) => !r.includes("offline-check.invalid"));
+    assert(otherRefusals.length === 0, `the app itself tried something the policy refused: ${otherRefusals.join(", ")}`);
+    return { requests: net.urls.length, origins: [...new Set(net.urls.map((u) => { try { return new URL(u).origin; } catch { return u.slice(0, 10); } }))] };
+  });
+
   await test("PDF proof export from the canonical store", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("(() => { document.getElementById('pdf').click(); })()");

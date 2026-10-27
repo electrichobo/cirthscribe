@@ -109,6 +109,33 @@ fn main() {
                 std::thread::sleep(std::time::Duration::from_secs(60));
             }
         }
+        // crash-at <point> save <work.db> <pkg>
+        // crash-at <point> open <pkg> <work.db> <backup dir>
+        // Run a package save or a package open (with migration) and stop at
+        // the named crash point: print "AT <point>", then hang until killed.
+        "crash-at" => {
+            fn stop(name: &'static str) {
+                if std::env::args().nth(2).as_deref() == Some(name) {
+                    println!("AT {name}");
+                    std::io::stdout().flush().unwrap();
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_secs(60));
+                    }
+                }
+            }
+            cirth_core::store::set_crash_hook_for_test(stop);
+            match args.get(2).map(String::as_str) {
+                Some("save") => {
+                    let store = Store::open(&arg(3)).unwrap();
+                    store.save_package(&arg(4)).unwrap();
+                }
+                Some("open") => {
+                    cirth_core::store::Store::open_package(&arg(3), &arg(4), Some(&arg(5))).unwrap();
+                }
+                _ => panic!("crash-at <point> save|open ..."),
+            }
+            println!("DONE");
+        }
         // hold <work.db>: open (take the lock) and hang.
         "hold" => {
             let _store = Store::open(&arg(1)).unwrap();
@@ -119,7 +146,7 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("usage: cirth-cli gen-fixtures <dir> | pdf <fixture> <out.pdf> [a4] | pagemap <fixture> | crash-writer <db> <n> | crash-inflight <db> | hold <db>");
+            eprintln!("usage: cirth-cli gen-fixtures <dir> | pdf <fixture> <out.pdf> [a4] | pagemap <fixture> | crash-writer <db> <n> | crash-inflight <db> | crash-at <point> save <db> <pkg> | crash-at <point> open <pkg> <db> <backups> | hold <db>");
             std::process::exit(2);
         }
     }

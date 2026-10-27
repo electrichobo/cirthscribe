@@ -48,6 +48,15 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 | N8 | Export Plain Text, open the file in Notepad / TextEdit / gedit | Indents line up in a fixed-pitch font; pages are separated by a form feed (some editors show it as a symbol or nothing). |
 | N6 | Free Writing, Flow mode on: type with a real IME (Japanese, Pinyin), then try the trackpad/mouse to select and drag text | Composed text lands at the end; nothing already written is selected, moved or deleted. Esc turns editing back on. |
 
+## 1d. Offline (A1), all platforms
+
+The e2e suite checks that the page reaches nothing outside the app and that the content policy refuses outside addresses. It does not switch the network off, because that changes system settings. Do this on a test machine only.
+
+| # | Steps | Expected |
+| - | - | - |
+| O1 | Disable the network adapter (or unplug it). Start the app, create a project, type, save, close, reopen, export PDF and text, use Free Writing and About. | Everything works; no error, delay or sign-in prompt mentions the network. |
+| O2 | With a firewall log or a monitor such as Little Snitch, Wireshark or `ss`, watch the app's process during O1 with the network on. | No connections from CirthScribe's own process. Write down any from the WebView runtime (browser update services, for example) separately. |
+
 ## 2. Real input methods (all platforms)
 
 Automated IME coverage is simulated composition (DevTools, Windows only). Real IMEs need a test machine where adding input languages is allowed (not the owner's production machine).

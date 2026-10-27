@@ -212,3 +212,42 @@ fn a_newer_schema_is_refused_without_touching_the_file() {
     assert_eq!(std::fs::read(&pkg).unwrap(), before);
     assert!(!d.join("work.db").exists() && !d.join("backups").exists());
 }
+
+#[test]
+fn killed_during_migration_leaves_the_original_and_reopens_cleanly() {
+    let d = tmpdir("killed");
+    let pkg = v1_copy(&d, "unicode-marks");
+    let original = std::fs::read(&pkg).unwrap();
+    let before = read_v1(&pkg);
+    let (work, backups) = (d.join("work.db"), d.join("backups"));
+
+    // Stop inside the migration transaction (all steps run, not committed), then kill.
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_cirth-cli"))
+        .args(["crash-at", "migration-uncommitted", "open"])
+        .args([&pkg, &work, &backups])
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    std::io::BufRead::read_line(&mut std::io::BufReader::new(child.stdout.as_mut().unwrap()), &mut line).unwrap();
+    assert_eq!(line.trim(), "AT migration-uncommitted");
+    child.kill().unwrap();
+    child.wait().unwrap();
+
+    // The project file and the pre-migration copy are untouched.
+    assert_eq!(std::fs::read(&pkg).unwrap(), original);
+    let kept: Vec<_> = std::fs::read_dir(&backups).unwrap().map(|e| e.unwrap().path()).collect();
+    assert_eq!(kept.len(), 1);
+    assert_eq!(std::fs::read(&kept[0]).unwrap(), original);
+    // The half-done working copy rolled back to v1.
+    assert_eq!(store::schema_of(&work).unwrap(), 1, "the uncommitted migration must not survive");
+
+    // Opening again migrates from scratch, with the same content and one backup.
+    let o = Store::open_package(&pkg, &work, Some(&backups)).unwrap();
+    assert_eq!(o.migrated_from, Some(1));
+    let s = o.store;
+    assert!(s.integrity_ok().unwrap());
+    let ids: Vec<String> = s.load().unwrap().blocks.iter().map(|b| b.id.clone()).collect();
+    assert_eq!(ids, before.blocks.iter().map(|b| b.0.clone()).collect::<Vec<_>>());
+    assert_eq!(std::fs::read_dir(&backups).unwrap().count(), 1, "no duplicate pre-migration copy");
+}

@@ -96,7 +96,12 @@ export class Syncer {
   onAck: (version: number) => void = () => {};
   stats = { batches: 0, ops: 0, lastDiffMs: 0, lastRoundTripMs: 0, roundTrips: [] as number[] };
 
-  constructor(doc: PMNode, version: number, private debounceMs = 300, private maxWaitMs = 1500) {
+  private debounceMs: number;
+  private maxWaitMs: number;
+
+  constructor(doc: PMNode, version: number, debounceMs = 300, maxWaitMs = 1500) {
+    this.debounceMs = debounceMs;
+    this.maxWaitMs = maxWaitMs;
     this.synced = doc;
     this.latest = doc;
     this.version = version;

@@ -310,3 +310,66 @@ fn page_profile_is_stored_per_document_and_saved_with_the_package() {
     let s = Store::open_package(&pkg, &work, None).unwrap().store;
     assert_eq!(s.document_profile(&s.default_document().unwrap()).unwrap(), "a4");
 }
+
+/// Run `cirth-cli crash-at <point> ...` and hard-kill it once it reports
+/// that it stopped at the point (it never gets further).
+fn kill_at(point: &str, rest: &[&std::path::Path]) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_cirth-cli"))
+        .arg("crash-at")
+        .arg(point)
+        .args(rest.iter().map(|p| p.as_os_str()))
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    BufReader::new(child.stdout.as_mut().unwrap()).read_line(&mut line).unwrap();
+    assert_eq!(line.trim(), format!("AT {point}"), "child did not stop at {point}");
+    child.kill().unwrap();
+    child.wait().unwrap();
+}
+
+#[test]
+fn killed_during_package_save_keeps_a_valid_package_and_every_edit() {
+    for point in ["snapshot-written", "snapshot-synced", "package-replaced"] {
+        let d = tmpdir(&format!("killsave-{point}"));
+        let work = d.join("w.db");
+        let pkg = d.join("script.cirth");
+        let doc = fixtures::unicode_marks().to_document().unwrap();
+        {
+            let mut s = Store::open(&work).unwrap();
+            s.seed(&doc).unwrap();
+            assert_eq!(s.save_package(&pkg).unwrap(), 1);
+            let b = Block::new(BlockKind::Action, "edited after the first save");
+            s.apply(&batch(1, vec![Op::Put { block: b, after: None }])).unwrap();
+        }
+        let first_save = std::fs::read(&pkg).unwrap();
+
+        kill_at(point, &[std::path::Path::new("save"), &work, &pkg]);
+
+        // The package on disk is a whole file: the old one before the
+        // replace, the new one after it. Never a mixture.
+        let info = Store::inspect(&pkg).unwrap();
+        if point == "package-replaced" {
+            assert_eq!(info.saved_version, 2, "{point}");
+            assert_eq!(info.blocks as usize, doc.blocks.len() + 1, "{point}");
+        } else {
+            assert_eq!(std::fs::read(&pkg).unwrap(), first_save, "{point}: package must be untouched before the replace");
+        }
+        assert!(rusqlite_conn(&pkg).query_row("PRAGMA integrity_check", [], |r| r.get::<_, String>(0)).unwrap() == "ok");
+
+        // Reopening recovers the edit whichever way the kill fell.
+        let o = Store::open_package(&pkg, &work, None).unwrap();
+        let s = o.store;
+        assert!(s.integrity_ok().unwrap());
+        let back = s.load().unwrap();
+        assert_eq!(back.blocks[0].text(), "edited after the first save", "{point}");
+        assert_eq!(back.blocks.len(), doc.blocks.len() + 1);
+        if point != "package-replaced" {
+            assert!(o.recovered, "{point}: the unsaved edit must come from the working store");
+        }
+        // The leftover temp file does not stop the next save.
+        assert_eq!(s.save_package(&pkg).unwrap(), 2);
+        assert!(!pkg.with_extension("cirth.tmp").exists());
+        assert_eq!(Store::inspect(&pkg).unwrap().saved_version, 2);
+    }
+}
