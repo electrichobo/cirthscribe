@@ -2,7 +2,25 @@
 
 Date: 2026-10-26. Commit reviewed: `16af402`. Reviewer: coding agent, for the owner.
 
-**Verdict: M1 is not done.** (Updated later on 2026-10-26: blockers 3, 6 and 7 are closed; see section 3.) Every M1 feature item is built and tested automatically on Windows. Linux has partial automated coverage. macOS has none for editing. M1's exit gate asks for more than that: editing smoke tests on all three OSes, crash tests on all three, and performance measured on each OS. Those runs are missing, and two tests the gate depends on do not exist yet. Nothing found so far is a known data-loss defect. The gaps are untested paths, not failures.
+**Status on 2026-10-27 (latest; the original review from 2026-10-26 follows):** everything M1 promised is built, and M1b too, now that the owner has added it. The original blockers stand as follows:
+
+| Original blocker | Now |
+| - | - |
+| 1. macOS editing never run | **Done.** Manual pass and rechecks on macOS 26.2 (M1–M13, N1–N19 pass; see MANUAL_CHECKS). Big Sur itself is untested: no machine for it. |
+| 2. Real IME run | **Waived by the owner** (not passed). |
+| 3. Kill during package save; crash during migration | **Done** (core tests on all three OSes in CI). |
+| 4. Performance on each OS | Windows and macOS measured and within target (macOS p95 24–26 ms, open 115 ms). **Linux desktop not measured; no reference machines named.** |
+| 5. Windows CI e2e | Still local only (the hosted runner cannot start WebView2); local runs are recorded. |
+| 6. Model contract test | **Done.** |
+| 7. Offline test | **Done in-app;** the network-off run is deferred by the owner. |
+
+Also still open:
+- STATUS defect 3: a rare End-then-Enter stress miss, about 1 in 4,000 trials, with no text lost. It is logged and has instrumentation in place; the cause is not found.
+- macOS recheck N20.
+
+**Proposal:** close M1 with these carried forward (Linux latency, reference machines, defect 3, N20), since none is a data-loss defect. The owner's call.
+
+Original verdict (2026-10-26): **M1 is not done.**
 
 Gate sources: ROADMAP.md (M1 exit) and the exit tests in docs/M1_PLAN.md.
 
