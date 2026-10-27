@@ -66,6 +66,13 @@ Jared raised these after the M1 feature work, which so far covered only the scri
    - Islands: Project (Home, title, Free Writing, Save), Format, View (View ▾, page view, zoom), Document (page size, spelling), and save status.
    - Save As and Export are in the File menu only.
    - The "Board may reorder script" switch moved onto the board.
+   - **Redesigned 2026-10-27 (owner, Story Architect-style reference):** one island centred over the script (it stays centred as side panels are shown or hidden).
+     - On the island: Home, undo, redo; block type, B, I, U, text colour, highlight, screen font and size; scene-list and board toggles, find, focus mode.
+     - A More (⋮) popover holds focus and typewriter mode, panel check items, page view, zoom, page size, spelling, Save and Free Writing.
+     - Project title and save status moved to the status bar.
+     - Temporary original icons (`app/src/icons.ts`) until the art set exists.
+     - On narrow windows the island wraps onto a second row, ribbon-style.
+     - A comments/review panel toggle joins the island when M5 builds comments; there is no placeholder button.
 5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A). **B, I and U built 2026-10-26:**
    - Block-type dropdown and B, I, U buttons show the state at the caret (pressed or not).
    - Using them keeps the selection and focus in the script.

@@ -16,21 +16,43 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 body { display: grid; grid-template-rows: auto 1fr auto; }
 .toolbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .toolbar label { display: inline-flex; gap: 6px; align-items: center; }
-/* Island toolbar: separate floating groups instead of one full-width bar. */
-body[data-view="editor"] > .toolbar { background: var(--bg); border-bottom: 0; padding: 8px 10px 4px; gap: 8px; }
-.island { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
-.island-status { margin-left: auto; color: var(--muted); }
-.island-status #status { margin-left: 0; }
-.fmt { min-width: 30px; padding: 3px 6px; font-family: Georgia, "Times New Roman", serif; }
+/* Island toolbar: one floating island centred over the script (the middle
+   column, so it stays centred as side panels are shown or hidden). It wraps
+   onto a second row, ribbon-style, when the window is narrow. Rarely used
+   settings live in its More (⋮) popover. */
+body[data-view="editor"] > .toolbar { display: grid; grid-template-columns: var(--nav-w, 260px) minmax(0, 1fr) var(--board-w, 320px); background: var(--bg); border-bottom: 0; padding: 8px 0 4px; }
+body[data-view="editor"] > .toolbar > .island { grid-column: 2; justify-self: center; max-width: calc(100% - 16px); }
+.toolbar > #more-settings { display: none; }
+.island { position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 0; padding: 4px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 10px rgba(0, 0, 0, .18); }
+.island-group { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; border-right: 1px solid var(--line); }
+.island select { border: 0; background: transparent; padding: 4px 2px; border-radius: 6px; max-width: 10em; }
+.island select:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Icon-style dropdowns: the select is invisible over its icon. */
+.icon-select { position: relative; display: inline-grid; place-items: center; width: 34px; height: 32px; border-radius: 8px; color: var(--ink); }
+.icon-select:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.icon-select:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.icon-select select { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; opacity: 0; cursor: pointer; }
+.icon-select .swatch { stroke: var(--line); }
+.icon-select-colour[data-value="red"] .swatch { stroke: var(--tc-red); } .icon-select-colour[data-value="orange"] .swatch { stroke: var(--tc-orange); }
+.icon-select-colour[data-value="green"] .swatch { stroke: var(--tc-green); } .icon-select-colour[data-value="blue"] .swatch { stroke: var(--tc-blue); }
+.icon-select-colour[data-value="purple"] .swatch { stroke: var(--tc-purple); }
+.icon-select-highlight[data-value="yellow"] .swatch { stroke: rgb(240, 200, 0); } .icon-select-highlight[data-value="green"] .swatch { stroke: rgb(76, 180, 90); }
+.icon-select-highlight[data-value="blue"] .swatch { stroke: rgb(80, 150, 255); } .icon-select-highlight[data-value="pink"] .swatch { stroke: rgb(240, 105, 180); }
+.icon-select-highlight[data-value="orange"] .swatch { stroke: rgb(255, 150, 40); }
+#block-kind { max-width: 9.5em; }
+.tool, .fmt { display: inline-grid; place-items: center; min-width: 32px; height: 32px; padding: 0 4px; border: 0; background: none; border-radius: 8px; color: var(--ink); }
+.tool:hover, .fmt:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.tool[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.fmt { font-family: Georgia, "Times New Roman", serif; font-size: 15px; }
 .fmt-b { font-weight: 700; }
 .fmt-i { font-style: italic; }
 .fmt-u { text-decoration: underline; }
-.fmt[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: var(--accent); }
+.fmt[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .board-option { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { padding: 3px 9px; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer; }
 button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, .card:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-#status { margin-left: auto; font-variant-numeric: tabular-nums; }
+#status { font-variant-numeric: tabular-nums; }
 #status[data-state="error"] { color: var(--bad); font-weight: 600; }
 #status[data-state="pending"]::before, #status[data-state="saving"]::before { content: "● "; color: var(--warn); }
 .panes { display: grid; grid-template-columns: var(--nav-w, 260px) minmax(0, 1fr) var(--board-w, 320px); grid-template-areas: "nav editor board"; min-height: 0; }
@@ -51,6 +73,11 @@ body[data-hide-nav] #navigator, body[data-hide-board] #board, body[data-hide-too
 .popup-menu [role^="menuitem"]:hover, .popup-menu [role^="menuitem"]:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .popup-menu [aria-checked="true"]::before { content: "✓"; position: absolute; left: 9px; }
 .popup-menu [role="separator"] { border-top: 1px solid var(--line); margin: 4px 0; }
+#view-menu { right: 0; min-width: 240px; }
+#view-menu [role="menu"] { display: grid; }
+.more-settings { display: grid; gap: 8px; padding: 8px 10px 6px; margin-top: 4px; border-top: 1px solid var(--line); }
+.more-settings label { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.more-actions { display: flex; gap: 8px; justify-content: flex-end; }
 /* Typewriter mode: room above and below so any line can sit at the middle. */
 body[data-typewriter] .editor-wrap { padding-top: 50vh; padding-bottom: 50vh; }
 /* Focus mode: only the script page. */
@@ -68,7 +95,9 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 .nav-move { padding: 0 5px; }
 .editor-wrap { overflow: auto; padding: 16px 0 40vh; }
 #banner { margin: 0 auto 10px; max-width: 8.5in; padding: 8px 10px; border: 1px solid var(--warn); color: var(--warn); background: var(--panel); border-radius: 4px; }
-footer { padding: 4px 12px; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+footer { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; padding: 4px 12px; border-top: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+footer #project-title { color: var(--ink); }
+footer #info { margin-left: auto; }
 
 /* The editable "page": 8.5in wide, Courier Prime 12pt, 6 lines per inch. 1ch = 0.1in.
    These offsets mirror the layout profile for a close visual match; the

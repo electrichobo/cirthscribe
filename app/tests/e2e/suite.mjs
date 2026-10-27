@@ -1786,12 +1786,41 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { menuItems: items.length, checked: ["page_letter", "spell_en_US"].map((id) => [id, checked(id)]) };
   });
 
-  await test("Island toolbar: grouped controls; B/I/U and block type follow the caret and keep the selection; file actions live in the menus", async () => {
+  await test("Island toolbar: one island centred over the script; panels and tools on it; rare settings in More; B/I/U and block type follow the caret", async () => {
     await openFixture("unicode-marks");
-    const groups = await app.evaluate("[...document.querySelectorAll('.toolbar > .island')].map(g => g.getAttribute('aria-label'))");
-    assert(JSON.stringify(groups) === JSON.stringify(["Project", "Format", "View", "Document", "Save status"]), `islands: ${groups}`);
+    const visible = (sel) => app.evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.getClientRects().length > 0; })()`);
+    const islands = await app.evaluate("document.querySelectorAll('.toolbar > .island').length");
+    const groups = await app.evaluate("[...document.querySelectorAll('.island > .island-group')].map(g => g.getAttribute('aria-label'))");
+    assert(islands === 1 && JSON.stringify(groups) === JSON.stringify(["Project and history", "Format", "Panels and tools"]), `one island with groups: ${islands} ${groups}`);
+    // Centred over the script, also when a side panel is hidden.
+    const offCentre = () => app.evaluate("(() => { const i = document.querySelector('.island').getBoundingClientRect(); const w = document.querySelector('.editor-wrap').getBoundingClientRect(); return Math.round((i.left + i.right) / 2 - (w.left + w.right) / 2); })()");
+    assert(Math.abs(await offCentre()) <= 2, `island centred over the script: ${await offCentre()} px`);
+    // Panel toggles on the island.
+    assert((await app.evaluate("document.getElementById('toggle-board').getAttribute('aria-pressed')")) === "true", "board button shows the board is on");
+    await clickHome(app, "#toggle-board");
+    await waitFor(app, "!document.getElementById('board').getClientRects().length && document.getElementById('toggle-board').getAttribute('aria-pressed') === 'false'", "board hidden from the island");
+    assert(Math.abs(await offCentre()) <= 2, `still centred with the board hidden: ${await offCentre()} px`);
+    await clickHome(app, "#toggle-board");
+    await waitFor(app, "document.getElementById('board').getClientRects().length > 0", "board back");
+    // Rarely used settings are not on the island; they are in More.
+    for (const sel of ["#profile", "#spelling", "#view-mode", "#zoom", "#save", "#go-free"]) assert(!(await visible(sel)), `${sel} is not on the island`);
     assert(!(await app.evaluate("!!document.querySelector('.toolbar #save-as, .toolbar #pdf, .toolbar #txt')")), "Save As and Export are menu-only");
+    await clickHome(app, "#view-menu-btn");
+    await waitFor(app, "!document.getElementById('view-menu').hidden", "More open");
+    for (const sel of ["#profile", "#spelling", "#view-mode", "#zoom", "#save", "#go-free"]) assert(await visible(`#view-menu ${sel}`), `${sel} in More`);
+    await audit("island and More");
+    await screenshot(app, "island-more");
+    await press("Escape");
     assert(await app.evaluate("!!document.querySelector('#board #structural') && !document.querySelector('.toolbar #structural')"), "the board's reorder switch lives on the board");
+    // Undo and redo from the island keep the caret in the script.
+    const ai0 = (await blocks()).findIndex((b) => b.kind === "action");
+    await caretAtEndOf(ai0);
+    await typeText(" UNDOME");
+    await sleep(600);
+    await app.evaluate("(() => { const b = document.getElementById('tool-undo'); b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); b.click(); return true; })()");
+    assert(!text((await blocks())[ai0]).includes("UNDOME") && (await app.evaluate("__cirth.view.hasFocus()")), "island undo, focus kept");
+    await app.evaluate("(() => { document.getElementById('tool-redo').click(); return true; })()");
+    assert(text((await blocks())[ai0]).includes("UNDOME"), "island redo");
     await audit("island toolbar");
     const pressed = () => app.evaluate("['fmt-bold', 'fmt-italic', 'fmt-underline'].map(id => document.getElementById(id).getAttribute('aria-pressed'))");
     // Press like a mouse does: mousedown (must not take focus), then click.

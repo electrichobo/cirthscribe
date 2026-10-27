@@ -30,6 +30,7 @@ import { createLatency } from "./latency";
 import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
+import { icon, iconButton, iconSelect } from "./icons";
 import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -550,17 +551,58 @@ const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(na
   size.title = "Size of the script text on screen only";
   for (let pt = 10; pt <= 20; pt++) size.append(new Option(`${pt} pt`, String(pt)));
   size.addEventListener("change", () => void setScreenSize(Number(size.value)));
-  island.append(font, size);
+  const fontWrap = iconSelect("font", font);
+  island.append(fontWrap, size);
   const show = () => {
     const p = currentPrefs();
     font.value = p.editor_font;
+    fontWrap.dataset.value = p.editor_font;
     size.value = String(p.editor_size);
   };
   onPanelsChanged(show);
   show();
 }
 const focusMode = createFocusMode(() => view?.focus());
-createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle(), () => void toggleTypewriter().then(centreTypingLine));
+createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle(), () => void toggleTypewriter().then(centreTypingLine), $("more-settings"));
+// The island's own buttons: Home, undo/redo, panel toggles, find, focus mode.
+{
+  const mod = /Mac/i.test(navigator.userAgent) ? "Cmd" : "Ctrl";
+  // Buttons that act on the script must not take focus from it.
+  const keepFocus = (b: HTMLButtonElement) => (b.addEventListener("mousedown", (e) => e.preventDefault()), b);
+  const homeBtn = iconButton("go-home", "home", "Home", "Save, close this project and return to the project library");
+  homeBtn.addEventListener("click", () => void goHome());
+  const undoBtn = keepFocus(iconButton("tool-undo", "undo", "Undo", `Undo (${mod}+Z)`));
+  undoBtn.addEventListener("click", () => {
+    if (!view) return;
+    undo(view.state, view.dispatch);
+    view.focus();
+  });
+  const redoBtn = keepFocus(iconButton("tool-redo", "redo", "Redo", `Redo (${mod}+Shift+Z)`));
+  redoBtn.addEventListener("click", () => {
+    if (!view) return;
+    redo(view.state, view.dispatch);
+    view.focus();
+  });
+  $("island-nav").append(homeBtn, undoBtn, redoBtn);
+  const navBtn = iconButton("toggle-nav", "scenes", "Scene list", "Show or hide the scene list");
+  navBtn.addEventListener("click", () => void togglePanel("nav"));
+  const boardBtn = iconButton("toggle-board", "board", "Board", "Show or hide the board");
+  boardBtn.addEventListener("click", () => void togglePanel("board"));
+  const findBtn = iconButton("tool-find", "find", "Find and replace", `Find and replace (${mod}+F)`);
+  findBtn.addEventListener("click", () => {
+    if (lastOpen) findBar.open();
+  });
+  const focusBtn = iconButton("tool-focus", "focus", "Focus mode", `Focus mode: only the script, full screen (${mod}+Shift+F)`);
+  focusBtn.addEventListener("click", () => void focusMode.toggle());
+  $("island-panels").append(navBtn, boardBtn, findBtn, focusBtn);
+  ($("view-menu-btn") as HTMLButtonElement).append(icon("more"));
+  const showPressed = () => {
+    navBtn.setAttribute("aria-pressed", String(currentPrefs().panels.nav));
+    boardBtn.setAttribute("aria-pressed", String(currentPrefs().panels.board));
+  };
+  onPanelsChanged(showPressed);
+  showPressed();
+}
 // Escape leaves focus mode wherever focus is (the editor's own Escape key
 // handles it first and marks the event handled).
 window.addEventListener("keydown", (e) => {
@@ -583,7 +625,6 @@ const home = createHome($("home"), {
   createProject: (title) => openWith("create_project", { title }),
 });
 
-$("go-home").addEventListener("click", () => void goHome());
 $("profile").addEventListener("change", async (e) => {
   const sel = e.target as HTMLSelectElement;
   try {

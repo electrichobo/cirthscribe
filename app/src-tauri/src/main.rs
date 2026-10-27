@@ -1113,15 +1113,23 @@ async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tau
 }
 
 /// Focus mode's window side: full screen without the menu bar (Windows and
-/// Linux keep the menu bar in full screen; macOS hides it by itself). On,
+/// Linux keep the menu bar in full screen, so it is hidden here). On,
 /// returns whether this call made the window full screen; off, leaves full
 /// screen only if `restore` says focus mode made it so.
+///
+/// macOS uses "simple" full screen (no new Space, no animation). Native full
+/// screen's exit animation left the window without keyboard input until it
+/// was clicked (GROGU, 2026-10-27, 3 of 3 runs; asking for focus again did
+/// not help). If the window is already in native full screen, it is left so.
 #[tauri::command]
 fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result<bool, String> {
     let e = |e: tauri::Error| e.to_string();
     if on {
         let made = !window.is_fullscreen().map_err(e)?;
         if made {
+            #[cfg(target_os = "macos")]
+            window.set_simple_fullscreen(true).map_err(e)?;
+            #[cfg(not(target_os = "macos"))]
             window.set_fullscreen(true).map_err(e)?;
         }
         #[cfg(not(target_os = "macos"))]
@@ -1131,12 +1139,11 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
         #[cfg(not(target_os = "macos"))]
         window.show_menu().map_err(e)?;
         if restore {
+            #[cfg(target_os = "macos")]
+            window.set_simple_fullscreen(false).map_err(e)?;
+            #[cfg(not(target_os = "macos"))]
             window.set_fullscreen(false).map_err(e)?;
         }
-        // macOS (GROGU, 2026-10-27): right after leaving full screen,
-        // Cmd+Shift shortcuts were dropped until something took focus.
-        // Asking for focus again is the guess; not yet verified on a Mac.
-        window.set_focus().map_err(e)?;
         Ok(false)
     }
 }

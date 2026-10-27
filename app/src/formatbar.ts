@@ -10,6 +10,7 @@ import type { Command, EditorState } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { HIGHLIGHTS, KINDS, KIND_LABEL, TEXT_COLORS, schema, type Kind } from "./schema";
 import { setKind } from "./keys";
+import { iconSelect } from "./icons";
 
 function markActive(state: EditorState, type: MarkType): boolean {
   const { from, to, empty, $from } = state.selection;
@@ -88,14 +89,16 @@ export function createFormatBar(root: HTMLElement, getView: () => EditorView | u
     sel.className = `fmt-${type.name}`;
     sel.setAttribute("aria-label", `${label} (on screen only, never printed)`);
     sel.title = `${label}: your own markup, shown on screen only. It is never printed or exported.`;
-    sel.append(new Option(`${label}: none`, ""));
+    sel.append(new Option("None", ""));
     for (const v of values) sel.append(new Option(cap(v), v));
     sel.addEventListener("change", () => apply(type, sel.value || null));
     return sel;
   };
   const color = valued("fmt-color", "Text colour", schema.marks.color, TEXT_COLORS);
   const highlight = valued("fmt-highlight", "Highlight", schema.marks.highlight, HIGHLIGHTS);
-  root.append(kind, ...buttons.map((x) => x.b), color, highlight);
+  const colorWrap = iconSelect("colour", color);
+  const highlightWrap = iconSelect("highlight", highlight);
+  root.append(kind, ...buttons.map((x) => x.b), colorWrap, highlightWrap);
 
   function apply(type: MarkType, value: string | null) {
     const v = getView();
@@ -114,8 +117,8 @@ export function createFormatBar(root: HTMLElement, getView: () => EditorView | u
     }
     color.value = markValue(state, schema.marks.color);
     highlight.value = markValue(state, schema.marks.highlight);
-    color.dataset.value = color.value;
-    highlight.dataset.value = highlight.value;
+    colorWrap.dataset.value = color.value;
+    highlightWrap.dataset.value = highlight.value;
   }
 
   return { update, apply };

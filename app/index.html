@@ -9,15 +9,15 @@
     <main id="home" aria-label="Home"></main>
     <main id="freewrite" aria-label="Free Writing"></main>
     <header class="toolbar" role="toolbar" aria-label="Script tools">
-      <div class="island" role="group" aria-label="Project">
-        <button id="go-home" type="button" title="Save, close this project and return to the project library">⌂ Home</button>
-        <strong id="project-title"></strong>
-        <button id="go-free" type="button" title="Free Writing (your project stays open)">Free Writing</button>
-        <button id="save" type="button" title="Save (Ctrl/Cmd+S). Save As and Export are in the File menu.">Save</button>
+      <!-- One island centred over the script. Icon buttons are filled in by
+           main.ts; rarely used settings live in the More (⋮) popover. -->
+      <div class="island" id="island">
+        <span class="island-group" id="island-nav" role="group" aria-label="Project and history"></span>
+        <span class="island-group" id="format-island" role="group" aria-label="Format"></span>
+        <span class="island-group" id="island-panels" role="group" aria-label="Panels and tools"></span>
+        <button id="view-menu-btn" type="button" class="tool" title="More: view modes, panels, page size, spelling, saving" aria-label="More options"></button>
       </div>
-      <div class="island" id="format-island" role="group" aria-label="Format"></div>
-      <div class="island" role="group" aria-label="View">
-        <button id="view-menu-btn" type="button" title="Focus mode and which panels are shown">View ▾</button>
+      <div id="more-settings" class="more-settings" role="group" aria-label="Page, spelling and file">
         <label>Page view
           <select id="view-mode" title="Continuous text, or page gaps from the authoritative page map">
             <option value="continuous">Continuous</option>
@@ -25,8 +25,6 @@
           </select>
         </label>
         <label>Zoom <input id="zoom" type="range" min="60" max="160" value="100" step="10" aria-label="Editor zoom" /></label>
-      </div>
-      <div class="island" role="group" aria-label="Document">
         <label>Page size
           <select id="profile" title="Stored with this document; pagination, PDF and text export use it"><option value="letter">US Letter</option><option value="a4">A4</option></select>
         </label>
@@ -37,10 +35,10 @@
             <option value="off">Off</option>
           </select>
         </label>
-      </div>
-      <div class="island island-status" role="group" aria-label="Save status">
-        <span id="status" aria-live="off"></span>
-        <span id="file-status" aria-live="off"></span>
+        <div class="more-actions">
+          <button id="save" type="button" title="Save (Ctrl/Cmd+S). Save As and Export are in the File menu.">Save</button>
+          <button id="go-free" type="button" title="Free Writing (your project stays open)">Free Writing</button>
+        </div>
       </div>
     </header>
     <main class="panes">
@@ -68,7 +66,12 @@
         <div id="board-body"></div>
       </aside>
     </main>
-    <footer id="info" aria-label="Counts and pages"></footer>
+    <footer aria-label="Status bar">
+      <strong id="project-title"></strong>
+      <span id="status" aria-live="off"></span>
+      <span id="file-status" aria-live="off"></span>
+      <span id="info"></span>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

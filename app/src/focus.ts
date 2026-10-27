@@ -1,9 +1,9 @@
 // Focus mode: full screen with only the script page. Every other panel is
 // hidden (body[data-focus]); Escape, the View menu or Ctrl/Cmd+Shift+F
-// leaves. The window goes full screen only if it was not already, the menu
-// bar is hidden on Windows and Linux (Rust, focus_window), and leaving full
-// screen from the OS (macOS green button) ends focus mode too. Session-only:
-// never stored.
+// leaves. The window goes full screen only if it was not already (macOS uses
+// simple full screen, no new Space), the menu bar is hidden on Windows and
+// Linux (Rust, focus_window), and leaving full screen from the OS ends focus
+// mode too. Session-only: never stored.
 
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -40,19 +40,6 @@ export function createFocusMode(focusEditor: () => void) {
     await invoke("focus_window", { on: false, restore }).catch(() => undefined);
     focusEditor();
     announce("Focus mode off");
-    // macOS: leaving full screen animates for a moment, and keyboard focus did
-    // not come back to the page (Cmd+Shift shortcuts were dropped). Ask again
-    // once it has settled. A guess at the cause, not yet verified on a Mac.
-    const wasFull = reachedFullscreen;
-    reachedFullscreen = false;
-    if (wasFull)
-      setTimeout(() => {
-        // Only if still in the script and nothing else took focus meanwhile.
-        if (on || document.body.dataset.view !== "editor") return;
-        const a = document.activeElement;
-        if (a && a !== document.body && !a.closest(".ProseMirror")) return;
-        void invoke("focus_window", { on: false, restore: false }).then(focusEditor).catch(() => undefined);
-      }, 800);
   }
 
   // Leaving full screen from outside the app ends focus mode as well.
