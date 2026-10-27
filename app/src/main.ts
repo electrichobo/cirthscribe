@@ -30,7 +30,7 @@ import { createLatency } from "./latency";
 import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
-import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
+import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
   name: string;
@@ -535,6 +535,30 @@ $("go-free").addEventListener("click", () => void openFreeWriting());
 
 const about = createAbout();
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
+// Screen font and size: on screen only (pages and exports keep Courier Prime 12 pt).
+{
+  const island = $("format-island");
+  const font = document.createElement("select");
+  font.id = "screen-font";
+  font.setAttribute("aria-label", "Screen font");
+  font.title = "Font of the script on screen only. Pages, PDF and exports always use Courier Prime 12 pt; Pages view shows that too.";
+  for (const [k, f] of Object.entries(SCREEN_FONTS)) font.append(new Option(f.label, k));
+  font.addEventListener("change", () => void setScreenFont(font.value as ScreenFont));
+  const size = document.createElement("select");
+  size.id = "screen-size";
+  size.setAttribute("aria-label", "Screen text size");
+  size.title = "Size of the script text on screen only";
+  for (let pt = 10; pt <= 20; pt++) size.append(new Option(`${pt} pt`, String(pt)));
+  size.addEventListener("change", () => void setScreenSize(Number(size.value)));
+  island.append(font, size);
+  const show = () => {
+    const p = currentPrefs();
+    font.value = p.editor_font;
+    size.value = String(p.editor_size);
+  };
+  onPanelsChanged(show);
+  show();
+}
 const focusMode = createFocusMode(() => view?.focus());
 createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle(), () => void toggleTypewriter().then(centreTypingLine));
 // Escape leaves focus mode wherever focus is (the editor's own Escape key
@@ -766,6 +790,21 @@ async function runMenu(id: string): Promise<void> {
       break;
     case "focus_mode":
       if (lastOpen) await focusMode.toggle();
+      break;
+    case "font_courier-prime":
+    case "font_mono":
+    case "font_serif":
+    case "font_sans":
+      await setScreenFont(id.slice(5) as ScreenFont);
+      break;
+    case "font_larger":
+      await stepScreenSize(1);
+      break;
+    case "font_smaller":
+      await stepScreenSize(-1);
+      break;
+    case "font_reset":
+      await stepScreenSize(0);
       break;
     case "view_typewriter":
       await toggleTypewriter();

@@ -49,9 +49,20 @@ export interface UiPrefs {
   panels: Record<Panel, boolean>;
   /** Typewriter mode: the typing line stays centred (view only). */
   typewriter: boolean;
+  /** Script font and size on screen only; pages and exports keep Courier Prime 12 pt. */
+  editor_font: ScreenFont;
+  editor_size: number;
 }
 
-let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true }, typewriter: false };
+export type ScreenFont = "courier-prime" | "mono" | "serif" | "sans";
+export const SCREEN_FONTS: Record<ScreenFont, { label: string; stack: string }> = {
+  "courier-prime": { label: "Courier Prime (standard)", stack: '"Courier Prime", monospace' },
+  mono: { label: "System monospace", stack: 'ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace' },
+  serif: { label: "Serif", stack: 'Georgia, "Times New Roman", "DejaVu Serif", serif' },
+  sans: { label: "Sans serif", stack: 'system-ui, "Segoe UI", Helvetica, Arial, "DejaVu Sans", sans-serif' },
+};
+
+let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true }, typewriter: false, editor_font: "courier-prime", editor_size: 12 };
 const panelListeners: (() => void)[] = [];
 
 function applyPrefs() {
@@ -59,6 +70,9 @@ function applyPrefs() {
   else delete document.documentElement.dataset.contrast;
   for (const [k, on] of Object.entries(prefs.panels)) document.body.toggleAttribute(`data-hide-${k}`, !on);
   document.body.toggleAttribute("data-typewriter", prefs.typewriter);
+  const root = document.documentElement.style;
+  root.setProperty("--script-font", (SCREEN_FONTS[prefs.editor_font] ?? SCREEN_FONTS["courier-prime"]).stack);
+  root.setProperty("--script-size", `${prefs.editor_size}pt`);
   panelListeners.forEach((f) => f());
 }
 
@@ -66,6 +80,20 @@ function applyPrefs() {
 export function onPanelsChanged(f: () => void) {
   panelListeners.push(f);
 }
+
+export async function setScreenFont(font: ScreenFont) {
+  const next = await setPrefs({ editor_font: font });
+  announce(`Screen font: ${SCREEN_FONTS[next.editor_font].label}. Pages and exports are unchanged.`);
+}
+
+/** Screen text size in points (10 to 20, screen only); a function of the current size, or a number. */
+export async function setScreenSize(pt: number | ((cur: number) => number)) {
+  const next = await setPrefs((cur) => ({ editor_size: Math.min(20, Math.max(10, typeof pt === "function" ? pt(cur.editor_size) : pt)) }));
+  announce(`Screen text size ${next.editor_size} points`);
+}
+
+/** +1 / -1 point, or 0 for the standard 12 pt. */
+export const stepScreenSize = (dir: 1 | -1 | 0) => setScreenSize((cur) => (dir === 0 ? 12 : cur + dir));
 
 export async function toggleTypewriter() {
   const next = await setPrefs((cur) => ({ typewriter: !cur.typewriter }));

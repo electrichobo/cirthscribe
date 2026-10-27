@@ -1026,6 +1026,23 @@ struct UiPrefs {
     /// Typewriter mode: the typing line stays centred (view only).
     #[serde(default)]
     typewriter: bool,
+    /// Font of the script on screen only (owner decision 2026-10-26: pages and
+    /// exports always use Courier Prime 12 pt). One of SCREEN_FONTS.
+    #[serde(default = "default_editor_font")]
+    editor_font: String,
+    /// Size of the script text on screen only, in points: 10 to 20.
+    #[serde(default = "default_editor_size")]
+    editor_size: f64,
+}
+
+const SCREEN_FONTS: [&str; 4] = ["courier-prime", "mono", "serif", "sans"];
+
+fn default_editor_font() -> String {
+    "courier-prime".into()
+}
+
+fn default_editor_size() -> f64 {
+    12.0
 }
 
 /// Panels of the script view the writer can hide (View menu).
@@ -1046,7 +1063,7 @@ impl Default for Panels {
 
 impl Default for UiPrefs {
     fn default() -> Self {
-        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false }
+        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false, editor_font: default_editor_font(), editor_size: default_editor_size() }
     }
 }
 
@@ -1055,7 +1072,11 @@ impl Default for UiPrefs {
 fn sync_view_checks(app: &tauri::AppHandle, prefs: &UiPrefs) {
     let p = &prefs.panels;
     let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status), ("view_typewriter", prefs.typewriter)];
-    set_menu_checks(app.clone(), checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect());
+    let mut map: std::collections::HashMap<String, bool> = checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
+    for f in SCREEN_FONTS {
+        map.insert(format!("font_{f}"), prefs.editor_font == f);
+    }
+    set_menu_checks(app.clone(), map);
 }
 
 fn prefs_path(app: &App) -> PathBuf {
@@ -1076,7 +1097,12 @@ async fn ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tauri::
 
 #[tauri::command]
 async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tauri::WebviewWindow, prefs: UiPrefs) -> Result<UiPrefs, String> {
-    let prefs = UiPrefs { scale: (prefs.scale * 10.0).round().clamp(8.0, 20.0) / 10.0, contrast: if prefs.contrast == "high" { "high".into() } else { "system".into() }, panels: prefs.panels, typewriter: prefs.typewriter };
+    let prefs = UiPrefs { scale: (prefs.scale * 10.0).round().clamp(8.0, 20.0) / 10.0, contrast: if prefs.contrast == "high" { "high".into() } else { "system".into() },
+        panels: prefs.panels,
+        typewriter: prefs.typewriter,
+        editor_font: if SCREEN_FONTS.contains(&prefs.editor_font.as_str()) { prefs.editor_font } else { default_editor_font() },
+        editor_size: if prefs.editor_size.is_finite() { prefs.editor_size.round().clamp(10.0, 20.0) } else { default_editor_size() },
+    };
     let path = prefs_path(&app);
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, serde_json::to_string_pretty(&prefs).map_err(|e| e.to_string())?).map_err(io_err)?;
@@ -1215,9 +1241,21 @@ fn edit_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
 /// Display: panels, focus mode, UI size and contrast. Panel check marks are
 /// set from preferences at startup.
 fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    // Screen only: pages and exports always use Courier Prime 12 pt.
+    let font = tauri::menu::SubmenuBuilder::new(app, "Screen Font")
+        .item(&check_item(app, "font_courier-prime", "Courier Prime (standard)", true)?)
+        .item(&check_item(app, "font_mono", "System Monospace", false)?)
+        .item(&check_item(app, "font_serif", "Serif", false)?)
+        .item(&check_item(app, "font_sans", "Sans Serif", false)?)
+        .separator()
+        .text("font_larger", "Larger Text")
+        .text("font_smaller", "Smaller Text")
+        .text("font_reset", "Standard Size (12 pt)")
+        .build()?;
     tauri::menu::SubmenuBuilder::new(app, "View")
         .text("focus_mode", keyed("Focus Mode", "Shift+F"))
         .item(&check_item(app, "view_typewriter", &keyed("Typewriter Mode", "Shift+T"), false)?)
+        .item(&font)
         .separator()
         .item(&check_item(app, "view_nav", "Scene List", true)?)
         .item(&check_item(app, "view_board", "Board", true)?)

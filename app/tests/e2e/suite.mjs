@@ -1853,6 +1853,43 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(saved.typewriter === false, `stored ${JSON.stringify(saved)}`);
   });
 
+  await test("Screen font and size change only the screen: text stays inside the page, Pages view and the page map keep the standard font", async () => {
+    await openFixture("page-boundaries");
+    const pages0 = await app.evaluate("window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => p.map.pages.length)");
+    const look = () => app.evaluate(`(() => { const pm = getComputedStyle(document.querySelector('.ProseMirror')); const page = document.getElementById('editor').getBoundingClientRect();
+      const over = [...document.querySelectorAll('.ProseMirror p')].filter(p => p.getBoundingClientRect().right > page.right + 1).length;
+      return { family: pm.fontFamily, size: pm.fontSize, over }; })()`);
+    let l = await look();
+    assert(l.family.includes("Courier Prime") && l.size === "16px" && l.over === 0, `standard at first: ${JSON.stringify(l)}`);
+    // Toolbar: serif, 18 pt.
+    await app.evaluate("(() => { const s = document.getElementById('screen-font'); s.value = 'serif'; s.dispatchEvent(new Event('change')); return true; })()");
+    await app.evaluate("(() => { const s = document.getElementById('screen-size'); s.value = '18'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "__cirth.prefs().editor_font === 'serif' && __cirth.prefs().editor_size === 18", "serif 18 pt stored");
+    l = await look();
+    assert(/Georgia|serif/.test(l.family) && l.size === "24px", `serif 18 pt on screen: ${JSON.stringify(l)}`);
+    assert(l.over === 0, `${l.over} paragraphs run past the page edge at 18 pt`);
+    await screenshot(app, "screen-font-serif-18");
+    await waitAnnounced("Screen text size 18 points", "size announced");
+    // The page map is the authority and does not change.
+    assert((await app.evaluate("window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => p.map.pages.length)")) === pages0, "page count unchanged");
+    // Pages view shows the real pages: standard font and size.
+    await app.evaluate("(() => { const s = document.getElementById('view-mode'); s.value = 'pages'; s.dispatchEvent(new Event('change')); return true; })()");
+    l = await look();
+    assert(l.family.includes("Courier Prime") && l.size === "16px", `Pages view uses the standard font: ${JSON.stringify(l)}`);
+    await app.evaluate("(() => { const s = document.getElementById('view-mode'); s.value = 'continuous'; s.dispatchEvent(new Event('change')); return true; })()");
+    // View menu: font items with check marks, larger and standard size.
+    await app.evaluate("__cirth.menu('font_mono')");
+    await app.evaluate("__cirth.menu('font_larger')");
+    await waitFor(app, "__cirth.prefs().editor_font === 'mono' && __cirth.prefs().editor_size === 19", "View > Screen Font from the menu");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'font_mono').checked && !m.find(i => i.id === 'font_serif').checked)", "check mark on the chosen font");
+    assert((await app.evaluate("[document.getElementById('screen-font').value, document.getElementById('screen-size').value]")).join() === "mono,19", "toolbar follows the menu");
+    const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
+    assert(saved.editor_font === "mono" && saved.editor_size === 19, `stored ${JSON.stringify(saved)}`);
+    await app.evaluate("__cirth.menu('font_courier-prime')");
+    await app.evaluate("__cirth.menu('font_reset')");
+    await waitFor(app, "__cirth.prefs().editor_font === 'courier-prime' && __cirth.prefs().editor_size === 12", "back to standard");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

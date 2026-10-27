@@ -74,27 +74,27 @@ footer { padding: 4px 12px; border-top: 1px solid var(--line); background: var(-
    These offsets mirror the layout profile for a close visual match; the
    authoritative page map comes from Rust, not from this CSS. */
 #editor { width: 8.5in; margin: 0 auto; background: var(--panel); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
-.ProseMirror { font-family: "Courier Prime", monospace; font-size: 12pt; line-height: 12pt; padding: 1in 0; outline: none; white-space: pre-wrap; word-wrap: break-word; }
-.ProseMirror p { margin: 12pt 0 0; }
+.ProseMirror { font-family: var(--script-font, "Courier Prime", monospace); font-size: var(--script-size, 12pt); line-height: var(--script-size, 12pt); padding: 1in 0; outline: none; white-space: pre-wrap; word-wrap: break-word; }
+.ProseMirror p { margin: var(--script-size, 12pt) 0 0; }
 .ProseMirror p:first-child { margin-top: 0; }
-.b-heading, .b-action, .b-shot, .b-section { margin-left: 1.5in !important; width: 60ch; }
+.b-heading, .b-action, .b-shot, .b-section { margin-left: 1.5in !important; width: 6in; }
 .b-heading, .b-shot, .b-section, .b-character, .b-transition { text-transform: uppercase; }
-.b-character { margin-left: 3.7in !important; width: 38ch; }
-.b-parenthetical { margin-left: 3.1in !important; width: 25ch; margin-top: 0 !important; }
-.b-dialogue, .b-lyric { margin-left: 2.5in !important; width: 35ch; margin-top: 0 !important; }
+.b-character { margin-left: 3.7in !important; width: 3.8in; }
+.b-parenthetical { margin-left: 3.1in !important; width: 2.5in; margin-top: 0 !important; }
+.b-dialogue, .b-lyric { margin-left: 2.5in !important; width: 3.5in; margin-top: 0 !important; }
 .b-lyric { font-style: italic; }
-.b-transition { margin-left: 5.5in !important; width: 20ch; text-align: right; }
+.b-transition { margin-left: 5.5in !important; width: 2in; text-align: right; }
 /* Dual dialogue: left speech floats, right speech sits beside it at the
    layout profile's dual columns (cirth_core::layout::Profile::dual_*). */
 .ProseMirror p.dual-left { float: left; clear: left; }
-.ProseMirror p.dual-left.b-character { margin-left: 2.2in !important; width: 25ch; }
-.ProseMirror p.dual-left.b-parenthetical { margin-left: 1.8in !important; width: 20ch; }
-.ProseMirror p.dual-left.b-dialogue, .ProseMirror p.dual-left.b-lyric { margin-left: 1.5in !important; width: 28ch; }
+.ProseMirror p.dual-left.b-character { margin-left: 2.2in !important; width: 2.5in; }
+.ProseMirror p.dual-left.b-parenthetical { margin-left: 1.8in !important; width: 2in; }
+.ProseMirror p.dual-left.b-dialogue, .ProseMirror p.dual-left.b-lyric { margin-left: 1.5in !important; width: 2.8in; }
 .ProseMirror p.dual-left + p.dual-left { margin-top: 0; }
 .ProseMirror p.dual-left.b-character + p.dual-left, .ProseMirror p.dual-left.b-dialogue + p.dual-left.b-dialogue { margin-top: 0 !important; }
-.ProseMirror p.dual-right.b-character { margin-left: 5.2in !important; width: 23ch; }
-.ProseMirror p.dual-right.b-parenthetical { margin-left: 4.8in !important; width: 20ch; }
-.ProseMirror p.dual-right.b-dialogue, .ProseMirror p.dual-right.b-lyric { margin-left: 4.5in !important; width: 28ch; }
+.ProseMirror p.dual-right.b-character { margin-left: 5.2in !important; width: 2.3in; }
+.ProseMirror p.dual-right.b-parenthetical { margin-left: 4.8in !important; width: 2in; }
+.ProseMirror p.dual-right.b-dialogue, .ProseMirror p.dual-right.b-lyric { margin-left: 4.5in !important; width: 2.8in; }
 /* Floats do not collapse margins; normal blocks do. Use padding for the
    blank line above each cue of a pair and above the block after it, so both
    columns start on the same line in every view. */
@@ -108,6 +108,10 @@ footer { padding: 4px 12px; border-top: 1px solid var(--line); background: var(-
 .page-mark { margin: 12pt 0 0 0; border-top: 1px dashed var(--accent); color: var(--accent); font: 10px system-ui, sans-serif; text-align: right; padding-right: .5in; user-select: none; }
 .page-mark.inline { border: 0; border-left: 2px solid var(--accent); padding: 0 3px; margin: 0 2px; font-size: 9px; vertical-align: super; }
 .page-mark.stale { opacity: .45; }
+/* Screen font and size (View > Screen Font, toolbar) change only the screen.
+   Column widths are in inches, so larger text wraps inside the same columns.
+   Page view always shows the standard font, so its breaks match the pages. */
+body[data-pageview="pages"] .ProseMirror { --script-font: "Courier Prime", monospace; --script-size: 12pt; }
 /* Page view: each page boundary from the Rust page map becomes a gap
    between sheets. Only the display changes; pagination does not. */
 body[data-pageview="pages"] .editor-wrap { background: color-mix(in srgb, var(--bg) 70%, #000); }

@@ -69,7 +69,12 @@ Jared raised these after the M1 feature work, which so far covered only the scri
 5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A). **B, I and U built 2026-10-26:**
    - Block-type dropdown and B, I, U buttons show the state at the caret (pressed or not).
    - Using them keeps the selection and focus in the script.
-   - Colour, highlight and screen font/size are still to do.
+   - **Screen font and size built 2026-10-27** (decision A1):
+     - Fonts: Courier Prime, system monospace, serif or sans serif; size 10–20 pt.
+     - Set from the toolbar's Format island or View > Screen Font, and stored per user.
+     - Column widths are now in inches, so larger text wraps inside the page.
+     - Pages view always shows Courier Prime 12 pt, so its breaks match the printed pages; the page map and exports never change.
+   - Colour and highlight are still to do (decision B).
 6. **Add comment button:** see decision C.
 7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording. **Built 2026-10-26:**
    - Schema v3 adds `logline` to beats. Older files are upgraded on open with the original kept; tested against real v2 files frozen before the change (`tests/data/schema-v2-*.cirth`).
