@@ -43,7 +43,7 @@ fn crash_point(name: &'static str) {
 pub enum StoreError {
     /// Another connection or process holds the project.
     Locked,
-    /// Written by a newer CirthScribe; refused rather than guessed at.
+    /// Written by a newer Kolbítar; refused rather than guessed at.
     FutureSchema(i64),
     Stale { base: u64, current: u64 },
     Invalid(String),
@@ -54,7 +54,7 @@ pub enum StoreError {
 impl std::fmt::Display for StoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StoreError::Locked => write!(f, "project is open in another CirthScribe window or process"),
+            StoreError::Locked => write!(f, "project is open in another Kolbítar window or process"),
             StoreError::FutureSchema(v) => write!(f, "project schema {v} is newer than this build supports ({SCHEMA_VERSION})"),
             StoreError::Stale { base, current } => write!(f, "stale change: based on v{base}, project is at v{current}"),
             StoreError::Invalid(m) => write!(f, "invalid change: {m}"),

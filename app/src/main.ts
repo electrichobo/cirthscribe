@@ -363,9 +363,9 @@ function afterWrite(r: Saved) {
   }
   showFileStatus();
   if (r.conflict) {
-    showBanner(`This project's file was changed outside CirthScribe since you opened it. To keep both, your version was saved as ${r.conflict}, and the other version is unchanged at ${r.other}. You are now editing ${r.conflict}.`);
+    showBanner(`This project's file was changed outside Kolbítar since you opened it. To keep both, your version was saved as ${r.conflict}, and the other version is unchanged at ${r.other}. You are now editing ${r.conflict}.`);
   } else if (r.recreated) {
-    showBanner(`The project file was missing (moved or deleted outside CirthScribe), so it was written again at ${r.path}.`);
+    showBanner(`The project file was missing (moved or deleted outside Kolbítar), so it was written again at ${r.path}.`);
   }
 }
 
@@ -388,7 +388,7 @@ async function saveAs(path?: string): Promise<boolean> {
   if (!lastOpen) return false;
   const target =
     path ??
-    (await saveDialog({ defaultPath: lastOpen.package_path, filters: [{ name: "CirthScribe project", extensions: ["cirth"] }] }));
+    (await saveDialog({ defaultPath: lastOpen.package_path, filters: [{ name: "Kolbítar project", extensions: ["cirth"] }] }));
   if (!target) return false;
   while (saving) await saving;
   saving = (async () => {
@@ -418,8 +418,8 @@ async function checkOutside(): Promise<{ changed: boolean; missing: boolean; pat
       outsideWarned = true;
       showBanner(
         c.missing
-          ? `The project file is no longer at ${c.path} (moved or deleted outside CirthScribe). Your edits are safe; the next save writes it again.`
-          : `The project file ${c.path} was changed outside CirthScribe. It will not be overwritten: your next save goes to a separate "(conflict …)" copy beside it.`,
+          ? `The project file is no longer at ${c.path} (moved or deleted outside Kolbítar). Your edits are safe; the next save writes it again.`
+          : `The project file ${c.path} was changed outside Kolbítar. It will not be overwritten: your next save goes to a separate "(conflict …)" copy beside it.`,
       );
     }
     return c;
@@ -675,7 +675,7 @@ async function saveNow() {
 
 /** Open a project file through the system dialog (from Home or the editor). */
 async function openViaDialog(): Promise<boolean> {
-  const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "CirthScribe project", extensions: ["cirth"] }] });
+  const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "Kolbítar project", extensions: ["cirth"] }] });
   return typeof path === "string" ? openWith("open_path", { path }) : false;
 }
 

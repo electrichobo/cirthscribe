@@ -1,4 +1,4 @@
-// Temporary toolbar icons, drawn for CirthScribe as simple strokes on a
+// Temporary toolbar icons, drawn for Kolbítar as simple strokes on a
 // 24 x 24 grid (docs/ART_ASSETS.md). One colour (currentColor), so they
 // follow light, dark and high-contrast themes. The owner's icon set will
 // replace these; names match ART_ASSETS.md where one exists.

@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! CirthScribe shell. The Rust side owns the canonical document (the working
+//! Kolbítar shell. The Rust side owns the canonical document (the working
 //! store); the web UI is an editing projection that submits versioned
 //! batches. Pagination and PDF are computed here from the canonical store,
 //! never from the WebView's DOM.
@@ -9,7 +9,7 @@
 //! library folder, or any folder via Open / Save As). Each open file has a
 //! working store in the app's data folder, keyed by the file's path, which
 //! is the crash-recovery journal. Writing the file is conflict-safe: if the
-//! file changed outside CirthScribe since we last read or wrote it, our
+//! file changed outside Kolbítar since we last read or wrote it, our
 //! version goes to a "(conflict ...)" copy beside it and the other version
 //! is left untouched.
 
@@ -451,7 +451,7 @@ struct Saved {
     /// Where the project now lives (changes after Save As or a conflict).
     path: String,
     name: String,
-    /// The file had changed outside CirthScribe: our version was written here
+    /// The file had changed outside Kolbítar: our version was written here
     /// instead, and the other version was left untouched at `other`.
     conflict: Option<String>,
     other: Option<String>,
@@ -559,7 +559,7 @@ struct OutsideChange {
     path: String,
 }
 
-/// Has the open project's file changed outside CirthScribe since we last
+/// Has the open project's file changed outside Kolbítar since we last
 /// read or wrote it? (The UI checks on focus and before autosave.)
 #[tauri::command]
 async fn check_outside_change(app: State<'_, App>) -> Result<OutsideChange, String> {
@@ -1352,7 +1352,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
     use tauri::menu::{MenuBuilder, SubmenuBuilder};
     let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…");
     #[cfg(not(target_os = "macos"))]
-    let help = help.separator().text("about", "About CirthScribe and Licences");
+    let help = help.separator().text("about", "About Kolbítar and Licences");
     let help = help.build()?;
     let (file, edit, view, format) = (file_menu(app)?, edit_menu(app)?, view_menu(app)?, format_menu(app)?);
     #[cfg(target_os = "macos")]
@@ -1360,9 +1360,9 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
         // Our own About screen (with the licences) instead of the bare native one.
         // Quit is our own item, not the predefined one: the predefined Quit
         // exits without running the close handler that saves the last edits.
-        let quit = tauri::menu::MenuItemBuilder::with_id("quit", "Quit CirthScribe").accelerator("Cmd+Q").build(app)?;
-        let app_menu = SubmenuBuilder::new(app, "CirthScribe")
-            .text("about", "About CirthScribe")
+        let quit = tauri::menu::MenuItemBuilder::with_id("quit", "Quit Kolbítar").accelerator("Cmd+Q").build(app)?;
+        let app_menu = SubmenuBuilder::new(app, "Kolbítar")
+            .text("about", "About Kolbítar")
             .separator()
             .services()
             .separator()
@@ -1514,7 +1514,7 @@ fn main() {
             fw_note_copied
         ])
         .build(tauri::generate_context!())
-        .expect("error while building CirthScribe")
+        .expect("error while building Kolbítar")
         .run(|handle, event| {
             // Safety net: the window's close handler saves first; if it could
             // not (e.g. the UI was unresponsive), save what the store holds.

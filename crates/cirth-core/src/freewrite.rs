@@ -24,7 +24,7 @@ impl From<rusqlite::Error> for FreeError {
     fn from(e: rusqlite::Error) -> Self {
         if let rusqlite::Error::SqliteFailure(f, _) = &e {
             if matches!(f.code, rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked) {
-                return FreeError("Free Writing is open in another CirthScribe window".into());
+                return FreeError("Free Writing is open in another Kolbítar window".into());
             }
         }
         FreeError(format!("database error: {e}"))
@@ -108,7 +108,7 @@ impl FreeStore {
         conn.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
         let v: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
         if v > SCHEMA_VERSION {
-            return Err(FreeError(format!("Free Writing data is from a newer CirthScribe (format {v})")));
+            return Err(FreeError(format!("Free Writing data is from a newer Kolbítar (format {v})")));
         }
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "FULL")?;

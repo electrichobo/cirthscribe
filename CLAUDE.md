@@ -1,6 +1,6 @@
-# CirthScribe: instructions for coding agents
+# Kolbítar: instructions for coding agents
 
-CirthScribe is a free, open-source, offline-first desktop writing and production application for Windows, macOS, and Linux. It combines screenplay editing, story planning, a shared project bible, and script-derived production tools. Working title only.
+Kolbítar is a free, open-source, offline-first desktop writing and production application for Windows, macOS, and Linux. It combines screenplay editing, story planning, a shared project bible, and script-derived production tools. The project file extension stays `.cirth`; internal crate names (cirth-core) and the app identifier keep the older working name.
 
 This repository currently contains a planning pack, not an implemented application. Never present a planned feature as working.
 

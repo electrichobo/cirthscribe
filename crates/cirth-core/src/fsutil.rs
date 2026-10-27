@@ -39,7 +39,7 @@ pub fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
 }
 
 /// What a file looked like when we last read or wrote it, to detect changes
-/// made outside CirthScribe (sync tools, other programs, a copy pasted over
+/// made outside Kolbítar (sync tools, other programs, a copy pasted over
 /// it). Size and modified time are a fast first check; the content hash
 /// decides, so a rewrite with identical bytes is not a change.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -4,7 +4,7 @@ The following defaults allow progress without pretending the owner has already s
 
 | Topic | Current position | When to settle |
 | --- | --- | --- |
-| Working title | CirthScribe | Revisit before public naming/branding |
+| Product name | **Kolbítar** (owner, 2026-10-27; trademark and copyright checked by the owner). Public-facing text uses it; the `.cirth` extension, crate names, the binary name and the app identifier keep the old working name, and the repository stays `electrichobo/cirthscribe` | Done |
 | Desktop stack | Rust + Tauri 2, accepted for M1 on Windows evidence (ADR 0001); macOS/Linux verification is an M1 gate | M0 ADR (done) |
 | Web UI/editor | ProseMirror, single undo stack, Rust-owned canonical document (ADR 0001) | M0 (done) |
 | Pagination authority | Rust fixed-pitch layout engine; WebView never measures pages; PDF draws the same page map (ADR 0001) | M0 (done); production rules M2 |

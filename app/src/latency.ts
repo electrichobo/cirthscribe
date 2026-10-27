@@ -32,7 +32,7 @@ export function createLatency(perf: PerfLog, openTimings: () => OpenTimings | un
     const verdict = s.n < ENOUGH ? `not enough key presses yet (${s.n} of ${ENOUGH})` : s.p95 < TARGET_P95_MS ? `within the M1 target (p95 < ${TARGET_P95_MS} ms)` : `OVER the M1 target (p95 < ${TARGET_P95_MS} ms)`;
     const o = openTimings();
     return [
-      `CirthScribe ${version} typing latency`,
+      `Kolbítar ${version} typing latency`,
       `Date: ${new Date().toISOString()}`,
       `System: ${navigator.userAgent}`,
       `Screen: ${screen.width}x${screen.height} at ${devicePixelRatio}x, window ${innerWidth}x${innerHeight}`,

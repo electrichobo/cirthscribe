@@ -1,16 +1,16 @@
-# CirthScribe
+# Kolbítar
 
 A free, open-source screenplay writing and story-production app for Windows, macOS and Linux. It works offline, needs no account, and has no subscription.
 
-Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)). "CirthScribe" is a working title.
+Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)).
 
 Free and open source under GPL-3.0 ([details](#license)).
 
-> **Early development.** CirthScribe is not ready to use yet: there is no download and no release. The features marked done below work in development builds and are covered by automated tests, but your scripts are not safe in it yet. Don't trust it with real work until a release says otherwise.
+> **Early development.** Kolbítar is not ready to use yet: there is no download and no release. The features marked done below work in development builds and are covered by automated tests, but your scripts are not safe in it yet. Don't trust it with real work until a release says otherwise.
 
 ## What it is
 
-CirthScribe is one app for the whole path from first idea to shooting script:
+Kolbítar is one app for the whole path from first idea to shooting script:
 
 - **Write.** A screenplay editor that formats as you type: scene headings, action, characters, dialogue and transitions, with industry-standard pages.
 - **Plan.** Outlines, index cards, a story timeline, and a "bible" of your characters, locations and world. These are all views of the same script, so they never drift out of sync.
@@ -167,21 +167,21 @@ Issues and suggestions are welcome. Contributions are accepted under the same li
 
 ### License
 
-CirthScribe is free and open-source software under the **GNU General Public License, version 3 only** ([LICENSE](LICENSE)), with one additional term under section 7(b) ([NOTICE](NOTICE)).
+Kolbítar is free and open-source software under the **GNU General Public License, version 3 only** ([LICENSE](LICENSE)), with one additional term under section 7(b) ([NOTICE](NOTICE)).
 
 In plain terms (the license text is what counts):
 
 - **Use it for free, for anything**, including professional and commercial writing. Your scripts are yours; the license covers the app, not what you write with it.
 - **Change it and share it.** Forks and modified versions are welcome.
-- **Keep it open.** Anyone who distributes CirthScribe or a modified version must give it out under the same license, with its full source code.
-- **Keep the credit.** Copies and modified versions must keep the attribution "Based on CirthScribe by Jared Hoy", in the NOTICE file and on any About or credits screen.
+- **Keep it open.** Anyone who distributes Kolbítar or a modified version must give it out under the same license, with its full source code.
+- **Keep the credit.** Copies and modified versions must keep the attribution "Based on Kolbítar by Jared Hoy", in the NOTICE file and on any About or credits screen.
 - **No warranty.** It is provided as is.
 
-The GPL does not forbid charging for copies; no open-source license can. But anyone who sells CirthScribe or a version of it must hand buyers the full source under the GPL, and buyers may then share it for free. CirthScribe itself will always be free.
+The GPL does not forbid charging for copies; no open-source license can. But anyone who sells Kolbítar or a version of it must hand buyers the full source under the GPL, and buyers may then share it for free. Kolbítar itself will always be free.
 
 ### Third-party components
 
-CirthScribe ships with these components under their own licenses:
+Kolbítar ships with these components under their own licenses:
 
 - **Courier Prime** font: SIL Open Font License 1.1 (`assets/fonts/courier-prime/OFL.txt`)
 - **SCOWL** English dictionaries: © Kevin Atkinson and others, under permissive notices (`assets/dictionaries/*/README_*.txt`)

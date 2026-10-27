@@ -1077,7 +1077,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const c = await app.evaluate("__cirth.checkOutside()");
     assert(c.changed, `outside change noticed: ${JSON.stringify(c)}`);
     let banner = await app.evaluate("document.getElementById('banner').textContent");
-    assert(/changed outside CirthScribe. It will not be overwritten/.test(banner), `early warning '${banner}'`);
+    assert(/changed outside Kolbítar. It will not be overwritten/.test(banner), `early warning '${banner}'`);
     await app.evaluate("(() => { document.getElementById('save').click(); return true; })()");
     await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.package_path.includes('(conflict ')", "conflict copy");
     const conflictPath = await app.evaluate("__cirth.lastOpen.package_path");
@@ -1264,7 +1264,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const pageHeight = () => app.evaluate("document.querySelector('#about-dialog .about-page').getBoundingClientRect().height");
     const t = await pageText();
     assert((await pageHeight()) > 150, `About tab visible: ${await pageHeight()} px`);
-    assert(t.includes("Based on CirthScribe by Jared Hoy"), "attribution");
+    assert(t.includes("Based on Kolbítar by Jared Hoy"), "attribution");
     assert(/GNU General Public License, version 3 only/.test(t) && /no warranty/i.test(t), "GPL notice and no warranty");
     assert(t.includes("ADDITIONAL TERMS UNDER SECTION 7(b)"), "NOTICE text with the 7(b) term");
     await clickHome(app, '[data-about-tab="gpl"]');
@@ -1559,7 +1559,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     }
     await screenshot(second, "second-writer");
     await second.close();
-    assert(/another CirthScribe window or process/.test(banner), `banner '${banner}'`);
+    assert(/another Kolbítar window or process/.test(banner), `banner '${banner}'`);
     assert(await storedMatchesEditor(), "first instance unaffected");
     return { banner };
   });
@@ -2043,7 +2043,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(r.includes("not enough key presses yet"), "says when there are too few samples");
     assert(/Last open: [\d.]+ ms for \d+ blocks/.test(r), "last open time shown");
     assert(r.includes(await app.evaluate("navigator.userAgent")), "system identified");
-    assert(/^CirthScribe \d+\.\d+\.\d+ typing latency/.test(r), `app version shown: ${r.split("\n")[0]}`);
+    assert(/^Kolbítar \d+\.\d+\.\d+ typing latency/.test(r), `app version shown: ${r.split("\n")[0]}`);
     await app.evaluate("(() => { document.getElementById('latency-reset').click(); return true; })()");
     r = await report();
     assert(r.includes("Key presses measured: 0"), "Start over clears the samples");

@@ -20,7 +20,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string,
 
 export function createAbout() {
   const dialog = el("dialog", { className: "about", id: "about-dialog" });
-  dialog.setAttribute("aria-label", "About CirthScribe and licences");
+  dialog.setAttribute("aria-label", "About Kolbítar and licences");
   document.body.append(dialog);
   let info: AboutInfo | null = null;
 
@@ -37,17 +37,17 @@ export function createAbout() {
     return el(
       "div",
       { className: "about-main" },
-      el("p", { className: "about-attribution" }, "Based on CirthScribe by Jared Hoy"),
+      el("p", { className: "about-attribution" }, "Based on Kolbítar by Jared Hoy"),
       el("p", {}, "Copyright © 2026 Jared Hoy (electrichobo)"),
       el("p", {}, "Source code: ", el("span", { className: "about-url" }, "https://github.com/electrichobo/cirthscribe")),
       el(
         "p",
         {},
-        "CirthScribe is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 only, with an additional attribution term under section 7(b). ",
+        "Kolbítar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 only, with an additional attribution term under section 7(b). ",
         el("strong", {}, "It comes with absolutely no warranty."),
         " See the GNU GPL v3 tab for details.",
       ),
-      el("p", {}, "CirthScribe works offline. It sends nothing about you or your writing anywhere."),
+      el("p", {}, "Kolbítar works offline. It sends nothing about you or your writing anywhere."),
       el("h3", {}, "Notice"),
       el("pre", { className: "about-text short", tabIndex: 0, ariaLabel: "Notice, full text" }, i.notice),
     );
@@ -66,7 +66,7 @@ export function createAbout() {
     const close = el("button", { type: "button", id: "about-close" }, "Close");
     close.addEventListener("click", () => dialog.close());
     dialog.replaceChildren(
-      el("h2", { id: "about-title" }, "CirthScribe ", el("span", { className: "about-version" }, `version ${info.version}`)),
+      el("h2", { id: "about-title" }, "Kolbítar ", el("span", { className: "about-version" }, `version ${info.version}`)),
       bar,
       el("div", { className: "about-page", role: "tabpanel" }, page(tab, info)),
       el("div", { className: "dialog-actions" }, close),
