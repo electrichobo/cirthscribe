@@ -53,7 +53,15 @@ Jared raised these after the M1 feature work, which so far covered only the scri
    - Hidden panels take no space.
    - Choices are stored in `preferences.json` and survive a hard kill.
    - The toolbar's page-layout dropdown is now labelled "Page view".
-3. **Everything in the menus:** File, Edit, View, Format, Help on every OS (the macOS app menu as well), covering save, export, Free Writing, Home, undo/redo, cut/copy/paste and formatting. The toolbar becomes an optional shortcut, never the only route.
+3. **Everything in the menus:** File, Edit, View, Format, Help on every OS (the macOS app menu as well), covering save, export, Free Writing, Home, undo/redo, cut/copy/paste and formatting. The toolbar becomes an optional shortcut, never the only route. **Built 2026-10-26:** the same menus on Windows, Linux and macOS (which also keeps its app menu).
+   - File: New Project, Open, Save, Save As, Export (PDF proof, Plain Text), Free Writing, Close Project, Quit (in the app menu on macOS).
+   - Edit: Undo, Redo, the OS's own Cut, Copy, Paste and Select All, Find and Replace, and Spelling (Suggestions; US, UK or Off, with a check mark).
+   - View: as built in item 2.
+   - Format: Bold, Italic, Underline; Block Type (all nine, in Ctrl/Cmd+1–9 order); Dual Dialogue; Page Break Before; Page Size (Letter or A4, with a check mark).
+   - Help: Typing Latency, plus About on Windows and Linux.
+   - Labels show the keyboard shortcut.
+   - Check marks follow the open document and the toolbar.
+   - The toolbar's buttons stay until the island toolbar (item 4) replaces them.
 4. **Island toolbar:** compact floating groups rather than a full-width bar. Story Architect is the reference for layout ideas only; no copying of its look or assets.
 5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A).
 6. **Add comment button:** see decision C.

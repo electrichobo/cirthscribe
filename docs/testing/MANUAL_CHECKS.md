@@ -41,7 +41,7 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 
 | # | Steps | Expected |
 | - | - | - |
-| N1 | Open the File menu | New Project…, Open…, Save, Save As…, Export PDF (proof), Export Plain Text…, Close Project, Quit. Each does what its button does. |
+| N1 | Open the File menu | New Project…, Open…, Save, Save As…, Export ▸ (PDF (proof), Plain Text…), Free Writing, Close Project, and Quit (Windows and Linux). Each does what its button does. |
 | N2 | File > Quit right after typing | The last words are in the file on reopen (same path as closing the window). |
 | N3 | macOS: Edit menu, then Cmd+C / Cmd+V / Cmd+X / Cmd+A in the script | Copy, paste, cut and select-all work; Cmd+Z / Cmd+Shift+Z undo and redo editor changes (not a WebView-level undo). |
 | N4 | macOS: CirthScribe app menu | About, Services, Hide, Hide Others, Show All are present. |
@@ -49,6 +49,7 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 | N7 | Help > About CirthScribe and Licences (Windows/Linux); CirthScribe > About CirthScribe (macOS) | The About screen opens with the attribution, GPL tab and third-party licences tab. |
 | N8 | Export Plain Text, open the file in Notepad / TextEdit / gedit | Indents line up in a fixed-pitch font; pages are separated by a form feed (some editors show it as a symbol or nothing). |
 | N10 | View menu: untick Scene List, Board, Toolbar, Status Bar one at a time; then View > Focus Mode; Escape | Each panel disappears and the script widens; the menu's check marks match what is shown after using the toolbar's View dropdown too. Focus mode is full screen with only the page (no menu bar on Windows and Linux; macOS hides its menu bar itself); Escape restores everything. |
+| N11 | Open each menu: File, Edit, View, Format, Help (and the CirthScribe menu on macOS). Use Edit > Cut, Copy, Paste and Select All in the script; Format > Bold on a selection; Format > Page Size > A4, then the toolbar's Page size back to US Letter | Every item does what its label says. The OS's Cut, Copy and Paste act on the script, which needs checking on each OS, especially Windows, where they are sent to the web view as keys. The Page Size check mark moves to follow the toolbar. |
 | N9 | macOS: type a word, then press Cmd+Q at once; reopen | The app quits (CirthScribe > Quit CirthScribe), and the word is in the file. File has no Quit on macOS. (Added after the 2026-10-26 pass.) |
 | N6 | Free Writing, Flow mode on: type with a real IME (Japanese, Pinyin), then try the trackpad/mouse to select and drag text | Composed text lands at the end; nothing already written is selected, moved or deleted. Esc turns editing back on. |
 

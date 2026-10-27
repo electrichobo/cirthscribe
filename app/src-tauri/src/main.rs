@@ -1050,12 +1050,8 @@ impl Default for UiPrefs {
 /// View menu check marks follow the stored panels (a click on a check item
 /// toggles its mark natively; this puts it back in line with the setting).
 fn sync_view_checks(app: &tauri::AppHandle, p: &Panels) {
-    let Some(menu) = app.menu() else { return };
-    for (id, on) in [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status)] {
-        if let Some(item) = menu.get(id).and_then(|k| k.as_check_menuitem().cloned()) {
-            let _ = item.set_checked(on);
-        }
-    }
+    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status)];
+    set_menu_checks(app.clone(), checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect());
 }
 
 fn prefs_path(app: &App) -> PathBuf {
@@ -1144,55 +1140,137 @@ async fn library_folder(app: State<'_, App>) -> Result<String, String> {
     Ok(library_dir(&app).display().to_string())
 }
 
-/// Native menu. Items carry no OS accelerators: shortcuts are handled in the
-/// web UI so they behave the same on every platform and in tests. Choices are
-/// sent to the UI as a "menu" event and run the same actions as the buttons.
-/// macOS also gets the standard app menu and an Edit menu (WKWebView needs
-/// it for Cmd+C/V); Undo/Redo there are custom so they reach the editor's
-/// history, not the WebView's native undo.
-/// Display: panels, focus mode, UI size and contrast (shortcuts are handled
-/// in the web UI). Panel check marks are set from preferences at startup.
-fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
-    use tauri::menu::CheckMenuItemBuilder;
-    let check = |id: &str, label: &str| CheckMenuItemBuilder::with_id(id, label).checked(true).build(app);
-    #[cfg(target_os = "macos")]
-    let focus = "Focus Mode (Cmd+Shift+F)";
+/// Native menu: File, Edit, View, Format, Help on every OS (plus the app
+/// menu on macOS), so every action is reachable from the menu bar. Custom
+/// items carry no OS accelerators: shortcuts are handled in the web UI so
+/// they behave the same on every platform and in tests; labels show the key.
+/// Choices are sent to the UI as a "menu" event and run the same actions as
+/// the buttons. Cut, Copy, Paste and Select All are the OS's own items
+/// (macOS and GTK run the native command; Windows sends the key to the web
+/// view). Undo and Redo are custom so they reach the editor's history.
+/// Check marks (panels, page size, spelling) are set by the UI through
+/// `set_menu_checks`.
+
+#[cfg(target_os = "macos")]
+const MOD: &str = "Cmd";
+#[cfg(not(target_os = "macos"))]
+const MOD: &str = "Ctrl";
+
+/// "Label (Ctrl+K)" on Windows and Linux, "Label (Cmd+K)" on macOS.
+fn keyed(label: &str, keys: &str) -> String {
+    format!("{label} ({MOD}+{keys})")
+}
+
+fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Result<tauri::menu::CheckMenuItem<tauri::Wry>> {
+    tauri::menu::CheckMenuItemBuilder::with_id(id, label).checked(on).build(app)
+}
+
+fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::SubmenuBuilder;
+    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF (proof)").text("export_txt", "Plain Text…").build()?;
+    let file = SubmenuBuilder::new(app, "File")
+        .text("new", "New Project…")
+        .text("open", keyed("Open…", "O"))
+        .separator()
+        .text("save", keyed("Save", "S"))
+        .text("save_as", keyed("Save As…", "Shift+S"))
+        .item(&export)
+        .separator()
+        .text("free_writing", "Free Writing")
+        .separator()
+        .text("home", "Close Project");
+    // On macOS Quit lives in the app menu (Cmd+Q), not in File.
     #[cfg(not(target_os = "macos"))]
-    let focus = "Focus Mode (Ctrl+Shift+F)";
+    let file = file.separator().text("quit", "Quit");
+    file.build()
+}
+
+fn edit_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::SubmenuBuilder;
+    let spelling = SubmenuBuilder::new(app, "Spelling")
+        .text("spell_suggest", keyed("Suggestions", "."))
+        .separator()
+        .item(&check_item(app, "spell_en_US", "US English", true)?)
+        .item(&check_item(app, "spell_en_GB", "UK English", false)?)
+        .item(&check_item(app, "spell_off", "Off", false)?)
+        .build()?;
+    SubmenuBuilder::new(app, "Edit")
+        .text("undo", keyed("Undo", "Z"))
+        .text("redo", keyed("Redo", "Shift+Z"))
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .separator()
+        .text("find", keyed("Find and Replace…", "F"))
+        .item(&spelling)
+        .build()
+}
+
+/// Display: panels, focus mode, UI size and contrast. Panel check marks are
+/// set from preferences at startup.
+fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     tauri::menu::SubmenuBuilder::new(app, "View")
-        .text("focus_mode", focus)
+        .text("focus_mode", keyed("Focus Mode", "Shift+F"))
         .separator()
-        .item(&check("view_nav", "Scene List")?)
-        .item(&check("view_board", "Board")?)
-        .item(&check("view_toolbar", "Toolbar")?)
-        .item(&check("view_status", "Status Bar")?)
+        .item(&check_item(app, "view_nav", "Scene List", true)?)
+        .item(&check_item(app, "view_board", "Board", true)?)
+        .item(&check_item(app, "view_toolbar", "Toolbar", true)?)
+        .item(&check_item(app, "view_status", "Status Bar", true)?)
         .separator()
-        .text("ui_larger", "Larger Interface")
-        .text("ui_smaller", "Smaller Interface")
-        .text("ui_reset", "Actual Size")
+        .text("ui_larger", keyed("Larger Interface", "="))
+        .text("ui_smaller", keyed("Smaller Interface", "-"))
+        .text("ui_reset", keyed("Actual Size", "0"))
         .separator()
         .text("ui_contrast", "High Contrast")
         .separator()
-        .text("focus_next", "Next Panel")
+        .text("focus_next", "Next Panel (F6)")
+        .build()
+}
+
+/// Text style, block type (same order as Ctrl/Cmd+1 to 9) and page size.
+fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::SubmenuBuilder;
+    let kinds = [
+        ("heading", "Scene Heading"),
+        ("action", "Action"),
+        ("character", "Character"),
+        ("parenthetical", "Parenthetical"),
+        ("dialogue", "Dialogue"),
+        ("transition", "Transition"),
+        ("shot", "Shot"),
+        ("section", "Section"),
+        ("lyric", "Lyric"),
+    ];
+    let mut block = SubmenuBuilder::new(app, "Block Type");
+    for (i, (id, label)) in kinds.iter().enumerate() {
+        block = block.text(format!("kind_{id}"), keyed(label, &(i + 1).to_string()));
+    }
+    let page = SubmenuBuilder::new(app, "Page Size")
+        .item(&check_item(app, "page_letter", "US Letter", true)?)
+        .item(&check_item(app, "page_a4", "A4", false)?)
+        .build()?;
+    SubmenuBuilder::new(app, "Format")
+        .text("bold", keyed("Bold", "B"))
+        .text("italic", keyed("Italic", "I"))
+        .text("underline", keyed("Underline", "U"))
+        .separator()
+        .item(&block.build()?)
+        .text("dual", keyed("Dual Dialogue", "D"))
+        .text("page_break", keyed("Page Break Before", "Enter"))
+        .separator()
+        .item(&page)
         .build()
 }
 
 fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{MenuBuilder, SubmenuBuilder};
-    let file = SubmenuBuilder::new(app, "File")
-        .text("new", "New Project…")
-        .text("open", "Open…")
-        .separator()
-        .text("save", "Save")
-        .text("save_as", "Save As…")
-        .text("export_pdf", "Export PDF (proof)")
-        .text("export_txt", "Export Plain Text…")
-        .separator()
-        .text("home", "Close Project");
-    // On macOS Quit lives in the app menu (Cmd+Q), not in File.
+    let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…");
     #[cfg(not(target_os = "macos"))]
-    let file = file.text("quit", "Quit");
-    let file = file.build()?;
+    let help = help.separator().text("about", "About CirthScribe and Licences");
+    let help = help.build()?;
+    let (file, edit, view, format) = (file_menu(app)?, edit_menu(app)?, view_menu(app)?, format_menu(app)?);
     #[cfg(target_os = "macos")]
     {
         // Our own About screen (with the licences) instead of the bare native one.
@@ -1210,29 +1288,77 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
             .separator()
             .item(&quit)
             .build()?;
-        let edit = SubmenuBuilder::new(app, "Edit")
-            .text("undo", "Undo")
-            .text("redo", "Redo")
-            .separator()
-            .cut()
-            .copy()
-            .paste()
-            .select_all()
-            .separator()
-            .text("find", "Find and Replace…")
-            .separator()
-            .text("dual", "Dual Dialogue")
-            .text("page_break", "Page Break Before")
-            .build()?;
-        let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…").build()?;
-        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view_menu(app)?, &help]).build();
+        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view, &format, &help]).build();
     }
     #[cfg(not(target_os = "macos"))]
-    {
-        let edit = SubmenuBuilder::new(app, "Edit").text("find", "Find and Replace…").separator().text("dual", "Dual Dialogue").text("page_break", "Page Break Before").build()?;
-        let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…").separator().text("about", "About CirthScribe and Licences").build()?;
-        MenuBuilder::new(app).items(&[&file, &edit, &view_menu(app)?, &help]).build()
+    MenuBuilder::new(app).items(&[&file, &edit, &view, &format, &help]).build()
+}
+
+/// Set check marks in the native menu (radio-like groups such as page size
+/// and spelling language are sent as one map; unknown ids are ignored).
+#[tauri::command]
+fn set_menu_checks(app: tauri::AppHandle, checks: std::collections::HashMap<String, bool>) {
+    let Some(menu) = app.menu() else { return };
+    for (id, on) in checks {
+        if let Some(item) = find_check(menu.items().unwrap_or_default(), &id) {
+            let _ = item.set_checked(on);
+        }
     }
+}
+
+/// The menu as a flat list ("File > Export > PDF (proof)", id, check state),
+/// so tests can check its structure and check marks.
+#[derive(Serialize)]
+struct MenuEntry {
+    path: String,
+    id: String,
+    checked: Option<bool>,
+}
+
+#[tauri::command]
+fn menu_items(app: tauri::AppHandle) -> Vec<MenuEntry> {
+    fn walk(items: Vec<tauri::menu::MenuItemKind<tauri::Wry>>, prefix: &str, out: &mut Vec<MenuEntry>) {
+        for item in items {
+            let (text, checked) = if let Some(c) = item.as_check_menuitem() {
+                (c.text().unwrap_or_default(), c.is_checked().ok())
+            } else if let Some(m) = item.as_menuitem() {
+                (m.text().unwrap_or_default(), None)
+            } else if let Some(p) = item.as_predefined_menuitem() {
+                (p.text().unwrap_or_default(), None)
+            } else if let Some(sub) = item.as_submenu() {
+                let path = format!("{prefix}{}", sub.text().unwrap_or_default());
+                walk(sub.items().unwrap_or_default(), &format!("{path} > "), out);
+                continue;
+            } else {
+                continue;
+            };
+            if !text.is_empty() {
+                out.push(MenuEntry { path: format!("{prefix}{text}"), id: item.id().as_ref().to_string(), checked });
+            }
+        }
+    }
+    let mut out = Vec::new();
+    if let Some(menu) = app.menu() {
+        walk(menu.items().unwrap_or_default(), "", &mut out);
+    }
+    out
+}
+
+/// Find a check item anywhere in the menu, including nested submenus.
+fn find_check(items: Vec<tauri::menu::MenuItemKind<tauri::Wry>>, id: &str) -> Option<tauri::menu::CheckMenuItem<tauri::Wry>> {
+    for item in items {
+        if let Some(c) = item.as_check_menuitem() {
+            if c.id().as_ref() == id {
+                return Some(c.clone());
+            }
+        }
+        if let Some(sub) = item.as_submenu() {
+            if let Some(found) = find_check(sub.items().unwrap_or_default(), id) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 fn main() {
@@ -1276,6 +1402,8 @@ fn main() {
             ui_prefs,
             set_ui_prefs,
             focus_window,
+            set_menu_checks,
+            menu_items,
             document_profile,
             set_document_profile,
             export_txt,

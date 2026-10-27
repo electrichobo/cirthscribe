@@ -10,7 +10,7 @@ import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialo
 import { listen } from "@tauri-apps/api/event";
 import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
-import { screenplayKeymap, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
+import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
 import { Syncer, diff, type SyncStatus } from "./sync";
 import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks, parsePlainText } from "./paste";
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
@@ -279,9 +279,10 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   };
   docCounts = null;
   scheduleCounts(true);
-  void spell.onOpen($("spelling") as HTMLSelectElement);
+  void spell.onOpen($("spelling") as HTMLSelectElement).then(syncMenuChecks);
   // Page size is stored per document; pagination, PDF and text use it.
   ($("profile") as HTMLSelectElement).value = await invoke<string>("document_profile").catch(() => "letter");
+  syncMenuChecks();
   setStatus({ state: "saved", version: o.doc.version });
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   const t2 = performance.now();
@@ -466,7 +467,25 @@ async function goHome() {
 
 const findBar = installFindBar($("find-bar"), () => view, showBanner);
 const spell = installSpell(() => view, showBanner);
-$("spelling").addEventListener("change", (e) => void spell.setLang((e.target as HTMLSelectElement).value));
+$("spelling").addEventListener("change", (e) => void spell.setLang((e.target as HTMLSelectElement).value).finally(syncMenuChecks));
+
+/** The native menu's check marks for this document's page size and spelling. */
+function syncMenuChecks() {
+  const page = ($("profile") as HTMLSelectElement).value;
+  const lang = ($("spelling") as HTMLSelectElement).value;
+  void invoke("set_menu_checks", {
+    checks: { page_letter: page === "letter", page_a4: page === "a4", spell_en_US: lang === "en_US", spell_en_GB: lang === "en_GB", spell_off: lang === "off" },
+  }).catch(() => undefined);
+}
+
+/** Choose a value in one of the toolbar's dropdowns as if the user had. */
+function chooseOption(id: string, value: string) {
+  const sel = $(id) as HTMLSelectElement;
+  if (sel.value !== value) {
+    sel.value = value;
+    sel.dispatchEvent(new Event("change"));
+  } else syncMenuChecks();
+}
 
 // View mode is a personal display preference (not stored in projects).
 function setViewMode(mode: string) {
@@ -541,6 +560,7 @@ $("profile").addEventListener("change", async (e) => {
     showBanner(`Could not change the page size: ${err}`);
     sel.value = await invoke<string>("document_profile").catch(() => sel.value);
   }
+  syncMenuChecks();
   await repaginate();
 });
 async function saveNow() {
@@ -625,6 +645,13 @@ window.addEventListener(
 
 /** Native menu choices (and tests) run the same actions as the buttons. */
 async function runMenu(id: string): Promise<void> {
+  if (id.startsWith("kind_")) {
+    if (view && lastOpen) {
+      setKind(id.slice(5) as Kind)(view.state, view.dispatch);
+      view.focus();
+    }
+    return;
+  }
   switch (id) {
     case "new":
       await goHome();
@@ -686,6 +713,31 @@ async function runMenu(id: string): Promise<void> {
       break;
     case "focus_next":
       cycleRegions(regions(), false);
+      break;
+    case "free_writing":
+      await openFreeWriting();
+      break;
+    case "bold":
+    case "italic":
+    case "underline":
+      if (view && lastOpen) {
+        toggleMark(schema.marks[id === "bold" ? "strong" : id === "italic" ? "em" : "underline"])(view.state, view.dispatch);
+        view.focus();
+      }
+      break;
+    case "spell_suggest":
+      if (lastOpen) spell.menuAtCaret();
+      break;
+    case "spell_en_US":
+    case "spell_en_GB":
+    case "spell_off":
+      if (lastOpen) chooseOption("spelling", id.slice(6));
+      else syncMenuChecks();
+      break;
+    case "page_letter":
+    case "page_a4":
+      if (lastOpen) chooseOption("profile", id.slice(5));
+      else syncMenuChecks();
       break;
     case "focus_mode":
       if (lastOpen) await focusMode.toggle();

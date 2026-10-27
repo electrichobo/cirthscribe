@@ -1696,6 +1696,58 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!(await app.evaluate("document.body.dataset.focus")), "Home ends focus mode");
   });
 
+  await test("Menus: File, Edit, View, Format, Help hold every action; formatting, block type, page size and spelling work from them; check marks follow", async () => {
+    await openFixture("unicode-marks");
+    const menu = () => app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
+    let items = await menu();
+    const tops = [...new Set(items.map((i) => i.path.split(" > ")[0]))];
+    assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
+    const ids = new Set(items.map((i) => i.id));
+    const want = ["new", "open", "save", "save_as", "export_pdf", "export_txt", "free_writing", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
+      "focus_mode", "view_nav", "view_board", "view_toolbar", "view_status", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast", "focus_next",
+      "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "latency", "about",
+      ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
+    const missing = want.filter((id) => !ids.has(id));
+    assert(!missing.length, `missing menu items: ${missing}`);
+    const editNative = items.filter((i) => i.path.startsWith("Edit > ") && !want.includes(i.id));
+    assert(editNative.length >= 4, `Edit has the OS's Cut, Copy, Paste and Select All: ${editNative.map((i) => i.path)}`);
+    assert(items.some((i) => i.path === "File > Export > PDF (proof)") && items.some((i) => i.path.startsWith("Format > Block Type > Dialogue (")), "nested Export and Block Type menus");
+    const checked = (id) => items.find((i) => i.id === id)?.checked;
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'page_letter').checked && !m.find(i => i.id === 'page_a4').checked && m.find(i => i.id === 'spell_en_US').checked)", "check marks match this document on open");
+
+    // Format > Bold on a selection; Block Type on the caret's block.
+    const b0 = await blocks();
+    const ai = b0.findIndex((b) => b.kind === "action");
+    await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 5]`);
+    await app.evaluate("__cirth.menu('bold')");
+    assert((await blocks())[ai].runs.some((r) => r.bold), "Format > Bold");
+    await app.evaluate("__cirth.menu('bold')");
+    assert(!(await blocks())[ai].runs.some((r) => r.bold), "Format > Bold again removes it");
+    await app.evaluate("__cirth.menu('kind_transition')");
+    assert((await blocks())[ai].kind === "transition", "Format > Block Type > Transition");
+    await press("z", [MOD_KEY]);
+    assert((await blocks())[ai].kind === "action", "one undo restores the type");
+
+    // Page size and spelling from the menu: the toolbar and the check marks follow.
+    await app.evaluate("__cirth.menu('page_a4')");
+    await waitFor(app, "document.getElementById('profile').value === 'a4' && __cirth.pagination?.map.profile.includes('a4')", "A4 from the Format menu");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'page_a4').checked && !m.find(i => i.id === 'page_letter').checked)", "A4 checked, Letter not");
+    await app.evaluate("__cirth.menu('page_letter')");
+    await waitFor(app, "document.getElementById('profile').value === 'letter'", "back to Letter");
+    await app.evaluate("__cirth.menu('spell_en_GB')");
+    await waitFor(app, "document.getElementById('spelling').value === 'en_GB'", "UK spelling from the Edit menu");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'spell_en_GB').checked && !m.find(i => i.id === 'spell_en_US').checked)", "UK checked");
+    await app.evaluate("__cirth.menu('spell_en_US')");
+    await waitFor(app, "document.getElementById('spelling').value === 'en_US'", "back to US");
+    // File > Free Writing.
+    await app.evaluate("__cirth.menu('free_writing')");
+    await waitFor(app, "document.body.dataset.view === 'free'", "File > Free Writing");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    items = await menu();
+    return { menuItems: items.length, checked: ["page_letter", "spell_en_US"].map((id) => [id, checked(id)]) };
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");
