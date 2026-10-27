@@ -10,7 +10,7 @@
   },
   "app": {
     "windows": [
-      { "title": "CirthScribe", "width": 1400, "height": 900 }
+      { "title": "CirthScribe", "width": 1400, "height": 900, "minWidth": 900, "minHeight": 560 }
     ],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"

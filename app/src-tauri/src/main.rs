@@ -1117,10 +1117,10 @@ async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tau
 /// returns whether this call made the window full screen; off, leaves full
 /// screen only if `restore` says focus mode made it so.
 ///
-/// macOS uses "simple" full screen (no new Space, no animation). Native full
-/// screen's exit animation left the window without keyboard input until it
-/// was clicked (GROGU, 2026-10-27, 3 of 3 runs; asking for focus again did
-/// not help). If the window is already in native full screen, it is left so.
+/// macOS uses "simple" full screen (no new Space, no animation); native full
+/// screen's exit left the window without keyboard input until it was
+/// clicked. Either way the web view must be made first responder again (see
+/// below). If the window is already in native full screen, it is left so.
 #[tauri::command]
 fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result<bool, String> {
     let e = |e: tauri::Error| e.to_string();
@@ -1130,10 +1130,12 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
             #[cfg(target_os = "macos")]
             {
                 window.set_simple_fullscreen(true).map_err(e)?;
-                // Simple full screen changes the window's style; macOS then
-                // stops treating it as the key window (GROGU, 77250a3: no
-                // keys until clicked). Make it key again. Unverified.
+                // tao's style-mask change makes its own content view the
+                // first responder, so keys stop reaching the WKWebView.
+                // Hand first responder back to the web view. (Found and
+                // verified on a Mac by GROGU, 2026-10-27.)
                 window.set_focus().map_err(e)?;
+                AsRef::<tauri::Webview<_>>::as_ref(&window).set_focus().map_err(e)?;
             }
             #[cfg(not(target_os = "macos"))]
             window.set_fullscreen(true).map_err(e)?;
@@ -1149,6 +1151,14 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
             {
                 window.set_simple_fullscreen(false).map_err(e)?;
                 window.set_focus().map_err(e)?;
+                // Leaving restores the style mask asynchronously, and tao then
+                // makes its content view first responder again; refocus the
+                // web view once that has run (150 ms worked in every Mac run).
+                let webview = AsRef::<tauri::Webview<_>>::as_ref(&window).clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    let _ = webview.set_focus();
+                });
             }
             #[cfg(not(target_os = "macos"))]
             window.set_fullscreen(false).map_err(e)?;
