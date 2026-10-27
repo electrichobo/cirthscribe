@@ -100,4 +100,16 @@ The automated tests check names, ids, focus movement and what is put in the anno
 
 | Date | Check | OS / version | WebView | Tester | Result | Notes |
 | - | - | - | - | - | - | - |
+| | Rows below transcribed on Windows from the macOS session's report; its own log and screenshots stayed on that Mac (no git there, by owner choice). Core tests 46/46, contract 4/4, binary minimum OS 11.0. Big Sur not covered. | | | | | |
+| 2026-10-26 | M1–M4, M6–M11 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Pass | Release build of `14a38b5` as an app bundle. |
+| 2026-10-26 | M5 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | **Fail** | TextEdit rich text pasted as two Action blocks (WebKit offers RTF as HTML). Fixed in `8e5d006`; recheck. |
+| 2026-10-26 | D1–D3 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Pass | Jared operated the Save panel; computer use cannot. |
+| 2026-10-26 | D4 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | No synced folder to hand. |
+| 2026-10-26 | N1–N5, N8 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Pass |  |
+| 2026-10-26 | N6 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | Needs a real IME (waived). |
+| 2026-10-26 | N7 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | **Fail** | About opened but all three tabs were empty (page area collapsed to 0 px). Fixed in `8e5d006`; recheck. |
+| 2026-10-26 | L1 ×3 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Pass | p95 24 / 25 / 26 ms; p99 33 / 35 / 42 ms; max 41 / 45 / 48 ms; 0 long tasks; last open 115 ms; on mains power; typed by computer use in bursts. |
+| 2026-10-26 | O1, O2 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | Turning Wi-Fi off cuts the computer-use session; needs a person. |
+| 2026-10-26 | A1–A10 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | VoiceOver froze the session; the owner declined section 3. |
+| 2026-10-26 | Observations | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | n/a | Cmd+Q did nothing and the app menu had no Quit (fixed in `8e5d006`, recheck N9). Scene-list click did not scroll, and Enter then added an empty heading (fixed, recheck M12). Cmd+Z on the board with board focus does nothing (open). |
 | 2026-10-26 | Section 2, real IMEs | all | all | none | **Waived (not run)** | Owner decision: no way to arrange IME test machines. Not a pass; simulated composition only. Run when a tester is available. |

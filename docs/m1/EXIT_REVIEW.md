@@ -93,7 +93,7 @@ The two Windows e2e steps also show "success", but they are `continue-on-error`.
 Run by a Claude session with computer use plus Jared on an M4 Pro MacBook. Setup:
 - macOS 26.2 (25C56), Safari 26.2 / WebKit 21623.1.14.11.9.
 - Commit `14a38b5`, release profile, built as an app bundle.
-- The detailed log is in `docs/testing/MANUAL_CHECKS.md` on branch `macos-pass` (not yet merged here).
+- The results are transcribed into the `docs/testing/MANUAL_CHECKS.md` results log from the session's report; its own log and screenshots stayed on the Mac, which has no git access by owner choice.
 
 **Results: 22 passed, 2 failed, 8 not run.**
 - Build and tests on the Mac: core 46/46, contract 4/4; the binary's minimum OS is 11.0.
