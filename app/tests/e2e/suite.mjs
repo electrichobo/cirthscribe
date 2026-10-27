@@ -1501,11 +1501,15 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // http://tauri.localhost and http://ipc.localhost (Windows); data: and blob: are local.
     const local = (u) => /^(data|blob):/.test(u) || (() => { try { const h = new URL(u).hostname; return h === "localhost" || h.endsWith(".localhost"); } catch { return false; } })();
     const outside = net.urls.filter((u) => !local(u) && !u.includes("offline-check.invalid"));
-    assert(net.urls.length > 10, `requests were recorded (${net.urls.length})`);
+    // WebView2 serves the app over http://*.localhost, which resource timing
+    // records; WebKit (tauri://, ipc://) does not record custom-scheme loads,
+    // so there only outside http(s) requests and policy refusals would show.
+    const scheme = await app.evaluate("location.protocol");
+    if (scheme.startsWith("http")) assert(net.urls.length > 10, `requests were recorded (${net.urls.length})`);
     assert(outside.length === 0, `requests outside the app: ${outside.join(", ")}`);
     const otherRefusals = net.refused.filter((r) => !r.includes("offline-check.invalid"));
     assert(otherRefusals.length === 0, `the app itself tried something the policy refused: ${otherRefusals.join(", ")}`);
-    return { requests: net.urls.length, origins: [...new Set(net.urls.map((u) => { try { return new URL(u).origin; } catch { return u.slice(0, 10); } }))] };
+    return { scheme, requests: net.urls.length, origins: [...new Set(net.urls.map((u) => { try { return new URL(u).origin; } catch { return u.slice(0, 10); } }))] };
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
