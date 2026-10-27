@@ -80,7 +80,7 @@ Jared raised these after the M1 feature work, which so far covered only the scri
      - Colours follow light, dark and contrast themes; in Windows contrast themes, marked text keeps a dotted underline or outline so colour is not the only sign.
      - The page layout never reads them, so the page map, PDF and text export are unchanged (core test and e2e).
      - Colours pasted from other apps are not taken over.
-6. **Add comment button:** see decision C.
+6. ~~**Add comment button:** see decision C.~~ **Moved to M5** (owner, decision C option 2, 2026-10-27): comments arrive with M5's anchored threads; no button in M1b.
 7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording. **Built 2026-10-26:**
    - Schema v3 adds `logline` to beats. Older files are upgraded on open with the original kept; tested against real v2 files frozen before the change (`tests/data/schema-v2-*.cirth`).
    - Cards show the linked scene's heading, an editable logline and the summary. The script excerpt is gone.
@@ -124,7 +124,7 @@ Jared raised these after the M1 feature work, which so far covered only the scri
   - (2) A per-document font that also changes pages and exports. This breaks the one-page-per-minute convention and needs bundled, licensed fonts.
   - (3) (1) for screenplays, plus free font choice in non-screenplay documents (M6 rich text).
 - **B. Colours.** **Decided 2026-10-27: on-screen writer's markup only; never printed or exported.** (Was: should text colour and highlight print in PDF exports, or show on screen only?) Either way they are stored as marks with stable meaning, never as the only signal: the rule "colour cannot be the only identifier" applies. Plain text cannot keep them, and FDX keeps them only partly; the export reports say so.
-- **C. Comments.** Anchored comments are M5 (anchors that survive edits, moves and splits; orphans; threads). Options: (1) keep M5 and give the button a basic slice early: a comment on a selection, anchored by block id and text offsets, with a side list; or (2) move all of M5's comment work forward. Option (1) needs the anchor design now, which ROADMAP already asks for ("Comment and branch anchors must be designed earlier").
+- **C. Comments.** **Decided 2026-10-27: option 2, all comment work stays in M5.** Anchored comments are M5 (anchors that survive edits, moves and splits; orphans; threads). Options: (1) keep M5 and give the button a basic slice early: a comment on a selection, anchored by block id and text offsets, with a side list; or (2) move all of M5's comment work forward. Option (1) needs the anchor design now, which ROADMAP already asks for ("Comment and branch anchors must be designed earlier").
 
 ## M3: Connected story development
 

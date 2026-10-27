@@ -69,7 +69,7 @@ Done:
 - [x] Text colour and highlight as your own on-screen markup (never printed)
 
 Still to do:
-- [ ] Add-comment button
+- [ ] Hands-on checks of the new workspace features on macOS
 
 ### Stage 2: Professional pages and file exchange
 
@@ -100,7 +100,7 @@ Still to do:
 
 ### Stage 5: Notes, alternatives and versions
 
-- [ ] Comments attached to the text
+- [ ] Comments attached to the text, with an add-comment button
 - [ ] Alternative takes on a scene or line
 - [ ] Snapshots and version history, with compare, restore and merge
 
