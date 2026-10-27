@@ -694,6 +694,11 @@ window.addEventListener(
 
 /** Native menu choices (and tests) run the same actions as the buttons. */
 async function runMenu(id: string): Promise<void> {
+  if (id.startsWith("color_") || id.startsWith("highlight_")) {
+    const [kind, value] = id.split("_");
+    if (view && lastOpen) formatBar.apply(kind === "color" ? schema.marks.color : schema.marks.highlight, value === "none" ? null : value);
+    return;
+  }
   if (id.startsWith("kind_")) {
     if (view && lastOpen) {
       setKind(id.slice(5) as Kind)(view.state, view.dispatch);

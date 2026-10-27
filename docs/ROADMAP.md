@@ -74,7 +74,12 @@ Jared raised these after the M1 feature work, which so far covered only the scri
      - Set from the toolbar's Format island or View > Screen Font, and stored per user.
      - Column widths are now in inches, so larger text wraps inside the page.
      - Pages view always shows Courier Prime 12 pt, so its breaks match the printed pages; the page map and exports never change.
-   - Colour and highlight are still to do (decision B).
+   - **Text colour and highlight built 2026-10-27** (decision B: on-screen markup only):
+     - Five text colours and five highlights, by palette name, from the toolbar or Format > Text Colour / Highlight.
+     - Stored with the text (in the contract), undoable, kept by copy and paste inside the app.
+     - Colours follow light, dark and contrast themes; in Windows contrast themes, marked text keeps a dotted underline or outline so colour is not the only sign.
+     - The page layout never reads them, so the page map, PDF and text export are unchanged (core test and e2e).
+     - Colours pasted from other apps are not taken over.
 6. **Add comment button:** see decision C.
 7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording. **Built 2026-10-26:**
    - Schema v3 adds `logline` to beats. Older files are upgraded on open with the original kept; tested against real v2 files frozen before the change (`tests/data/schema-v2-*.cirth`).
@@ -118,7 +123,7 @@ Jared raised these after the M1 feature work, which so far covered only the scri
   - (1) Font and size change only how the script looks on screen; pages and exports stay standard. **Chosen by the owner 2026-10-26.**
   - (2) A per-document font that also changes pages and exports. This breaks the one-page-per-minute convention and needs bundled, licensed fonts.
   - (3) (1) for screenplays, plus free font choice in non-screenplay documents (M6 rich text).
-- **B. Colours.** Should text colour and highlight print in PDF exports, or show on screen only (writer's markup)? Either way they are stored as marks with stable meaning, never as the only signal: the rule "colour cannot be the only identifier" applies. Plain text cannot keep them, and FDX keeps them only partly; the export reports say so.
+- **B. Colours.** **Decided 2026-10-27: on-screen writer's markup only; never printed or exported.** (Was: should text colour and highlight print in PDF exports, or show on screen only?) Either way they are stored as marks with stable meaning, never as the only signal: the rule "colour cannot be the only identifier" applies. Plain text cannot keep them, and FDX keeps them only partly; the export reports say so.
 - **C. Comments.** Anchored comments are M5 (anchors that survive edits, moves and splits; orphans; threads). Options: (1) keep M5 and give the button a basic slice early: a comment on a selection, anchored by block id and text offsets, with a side list; or (2) move all of M5's comment work forward. Option (1) needs the anchor design now, which ROADMAP already asks for ("Comment and branch anchors must be designed earlier").
 
 ## M3: Connected story development

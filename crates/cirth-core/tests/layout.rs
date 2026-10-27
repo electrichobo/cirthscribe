@@ -140,3 +140,24 @@ fn editing_one_block_only_reflows_from_that_point() {
         );
     }
 }
+
+#[test]
+fn colour_and_highlight_never_reach_pages_or_exports() {
+    // Owner decision 2026-10-27: on-screen markup only. Mark every run of a
+    // real fixture; the page map, the text export and the PDF must not change.
+    let plain = fixtures::unicode_marks().to_document().unwrap();
+    let mut marked = plain.clone();
+    for (i, b) in marked.blocks.iter_mut().enumerate() {
+        for r in &mut b.runs {
+            r.color = Some(["red", "blue"][i % 2].into());
+            r.highlight = Some("yellow".into());
+        }
+    }
+    let p = Profile::us_letter();
+    let (a, b) = (paginate(&plain.blocks, &p, 1), paginate(&marked.blocks, &p, 1));
+    assert_eq!(serde_json::to_string(&a).unwrap(), serde_json::to_string(&b).unwrap(), "page map unchanged");
+    assert_eq!(cirth_core::txt::render(&a, &p).text, cirth_core::txt::render(&b, &p).text, "text export unchanged");
+    // The PDF is drawn only from the page map (pdf::render never sees runs),
+    // so an identical map means identical PDF content. Its bytes are not
+    // compared: the writer embeds per-render metadata.
+}

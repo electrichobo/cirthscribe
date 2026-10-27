@@ -47,6 +47,7 @@ fn the_fixture_covers_every_kind_and_field() {
     assert!(blocks.iter().any(|b| b.scene_id.is_some()));
     let runs: Vec<_> = blocks.iter().flat_map(|b| &b.runs).collect();
     assert!(runs.iter().any(|r| r.bold) && runs.iter().any(|r| r.italic) && runs.iter().any(|r| r.underline));
+    assert!(runs.iter().any(|r| r.color.is_some()) && runs.iter().any(|r| r.highlight.is_some()), "colour and highlight");
     let ops: Vec<&str> = c["batch"]["ops"].as_array().unwrap().iter().map(|o| o["op"].as_str().unwrap()).collect();
     for op in ["put", "update", "delete"] {
         assert!(ops.contains(&op), "no {op} op");

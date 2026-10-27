@@ -82,8 +82,25 @@ export const schema = new Schema({
     },
     em: { parseDOM: [{ tag: "em" }, { tag: "i" }, { style: "font-style=italic" }], toDOM: () => ["em", 0] },
     underline: { parseDOM: [{ tag: "u" }, { style: "text-decoration=underline" }], toDOM: () => ["u", 0] },
+    // Writer's markup, on screen only (owner decision 2026-10-27): never
+    // printed or exported. Values are palette names (TEXT_COLORS,
+    // HIGHLIGHTS); colours from other apps' pasted HTML are not taken over.
+    color: {
+      attrs: { value: {} },
+      parseDOM: [{ tag: "span[data-color]", getAttrs: (el) => ({ value: (el as HTMLElement).dataset.color }) }],
+      toDOM: (m) => ["span", { "data-color": m.attrs.value, class: `tc tc-${m.attrs.value}` }, 0],
+    },
+    highlight: {
+      attrs: { value: {} },
+      parseDOM: [{ tag: "mark[data-highlight]", getAttrs: (el) => ({ value: (el as HTMLElement).dataset.highlight }) }],
+      toDOM: (m) => ["mark", { "data-highlight": m.attrs.value, class: `hl hl-${m.attrs.value}` }, 0],
+    },
   },
 });
+
+/** Palette for the on-screen markup marks (names are stored; colours come from the theme). */
+export const TEXT_COLORS = ["red", "orange", "green", "blue", "purple"] as const;
+export const HIGHLIGHTS = ["yellow", "green", "blue", "pink", "orange"] as const;
 
 // Domain types mirrored from cirth-core (serde field names).
 export interface Run {
@@ -91,6 +108,8 @@ export interface Run {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  color?: string;
+  highlight?: string;
 }
 export interface Block {
   id: string;
@@ -118,6 +137,10 @@ export function nodeToBlock(n: PMNode): Block {
     if (has(t.marks, "strong")) r.bold = true;
     if (has(t.marks, "em")) r.italic = true;
     if (has(t.marks, "underline")) r.underline = true;
+    const color = t.marks.find((m) => m.type.name === "color");
+    if (color) r.color = color.attrs.value;
+    const hl = t.marks.find((m) => m.type.name === "highlight");
+    if (hl) r.highlight = hl.attrs.value;
     runs.push(r);
   });
   if (runs.length === 0) runs.push({ text: "" });
@@ -136,6 +159,8 @@ export function blockToNode(b: Block): PMNode {
       if (r.bold) marks.push(schema.marks.strong.create());
       if (r.italic) marks.push(schema.marks.em.create());
       if (r.underline) marks.push(schema.marks.underline.create());
+      if (r.color) marks.push(schema.marks.color.create({ value: r.color }));
+      if (r.highlight) marks.push(schema.marks.highlight.create({ value: r.highlight }));
       return schema.text(r.text, marks);
     });
   return schema.nodes.block.create(

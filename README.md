@@ -66,9 +66,9 @@ Done:
 - [x] Typewriter mode: the line you are typing stays centred while the text scrolls
 - [x] Scene cards with a logline and summary instead of a copy of the scene
 - [x] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
+- [x] Text colour and highlight as your own on-screen markup (never printed)
 
 Still to do:
-- [ ] Text colour and highlight
 - [ ] Add-comment button
 
 ### Stage 2: Professional pages and file exchange

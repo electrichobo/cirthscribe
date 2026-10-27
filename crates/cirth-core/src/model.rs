@@ -79,6 +79,14 @@ pub struct Run {
     pub italic: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub underline: bool,
+    /// Writer's markup, on screen only (owner decision 2026-10-27): a palette
+    /// name such as "red". Never printed or exported; the page layout does
+    /// not read it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Writer's highlight, on screen only, like `color`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -87,7 +95,7 @@ fn is_false(b: &bool) -> bool {
 
 impl Run {
     pub fn plain(text: impl Into<String>) -> Run {
-        Run { text: text.into(), bold: false, italic: false, underline: false }
+        Run { text: text.into(), bold: false, italic: false, underline: false, color: None, highlight: None }
     }
 }
 

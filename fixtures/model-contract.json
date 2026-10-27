@@ -14,6 +14,7 @@
     { "id": "b-shot", "kind": "shot", "runs": [{ "text": "ANGLE ON THE SEA" }] },
     { "id": "b-section", "kind": "section", "runs": [{ "text": "Act two" }] },
     { "id": "b-lyric", "kind": "lyric", "runs": [{ "text": "La la la", "italic": true }] },
+    { "id": "b-markup", "kind": "action", "runs": [{ "text": "Fix this", "color": "red" }, { "text": " and " }, { "text": "check that", "bold": true, "highlight": "yellow" }, { "text": " both", "color": "blue", "highlight": "green" }] },
     { "id": "b-empty", "kind": "action", "runs": [{ "text": "" }] }
   ],
   "beats": [

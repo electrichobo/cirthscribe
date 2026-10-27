@@ -1890,6 +1890,56 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "__cirth.prefs().editor_font === 'courier-prime' && __cirth.prefs().editor_size === 12", "back to standard");
   });
 
+  await test("Text colour and highlight: on-screen markup that is stored and undoable but never reaches the text export", async () => {
+    await openFixture("unicode-marks");
+    const txtBefore = join(dataDir, "markup-before.txt");
+    const txtAfter = join(dataDir, "markup-after.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(txtBefore)})`), "export before");
+    const b0 = await blocks();
+    const ai = b0.findIndex((b) => b.kind === "action" && text(b).length > 12);
+    const choose = (id, value) => app.evaluate(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change')); return true; })()`);
+    await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 5]`);
+    await choose("fmt-color", "red");
+    let r = (await blocks())[ai].runs;
+    assert(r[0].color === "red" && r[0].text.length === 4 && !r[1].color, `red on the selection only: ${JSON.stringify(r)}`);
+    assert(await app.evaluate("__cirth.view.hasFocus()"), "back in the script after choosing");
+    await choose("fmt-highlight", "yellow");
+    r = (await blocks())[ai].runs;
+    assert(r[0].color === "red" && r[0].highlight === "yellow", `both marks: ${JSON.stringify(r)}`);
+    const shown = await app.evaluate(`(() => { const s = document.querySelector('.ProseMirror .tc-red'); const m = document.querySelector('.ProseMirror mark.hl-yellow'); return !!s && !!m && getComputedStyle(s).color !== getComputedStyle(document.querySelector('.ProseMirror')).color; })()`);
+    assert(shown, "the red text and the yellow highlight are visible on screen");
+    // The toolbar follows the caret.
+    await setCaret(`[ps[${ai}][0] + 3]`);
+    assert((await app.evaluate("[document.getElementById('fmt-color').value, document.getElementById('fmt-highlight').value]")).join() === "red,yellow", "toolbar shows the marks at the caret");
+    // Format menu, and one undo per change.
+    await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 5]`);
+    await app.evaluate("__cirth.menu('highlight_none')");
+    assert(!(await blocks())[ai].runs.some((x) => x.highlight), "Format > Highlight > None removes it");
+    await app.evaluate("__cirth.menu('color_blue')");
+    assert((await blocks())[ai].runs[0].color === "blue", "Format > Text Colour > Blue replaces red");
+    await press("z", [MOD_KEY]);
+    assert((await blocks())[ai].runs[0].color === "red", "one undo restores red");
+    await choose("fmt-highlight", "green");
+    // Stored with the text and kept after reopening.
+    assert(await storedMatchesEditor(), "stored equals editor");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("unicode-marks", false);
+    r = (await blocks())[ai].runs;
+    assert(r[0].color === "red" && r[0].highlight === "green", `kept after reopening: ${JSON.stringify(r)}`);
+    // Never printed or exported: the text export is identical.
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(txtAfter)})`), "export after");
+    assert(readFileSync(txtBefore, "utf8") === readFileSync(txtAfter, "utf8"), "text export unchanged by colour and highlight");
+    // Our own copy and paste keeps the markup.
+    const own = await app.evaluate(`(() => { const v = __cirth.view; let p0 = 0; v.state.doc.forEach((n, p, i) => { if (i === ${ai}) p0 = p; });
+      const r = v.serializeForClipboard(v.state.doc.slice(p0 + 1, p0 + 5)); return { html: r.dom.innerHTML, text: r.text }; })()`);
+    await caretAtEndOf(ai);
+    await pasteEvent({ "text/html": own.html, "text/plain": own.text });
+    r = (await blocks())[ai].runs;
+    assert(r.at(-1).color === "red" && r.at(-1).highlight === "green", `pasted copy keeps markup: ${JSON.stringify(r)}`);
+    await screenshot(app, "colour-highlight");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

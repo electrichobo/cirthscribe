@@ -1290,6 +1290,15 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
     for (i, (id, label)) in kinds.iter().enumerate() {
         block = block.text(format!("kind_{id}"), keyed(label, &(i + 1).to_string()));
     }
+    // Writer's markup, on screen only: never printed or exported.
+    let mut color = SubmenuBuilder::new(app, "Text Colour (screen only)").text("color_none", "None").separator();
+    for c in ["red", "orange", "green", "blue", "purple"] {
+        color = color.text(format!("color_{c}"), format!("{}{}", c[..1].to_uppercase(), &c[1..]));
+    }
+    let mut highlight = SubmenuBuilder::new(app, "Highlight (screen only)").text("highlight_none", "None").separator();
+    for c in ["yellow", "green", "blue", "pink", "orange"] {
+        highlight = highlight.text(format!("highlight_{c}"), format!("{}{}", c[..1].to_uppercase(), &c[1..]));
+    }
     let page = SubmenuBuilder::new(app, "Page Size")
         .item(&check_item(app, "page_letter", "US Letter", true)?)
         .item(&check_item(app, "page_a4", "A4", false)?)
@@ -1298,6 +1307,8 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .text("bold", keyed("Bold", "B"))
         .text("italic", keyed("Italic", "I"))
         .text("underline", keyed("Underline", "U"))
+        .item(&color.build()?)
+        .item(&highlight.build()?)
         .separator()
         .item(&block.build()?)
         .text("dual", keyed("Dual Dialogue", "D"))
