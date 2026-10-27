@@ -40,6 +40,19 @@ export function createFocusMode(focusEditor: () => void) {
     await invoke("focus_window", { on: false, restore }).catch(() => undefined);
     focusEditor();
     announce("Focus mode off");
+    // macOS: leaving full screen animates for a moment, and keyboard focus did
+    // not come back to the page (Cmd+Shift shortcuts were dropped). Ask again
+    // once it has settled. A guess at the cause, not yet verified on a Mac.
+    const wasFull = reachedFullscreen;
+    reachedFullscreen = false;
+    if (wasFull)
+      setTimeout(() => {
+        // Only if still in the script and nothing else took focus meanwhile.
+        if (on || document.body.dataset.view !== "editor") return;
+        const a = document.activeElement;
+        if (a && a !== document.body && !a.closest(".ProseMirror")) return;
+        void invoke("focus_window", { on: false, restore: false }).then(focusEditor).catch(() => undefined);
+      }, 800);
   }
 
   // Leaving full screen from outside the app ends focus mode as well.

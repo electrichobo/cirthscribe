@@ -1133,6 +1133,10 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
         if restore {
             window.set_fullscreen(false).map_err(e)?;
         }
+        // macOS (GROGU, 2026-10-27): right after leaving full screen,
+        // Cmd+Shift shortcuts were dropped until something took focus.
+        // Asking for focus again is the guess; not yet verified on a Mac.
+        window.set_focus().map_err(e)?;
         Ok(false)
     }
 }
