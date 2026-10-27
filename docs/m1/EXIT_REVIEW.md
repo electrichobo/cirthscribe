@@ -50,7 +50,7 @@ All of these need a test machine, not the owner's production machine. Checklists
 In priority order. Items 1 to 4 are the gate. Items 5 to 7 are gaps where the gate is not stated clearly enough to pass.
 
 1. **macOS editing smoke test has never run.** The ROADMAP gate says "editing smoke tests pass on Windows, Mac, and Linux". This needs the MANUAL_CHECKS section 1 run on a Mac (unavailable for a few days) and logged.
-2. **Real IME run is missing.** A3 says that with an IME "no characters disappear, duplicate, or corrupt". Simulated composition passes, but a real IME is where editors usually lose text. At least one CJK IME should be checked on each OS before M1 can be called free of data-loss risk.
+2. ~~**Real IME run is missing.**~~ **Waived by the owner 2026-10-26, not passed.** No test machines with these input methods can be arranged. It is not run and is not counted as a pass. Simulated composition is the only evidence, and real-IME text loss stays a known risk (A3) to retest when a tester is available.
 3. ~~**There is no real kill-during-package-save test.**~~ **Closed 2026-10-26.** `cirth-cli crash-at <point>` stops a real save at three points: snapshot written, snapshot flushed, and file replaced. The test kills it with the same hard kill as the store crash tests (`killed_during_package_save_keeps_a_valid_package_and_every_edit`). The package is always a whole file (old or new) and every acknowledged edit comes back on reopen. The next save works despite the leftover temp file. A deliberately non-atomic save (delete, then write) fails the test. A crash inside the migration transaction is covered too (`killed_during_migration_leaves_the_original_and_reopens_cleanly`): the project file and pre-migration copy are untouched, the working copy rolls back to v1, and reopening migrates cleanly with no duplicate backup. These run in CI on all three OSes as part of `cargo test -p cirth-core`.
 4. **Performance is measured on one OS only.** The gate wants p95 < 50 ms and warm open < 3 s "on each OS's reference machine". Linux and macOS have no measurement and no reference machine is defined. Linux CI under Xvfb is not a fair reference. The p99 tail (33 to 134 ms between runs) is still unexplained (M1_PLAN 1.5).
 5. **Windows CI e2e does not run.** WebView2 doesn't start on the hosted runner, and the step is non-blocking. Windows is covered by local runs, which the gate accepts as "recorded manual runs". Record those runs in the results log, or fix the runner. Not a hard blocker if the log is kept.
@@ -68,10 +68,11 @@ Owner decisions (2026-10-26):
 - **Windows x64 only,** no 32-bit build.
 - **`.cirth` stays.**
 
+- **Windows 10 or later.**
+- **Linux distribution-agnostic.** That is a packaging job (AppImage on an older base, or Flatpak). The CI binary needs Ubuntu 24.04's glibc and WebKitGTK.
+
 Still open:
-- Minimum Windows version (WebView2 needs 10 or 11).
 - Windows on ARM.
-- Linux distributions.
 - Which machine is the reference machine for each OS.
 
 I'm inferring that macOS builds cover both Apple Silicon and Intel, since Big Sur runs on both.

@@ -13,7 +13,7 @@ Order matters: the first three items remove M0's open risks before features grow
    - macOS 15: **green** (core tests including process-kill crash tests; app builds). Editing is manual (`docs/testing/MANUAL_CHECKS.md`).
    - Windows Server 2025 (MSVC): core tests and build **green**; MSVC binary imports no `WebView2Loader.dll` and no MinGW runtime (answers the M0 question). **Open item: e2e does not run on the hosted runner.** DevTools driver: the app runs but WebView2's DevTools port never opens (90 s wait, WebView2 155.0.4283.62 installed). WebDriver driver: the step hung with no output past the runner's 25-minute deadline and the 30-minute step limit (run 40274314737), so the in-runner deadline also failed to fire on Windows (a harness defect). Guess, unconfirmed: WebView2 cannot start in the runner's desktop session. Update (run 40397042653, 2026-10-26): with an 8-minute cap the WebDriver suite's own deadline did fire, before the first test, so the app never reached Home on the runner; the DevTools driver again saw the app running with no debugging port. Since 2026-10-26 both Windows e2e steps are `continue-on-error` with a 10-minute cap and do not gate CI. **Windows e2e is a local check** on a desktop session (`npm run e2e:cdp`, `npm run e2e:webdriver`) until this is solved. Next: read the job log (needs a GitHub sign-in), then try a self-hosted or interactive-session runner.
    - Remaining: lint and typecheck steps.
-4. **Real IME checklist** (`docs/testing/MANUAL_CHECKS.md` section 2): Microsoft Japanese, Chinese (Pinyin) and Korean IMEs on Windows; macOS Japanese/Pinyin; IBus or Fcitx on Linux. Run on test machines, not the owner's production machine, since enabling input languages changes system settings.
+4. **Waived by the owner 2026-10-26: not run.** The owner has no way to arrange test machines with these input methods, so this check does not block M1. It has **not** passed; simulated composition (DevTools) is the only evidence, and real-IME text loss stays a known risk until someone runs it. Original item: **Real IME checklist** (`docs/testing/MANUAL_CHECKS.md` section 2): Microsoft Japanese, Chinese (Pinyin) and Korean IMEs on Windows; macOS Japanese/Pinyin; IBus or Fcitx on Linux. Run on test machines, not the owner's production machine, since enabling input languages changes system settings.
 5. **Tail latency.** p99 input-to-paint varies 33 to 134 ms between runs with no long tasks (FINDINGS). Find the cause before relying on p99.
 
 ## 2. App shell and project lifecycle
@@ -65,6 +65,6 @@ Focus order across panels, screen-reader labels and live regions (save status), 
 ## Decisions needed from the owner during M1 (not blocking the start)
 
 - ~~Project license~~ GPL-3.0-only with a 7(b) attribution term (2026-10-26).
-- ~~Minimum OS versions and CPU architectures.~~ Partly settled 2026-10-26: macOS 11 Big Sur or later, Windows x64 only. Still open: minimum Windows version, Linux distributions.
+- ~~Minimum OS versions and CPU architectures.~~ Settled 2026-10-26: Windows 10 or later (x64 only), macOS 11 Big Sur or later, Linux distribution-agnostic (packaging decides how).
 - Spell-check engine and dictionary sources once options are compared.
 - ~~Whether `.cirth` stays the extension.~~ Yes (owner, 2026-10-26).

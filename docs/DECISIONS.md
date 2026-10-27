@@ -18,7 +18,7 @@ The following defaults allow progress without pretending the owner has already s
 | Timing language | Estimates separate from measured on-screen duration | Fixed semantic rule |
 | Google support | Tested DOCX/XLSX/CSV profiles first; live feedback later | M2/M4, integration ADR later |
 | AI | Optional BYO provider/endpoint, disabled by default | M7 |
-| OS support | Owner, 2026-10-26: macOS 11 Big Sur or later; Windows x64 only (no 32-bit build). Not yet stated: minimum Windows version (WebView2 itself needs Windows 10 or 11), Windows on ARM, Linux distributions. macOS builds for both Apple Silicon and Intel, since Big Sur runs on both (inferred, not stated by the owner) | Windows version and Linux before the first release |
+| OS support | Owner, 2026-10-26: Windows 10 or later, x64 only (no 32-bit build); macOS 11 Big Sur or later; Linux distribution-agnostic. macOS builds for both Apple Silicon and Intel, since Big Sur runs on both (inferred, not stated by the owner). Distribution-agnostic Linux needs packaging that carries or targets an old enough base (AppImage built on an older distribution, or Flatpak); a binary built on CI's Ubuntu 24.04 needs glibc 2.39 and WebKitGTK 4.1, so it would not run on older distributions. Not yet stated: Windows on ARM | Packaging before the first release |
 | Fonts/dictionaries | Courier Prime (OFL 1.1) for the screenplay profile; non-Latin fallback and dictionaries unselected | Font M0 (done); fallback and dictionaries M1/M2 |
 | Signing/installers | Plan separately; no promise that every release can be signed at no cost | Before distribution |
 | Git-like history | In-app snapshots/branches, no Git installation requirement | M5 implementation ADR |
@@ -28,7 +28,7 @@ The following defaults allow progress without pretending the owner has already s
 - Exact visual identity, keyboard cycle variants, and preferred default page profile.
 - Which production revision conventions should ship as presets.
 - Whether immersive storytelling first targets branching prose, interactive screenplay annotations, or another output engine.
-- Minimum Windows version, Windows on ARM, and which Linux distributions to support (macOS and Windows architecture settled 2026-10-26).
+- Windows on ARM (other platform minimums settled 2026-10-26).
 - Whether private notes/history are included by default in shared native packages.
 
 ## ADR template

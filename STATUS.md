@@ -29,7 +29,7 @@ M1 progress:
 - About and licences screen (attribution, GPL, third-party licences); notices file generated and checked in CI.
 - 4 Free Writing: notes outside any project (own database), folders, search, Trash, autosave that survives a hard kill, .txt export, copy or move into the open script with provenance. Flow mode turns off editing so text only grows at the end.
 
-M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run and latency measured on each OS. Closed since the review: a real kill-during-package-save test (and a crash during migration), a Rust/TypeScript model contract test, and an in-app offline test. Platforms (owner): macOS 11 or later, Windows x64 only; `.cirth` stays. Next: the manual passes on test machines.
+M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run and latency measured on each OS. Closed since the review: a real kill-during-package-save test (and a crash during migration), a Rust/TypeScript model contract test, and an in-app offline test. Platforms (owner): Windows 10 or later (x64 only), macOS 11 or later, Linux distribution-agnostic; `.cirth` stays. Real-IME testing is waived by the owner (not run, not passed). Next: the macOS pass and latency on macOS and Linux.
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 
@@ -50,7 +50,7 @@ Fixed: native End key right after typing missed by the editor (M1, see `docs/m0/
 
 ## Untested
 
-macOS editing (manual checklist not yet run), real IMEs, screen readers, high DPI. Linux is covered by CI (WebKitGTK under Xvfb on Ubuntu 24.04), not by a desktop session.
+macOS editing (manual checklist not yet run), real IMEs (waived by the owner 2026-10-26), screen readers, high DPI. Linux is covered by CI (WebKitGTK under Xvfb on Ubuntu 24.04), not by a desktop session.
 
 ## How to run (Windows, dev machine)
 

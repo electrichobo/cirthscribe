@@ -90,4 +90,4 @@ The automated tests check names, ids, focus movement and what is put in the anno
 
 | Date | Check | OS / version | WebView | Tester | Result | Notes |
 | - | - | - | - | - | - | - |
-| | | | | | | |
+| 2026-10-26 | Section 2, real IMEs | all | all | none | **Waived (not run)** | Owner decision: no way to arrange IME test machines. Not a pass; simulated composition only. Run when a tester is available. |
