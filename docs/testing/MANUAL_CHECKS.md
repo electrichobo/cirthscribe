@@ -81,7 +81,7 @@ Automated IME coverage is simulated composition (DevTools, Windows only). Real I
 
 ## 3. Accessibility (M1 item 6)
 
-The automated tests check names, ids, focus movement and what is put in the announcement region; only a real screen reader shows what is actually spoken. Run each row with Narrator (Windows) and Orca (Linux) on a test machine. **VoiceOver is out of scope** (owner, 2026-10-26: not wanted) (screen readers speak aloud and change input handling, so not on a production machine).
+The automated tests check names, ids, focus movement and what is put in the announcement region; only a real screen reader shows what is actually spoken. **Not part of M1** (owner, 2026-10-26): screen-reader testing (Narrator, VoiceOver, Orca) is dropped for M1. The checklist is kept for whenever it is scheduled. If run, use a test machine: screen readers speak aloud and change input handling.
 
 | # | Steps | Expected |
 | - | - | - |
@@ -112,6 +112,6 @@ The automated tests check names, ids, focus movement and what is put in the anno
 | 2026-10-26 | O1, O2 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | Turning Wi-Fi off cuts the computer-use session; needs a person. |
 | 2026-10-26 | A1–A10 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | VoiceOver froze the session; the owner declined section 3. |
 | 2026-10-26 | Observations | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | n/a | Cmd+Q did nothing and the app menu had no Quit (fixed in `8e5d006`, recheck N9). Scene-list click did not scroll, and Enter then added an empty heading (fixed, recheck M12). Cmd+Z on the board with board focus does nothing (open). |
-| 2026-10-26 | Section 3 with VoiceOver | macOS | | none | **Dropped** | Owner decision: VoiceOver testing is not wanted. Narrator and Orca rows are unaffected. |
+| 2026-10-26 | Section 3, all screen readers | all | | none | **Dropped for M1** | Owner decision: VoiceOver not wanted at all; Narrator and Orca not part of M1. |
 | 2026-10-26 | Section 1d, offline (O1, O2) | all | | none | **Deferred (not run)** | Owner decision: skipped for now. Covered meanwhile only by the in-app e2e check (no outside requests; CSP refuses outside addresses). |
 | 2026-10-26 | Section 2, real IMEs | all | all | none | **Waived (not run)** | Owner decision: no way to arrange IME test machines. Not a pass; simulated composition only. Run when a tester is available. |

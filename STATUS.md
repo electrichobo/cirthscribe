@@ -25,11 +25,11 @@ M1 progress:
 
 - 3 Dual dialogue toggle (side by side in the editor), forced page break, page view (gaps from the Rust page map).
 - 5 Page size (Letter/A4) stored per document; plain-text export from the page map, with a note on what text cannot keep.
-- 6 Accessibility (automated parts): F6 between panels; keyboard-only scene list and board with announced moves; quiet save status; UI size and high contrast in the View menu, kept across restarts. Real screen-reader runs are still manual (MANUAL_CHECKS section 3).
+- 6 Accessibility (automated parts): F6 between panels; keyboard-only scene list and board with announced moves; quiet save status; UI size and high contrast in the View menu, kept across restarts. Testing with real screen readers is not part of M1 (owner, 2026-10-26).
 - About and licences screen (attribution, GPL, third-party licences); notices file generated and checked in CI.
 - 4 Free Writing: notes outside any project (own database), folders, search, Trash, autosave that survives a hard kill, .txt export, copy or move into the open script with provenance. Flow mode turns off editing so text only grows at the end.
 
-M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run and latency measured on each OS. Closed since the review: a real kill-during-package-save test (and a crash during migration), a Rust/TypeScript model contract test, and an in-app offline test. Platforms (owner): Windows 10 or later (x64 only), macOS 11 or later, Linux distribution-agnostic; `.cirth` stays. Real-IME testing is waived by the owner (not run, not passed); VoiceOver testing is dropped; the network-off check is deferred. Next: the macOS pass and latency on macOS and Linux (Help > Typing Latency… gives copyable numbers on any OS).
+M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run and latency measured on each OS. Closed since the review: a real kill-during-package-save test (and a crash during migration), a Rust/TypeScript model contract test, and an in-app offline test. Platforms (owner): Windows 10 or later (x64 only), macOS 11 or later, Linux distribution-agnostic; `.cirth` stays. Real-IME testing is waived by the owner (not run, not passed); screen-reader testing is not part of M1; the network-off check is deferred. Next: the macOS pass and latency on macOS and Linux (Help > Typing Latency… gives copyable numbers on any OS).
 
 The repository contains a feasibility spike, not a usable application. Nothing here is a release.
 
@@ -50,7 +50,7 @@ Fixed: native End key right after typing missed by the editor (M1, see `docs/m0/
 
 ## Untested
 
-macOS editing (manual checklist not yet run), real IMEs (waived by the owner 2026-10-26), screen readers, high DPI. Linux is covered by CI (WebKitGTK under Xvfb on Ubuntu 24.04), not by a desktop session.
+macOS editing (manual checklist not yet run), real IMEs (waived by the owner 2026-10-26), screen readers (not part of M1, owner 2026-10-26), high DPI. Linux is covered by CI (WebKitGTK under Xvfb on Ubuntu 24.04), not by a desktop session.
 
 ## How to run (Windows, dev machine)
 

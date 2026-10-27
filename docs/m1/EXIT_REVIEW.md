@@ -41,7 +41,7 @@ All of these need a test machine, not the owner's production machine. Checklists
 | Native Open/Save As dialogs (D1 to D4) | 1b | No driver can operate OS dialogs. |
 | Native menus, macOS Edit menu, dual-dialogue caret, TXT in a real editor (N1 to N8) | 1c | OS menus can't be automated. |
 | Real IMEs: Japanese, Pinyin, Korean on Windows, macOS and Linux | 2 | Only simulated composition is automated. Adding input languages changes system settings. |
-| Screen readers: Narrator, Orca (A1 to A10; VoiceOver dropped by the owner) | 3 | Only a real reader shows what is spoken. Screen readers talk aloud and take over input. |
+| ~~Screen readers (A1 to A10)~~ | 3 | **Not part of M1** (owner, 2026-10-26). The automated checks (names, focus, announcements) still run. |
 | High DPI | (no checklist yet) | Not tested anywhere. |
 | End-key stress test on WKWebView and WebKitGTK | M1_PLAN 1.1 | The Linux e2e runs the startup regression test. The 500-trial stress test is Windows-only (DevTools), and macOS has none. |
 
@@ -122,6 +122,5 @@ Not run:
 4. Run on test machines and log the results:
    - macOS: section 1 checks, plus latency on the long fixture.
    - Real IMEs: section 2.
-   - Screen readers: section 3.
    - Linux desktop: latency.
 5. Fix whatever those runs find, then repeat this review.

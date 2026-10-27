@@ -53,7 +53,6 @@ Done:
 - [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
 
 Still to do:
-- [ ] Testing with real screen readers (Narrator, VoiceOver, Orca)
 - [ ] Hands-on testing on macOS and with Asian-language input methods
 
 ### Stage 2: Professional pages and file exchange
