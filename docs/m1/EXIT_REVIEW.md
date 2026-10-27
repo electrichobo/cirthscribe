@@ -106,7 +106,12 @@ Defects found, and fixed on main after the pass. Each needs a recheck on a Mac:
 - **Cmd+Q did nothing.** Fixed: the app menu has its own Quit (Cmd+Q) that goes through the save-first close. The predefined macOS Quit would skip it. Recheck: N9.
 - **Scene-list click + Enter:** clicking a scene did not scroll there on WebKit, and Enter then inserted an empty heading above it. Fixed: the caret goes to the end of the heading and the heading is scrolled into view explicitly. The caret and Enter behaviour is tested by e2e on both drivers. Only Linux CI and a Mac recheck (M12) can prove the scroll part, because WebView2 already scrolled.
 
-Still open from the pass: Cmd+Z on the board while it has focus does nothing (works from the editor).
+**Recheck on `440e982` (same Mac, 2026-10-26): M5, N7, M12 and N9 all pass**, as does the Typing Latency dialog.
+
+Still open from the passes:
+- Cmd+Z on the board while it has focus does nothing (works from the editor).
+- Pasting the app's own copy into an empty block merges the first pasted block into it, so a cue becomes Action. Plain and foreign-app paste already handle this; in-app copies go through ProseMirror's parser, which does not. Probably present since M0.
+- The About dialog changes height between tabs (cosmetic).
 
 Not run:
 - **D4:** needs a synced folder.
