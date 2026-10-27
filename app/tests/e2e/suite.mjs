@@ -1669,7 +1669,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.menu('view_nav')");
     await waitFor(app, "!document.getElementById('navigator').getClientRects().length", "scene list hidden");
     await waitAnnounced("Scene list hidden", "hiding announced");
-    assert((await editorWidth()) > w0 + 200, `script takes the space: ${w0} -> ${await editorWidth()}`);
+    assert((await editorWidth()) > w0 + 100, `script takes the space: ${w0} -> ${await editorWidth()}`); // panels may be at their narrower widths (layout-mode.ts)
     // Toolbar dropdown: keyboard only.
     await app.evaluate("document.getElementById('view-menu-btn').focus()");
     await press("Enter");
@@ -1988,6 +1988,41 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     r = (await blocks())[ai].runs;
     assert(r.at(-1).color === "red" && r.at(-1).highlight === "green", `pasted copy keeps markup: ${JSON.stringify(r)}`);
     await screenshot(app, "colour-highlight");
+  });
+
+  await test("Narrow script column: panels shrink, then float over the script and open from the island; the page always fits", async () => {
+    await openFixture("page-boundaries");
+    const setZoom = (z) => app.evaluate(`(() => { const s = document.getElementById('zoom'); s.value = '${z}'; s.dispatchEvent(new Event('input')); return true; })()`);
+    const state = () => app.evaluate(`(() => { const w = document.querySelector('.editor-wrap'); const page = document.getElementById('editor').getBoundingClientRect().width;
+      const shown = (id) => document.getElementById(id).getClientRects().length > 0;
+      return { layout: document.body.dataset.layout, fits: w.clientWidth >= page, nav: shown('navigator'), board: shown('board'),
+        navPressed: document.getElementById('toggle-nav').getAttribute('aria-pressed'), boardPressed: document.getElementById('toggle-board').getAttribute('aria-pressed'), editorW: Math.round(w.getBoundingClientRect().width) }; })()`);
+    let s = await state();
+    assert(s.layout !== "overlay" && s.fits && s.nav && s.board, `at 100% the page fits beside both panels: ${JSON.stringify(s)}`);
+    // A page too wide for the column: the panels float instead of squeezing it.
+    await setZoom(160);
+    s = await state();
+    assert(s.layout === "overlay" && !s.nav && !s.board && s.fits, `overlay: panels out of the way, page fits: ${JSON.stringify(s)}`);
+    assert(s.navPressed === "false" && s.boardPressed === "false", "island buttons show the panels closed");
+    const w0 = s.editorW;
+    await clickHome(app, "#toggle-nav");
+    s = await state();
+    assert(s.nav && s.navPressed === "true" && s.editorW === w0, `scene list floats over the script without squeezing it: ${JSON.stringify(s)}`);
+    assert(await app.evaluate("document.getElementById('navigator').contains(document.activeElement)"), "focus moves into the floating panel");
+    await waitAnnounced("open over the script", "announced");
+    await press("Escape");
+    s = await state();
+    assert(!s.nav && (await app.evaluate("__cirth.view.hasFocus()")), `Escape closes it and returns to the script: ${JSON.stringify(s)}`);
+    await clickHome(app, "#toggle-board");
+    assert((await state()).board, "board floats");
+    await app.evaluate("__cirth.view.focus()");
+    assert(!(await state()).board, "going back to the script closes it");
+    const panelsNow = await app.evaluate("__cirth.prefs().panels");
+    assert(["nav", "board", "toolbar", "status"].every((k) => panelsNow[k] === true), `floating never changes the stored panel choices: ${JSON.stringify(panelsNow)} layout ${JSON.stringify(await state())}`);
+    await screenshot(app, "overlay-closed");
+    await setZoom(100);
+    s = await state();
+    assert(s.layout !== "overlay" && s.nav && s.board, `back beside the script at 100%: ${JSON.stringify(s)}`);
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {

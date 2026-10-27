@@ -69,6 +69,15 @@ body[data-view="editor"] { grid-template-areas: "toolbar" "panes" "footer"; }
 body[data-view="editor"] > .toolbar { grid-area: toolbar; }
 body[data-view="editor"] > .panes { grid-area: panes; }
 body[data-view="editor"] > footer { grid-area: footer; }
+/* Narrow windows (layout-mode.ts): panels shrink ("compact"), then leave the
+   layout and float over the script ("overlay"), opened from the island.
+   These come before the hide rules so a hidden panel stays at width 0. */
+body[data-layout="compact"] { --nav-w: 200px; --board-w: 260px; }
+body[data-layout="overlay"] { --nav-w: 0px; --board-w: 0px; }
+.panes { position: relative; }
+body[data-layout="overlay"] #navigator, body[data-layout="overlay"] #board { display: none; }
+body[data-layout="overlay"][data-float-nav]:not([data-focus]) #navigator { display: block; position: absolute; top: 0; bottom: 0; left: 0; width: 280px; z-index: 15; box-shadow: 6px 0 18px rgba(0, 0, 0, .3); }
+body[data-layout="overlay"][data-float-board]:not([data-focus]) #board { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 340px; z-index: 15; box-shadow: -6px 0 18px rgba(0, 0, 0, .3); }
 body[data-hide-nav] { --nav-w: 0; }
 body[data-hide-board] { --board-w: 0; }
 body[data-hide-nav] #navigator, body[data-hide-board] #board, body[data-hide-toolbar] > .toolbar, body[data-hide-status] > footer { display: none; }

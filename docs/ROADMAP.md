@@ -73,6 +73,12 @@ Jared raised these after the M1 feature work, which so far covered only the scri
      - Temporary original icons (`app/src/icons.ts`) until the art set exists.
      - On narrow windows the island wraps onto a second row, ribbon-style.
      - A comments/review panel toggle joins the island when M5 builds comments; there is no placeholder button.
+     - **Narrow windows (owner, 2026-10-27):**
+       - When the page does not fit beside the side panels, they shrink (scene list 200 px, board 260 px).
+       - If it still does not fit, they leave the layout and float over the script, opened from the island's scene-list and board buttons.
+       - Escape, going back to the script, or the same button closes them.
+       - Floating is temporary; the View menu's show/hide choice is unchanged.
+       - The window's minimum size is 900 × 560.
 5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A). **B, I and U built 2026-10-26:**
    - Block-type dropdown and B, I, U buttons show the state at the caret (pressed or not).
    - Using them keeps the selection and focus in the script.

@@ -31,6 +31,7 @@ import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
 import { icon, iconButton, iconSelect } from "./icons";
+import { createLayoutMode } from "./layout-mode";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -564,6 +565,15 @@ const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(na
 }
 const focusMode = createFocusMode(() => view?.focus());
 createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle(), () => void toggleTypewriter().then(centreTypingLine), $("more-settings"));
+// Narrow windows: side panels shrink, then float over the script (layout-mode.ts).
+let showPanelButtons = () => {};
+const layoutMode = createLayoutMode({
+  zoom: () => Number(($("zoom") as HTMLInputElement).value) / 100,
+  panes: document.querySelector<HTMLElement>(".panes")!,
+  panels: { nav: navEl, board: boardEl },
+  onChange: () => showPanelButtons(),
+  focusScript: () => view?.focus(),
+});
 // The island's own buttons: Home, undo/redo, panel toggles, find, focus mode.
 {
   const mod = /Mac/i.test(navigator.userAgent) ? "Cmd" : "Ctrl";
@@ -585,9 +595,10 @@ createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.tog
   });
   $("island-nav").append(homeBtn, undoBtn, redoBtn);
   const navBtn = iconButton("toggle-nav", "scenes", "Scene list", "Show or hide the scene list");
-  navBtn.addEventListener("click", () => void togglePanel("nav"));
+  // In the floating layout these open the panel over the script instead.
+  navBtn.addEventListener("click", () => (layoutMode.mode === "overlay" && currentPrefs().panels.nav ? layoutMode.toggleFloat("nav") : void togglePanel("nav")));
   const boardBtn = iconButton("toggle-board", "board", "Board", "Show or hide the board");
-  boardBtn.addEventListener("click", () => void togglePanel("board"));
+  boardBtn.addEventListener("click", () => (layoutMode.mode === "overlay" && currentPrefs().panels.board ? layoutMode.toggleFloat("board") : void togglePanel("board")));
   const findBtn = iconButton("tool-find", "find", "Find and replace", `Find and replace (${mod}+F)`);
   findBtn.addEventListener("click", () => {
     if (lastOpen) findBar.open();
@@ -597,9 +608,11 @@ createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.tog
   $("island-panels").append(navBtn, boardBtn, findBtn, focusBtn);
   ($("view-menu-btn") as HTMLButtonElement).append(icon("more"));
   const showPressed = () => {
-    navBtn.setAttribute("aria-pressed", String(currentPrefs().panels.nav));
-    boardBtn.setAttribute("aria-pressed", String(currentPrefs().panels.board));
+    const overlay = layoutMode.mode === "overlay";
+    navBtn.setAttribute("aria-pressed", String(overlay ? layoutMode.isFloating("nav") : currentPrefs().panels.nav));
+    boardBtn.setAttribute("aria-pressed", String(overlay ? layoutMode.isFloating("board") : currentPrefs().panels.board));
   };
+  showPanelButtons = showPressed;
   onPanelsChanged(showPressed);
   showPressed();
   // Toolbar keys (WAI-ARIA toolbar pattern): Left/Right/Home/End move along
@@ -910,6 +923,7 @@ async function exportText(path?: string): Promise<boolean> {
 }
 $("zoom").addEventListener("input", (e) => {
   editorEl.style.zoom = `${(e.target as HTMLInputElement).value}%`;
+  layoutMode.apply();
 });
 $("structural").addEventListener("change", (e) => {
   board.structural = (e.target as HTMLInputElement).checked;
@@ -939,6 +953,7 @@ $("structural").addEventListener("change", (e) => {
   perf,
   latency,
   focusMode,
+  layoutMode,
   selSync,
   blocks: () => {
     const out: Block[] = [];
