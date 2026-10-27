@@ -1235,6 +1235,165 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "__cirth.pagination && !__cirth.pagination.map.profile.includes('a4')", "back to Letter");
   });
 
+  // Every visible control has an accessible name; ids are unique; aria
+  // references resolve; the background save lines are not live regions.
+  const AUDIT = `(() => {
+    const visible = (e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+    const text = (e) => (e?.textContent ?? '').replace(/\\s+/g, ' ').trim();
+    const nameOf = (e) => {
+      const by = e.getAttribute('aria-labelledby');
+      if (by) return by.split(/\\s+/).map((id) => text(document.getElementById(id))).join(' ').trim();
+      if (e.getAttribute('aria-label')) return e.getAttribute('aria-label').trim();
+      if (e.labels && e.labels.length) return [...e.labels].map(text).join(' ').trim();
+      if (['BUTTON', 'A'].includes(e.tagName) || ['button', 'tab', 'listitem'].includes(e.getAttribute('role'))) return text(e) || (e.title ?? '').trim();
+      return (e.title ?? '').trim();
+    };
+    const sel = 'button, input:not([type=hidden]), select, textarea, a[href], [tabindex], [contenteditable=true], [role=button], [role=tab]';
+    const unnamed = [...document.querySelectorAll(sel)].filter(visible).filter((e) => !nameOf(e)).map((e) => e.outerHTML.slice(0, 140));
+    const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
+    const dup = [...new Set(ids.filter((x, i) => ids.indexOf(x) !== i))];
+    const refs = [...document.querySelectorAll('[aria-describedby], [aria-labelledby], [aria-controls]')].flatMap((e) => ['aria-describedby', 'aria-labelledby', 'aria-controls'].flatMap((a) => (e.getAttribute(a) || '').split(/\\s+/).filter(Boolean)));
+    const badRefs = refs.filter((id) => !document.getElementById(id));
+    const chatty = ['status', 'file-status', 'fw-status'].filter((id) => { const e = document.getElementById(id); return e && (e.getAttribute('aria-live') ?? (e.getAttribute('role') === 'status' ? 'polite' : 'off')) !== 'off'; });
+    return { unnamed, dup, badRefs, chatty };
+  })()`;
+  const audit = async (where) => {
+    const r = await app.evaluate(AUDIT);
+    assert(!r.unnamed.length, `${where}: controls without a name: ${r.unnamed.join(" | ")}`);
+    assert(!r.dup.length, `${where}: duplicate ids ${r.dup.join(", ")}`);
+    assert(!r.badRefs.length, `${where}: aria references to missing ids ${r.badRefs.join(", ")}`);
+    assert(!r.chatty.length, `${where}: save status announced on every change: ${r.chatty.join(", ")}`);
+  };
+  const announced = () => app.evaluate("document.getElementById('announce')?.textContent ?? ''");
+  // Messages land a moment after the change (the region is cleared first).
+  const waitAnnounced = (part, what) => waitFor(app, `(document.getElementById('announce')?.textContent ?? '').includes(${JSON.stringify(part)})`, what);
+
+  await test("Accessibility audit: names, unique ids, aria references, quiet save status (Home, editor, find, Free Writing, About)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await audit("Home");
+    await openFixture("page-boundaries");
+    await audit("Editor");
+    await app.evaluate("__cirth.menu('find')");
+    await audit("Editor with find bar");
+    await app.evaluate("(() => { document.getElementById('find-close').click(); return true; })()");
+    await fwOpen();
+    await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
+    await waitFor(app, "!!__cirth.free.current", "piece open");
+    await audit("Free Writing");
+    await app.evaluate("(() => { document.getElementById('fw-back').click(); return true; })()");
+    await app.evaluate("__cirth.about.open()");
+    await audit("About");
+    await app.evaluate("__cirth.about.close()");
+  });
+
+  await test("Keyboard only: F6 between panels; navigator and board are one Tab stop each; Alt+arrows move with announcements", async () => {
+    await openFixture("page-boundaries");
+    const ids = async () => (await app.evaluate("__cirth.scenes().map(s => s.sceneId)"));
+    const order0 = await ids();
+    await caretAtEndOf(0);
+    const activeIn = (sel) => app.evaluate(`!!document.activeElement && !!document.activeElement.closest(${JSON.stringify(sel)})`);
+    // F6 from the editor: board, then toolbar, navigator, editor; Shift+F6 goes back.
+    await press("F6");
+    assert(await activeIn("#board"), "F6: board");
+    await press("F6");
+    assert(await activeIn(".toolbar"), "F6: toolbar");
+    await press("F6");
+    assert(await activeIn("#navigator"), "F6: navigator");
+    await press("F6");
+    assert(await app.evaluate("document.activeElement === __cirth.view.dom"), "F6: editor");
+    await press("F6", ["shift"]);
+    assert(await activeIn("#navigator"), "Shift+F6: back to the navigator");
+    // One Tab stop per list.
+    const tabStops = (sel) => app.evaluate(`[...document.querySelectorAll(${JSON.stringify(sel + " button, " + sel + " textarea, " + sel + " [tabindex]")})].filter(e => e.tabIndex >= 0 && !e.disabled && e.getClientRects().length).length`);
+    assert((await tabStops("#navigator")) === 1, `navigator tab stops ${await tabStops("#navigator")}`);
+    // Escape in the editor goes to the navigator's current scene.
+    await caretAtEndOf(0);
+    await press("Escape");
+    const focusedScene = () => app.evaluate("document.activeElement?.closest('[data-item]')?.dataset.item ?? null");
+    assert((await focusedScene()) === order0[0], "Escape: current scene in the navigator");
+    await press("ArrowDown");
+    assert((await focusedScene()) === order0[1], "ArrowDown: next scene");
+    await press("Enter");
+    assert(await app.evaluate(`document.activeElement === __cirth.view.dom && document.querySelector('#navigator li.current')?.dataset.item === ${JSON.stringify(order0[1])}`) || (await sleep(300), await app.evaluate(`document.querySelector('#navigator li.current')?.dataset.item === ${JSON.stringify(order0[1])}`)), "Enter: caret in scene 2");
+    // Alt+Down moves scene 2 to position 3; focus stays on it; it is announced.
+    await press("Escape");
+    await sleep(250);
+    assert((await focusedScene()) === order0[1], "back on scene 2");
+    await press("ArrowDown", ["alt"]);
+    await waitFor(app, `__cirth.scenes()[2]?.sceneId === ${JSON.stringify(order0[1])}`, "scene moved down");
+    await sleep(300);
+    assert((await focusedScene()) === order0[1], `focus follows the moved scene (${await focusedScene()})`);
+    await waitAnnounced("position 3 of 4", "move announced");
+    await app.evaluate("__cirth.view.focus()");
+    await press("z", [MOD_KEY]);
+    assert(JSON.stringify(await ids()) === JSON.stringify(order0), "one undo restores the order");
+    // Board (planning only): arrows choose, Alt+Right moves the card, script untouched.
+    await sleep(300);
+    const cardOrder = () => app.evaluate("[...document.querySelectorAll('#board .card')].map(c => c.dataset.item)");
+    const cards0 = await cardOrder();
+    await app.evaluate("document.querySelector('#board .card[tabindex=\"0\"]').focus()");
+    assert((await focusedScene()) === cards0[0], "first card focused");
+    const boardStops = await tabStops("#board .cards");
+    assert(boardStops === 4, `board tab stops: chosen card and its 3 controls, got ${boardStops}`);
+    await press("ArrowRight", ["alt"]);
+    await waitFor(app, `JSON.stringify([...document.querySelectorAll('#board .card')].map(c => c.dataset.item)) !== ${JSON.stringify(JSON.stringify(cards0))}`, "card moved");
+    assert((await cardOrder())[1] === cards0[0], "card now second");
+    assert((await focusedScene()) === cards0[0], "focus stays on the moved card");
+    await waitAnnounced("The script is unchanged", "card move announced");
+    assert(JSON.stringify(await ids()) === JSON.stringify(order0), "script order untouched in planning mode");
+    await press("ArrowRight");
+    assert((await focusedScene()) === (await cardOrder())[2], "ArrowRight: next card");
+    await press("Enter");
+    assert(await app.evaluate("document.activeElement?.dataset.part === 'summary'"), "Enter: edit the summary");
+    await press("Escape");
+    assert(await app.evaluate("document.activeElement?.classList.contains('card')"), "Escape: back to the card");
+  });
+
+  await test("Display: UI size and high contrast persist across restarts; theme colours meet contrast minimums", async () => {
+    const ratio = `(() => {
+      const css = getComputedStyle(document.documentElement);
+      const rgb = (v) => { let h = css.getPropertyValue(v).trim().replace('#', ''); if (h.length === 3) h = [...h].map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); };
+      const lum = (v) => { const [r, g, b] = rgb(v); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+      const out = {};
+      for (const fg of ['--ink', '--muted', '--accent', '--warn', '--bad']) for (const bg of ['--bg', '--panel']) out[fg + ' on ' + bg] = Math.round(cr(fg, bg) * 100) / 100;
+      return out;
+    })()`;
+    const check = async (min, label) => {
+      const r = await app.evaluate(ratio);
+      const low = Object.entries(r).filter(([, v]) => !(v >= min));
+      assert(!low.length, `${label}: below ${min}:1: ${JSON.stringify(low)}`);
+    };
+    await check(4.5, "standard theme");
+    const w0 = await app.evaluate("window.innerWidth");
+    await press("=", [MOD_KEY]);
+    await press("=", [MOD_KEY]);
+    await waitFor(app, "__cirth.prefs().scale === 1.2", "scale 120%").catch(async (e) => {
+      throw new Error(`${e.message}; prefs ${JSON.stringify(await app.evaluate("__cirth.prefs()"))}, announced '${await announced()}'`);
+    });
+    await waitAnnounced("120 percent", "size announced");
+    if (driver.name === "cdp") {
+      const w1 = await app.evaluate("window.innerWidth");
+      assert(Math.abs(w1 - w0 / 1.2) < 3, `whole window zoomed: ${w0} -> ${w1}`);
+    }
+    await app.evaluate("__cirth.menu('ui_contrast')");
+    await waitFor(app, "document.documentElement.dataset.contrast === 'high'", "high contrast on");
+    await check(7, "high contrast");
+    // Preferences are written at once: a hard kill keeps them.
+    await app.kill();
+    await sleep(1500);
+    app = await driver.launch("after-prefs-kill");
+    await waitHome(app);
+    await waitFor(app, "__cirth.prefs().scale === 1.2 && document.documentElement.dataset.contrast === 'high'", "preferences restored");
+    await screenshot(app, "high-contrast-home");
+    await press("0", [MOD_KEY]);
+    await app.evaluate("__cirth.menu('ui_contrast')");
+    await waitFor(app, "__cirth.prefs().scale === 1 && !document.documentElement.dataset.contrast", "back to defaults");
+    const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
+    assert(saved.scale === 1 && saved.contrast === "system", `stored ${JSON.stringify(saved)}`);
+  });
+
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {
     await openFixture("unicode-marks");
     const n0 = (await blocks()).length;

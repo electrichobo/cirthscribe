@@ -19,6 +19,7 @@ const KEYS = {
   Delete: { key: "Delete", code: "Delete", windowsVirtualKeyCode: 46 },
   PageUp: { key: "PageUp", code: "PageUp", windowsVirtualKeyCode: 33 },
   PageDown: { key: "PageDown", code: "PageDown", windowsVirtualKeyCode: 34 },
+  F6: { key: "F6", code: "F6", windowsVirtualKeyCode: 117 },
 };
 const MOD = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 const NATIVE_COMMAND = { v: "paste", c: "copy", x: "cut" };

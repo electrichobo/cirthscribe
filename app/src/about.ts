@@ -20,7 +20,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string,
 
 export function createAbout() {
   const dialog = el("dialog", { className: "about", id: "about-dialog" });
-  dialog.setAttribute("aria-labelledby", "about-title");
+  dialog.setAttribute("aria-label", "About CirthScribe and licences");
   document.body.append(dialog);
   let info: AboutInfo | null = null;
 
@@ -32,8 +32,8 @@ export function createAbout() {
   type Tab = (typeof tabs)[number]["id"];
 
   function page(tab: Tab, i: AboutInfo): HTMLElement {
-    if (tab === "gpl") return el("pre", { className: "about-text", tabIndex: 0 }, i.license);
-    if (tab === "third") return el("pre", { className: "about-text", tabIndex: 0 }, i.third_party);
+    if (tab === "gpl") return el("pre", { className: "about-text", tabIndex: 0, ariaLabel: "GNU General Public License version 3, full text" }, i.license);
+    if (tab === "third") return el("pre", { className: "about-text", tabIndex: 0, ariaLabel: "Third-party licences, full text" }, i.third_party);
     return el(
       "div",
       { className: "about-main" },
@@ -49,7 +49,7 @@ export function createAbout() {
       ),
       el("p", {}, "CirthScribe works offline. It sends nothing about you or your writing anywhere."),
       el("h3", {}, "Notice"),
-      el("pre", { className: "about-text short", tabIndex: 0 }, i.notice),
+      el("pre", { className: "about-text short", tabIndex: 0, ariaLabel: "Notice, full text" }, i.notice),
     );
   }
 

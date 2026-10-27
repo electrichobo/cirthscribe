@@ -50,9 +50,10 @@ Done:
 - [x] Plain-text export with the same pages and layout
 - [x] US Letter / A4 page size, saved with each document
 - [x] About screen with the licence and every third-party licence
+- [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
 
 Still to do:
-- [ ] Accessibility: keyboard-only use, screen readers, high contrast, UI scaling
+- [ ] Testing with real screen readers (Narrator, VoiceOver, Orca)
 - [ ] Hands-on testing on macOS and with Asian-language input methods
 
 ### Stage 2: Professional pages and file exchange

@@ -34,8 +34,8 @@
       <button id="txt" type="button" title="Plain text with the same line breaks and pages as the PDF">Export Text…</button>
       <label>Zoom <input id="zoom" type="range" min="60" max="160" value="100" step="10" aria-label="Editor zoom" /></label>
       <label class="toggle"><input id="structural" type="checkbox" /> Board may reorder script</label>
-      <span id="status" role="status" aria-live="polite"></span>
-      <span id="file-status" role="status" aria-live="polite"></span>
+      <span id="status" aria-live="off"></span>
+      <span id="file-status" aria-live="off"></span>
     </header>
     <main class="panes">
       <nav id="navigator" aria-label="Scene navigator"></nav>
@@ -54,11 +54,12 @@
           <button id="find-close" type="button" title="Close (Escape)" aria-label="Close find">✕</button>
         </div>
         <div id="banner" role="alert" hidden></div>
+        <p id="editor-hint" class="sr-only">Tab and Shift+Tab change the block type; Ctrl+1 to 9 set it directly. Escape goes to the scene list; F6 moves between panels.</p>
         <div id="editor"></div>
       </section>
       <aside id="board" aria-label="Board"></aside>
     </main>
-    <footer id="info"></footer>
+    <footer id="info" aria-label="Counts and pages"></footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

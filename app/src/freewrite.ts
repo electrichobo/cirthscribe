@@ -15,6 +15,7 @@
 // Move does the same and then sends the piece to Trash.
 
 import { invoke } from "@tauri-apps/api/core";
+import { announce } from "./a11y";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 
 export interface Folder {
@@ -85,7 +86,7 @@ export function createFreeWriting(root: HTMLElement, hooks: Hooks) {
   const newFolder = el("button", { type: "button", id: "fw-new-folder" }, "New folder");
   const scopes = el("ul", { className: "fw-scopes", role: "list" });
   const list = el("ul", { className: "fw-list", role: "list", id: "fw-list" });
-  const side = el("aside", { className: "fw-side" }, el("div", { className: "fw-new" }, newPiece, newFolder), scopes, list);
+  const side = el("aside", { className: "fw-side", ariaLabel: "Free Writing list" }, el("div", { className: "fw-new" }, newPiece, newFolder), scopes, list);
   const title = el("input", { type: "text", id: "fw-title", placeholder: "Title" });
   title.setAttribute("aria-label", "Piece title");
   const body = el("textarea", { id: "fw-body", placeholder: "Start writing. Nothing here is part of a project until you copy it in." });
@@ -98,7 +99,9 @@ export function createFreeWriting(root: HTMLElement, hooks: Hooks) {
   const copyBtn = el("button", { type: "button", id: "fw-copy", title: "Insert this piece into the open script at its cursor" }, "Copy into project");
   const moveBtn = el("button", { type: "button", id: "fw-move", title: "Copy into the open script, then move this piece to Trash" }, "Move into project");
   const trashBtn = el("button", { type: "button", id: "fw-trash" }, "Trash");
-  const status = el("span", { id: "fw-status", role: "status" });
+  const status = el("span", { id: "fw-status" });
+  // Not a live region: it changes on every keystroke. Failures are announced.
+  status.setAttribute("aria-live", "off");
   const flowNote = el("p", { className: "fw-flow-note", hidden: true }, "Flow mode: editing is off. Keep writing; press Esc to edit again.");
   const msg = el("p", { className: "fw-msg", id: "fw-msg", role: "status", hidden: true });
   const say = (text: string) => {
@@ -110,7 +113,7 @@ export function createFreeWriting(root: HTMLElement, hooks: Hooks) {
   const empty = el("p", { className: "fw-empty" }, "Choose a piece, or start a new one.");
   const editor = el("section", { className: "fw-editor" }, tools, flowNote, title, body, prov);
   const mainMsg = msg;
-  const main = el("section", { className: "fw-main" }, mainMsg, empty, editor);
+  const main = el("section", { className: "fw-main", ariaLabel: "Piece" }, mainMsg, empty, editor);
   root.replaceChildren(header, el("div", { className: "fw-body" }, side, main));
 
   let folders: Folder[] = [];
@@ -183,6 +186,7 @@ export function createFreeWriting(root: HTMLElement, hooks: Hooks) {
       } catch (e) {
         dirty = true;
         showStatus(`NOT SAVED: ${e}`);
+        announce(`Free Writing not saved: ${e}`, true);
       }
     })();
     try {

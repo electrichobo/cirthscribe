@@ -26,6 +26,7 @@ import { installSpell, spellPlugin } from "./spell";
 import { dualPlugin, toggleDual, togglePageBreak } from "./format";
 import { createFreeWriting } from "./freewrite";
 import { createAbout } from "./about";
+import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
   name: string;
@@ -73,6 +74,9 @@ function setStatus(s: SyncStatus) {
     saving: `Storing… (v${s.version})`,
     error: `NOT STORED: ${s.message}`,
   }[s.state];
+  // The status line is not a live region (it changes on every keystroke);
+  // only a failure is announced, once.
+  if (s.state === "error" && statusEl.dataset.state !== "error") announce(text, true);
   statusEl.textContent = text;
   statusEl.dataset.state = s.state;
 }
@@ -136,10 +140,19 @@ let navTimer: number | undefined;
 let pageTimer: number | undefined;
 
 function rerenderSide() {
-  renderNavigator(navEl, view);
+  renderNav();
   if (!boardEl.contains(document.activeElement) || !(document.activeElement instanceof HTMLTextAreaElement)) {
-    renderBoard(boardEl, view, board, rerenderSide);
+    const key = focusKey(boardEl);
+    renderBoard(boardEl, view, board, rerenderSide, key?.split("|")[0]);
+    restoreFocus(boardEl, key);
   }
+}
+
+/** Re-render the navigator, keeping keyboard focus on the same scene. */
+function renderNav() {
+  const key = focusKey(navEl);
+  renderNavigator(navEl, view, key?.split("|")[0]);
+  restoreFocus(navEl, key);
 }
 
 async function repaginate() {
@@ -164,8 +177,13 @@ function schedulePaginate(ms = 600) {
 }
 
 function dispatch(tr: Transaction) {
+  const before = view.state.selection.$from.parent;
   const next = view.state.apply(tr);
   view.updateState(next);
+  const after = next.selection.$from.parent;
+  if (after.type.name === "block" && before.type.name === "block" && after.attrs.id === before.attrs.id && after.attrs.kind !== before.attrs.kind) {
+    announce(KIND_LABEL[after.attrs.kind as Kind]);
+  }
   if (tr.docChanged) {
     syncer.changed(next.doc);
     findBar.refreshCount();
@@ -174,7 +192,7 @@ function dispatch(tr: Transaction) {
     navTimer = window.setTimeout(rerenderSide, 150);
   } else if (tr.selectionSet) {
     window.clearTimeout(navTimer);
-    navTimer = window.setTimeout(() => renderNavigator(navEl, view), 150);
+    navTimer = window.setTimeout(renderNav, 150);
   }
   if (tr.docChanged || tr.selectionSet) scheduleCounts();
   updateInfo();
@@ -189,7 +207,7 @@ function makeState(blocks: Block[]) {
       history(),
       // Before the screenplay keymap: Tab/Enter accept a suggestion when one is open.
       completePlugin(),
-      screenplayKeymap(() => (navEl.querySelector("button") as HTMLButtonElement | null)?.focus()),
+      screenplayKeymap(() => focusRegion(navEl)),
       keymap({ "Mod-d": toggleDual(showBanner), "Mod-Enter": togglePageBreak }),
       keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
       keymap(baseKeymap),
@@ -246,7 +264,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
       handleDOMEvents: { contextmenu: (v, e) => spell.onContextMenu(v, e as MouseEvent) },
       clipboardTextParser: (text) => clipboardTextParser(text),
       clipboardTextSerializer: (slice) => clipboardTextSerializer(slice),
-      attributes: { "aria-label": "Screenplay text", spellcheck: "false" },
+      attributes: { "aria-label": "Screenplay text", "aria-multiline": "true", "aria-describedby": "editor-hint", spellcheck: "false" },
     });
   // Ids may have been repaired on load (should not happen for store data).
   syncer = new Syncer(view.state.doc, o.doc.version);
@@ -507,6 +525,7 @@ $("profile").addEventListener("change", async (e) => {
 async function saveNow() {
   try {
     await saveFile(true);
+    announce("Saved");
   } catch (e) {
     showBanner(`Save failed: ${e}. Your edits are still kept in the recovery store.`);
   }
@@ -521,6 +540,24 @@ async function openViaDialog(): Promise<boolean> {
 // Shortcuts: handled here, not as OS menu accelerators, so they work the same
 // on every platform and can be exercised by the test drivers.
 const isMac = /Mac/i.test(navigator.userAgent);
+
+/** The regions F6 moves between in the current view, in reading order. */
+function regions(): HTMLElement[] {
+  const v = document.body.dataset.view;
+  const q = (s: string) => document.querySelector<HTMLElement>(s);
+  const list = v === "home" ? [q(".home-side"), q(".home-main")] : v === "free" ? [q(".fw-side"), q(".fw-main")] : [q(".toolbar"), navEl, q(".editor-wrap"), boardEl];
+  return list.filter((r): r is HTMLElement => !!r);
+}
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "F6" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing && !document.querySelector("dialog[open]")) {
+      e.preventDefault();
+      cycleRegions(regions(), e.shiftKey);
+    }
+  },
+  true,
+);
 window.addEventListener(
   "keydown",
   (e) => {
@@ -539,6 +576,9 @@ window.addEventListener(
     } else if (k === "o" && !e.shiftKey) {
       e.preventDefault();
       void openViaDialog();
+    } else if (k === "=" || k === "+" || k === "-" || k === "0") {
+      e.preventDefault();
+      void stepScale(k === "0" ? 0 : k === "-" ? -1 : 1);
     }
   },
   true,
@@ -590,9 +630,26 @@ async function runMenu(id: string): Promise<void> {
     case "about":
       await about.open();
       break;
+    case "ui_larger":
+      await stepScale(1);
+      break;
+    case "ui_smaller":
+      await stepScale(-1);
+      break;
+    case "ui_reset":
+      await stepScale(0);
+      break;
+    case "ui_contrast":
+      await toggleContrast();
+      break;
+    case "focus_next":
+      cycleRegions(regions(), false);
+      break;
   }
 }
 void listen<string>("menu", (e) => void runMenu(e.payload));
+installLiveRegions();
+void loadPrefs();
 
 $("save").addEventListener("click", () => void saveNow());
 $("save-as").addEventListener("click", () => void saveAs());
@@ -632,6 +689,8 @@ $("structural").addEventListener("change", (e) => {
 // Test and measurement hooks (used by app/tests via the WebView DevTools protocol).
 (window as any).__cirth = {
   about,
+  prefs: currentPrefs,
+  regions,
   exportText,
   get view() {
     return view;

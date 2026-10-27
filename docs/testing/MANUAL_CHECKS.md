@@ -62,7 +62,20 @@ Automated IME coverage is simulated composition (DevTools, Windows only). Real I
 
 ## 3. Accessibility (M1 item 6)
 
-Narrator (Windows), VoiceOver (macOS), Orca (Linux): navigator, editor, board and toolbar are reachable by keyboard, announce their names, and announce save status changes.
+The automated tests check names, ids, focus movement and what is put in the announcement region; only a real screen reader shows what is actually spoken. Run each row with Narrator (Windows), VoiceOver (macOS) and Orca (Linux) on a test machine (screen readers speak aloud and change input handling, so not on a production machine).
+
+| # | Steps | Expected |
+| - | - | - |
+| A1 | Start the app; Tab through Home | Every control is read with a sensible name; project cards read title, file, counts and badges. |
+| A2 | Open a sample; type a few words | Typing is not interrupted by save-status announcements. Ctrl+S says "Saved". |
+| A3 | In the editor press Tab and Shift+Tab on an empty line | The new block type is spoken ("Character", "Dialogue"...). |
+| A4 | Press F6 repeatedly | Toolbar, Scene navigator, Screenplay and Board are reached in turn and their names spoken; Shift+F6 goes back. |
+| A5 | Escape from the editor; Up/Down in the scene list; Enter | Scene numbers and headings are read; Enter puts the caret in that scene. |
+| A6 | In the scene list press Alt+Down; then Ctrl+Z in the editor | "Scene moved to position N of M" is spoken; undo restores the order. On macOS check Option+Down is not taken by VoiceOver. |
+| A7 | F6 to the board; arrows; Alt+Right; Enter; Escape | Cards are read with their number, linked scene and summary; the move is spoken with whether the script changed; Enter edits the summary, Escape returns. |
+| A8 | View > High Contrast; Ctrl+= twice; Ctrl+0; restart | Strong colours and focus rings; the whole window grows and shrinks; the size and contrast choices survive a restart. |
+| A9 | Windows: turn on a Contrast theme in Settings (test machine only) | The app follows the system colours; focus rings, find highlights and spelling underlines stay visible. |
+| A10 | Help > About CirthScribe and Licences; Tab and arrow through the tabs | The attribution and licence texts can be reached and read. |
 
 ## Results log
 
