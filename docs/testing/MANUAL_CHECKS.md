@@ -81,7 +81,7 @@ Automated IME coverage is simulated composition (DevTools, Windows only). Real I
 
 ## 3. Accessibility (M1 item 6)
 
-The automated tests check names, ids, focus movement and what is put in the announcement region; only a real screen reader shows what is actually spoken. Run each row with Narrator (Windows), VoiceOver (macOS) and Orca (Linux) on a test machine (screen readers speak aloud and change input handling, so not on a production machine).
+The automated tests check names, ids, focus movement and what is put in the announcement region; only a real screen reader shows what is actually spoken. Run each row with Narrator (Windows) and Orca (Linux) on a test machine. **VoiceOver is out of scope** (owner, 2026-10-26: not wanted) (screen readers speak aloud and change input handling, so not on a production machine).
 
 | # | Steps | Expected |
 | - | - | - |
@@ -90,7 +90,7 @@ The automated tests check names, ids, focus movement and what is put in the anno
 | A3 | In the editor press Tab and Shift+Tab on an empty line | The new block type is spoken ("Character", "Dialogue"...). |
 | A4 | Press F6 repeatedly | Toolbar, Scene navigator, Screenplay and Board are reached in turn and their names spoken; Shift+F6 goes back. |
 | A5 | Escape from the editor; Up/Down in the scene list; Enter | Scene numbers and headings are read; Enter puts the caret in that scene. |
-| A6 | In the scene list press Alt+Down; then Ctrl+Z in the editor | "Scene moved to position N of M" is spoken; undo restores the order. On macOS check Option+Down is not taken by VoiceOver. |
+| A6 | In the scene list press Alt+Down; then Ctrl+Z in the editor | "Scene moved to position N of M" is spoken; undo restores the order. |
 | A7 | F6 to the board; arrows; Alt+Right; Enter; Escape | Cards are read with their number, linked scene and summary; the move is spoken with whether the script changed; Enter edits the summary, Escape returns. |
 | A8 | View > High Contrast; Ctrl+= twice; Ctrl+0; restart | Strong colours and focus rings; the whole window grows and shrinks; the size and contrast choices survive a restart. |
 | A9 | Windows: turn on a Contrast theme in Settings (test machine only) | The app follows the system colours; focus rings, find highlights and spelling underlines stay visible. |
@@ -112,4 +112,6 @@ The automated tests check names, ids, focus movement and what is put in the anno
 | 2026-10-26 | O1, O2 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | Turning Wi-Fi off cuts the computer-use session; needs a person. |
 | 2026-10-26 | A1–A10 | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | Not run | VoiceOver froze the session; the owner declined section 3. |
 | 2026-10-26 | Observations | macOS 26.2 (25C56), M4 Pro | Safari 26.2 / WebKit 21623.1.14.11.9 | Claude (computer use) + Jared | n/a | Cmd+Q did nothing and the app menu had no Quit (fixed in `8e5d006`, recheck N9). Scene-list click did not scroll, and Enter then added an empty heading (fixed, recheck M12). Cmd+Z on the board with board focus does nothing (open). |
+| 2026-10-26 | Section 3 with VoiceOver | macOS | | none | **Dropped** | Owner decision: VoiceOver testing is not wanted. Narrator and Orca rows are unaffected. |
+| 2026-10-26 | Section 1d, offline (O1, O2) | all | | none | **Deferred (not run)** | Owner decision: skipped for now. Covered meanwhile only by the in-app e2e check (no outside requests; CSP refuses outside addresses). |
 | 2026-10-26 | Section 2, real IMEs | all | all | none | **Waived (not run)** | Owner decision: no way to arrange IME test machines. Not a pass; simulated composition only. Run when a tester is available. |
