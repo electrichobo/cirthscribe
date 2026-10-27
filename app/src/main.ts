@@ -31,7 +31,7 @@ import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
 import { icon, iconButton, iconSelect } from "./icons";
-import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
+import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
   name: string;
@@ -575,13 +575,13 @@ createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.tog
   undoBtn.addEventListener("click", () => {
     if (!view) return;
     undo(view.state, view.dispatch);
-    view.focus();
+    if (usedPointer()) view.focus();
   });
   const redoBtn = keepFocus(iconButton("tool-redo", "redo", "Redo", `Redo (${mod}+Shift+Z)`));
   redoBtn.addEventListener("click", () => {
     if (!view) return;
     redo(view.state, view.dispatch);
-    view.focus();
+    if (usedPointer()) view.focus();
   });
   $("island-nav").append(homeBtn, undoBtn, redoBtn);
   const navBtn = iconButton("toggle-nav", "scenes", "Scene list", "Show or hide the scene list");
@@ -602,6 +602,20 @@ createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.tog
   };
   onPanelsChanged(showPressed);
   showPressed();
+  // Toolbar keys (WAI-ARIA toolbar pattern): Left/Right/Home/End move along
+  // the island. On a dropdown they move too instead of changing its value;
+  // Up/Down (or Space) still open it.
+  const island = $("island");
+  island.addEventListener("keydown", (e) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key) || e.altKey || e.ctrlKey || e.metaKey) return;
+    const stops = [...island.querySelectorAll<HTMLElement>("button, select")].filter((c) => c.getClientRects().length && !(c as HTMLButtonElement).disabled);
+    const at = stops.indexOf(document.activeElement as HTMLElement);
+    if (at < 0) return;
+    e.preventDefault();
+    const n = stops.length;
+    const to = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : (at + (e.key === "ArrowRight" ? 1 : n - 1)) % n;
+    stops[to].focus();
+  });
 }
 // Escape leaves focus mode wherever focus is (the editor's own Escape key
 // handles it first and marks the event handled).

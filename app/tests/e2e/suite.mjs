@@ -1810,7 +1810,28 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     for (const sel of ["#profile", "#spelling", "#view-mode", "#zoom", "#save", "#go-free"]) assert(await visible(`#view-menu ${sel}`), `${sel} in More`);
     await audit("island and More");
     await screenshot(app, "island-more");
+    // Tab cycles inside More and never leaves into the script (macOS check N18).
+    const kinds0 = (await blocks()).map((b) => b.kind).join();
+    const inMore = () => app.evaluate("document.getElementById('view-menu').contains(document.activeElement)");
+    for (let i = 0; i < 9; i++) {
+      await press("Tab");
+      assert(await inMore(), `Tab ${i + 1} stays inside More`);
+    }
+    await press("Tab", ["shift"]);
+    assert(await inMore(), "Shift+Tab stays inside More");
+    assert((await blocks()).map((b) => b.kind).join() === kinds0, "no block type changed while tabbing");
     await press("Escape");
+    assert(await app.evaluate("document.getElementById('view-menu').hidden && document.activeElement?.id === 'view-menu-btn'"), "Escape closes More and returns to ⋮");
+    // Arrow keys move along the island (toolbar pattern), Home and End jump.
+    await press("Home");
+    assert((await app.evaluate("document.activeElement?.id")) === "go-home", "Home: first island control");
+    await press("ArrowRight");
+    assert((await app.evaluate("document.activeElement?.id")) === "tool-undo", "ArrowRight: next control");
+    await press("End");
+    assert((await app.evaluate("document.activeElement?.id")) === "view-menu-btn", "End: last control");
+    await press("ArrowLeft");
+    assert((await app.evaluate("document.activeElement?.id")) === "tool-focus", "ArrowLeft: previous control");
+    assert((await blocks()).map((b) => b.kind).join() === kinds0, "arrowing along the island edits nothing");
     assert(await app.evaluate("!!document.querySelector('#board #structural') && !document.querySelector('.toolbar #structural')"), "the board's reorder switch lives on the board");
     // Undo and redo from the island keep the caret in the script.
     const ai0 = (await blocks()).findIndex((b) => b.kind === "action");

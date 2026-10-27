@@ -1128,7 +1128,13 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
         let made = !window.is_fullscreen().map_err(e)?;
         if made {
             #[cfg(target_os = "macos")]
-            window.set_simple_fullscreen(true).map_err(e)?;
+            {
+                window.set_simple_fullscreen(true).map_err(e)?;
+                // Simple full screen changes the window's style; macOS then
+                // stops treating it as the key window (GROGU, 77250a3: no
+                // keys until clicked). Make it key again. Unverified.
+                window.set_focus().map_err(e)?;
+            }
             #[cfg(not(target_os = "macos"))]
             window.set_fullscreen(true).map_err(e)?;
         }
@@ -1140,7 +1146,10 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
         window.show_menu().map_err(e)?;
         if restore {
             #[cfg(target_os = "macos")]
-            window.set_simple_fullscreen(false).map_err(e)?;
+            {
+                window.set_simple_fullscreen(false).map_err(e)?;
+                window.set_focus().map_err(e)?;
+            }
             #[cfg(not(target_os = "macos"))]
             window.set_fullscreen(false).map_err(e)?;
         }

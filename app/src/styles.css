@@ -24,7 +24,12 @@ body[data-view="editor"] > .toolbar { display: grid; grid-template-columns: var(
 body[data-view="editor"] > .toolbar > .island { grid-column: 2; justify-self: center; max-width: calc(100% - 16px); }
 .toolbar > #more-settings { display: none; }
 .island { position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 0; padding: 4px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 10px rgba(0, 0, 0, .18); }
-.island-group { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; border-right: 1px solid var(--line); }
+.island-group { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; padding: 0 6px; border-right: 1px solid var(--line); }
+/* Narrow windows: the script column is too narrow to hold the island, so it
+   spans the whole width and its groups wrap (ribbon-style). */
+@media (max-width: 1100px) {
+  body[data-view="editor"] > .toolbar > .island { grid-column: 1 / -1; }
+}
 .island select { border: 0; background: transparent; padding: 4px 2px; border-radius: 6px; max-width: 10em; }
 .island select:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* Icon-style dropdowns: the select is invisible over its icon. */

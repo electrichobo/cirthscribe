@@ -100,10 +100,16 @@ export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => voi
     if (e.key === "Escape") {
       e.preventDefault();
       close(true);
+    } else if (e.key === "Tab") {
+      // Tab cycles inside the popover: the menu (as one stop), then each
+      // setting. Leaving by Tab would drop focus into the script, where Tab
+      // changes the block type (macOS check N18). Escape is the way out.
+      e.preventDefault();
+      const ring: HTMLElement[] = [all[Math.max(at, 0)], ...settings.querySelectorAll<HTMLElement>("select, input, button")];
+      const i = at >= 0 ? 0 : ring.indexOf(document.activeElement as HTMLElement);
+      ring[(i + (e.shiftKey ? ring.length - 1 : 1)) % ring.length]?.focus();
     } else if (at < 0) {
-      // In the settings: their own keys; Tab past the last one closes.
-      const last = [...menu.querySelectorAll<HTMLElement>("select, input, button")].at(-1);
-      if (e.key === "Tab" && !e.shiftKey && document.activeElement === last) close(false);
+      // In the settings: their own keys.
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       all[(at + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length]?.focus();

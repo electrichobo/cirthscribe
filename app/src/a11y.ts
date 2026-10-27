@@ -42,6 +42,13 @@ export function announce(msg: string, urgent = false) {
 export type Panel = "nav" | "board" | "toolbar" | "status";
 export const PANEL_LABEL: Record<Panel, string> = { nav: "Scene list", board: "Board", toolbar: "Toolbar", status: "Status bar" };
 
+// Toolbar controls return focus to the script after a mouse action, but keep
+// it after a keyboard action (in the script Tab changes the block type, so a
+// keyboard user must not be dropped there: macOS check N18).
+let lastPointer = -1e9;
+for (const t of ["pointerdown", "mousedown"]) document.addEventListener(t, () => (lastPointer = performance.now()), true);
+export const usedPointer = () => performance.now() - lastPointer < 1500;
+
 export interface UiPrefs {
   scale: number;
   contrast: "system" | "high";

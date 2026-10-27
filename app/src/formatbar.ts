@@ -11,6 +11,7 @@ import type { EditorView } from "prosemirror-view";
 import { HIGHLIGHTS, KINDS, KIND_LABEL, TEXT_COLORS, schema, type Kind } from "./schema";
 import { setKind } from "./keys";
 import { iconSelect } from "./icons";
+import { usedPointer } from "./a11y";
 
 function markActive(state: EditorState, type: MarkType): boolean {
   const { from, to, empty, $from } = state.selection;
@@ -56,7 +57,7 @@ export function createFormatBar(root: HTMLElement, getView: () => EditorView | u
     const v = getView();
     if (!v) return;
     setKind(kind.value as Kind)(v.state, v.dispatch);
-    v.focus();
+    if (usedPointer()) v.focus();
   });
 
   const marks: { id: string; label: string; key: string; type: MarkType; face: string }[] = [
@@ -79,7 +80,7 @@ export function createFormatBar(root: HTMLElement, getView: () => EditorView | u
       const v = getView();
       if (!v) return;
       toggleMark(m.type)(v.state, v.dispatch);
-      v.focus();
+      if (usedPointer()) v.focus();
     });
     return { b, m };
   });
@@ -104,7 +105,7 @@ export function createFormatBar(root: HTMLElement, getView: () => EditorView | u
     const v = getView();
     if (!v) return;
     setMarkValue(type, value)(v.state, v.dispatch);
-    v.focus();
+    if (usedPointer()) v.focus();
   }
 
   /** Show the state at the caret; called after every editor transaction. */
