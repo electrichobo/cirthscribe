@@ -69,11 +69,23 @@ export function createLayoutMode(opts: { zoom: () => number; panes: HTMLElement;
   // does Escape inside one.
   for (const side of ["nav", "board"] as Side[]) {
     opts.panels[side].addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && mode === "overlay" && floating[side] && !e.defaultPrevented) {
+      if (mode !== "overlay" || !floating[side] || e.defaultPrevented) return;
+      if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
         closeFloats();
         opts.focusScript();
+      } else if (e.key === "Tab") {
+        // Tab cycles inside the floating panel: leaving by Tab would drop
+        // focus into the script, where Tab changes the block type (macOS
+        // check N19). Escape is the way out.
+        e.preventDefault();
+        const stops = [...opts.panels[side].querySelectorAll<HTMLElement>("button, input, textarea, select, [tabindex]")].filter(
+          (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0,
+        );
+        if (!stops.length) return;
+        const at = stops.indexOf(document.activeElement as HTMLElement);
+        stops[(at + (e.shiftKey ? stops.length - 1 : 1) + stops.length) % stops.length].focus();
       }
     });
   }

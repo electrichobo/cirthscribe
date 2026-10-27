@@ -2010,11 +2010,25 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(s.nav && s.navPressed === "true" && s.editorW === w0, `scene list floats over the script without squeezing it: ${JSON.stringify(s)}`);
     assert(await app.evaluate("document.getElementById('navigator').contains(document.activeElement)"), "focus moves into the floating panel");
     await waitAnnounced("open over the script", "announced");
+    // Tab stays inside the floating panel (it used to drop into the script,
+    // where Tab changes the block type: macOS check N19).
+    const kindsBefore = (await blocks()).map((b) => b.kind).join();
+    for (let i = 0; i < 3; i++) await press("Tab");
+    await press("Tab", ["shift"]);
+    assert((await state()).nav && (await app.evaluate("document.getElementById('navigator').contains(document.activeElement)")), "Tab stays in the floating scene list");
+    assert((await blocks()).map((b) => b.kind).join() === kindsBefore, "no block type changed");
     await press("Escape");
     s = await state();
     assert(!s.nav && (await app.evaluate("__cirth.view.hasFocus()")), `Escape closes it and returns to the script: ${JSON.stringify(s)}`);
     await clickHome(app, "#toggle-board");
     assert((await state()).board, "board floats");
+    // Arrow keys on the board's first control stay in the board (macOS note:
+    // they seemed to close it and move the script caret).
+    const sel0 = await app.evaluate("__cirth.view.state.selection.head");
+    await app.evaluate("(() => { document.getElementById('structural').focus(); return true; })()");
+    await press("ArrowDown");
+    await press("ArrowRight");
+    assert((await state()).board && (await app.evaluate("__cirth.view.state.selection.head")) === sel0, `arrows on the floating board leave the script alone: ${JSON.stringify(await state())}`);
     await app.evaluate("__cirth.view.focus()");
     assert(!(await state()).board, "going back to the script closes it");
     const panelsNow = await app.evaluate("__cirth.prefs().panels");
