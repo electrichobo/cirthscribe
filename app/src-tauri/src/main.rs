@@ -1137,12 +1137,13 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
             .text("dual", "Dual Dialogue")
             .text("page_break", "Page Break Before")
             .build()?;
-        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view_menu(app)?]).build();
+        let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…").build()?;
+        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view_menu(app)?, &help]).build();
     }
     #[cfg(not(target_os = "macos"))]
     {
         let edit = SubmenuBuilder::new(app, "Edit").text("find", "Find and Replace…").separator().text("dual", "Dual Dialogue").text("page_break", "Page Break Before").build()?;
-        let help = SubmenuBuilder::new(app, "Help").text("about", "About CirthScribe and Licences").build()?;
+        let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…").separator().text("about", "About CirthScribe and Licences").build()?;
         MenuBuilder::new(app).items(&[&file, &edit, &view_menu(app)?, &help]).build()
     }
 }

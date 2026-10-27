@@ -26,6 +26,7 @@ import { installSpell, spellPlugin } from "./spell";
 import { dualPlugin, toggleDual, togglePageBreak } from "./format";
 import { createFreeWriting } from "./freewrite";
 import { createAbout } from "./about";
+import { createLatency } from "./latency";
 import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -501,6 +502,11 @@ const free = createFreeWriting($("freewrite"), {
 $("go-free").addEventListener("click", () => void openFreeWriting());
 
 const about = createAbout();
+const latency = createLatency(
+  perf,
+  () => (window as any).__cirth.openTimings,
+  () => (lastOpen ? `"${lastOpen.doc.title || lastOpen.name}", ${view.state.doc.childCount} blocks, ${lastPagination ? `${lastPagination.map.pages.length} pages` : "not paginated"}` : "no project open"),
+);
 const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
   restoreBackup: (path) => openWith("restore_backup", { path }),
@@ -630,6 +636,9 @@ async function runMenu(id: string): Promise<void> {
     case "about":
       await about.open();
       break;
+    case "latency":
+      await latency.open();
+      break;
     case "ui_larger":
       await stepScale(1);
       break;
@@ -706,6 +715,7 @@ $("structural").addEventListener("change", (e) => {
   },
   board,
   perf,
+  latency,
   selSync,
   blocks: () => {
     const out: Block[] = [];

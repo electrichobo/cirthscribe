@@ -206,6 +206,8 @@ dialog.about[open] { display: flex; }
 dialog.about::backdrop { background: rgba(0, 0, 0, .45); }
 dialog.about h2 { margin: 0 0 10px; font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--ink); }
 dialog.about h3 { font-size: 13px; margin: 14px 0 6px; }
+.latency-text { width: 100%; box-sizing: border-box; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+.latency-note { min-height: 1.2em; margin: 6px 0 0; color: var(--muted); }
 .about-version { font-weight: normal; font-size: 13px; color: var(--muted); }
 .about-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .about-tabs button { border: none; background: none; color: var(--ink); padding: 6px 10px; border-bottom: 2px solid transparent; cursor: pointer; }

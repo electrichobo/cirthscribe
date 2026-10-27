@@ -48,6 +48,14 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 | N8 | Export Plain Text, open the file in Notepad / TextEdit / gedit | Indents line up in a fixed-pitch font; pages are separated by a form feed (some editors show it as a symbol or nothing). |
 | N6 | Free Writing, Flow mode on: type with a real IME (Japanese, Pinyin), then try the trackpad/mouse to select and drag text | Composed text lands at the end; nothing already written is selected, moved or deleted. Esc turns editing back on. |
 
+## 1e. Typing latency (M1 exit test), macOS and Linux desktop
+
+The automated measurement uses DevTools, which only Windows has. On the other systems, the app reports its own measurement.
+
+| # | Steps | Expected |
+| - | - | - |
+| L1 | Release build, on mains power. Open the sample "The Tide Ledger". Click in the middle of the script and type normally for at least 30 seconds. Then open Help > Typing Latency… and press Copy. | The report shows at least 200 key presses with p95 under 50 ms and "Last open" under 3000 ms. Paste the whole report into the Notes column. Repeat 3 times (Start over between runs), because single-run p99 varies. |
+
 ## 1d. Offline (A1), all platforms
 
 The e2e suite checks that the page reaches nothing outside the app and that the content policy refuses outside addresses. It does not switch the network off, because that changes system settings. Do this on a test machine only.

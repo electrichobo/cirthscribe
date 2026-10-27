@@ -1508,6 +1508,34 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { requests: net.urls.length, origins: [...new Set(net.urls.map((u) => { try { return new URL(u).origin; } catch { return u.slice(0, 10); } }))] };
   });
 
+  await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
+    await openFixture("page-boundaries", false);
+    await app.evaluate("__cirth.perf.reset()");
+    await caretAtEndOf(1);
+    await typeText(" measured keys");
+    await sleep(300);
+    await app.evaluate("__cirth.menu('latency')");
+    await waitFor(app, "document.getElementById('latency-dialog')?.open === true", "Typing Latency open");
+    await audit("Typing Latency");
+    const report = () => app.evaluate("document.querySelector('#latency-dialog textarea').value");
+    let r = await report();
+    const n = Number(/Key presses measured: (\d+)/.exec(r)?.[1]);
+    const expected = await app.evaluate("__cirth.perf.summary().n");
+    assert(n === expected && n >= 14, `report counts the samples: ${n} (log has ${expected})`);
+    assert(/Median: [\d.]+ ms {2}p95: [\d.]+ ms/.test(r), `percentiles shown: ${r}`);
+    assert(r.includes("not enough key presses yet"), "says when there are too few samples");
+    assert(/Last open: [\d.]+ ms for \d+ blocks/.test(r), "last open time shown");
+    assert(r.includes(await app.evaluate("navigator.userAgent")), "system identified");
+    assert(/^CirthScribe \d+\.\d+\.\d+ typing latency/.test(r), `app version shown: ${r.split("\n")[0]}`);
+    await app.evaluate("(() => { document.getElementById('latency-reset').click(); return true; })()");
+    r = await report();
+    assert(r.includes("Key presses measured: 0"), "Start over clears the samples");
+    await app.evaluate("(() => { document.getElementById('latency-copy').click(); return true; })()");
+    await waitFor(app, "/Copied|Selected/.test(document.querySelector('#latency-dialog .latency-note').textContent)", "copy feedback");
+    await app.evaluate("__cirth.latency.close()");
+    assert(!(await app.evaluate("document.getElementById('latency-dialog').open")), "closed");
+  });
+
   await test("PDF proof export from the canonical store", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("(() => { document.getElementById('pdf').click(); })()");
