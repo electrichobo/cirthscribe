@@ -1549,7 +1549,8 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
       const $p = v.state.selection.$from;
       return { top: h.top - wrap.top, bottom: wrap.bottom - h.bottom, inHeading: $p.parent.attrs.sceneId === ${JSON.stringify(target)}, atEnd: $p.parentOffset === $p.parent.content.size, focused: v.hasFocus() };
     })()`);
-    assert(where.top >= 0 && where.bottom >= 0, `heading visible in the script: ${JSON.stringify(where)}`);
+    // 2 px slack: aligning to the top lands on sub-pixel positions (-0.47 px on WebKitGTK).
+    assert(where.top >= -2 && where.bottom >= -2, `heading visible in the script: ${JSON.stringify(where)}`);
     assert(where.inHeading && where.atEnd && where.focused, `caret at the end of the heading: ${JSON.stringify(where)}`);
     const before = await blocks();
     const i = before.findIndex((b) => b.scene_id === target);
