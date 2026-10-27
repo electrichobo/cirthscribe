@@ -54,6 +54,10 @@ Combine Story Architect-style planning with an MMS-inspired navigator:
 - Search/filter by character, location, tag, thread, and note category.
 - Drag/drop organization with keyboard alternatives.
 - Navigator and manuscript scroll to each other's selected scene.
+- A tabbed navigator in the spirit of Final Draft 13's (behaviour only): scenes with page, length in eighths, summary, colour label and characters; a characters tab with speaking counts and appearances; notes; outline. Filters and search.
+- An outline editor (acts, sequences, scenes, beats; title, logline, summary per item) and a zoomed-out overview of the whole script for orientation.
+- Cards show a scene's logline and summary, not a copy of its script text.
+- A beat/pacing board divided into acts wherever the writer chooses, and an evidence-board view where cards are joined by labelled "strings".
 - Corkboard cards with summaries, labels, color, images, and video-link references.
 - Freeform mind/brain map with typed, labeled relationships.
 - Presentation views without changing document content.
@@ -117,13 +121,16 @@ Comments retain their branch context. Restoring a historical branch does not rew
 
 Tags reference exact script ranges and stable entities. Categories include cast, locations, props, costume, vehicles, sound, VFX/SFX, extras, stunts, and user categories. Users can correct proposed tags.
 
-Each report is independently selectable, filterable, previewable, and exportable:
+Reports and charts live together in **StoryScry**. It opens on a dashboard summary of every available report, mostly as charts (Nightingale/polar area, bullet, dot plot, bar), and each chart opens into its full report. Each report is independently selectable, filterable, previewable, and exportable:
 - Characters/cast and dialogue.
 - Scene list and one-liners.
 - Locations and sets.
 - Props and each other tag category.
 - Revision/changed-page report.
 - Character participation and timing metrics.
+- Action vs dialogue (words and lines, per scene and overall).
+- Interior vs exterior, and time of day.
+- Character sides: a character's scenes as pages for actors (their scenes only, or full pages with other scenes crossed out), keeping dual-dialogue pairs whole.
 
 Report scope includes selected documents/episodes, branch, snapshot/revision, scenes, and inclusion of omitted content. Reports identify their source version and whether they are stale. Regeneration must not overwrite manual annotations without retaining them separately.
 
@@ -172,7 +179,7 @@ Add XLSX and CSV/TSV for tabular reports and stripboard rows to meet the request
 
 See INTEROPERABILITY.md for fidelity and Google tests. Preserve the strongest supported semantics; never silently discard unsupported features.
 
-Provide resizable panels, keyboard shortcuts, undoable drag/drop, clear save status, readable dark/light themes, adjustable UI scale, high contrast, screen-reader labels, and a distraction-reduced mode. Do not put implementation terminology into ordinary writing workflows.
+Provide resizable panels, keyboard shortcuts, undoable drag/drop, clear save status, readable dark/light themes, adjustable UI scale, high contrast, screen-reader labels, a distraction-reduced mode (focus mode), and a typewriter mode that keeps the typing line centred. Do not put implementation terminology into ordinary writing workflows.
 
 Initial non-goals: mandatory web service, mobile clients, built-in paid AI, full budgeting, video editing, automatic measured screen time from footage, and copying another app's visual identity.
 

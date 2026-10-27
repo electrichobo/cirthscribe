@@ -53,18 +53,37 @@ Done:
 - [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
 
 Still to do:
-- [ ] Hands-on testing on macOS and with Asian-language input methods
+- [ ] Recheck the latest fixes on macOS
+- [ ] Typing-speed check on a Linux desktop
+
+### 🔨 Stage 1b: Writing workspace (in progress)
+
+Done:
+- [x] Focus mode: full screen with only the script page
+- [x] Show or hide the scene list, board, toolbar and status bar (View menu and a toolbar dropdown)
+- [x] Full menu bar on every system: File, Edit, View, Format, Help
+- [x] Island-style toolbar with block type, bold, italic and underline
+
+Still to do:
+- [ ] Typewriter mode: the line you are typing stays centred while the text scrolls
+- [ ] Text colour and highlight
+- [ ] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
+- [ ] Add-comment button
+- [ ] Scene cards with a logline and summary instead of a copy of the scene
 
 ### Stage 2: Professional pages and file exchange
 
 - [ ] Final production-quality PDF and title pages
 - [ ] Scene numbers, revision colours, locked pages (A/B pages)
-- [ ] Import and export Final Draft (FDX), Word (DOCX), RTF, HTML and text, each with a report of what carried over
+- [ ] Import and export Final Draft (FDX), Word (DOCX), RTF, HTML and text, each with a report of what carried over (including dual dialogue)
 
 ### Stage 3: Story planning
 
 - [ ] Episodes and series sharing one story bible
-- [ ] Outline, index-card board, and mind map
+- [ ] Tabbed navigator: scenes (length, summary, characters), characters, notes, outline
+- [ ] Outline editor, and an overview map of the whole script
+- [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
+- [ ] Beat and pacing board, split into acts wherever you choose
 - [ ] Reordering scenes from the board (only with your permission, and undoable)
 - [ ] Story timeline, kept separate from script order
 - [ ] Character, location and world profiles
@@ -72,7 +91,9 @@ Still to do:
 ### Stage 4: Production tools
 
 - [ ] Script breakdown tags (props, wardrobe, cast and more)
-- [ ] Separate reports for characters, scenes, locations and props
+- [ ] StoryScry: a dashboard of charts summarising every report, each opening into the full report
+- [ ] Separate reports for characters, scenes, locations and props, plus action vs dialogue, interior vs exterior, and day vs night
+- [ ] Character sides: a character's scenes as pages for actors
 - [ ] Stripboard and shooting schedule
 - [ ] Page counts in eighths, and character appearance charts
 - [ ] Reports in PDF, spreadsheet (XLSX/CSV) and HTML

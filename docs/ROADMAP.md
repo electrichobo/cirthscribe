@@ -73,9 +73,32 @@ Jared raised these after the M1 feature work, which so far covered only the scri
 6. **Add comment button:** see decision C.
 7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording.
 
+8. **Typewriter mode** (owner, 2026-10-26): a View toggle, like focus mode, that keeps the line being typed at a fixed height (centred) in the window. The text scrolls up instead of the caret running down the page. It works on its own or together with focus mode, and the choice is stored per user. It changes the view only, never pages or exports.
+
+**Dual dialogue across the app** (owner asked to make sure it is handled everywhere):
+
+| Where | State |
+| - | - |
+| Editor: toggle (Ctrl/Cmd+D, Format menu), side-by-side display, caret moves left column then right | Built (M1) |
+| Pagination, PDF proof, plain-text export | Built (M1); pairs taller than a page fall back to sequential speeches with a warning |
+| Data model and Rust/TypeScript contract (`dual` flag on the right speaker's cue) | Built (M1) |
+| FDX import/export (`DualDialogue` element), Fountain (`^`), DOCX/RTF/HTML | M2: must round-trip or be reported in the loss report |
+| Production PDF (title pages, continuations, locked pages) | M2 |
+| Reports and StoryScry: both speakers counted as speaking in that scene; simultaneous speech labelled, not double-counted as time | M4 |
+| Character sides | M4: a dual pair stays whole when either speaker's sides are made |
+| Comments and alternatives anchored inside a dual pair | M5 |
+| Acceptance fixtures | Dual pair at a page end exists; add dual cases to report, interchange and sides fixtures as those features are built |
+
 **M3, made explicit:**
-8. **Corkboard and mind map as an evidence board:** cards (scenes, beats, characters, notes, images) linked by visible "strings": typed, labelled connections the writer draws. Moving a card never reorders the script unless the structural permission is on.
-9. **Beat / pacing board:** a lane of beats that the writer divides into acts wherever they choose, any number of acts. Optional starting structures (for example three-act or five-act) use generic names, not trademarked methods. It shows pacing (beat position against estimated page or time, labelled as an estimate). It links to scenes the same way cards do.
+9. **Corkboard and mind map as an evidence board:** cards (scenes, beats, characters, notes, images) linked by visible "strings": typed, labelled connections the writer draws. Moving a card never reorders the script unless the structural permission is on.
+10. **Navigator, Final Draft 13-style** (reference for behaviour only): a side panel with tabs:
+   - **Scenes:** number once locked, heading, page and length in eighths, summary, colour label, and the characters in the scene. Filter, search and jump.
+   - **Characters:** speaking counts, scenes, first appearance, and jump to each.
+   - **Notes:** later, with comments.
+   - **Outline.**
+   It extends the current scene list; the scroll sync with the script stays.
+11. **Outline editor and overview:** an editable outline of acts, sequences, scenes and beats. Each item has its title, logline and summary. Reordering an item reorders the script only with the structural permission, and is undoable. The **overview** is a zoomed-out read-only map of the whole script (scenes as blocks sized by length, coloured by label or act) for finding your place.
+12. **Beat / pacing board:** a lane of beats that the writer divides into acts wherever they choose, any number of acts. Optional starting structures (for example three-act or five-act) use generic names, not trademarked methods. It shows pacing (beat position against estimated page or time, labelled as an estimate). It links to scenes the same way cards do.
 
 **Decisions needed (they affect data and pagination):**
 - **A. Fonts.** Screenplay pages are fixed-pitch Courier Prime 12 pt, and page count depends on it. Options:
@@ -88,8 +111,9 @@ Jared raised these after the M1 feature work, which so far covered only the scri
 ## M3: Connected story development
 
 - Nested episodes and mixed document containers with shared bible.
-- Navigator, hierarchical outline, notes/bookmarks.
-- Corkboard and mind map, images/video links.
+- Tabbed navigator (item 10 above), outline editor and overview (item 11), notes/bookmarks.
+- Corkboard and mind map as an evidence board with strings (item 9), images/video links.
+- Beat/pacing board with writer-chosen acts (item 12).
 - Permission-controlled bi-directional scene ordering.
 - Independent chronological story timeline.
 - Character/location/world profiles and aliases.
@@ -99,11 +123,35 @@ Exit: cards, navigator, script, chronology, and bible stay consistent after edit
 
 ## M4: Production analysis and stripboard
 
+**StoryScry** (owner's name, 2026-10-26) is where every report and chart lives. Opening it shows a dashboard summary of all available reports, mostly as charts. Each chart opens into the full report, which can be filtered and exported on its own. The reference for the approach is Celtx's Insights; no copying of its look.
+- **Metrics** (each also an independent report):
+  - action vs dialogue (words and lines, per scene and overall);
+  - interior vs exterior (and INT/EXT);
+  - day vs night (time of day);
+  - locations (scenes, pages, first and last use);
+  - characters (dialogue, scenes speaking and present, first appearance);
+  - scene lengths and pacing across acts;
+  - props and other tags once tagging exists.
+- **Chart types**, chosen to suit the data:
+  - Nightingale (polar area) for shares such as INT/EXT, day/night and locations;
+  - bullet charts for a value against a target, such as page count or act lengths;
+  - dot plots for per-scene or per-character distributions;
+  - plain bar and line charts where they read better.
+- **Rules:** charts and their report rows come from the same data and agree (acceptance E8). Estimates are labelled as estimates. Colour is never the only signal. Every chart has a table view for keyboard and screen-reader users. Exports: PDF, HTML, CSV/XLSX.
+- **Libraries:** the charting approach (original SVG or a charting library) is not chosen yet; any library needs the owner's OK and a licence check.
+
+**Character sides** (owner, 2026-10-26): for a chosen character or characters, export the scenes they appear in, as pages for actors and auditions.
+- Options: their scenes only, or full pages with the other scenes crossed out.
+- Each scene keeps its scene numbers and page labels from the locked script when locking exists.
+- A dual-dialogue pair stays whole.
+- Built on the M2 production PDF.
+
 - Range/entity tags with correction controls.
 - Independent character, scene, location, prop/category, and revision reports.
 - Vertical stripboard and independent scheduling order.
 - Page/eighth calculations tied to a stated layout/scope.
-- Character participation charts with honest timing labels.
+- StoryScry dashboard and charts (above); character participation charts with honest timing labels.
+- Character sides (above).
 - PDF/RTF/HTML reports; PDF/HTML stripboards.
 - XLSX and CSV/TSV for tabular reports/stripboards.
 - Google Docs/Sheets compatibility-profile testing.
