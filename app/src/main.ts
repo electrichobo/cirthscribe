@@ -29,6 +29,7 @@ import { createAbout } from "./about";
 import { createLatency } from "./latency";
 import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
+import { createFormatBar } from "./formatbar";
 import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -56,6 +57,7 @@ const infoEl = $("info");
 const banner = $("banner");
 const navEl = $("navigator");
 const boardEl = $("board");
+const boardBody = $("board-body");
 const editorEl = $("editor");
 
 let view: EditorView;
@@ -146,7 +148,7 @@ function rerenderSide() {
   renderNav();
   if (!boardEl.contains(document.activeElement) || !(document.activeElement instanceof HTMLTextAreaElement)) {
     const key = focusKey(boardEl);
-    renderBoard(boardEl, view, board, rerenderSide, key?.split("|")[0]);
+    renderBoard(boardBody, view, board, rerenderSide, key?.split("|")[0]);
     restoreFocus(boardEl, key);
   }
 }
@@ -183,6 +185,7 @@ function dispatch(tr: Transaction) {
   const before = view.state.selection.$from.parent;
   const next = view.state.apply(tr);
   view.updateState(next);
+  formatBar.update(next);
   const after = next.selection.$from.parent;
   if (after.type.name === "block" && before.type.name === "block" && after.attrs.id === before.attrs.id && after.attrs.kind !== before.attrs.kind) {
     announce(KIND_LABEL[after.attrs.kind as Kind]);
@@ -526,6 +529,7 @@ const free = createFreeWriting($("freewrite"), {
 $("go-free").addEventListener("click", () => void openFreeWriting());
 
 const about = createAbout();
+const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
 const focusMode = createFocusMode(() => view?.focus());
 createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle());
 // Escape leaves focus mode wherever focus is (the editor's own Escape key
@@ -667,7 +671,7 @@ async function runMenu(id: string): Promise<void> {
       if (lastOpen) await saveAs();
       break;
     case "export_pdf":
-      if (lastOpen) $("pdf").click();
+      if (lastOpen) await exportPdf();
       break;
     case "export_txt":
       await exportText();
@@ -755,8 +759,8 @@ installLiveRegions();
 void loadPrefs();
 
 $("save").addEventListener("click", () => void saveNow());
-$("save-as").addEventListener("click", () => void saveAs());
-$("pdf").addEventListener("click", async () => {
+/** PDF proof from the canonical store (File > Export > PDF). */
+async function exportPdf() {
   await syncer.flush();
   try {
     const r = await invoke<{ path: string; pages: number; doc_version: number; layout_ms: number; pdf_ms: number; missing_glyphs: string[] }>("export_pdf", { profileName: ($("profile") as HTMLSelectElement).value });
@@ -764,7 +768,7 @@ $("pdf").addEventListener("click", async () => {
   } catch (e) {
     showBanner(`PDF export failed: ${e}`);
   }
-});
+}
 /** Plain text with the PDF's line breaks and pages (cirth_core::txt). */
 async function exportText(path?: string): Promise<boolean> {
   if (!lastOpen) return false;
@@ -780,7 +784,6 @@ async function exportText(path?: string): Promise<boolean> {
     return false;
   }
 }
-$("txt").addEventListener("click", () => void exportText());
 $("zoom").addEventListener("input", (e) => {
   editorEl.style.zoom = `${(e.target as HTMLInputElement).value}%`;
 });
@@ -795,6 +798,7 @@ $("structural").addEventListener("change", (e) => {
   prefs: currentPrefs,
   regions,
   exportText,
+  exportPdf,
   get view() {
     return view;
   },

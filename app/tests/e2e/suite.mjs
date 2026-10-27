@@ -1553,7 +1553,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitOpen(app);
     assert((await blocks()).some((b) => text(b).startsWith("No signal.")), "text back after reopening");
     assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(join(dataDir, "offline.txt"))})`), "text export");
-    await app.evaluate("(() => { document.getElementById('pdf').click(); return true; })()");
+    await app.evaluate("__cirth.menu('export_pdf')");
     await waitFor(app, "/PDF proof/.test(document.getElementById('banner').textContent)", "PDF export");
     await fwOpen();
     await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
@@ -1748,6 +1748,44 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { menuItems: items.length, checked: ["page_letter", "spell_en_US"].map((id) => [id, checked(id)]) };
   });
 
+  await test("Island toolbar: grouped controls; B/I/U and block type follow the caret and keep the selection; file actions live in the menus", async () => {
+    await openFixture("unicode-marks");
+    const groups = await app.evaluate("[...document.querySelectorAll('.toolbar > .island')].map(g => g.getAttribute('aria-label'))");
+    assert(JSON.stringify(groups) === JSON.stringify(["Project", "Format", "View", "Document", "Save status"]), `islands: ${groups}`);
+    assert(!(await app.evaluate("!!document.querySelector('.toolbar #save-as, .toolbar #pdf, .toolbar #txt')")), "Save As and Export are menu-only");
+    assert(await app.evaluate("!!document.querySelector('#board #structural') && !document.querySelector('.toolbar #structural')"), "the board's reorder switch lives on the board");
+    await audit("island toolbar");
+    const pressed = () => app.evaluate("['fmt-bold', 'fmt-italic', 'fmt-underline'].map(id => document.getElementById(id).getAttribute('aria-pressed'))");
+    // Press like a mouse does: mousedown (must not take focus), then click.
+    const pressButton = (id) => app.evaluate(`(() => { const b = document.getElementById(${JSON.stringify(id)}); b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); b.click(); return true; })()`);
+    const b0 = await blocks();
+    const ai = b0.findIndex((b) => b.kind === "action" && text(b).length > 8);
+    await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 6]`);
+    const sel0 = await app.evaluate("[__cirth.view.state.selection.from, __cirth.view.state.selection.to]");
+    await pressButton("fmt-bold");
+    assert((await blocks())[ai].runs[0].bold && (await blocks())[ai].runs[0].text.length === 5, `B bolds the selection: ${JSON.stringify((await blocks())[ai].runs)}`);
+    assert(JSON.stringify(await app.evaluate("[__cirth.view.state.selection.from, __cirth.view.state.selection.to]")) === JSON.stringify(sel0) && (await app.evaluate("__cirth.view.hasFocus()")), "selection and focus kept");
+    assert((await pressed())[0] === "true", "B shows pressed on bold text");
+    await pressButton("fmt-italic");
+    await pressButton("fmt-underline");
+    assert(JSON.stringify(await pressed()) === JSON.stringify(["true", "true", "true"]), `all three pressed: ${await pressed()}`);
+    await press("b", [MOD_KEY]);
+    assert((await pressed())[0] === "false" && !(await blocks())[ai].runs.some((r) => r.bold), "Ctrl/Cmd+B turns bold off and the button follows");
+    // Caret elsewhere: plain text shows nothing pressed.
+    await caretAtEndOf(ai);
+    assert(JSON.stringify(await pressed()) === JSON.stringify(["false", "false", "false"]), `plain text: ${await pressed()}`);
+    // Block type follows the caret, and choosing one changes the block (one undo step).
+    const ci = b0.findIndex((b) => b.kind === "character");
+    await caretAtEndOf(ci);
+    assert((await app.evaluate("document.getElementById('block-kind').value")) === "character", "block type shows the caret's block");
+    await app.evaluate("(() => { const s = document.getElementById('block-kind'); s.value = 'transition'; s.dispatchEvent(new Event('change')); return true; })()");
+    assert((await blocks())[ci].kind === "transition" && (await app.evaluate("__cirth.view.hasFocus()")), "choosing a type changes the block and returns to the script");
+    await press("z", [MOD_KEY]);
+    assert((await blocks())[ci].kind === "character" && (await app.evaluate("document.getElementById('block-kind').value")) === "character", "undo restores it and the control follows");
+    await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 6]`);
+    await screenshot(app, "island-toolbar");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");
@@ -1778,7 +1816,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
   await test("PDF proof export from the canonical store", async () => {
     await openFixture("page-boundaries", false);
-    await app.evaluate("(() => { document.getElementById('pdf').click(); })()");
+    await app.evaluate("__cirth.menu('export_pdf')");
     let banner = "";
     for (let i = 0; i < 50 && !/PDF proof/.test(banner); i++) {
       await sleep(100);

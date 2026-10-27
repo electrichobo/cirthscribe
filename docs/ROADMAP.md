@@ -62,8 +62,14 @@ Jared raised these after the M1 feature work, which so far covered only the scri
    - Labels show the keyboard shortcut.
    - Check marks follow the open document and the toolbar.
    - The toolbar's buttons stay until the island toolbar (item 4) replaces them.
-4. **Island toolbar:** compact floating groups rather than a full-width bar. Story Architect is the reference for layout ideas only; no copying of its look or assets.
-5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A).
+4. **Island toolbar:** compact floating groups rather than a full-width bar. Story Architect is the reference for layout ideas only; no copying of its look or assets. **Built 2026-10-26 (first pass, text labels until the icon set exists):**
+   - Islands: Project (Home, title, Free Writing, Save), Format, View (View ▾, page view, zoom), Document (page size, spelling), and save status.
+   - Save As and Export are in the File menu only.
+   - The "Board may reorder script" switch moved onto the board.
+5. **Format controls in the toolbar:** bold, italic, underline (already in the editor, with no buttons yet), text colour, highlight colour, and font and size (see decision A). **B, I and U built 2026-10-26:**
+   - Block-type dropdown and B, I, U buttons show the state at the caret (pressed or not).
+   - Using them keeps the selection and focus in the script.
+   - Colour, highlight and screen font/size are still to do.
 6. **Add comment button:** see decision C.
 7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording.
 

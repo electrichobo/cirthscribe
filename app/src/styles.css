@@ -16,6 +16,17 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 body { display: grid; grid-template-rows: auto 1fr auto; }
 .toolbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .toolbar label { display: inline-flex; gap: 6px; align-items: center; }
+/* Island toolbar: separate floating groups instead of one full-width bar. */
+body[data-view="editor"] > .toolbar { background: var(--bg); border-bottom: 0; padding: 8px 10px 4px; gap: 8px; }
+.island { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.island-status { margin-left: auto; color: var(--muted); }
+.island-status #status { margin-left: 0; }
+.fmt { min-width: 30px; padding: 3px 6px; font-family: Georgia, "Times New Roman", serif; }
+.fmt-b { font-weight: 700; }
+.fmt-i { font-style: italic; }
+.fmt-u { text-decoration: underline; }
+.fmt[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: var(--accent); }
+.board-option { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { padding: 3px 9px; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer; }
 button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, .card:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -269,7 +280,7 @@ button.link { background: none; border: none; padding: 4px 0; color: var(--accen
 @media (forced-colors: active) {
   button, select, input, textarea, .card, dialog { border: 1px solid ButtonText; }
   :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px; }
-  .nav-list li.current .nav-go, .about-tabs button.current { border: 2px solid Highlight; }
+  .nav-list li.current .nav-go, .about-tabs button.current, .fmt[aria-pressed="true"] { border: 2px solid Highlight; }
   #status[data-state="pending"]::before, #status[data-state="saving"]::before { color: CanvasText; }
   /* Find highlights are background tints, which forced colours remove. */
   .find-hit { outline: 1px solid Highlight; }

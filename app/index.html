@@ -8,35 +8,40 @@
   <body data-view="home">
     <main id="home" aria-label="Home"></main>
     <main id="freewrite" aria-label="Free Writing"></main>
-    <header class="toolbar" role="toolbar" aria-label="Project">
-      <button id="go-home" type="button" title="Save, close this project and return to the project library">⌂ Home</button>
-      <strong id="project-title"></strong>
-      <button id="go-free" type="button" title="Free Writing (your project stays open)">Free Writing</button>
-      <button id="view-menu-btn" type="button" title="Focus mode and which panels are shown">View ▾</button>
-      <button id="save" type="button">Save</button>
-      <button id="save-as" type="button" title="Save this project to another file and continue there">Save As…</button>
-      <label>Page size
-        <select id="profile" title="Stored with this document; pagination, PDF and text export use it"><option value="letter">US Letter</option><option value="a4">A4</option></select>
-      </label>
-      <label>Page view
-        <select id="view-mode" title="Continuous text, or page gaps from the authoritative page map">
-          <option value="continuous">Continuous</option>
-          <option value="pages">Pages</option>
-        </select>
-      </label>
-      <label>Spelling
-        <select id="spelling" title="Spelling language for this project (Ctrl/Cmd+. for suggestions)">
-          <option value="en_US">US English</option>
-          <option value="en_GB">UK English</option>
-          <option value="off">Off</option>
-        </select>
-      </label>
-      <button id="pdf" type="button">Export PDF (proof)</button>
-      <button id="txt" type="button" title="Plain text with the same line breaks and pages as the PDF">Export Text…</button>
-      <label>Zoom <input id="zoom" type="range" min="60" max="160" value="100" step="10" aria-label="Editor zoom" /></label>
-      <label class="toggle"><input id="structural" type="checkbox" /> Board may reorder script</label>
-      <span id="status" aria-live="off"></span>
-      <span id="file-status" aria-live="off"></span>
+    <header class="toolbar" role="toolbar" aria-label="Script tools">
+      <div class="island" role="group" aria-label="Project">
+        <button id="go-home" type="button" title="Save, close this project and return to the project library">⌂ Home</button>
+        <strong id="project-title"></strong>
+        <button id="go-free" type="button" title="Free Writing (your project stays open)">Free Writing</button>
+        <button id="save" type="button" title="Save (Ctrl/Cmd+S). Save As and Export are in the File menu.">Save</button>
+      </div>
+      <div class="island" id="format-island" role="group" aria-label="Format"></div>
+      <div class="island" role="group" aria-label="View">
+        <button id="view-menu-btn" type="button" title="Focus mode and which panels are shown">View ▾</button>
+        <label>Page view
+          <select id="view-mode" title="Continuous text, or page gaps from the authoritative page map">
+            <option value="continuous">Continuous</option>
+            <option value="pages">Pages</option>
+          </select>
+        </label>
+        <label>Zoom <input id="zoom" type="range" min="60" max="160" value="100" step="10" aria-label="Editor zoom" /></label>
+      </div>
+      <div class="island" role="group" aria-label="Document">
+        <label>Page size
+          <select id="profile" title="Stored with this document; pagination, PDF and text export use it"><option value="letter">US Letter</option><option value="a4">A4</option></select>
+        </label>
+        <label>Spelling
+          <select id="spelling" title="Spelling language for this project (Ctrl/Cmd+. for suggestions)">
+            <option value="en_US">US English</option>
+            <option value="en_GB">UK English</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+      </div>
+      <div class="island island-status" role="group" aria-label="Save status">
+        <span id="status" aria-live="off"></span>
+        <span id="file-status" aria-live="off"></span>
+      </div>
     </header>
     <main class="panes">
       <nav id="navigator" aria-label="Scene navigator"></nav>
@@ -58,7 +63,10 @@
         <p id="editor-hint" class="sr-only">Tab and Shift+Tab change the block type; Ctrl+1 to 9 set it directly. Escape goes to the scene list; F6 moves between panels.</p>
         <div id="editor"></div>
       </section>
-      <aside id="board" aria-label="Board"></aside>
+      <aside id="board" aria-label="Board">
+        <label class="toggle board-option"><input id="structural" type="checkbox" /> Board may reorder script</label>
+        <div id="board-body"></div>
+      </aside>
     </main>
     <footer id="info" aria-label="Counts and pages"></footer>
     <script type="module" src="/src/main.ts"></script>
