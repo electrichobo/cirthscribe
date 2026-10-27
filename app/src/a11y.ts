@@ -47,21 +47,29 @@ export interface UiPrefs {
   contrast: "system" | "high";
   /** Panels of the script view; hidden ones take no space. */
   panels: Record<Panel, boolean>;
+  /** Typewriter mode: the typing line stays centred (view only). */
+  typewriter: boolean;
 }
 
-let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true } };
+let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true }, typewriter: false };
 const panelListeners: (() => void)[] = [];
 
 function applyPrefs() {
   if (prefs.contrast === "high") document.documentElement.dataset.contrast = "high";
   else delete document.documentElement.dataset.contrast;
   for (const [k, on] of Object.entries(prefs.panels)) document.body.toggleAttribute(`data-hide-${k}`, !on);
+  document.body.toggleAttribute("data-typewriter", prefs.typewriter);
   panelListeners.forEach((f) => f());
 }
 
 /** Called after panel visibility changes (the toolbar's View menu redraws). */
 export function onPanelsChanged(f: () => void) {
   panelListeners.push(f);
+}
+
+export async function toggleTypewriter() {
+  const next = await setPrefs((cur) => ({ typewriter: !cur.typewriter }));
+  announce(next.typewriter ? "Typewriter mode on: the typing line stays centred" : "Typewriter mode off");
 }
 
 export async function togglePanel(p: Panel) {

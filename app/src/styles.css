@@ -51,6 +51,8 @@ body[data-hide-nav] #navigator, body[data-hide-board] #board, body[data-hide-too
 .popup-menu [role^="menuitem"]:hover, .popup-menu [role^="menuitem"]:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .popup-menu [aria-checked="true"]::before { content: "✓"; position: absolute; left: 9px; }
 .popup-menu [role="separator"] { border-top: 1px solid var(--line); margin: 4px 0; }
+/* Typewriter mode: room above and below so any line can sit at the middle. */
+body[data-typewriter] .editor-wrap { padding-top: 50vh; padding-bottom: 50vh; }
 /* Focus mode: only the script page. */
 body[data-focus] > .toolbar, body[data-focus] > footer, body[data-focus] #navigator, body[data-focus] #board { display: none; }
 body[data-focus] { --nav-w: 0; --board-w: 0; }
@@ -126,7 +128,7 @@ body[data-pageview="pages"] .page-mark.inline { margin: .4in 0; padding-right: 6
 .card-link { display: block; width: 100%; text-align: left; font-weight: 600; border: 0; background: none; padding: 0 0 4px; }
 .card-link.missing { color: var(--warn); }
 .summary { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 3px 5px; }
-.excerpt { margin: 4px 0; color: var(--muted); font-family: "Courier Prime", monospace; font-size: 11px; }
+.card .logline { width: 100%; margin: 4px 0; padding: 4px 6px; font-weight: 600; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 .card-moves { display: flex; gap: 4px; justify-content: flex-end; }
 /* View switching: Home (project library), the editor, or Free Writing. */
 body[data-view="home"] > .toolbar, body[data-view="home"] > .panes, body[data-view="home"] > footer { display: none; }

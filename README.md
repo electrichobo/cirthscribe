@@ -63,13 +63,13 @@ Done:
 - [x] Show or hide the scene list, board, toolbar and status bar (View menu and a toolbar dropdown)
 - [x] Full menu bar on every system: File, Edit, View, Format, Help
 - [x] Island-style toolbar with block type, bold, italic and underline
+- [x] Typewriter mode: the line you are typing stays centred while the text scrolls
+- [x] Scene cards with a logline and summary instead of a copy of the scene
 
 Still to do:
-- [ ] Typewriter mode: the line you are typing stays centred while the text scrolls
 - [ ] Text colour and highlight
 - [ ] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
 - [ ] Add-comment button
-- [ ] Scene cards with a logline and summary instead of a copy of the scene
 
 ### Stage 2: Professional pages and file exchange
 

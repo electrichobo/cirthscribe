@@ -10,7 +10,6 @@ export interface SceneInfo {
   heading: string;
   from: number; // doc position of the heading block
   to: number; // end of the scene's last block
-  excerpt: string;
 }
 
 export function scenesOf(doc: PMNode): SceneInfo[] {
@@ -18,11 +17,9 @@ export function scenesOf(doc: PMNode): SceneInfo[] {
   doc.forEach((n, pos) => {
     const end = pos + n.nodeSize;
     if (n.attrs.kind === "heading" && n.attrs.sceneId) {
-      out.push({ sceneId: n.attrs.sceneId, index: out.length + 1, heading: n.textContent, from: pos, to: end, excerpt: "" });
+      out.push({ sceneId: n.attrs.sceneId, index: out.length + 1, heading: n.textContent, from: pos, to: end });
     } else if (out.length) {
-      const s = out[out.length - 1];
-      s.to = end;
-      if (!s.excerpt && n.attrs.kind === "action") s.excerpt = n.textContent;
+      out[out.length - 1].to = end;
     }
   });
   return out;

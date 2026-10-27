@@ -102,6 +102,8 @@ export interface Block {
 }
 export interface Beat {
   id: string;
+  /** One authored line; cards show it above the summary. */
+  logline: string;
   summary: string;
   scene_id: string | null;
   pos: number;

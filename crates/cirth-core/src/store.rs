@@ -21,7 +21,7 @@ use crate::ops::{Ack, Batch, Op};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -164,10 +164,17 @@ fn migrate_v2(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v2 -> v3: beats get a logline (one authored line shown on cards above
+/// the summary). Existing beats get an empty one; nothing else changes.
+fn migrate_v3(tx: &Transaction) -> Result<()> {
+    tx.execute_batch("ALTER TABLE beats ADD COLUMN logline TEXT NOT NULL DEFAULT '';")?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -386,9 +393,9 @@ impl Store {
     }
 
     pub fn beats(&self) -> Result<Vec<Beat>> {
-        let mut stmt = self.conn.prepare("SELECT id, summary, scene_id, pos FROM beats ORDER BY pos")?;
+        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos FROM beats ORDER BY pos")?;
         let beats = stmt
-            .query_map([], |r| Ok(Beat { id: r.get(0)?, summary: r.get(1)?, scene_id: r.get(2)?, pos: r.get(3)? }))?
+            .query_map([], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(beats)
     }
@@ -396,8 +403,8 @@ impl Store {
     /// Planning edits. They never touch script text or script order.
     pub fn put_beat(&self, beat: &Beat) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO beats(id, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, (SELECT value FROM meta WHERE key = 'default_document'))",
-            params![beat.id, beat.summary, beat.scene_id, beat.pos],
+            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, ?5, (SELECT value FROM meta WHERE key = 'default_document'))",
+            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos],
         )?;
         Ok(())
     }

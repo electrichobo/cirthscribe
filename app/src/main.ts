@@ -30,7 +30,7 @@ import { createLatency } from "./latency";
 import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
-import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
+import { announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
   name: string;
@@ -186,6 +186,7 @@ function dispatch(tr: Transaction) {
   const next = view.state.apply(tr);
   view.updateState(next);
   formatBar.update(next);
+  if (!tr.getMeta("pointer") && (tr.docChanged || tr.selectionSet)) centreTypingLine();
   const after = next.selection.$from.parent;
   if (after.type.name === "block" && before.type.name === "block" && after.attrs.id === before.attrs.id && after.attrs.kind !== before.attrs.kind) {
     announce(KIND_LABEL[after.attrs.kind as Kind]);
@@ -531,7 +532,7 @@ $("go-free").addEventListener("click", () => void openFreeWriting());
 const about = createAbout();
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
 const focusMode = createFocusMode(() => view?.focus());
-createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle());
+createViewMenu($("view-menu-btn") as HTMLButtonElement, () => void focusMode.toggle(), () => void toggleTypewriter().then(centreTypingLine));
 // Escape leaves focus mode wherever focus is (the editor's own Escape key
 // handles it first and marks the event handled).
 window.addEventListener("keydown", (e) => {
@@ -586,6 +587,19 @@ async function openViaDialog(): Promise<boolean> {
 // on every platform and can be exercised by the test drivers.
 const isMac = /Mac/i.test(navigator.userAgent);
 
+/** Typewriter mode: keep the caret's line at the middle of the script area.
+ *  Not after mouse clicks (the text would jump under the pointer). The
+ *  padding in styles.css lets the first and last lines reach the middle. */
+function centreTypingLine() {
+  if (!currentPrefs().typewriter || !view?.hasFocus()) return;
+  const scroller = view.dom.closest(".editor-wrap") as HTMLElement | null;
+  if (!scroller) return;
+  const caret = view.coordsAtPos(view.state.selection.head);
+  const box = scroller.getBoundingClientRect();
+  const delta = (caret.top + caret.bottom) / 2 - (box.top + scroller.clientHeight / 2);
+  if (Math.abs(delta) > 1) scroller.scrollTop += delta;
+}
+
 /** Focus is in the scene list or the board, but not in a text field. */
 function inPanelNotField(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
@@ -627,6 +641,9 @@ window.addEventListener(
     } else if (k === "f" && e.shiftKey) {
       e.preventDefault();
       if (lastOpen) void focusMode.toggle();
+    } else if (k === "t" && e.shiftKey) {
+      e.preventDefault();
+      void toggleTypewriter().then(centreTypingLine);
     } else if (k === "o" && !e.shiftKey) {
       e.preventDefault();
       void openViaDialog();
@@ -745,6 +762,10 @@ async function runMenu(id: string): Promise<void> {
       break;
     case "focus_mode":
       if (lastOpen) await focusMode.toggle();
+      break;
+    case "view_typewriter":
+      await toggleTypewriter();
+      centreTypingLine();
       break;
     case "view_nav":
     case "view_board":

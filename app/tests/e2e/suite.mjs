@@ -444,9 +444,19 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await caretAtEndOf(1);
     await typeText(" LIVE-EDIT");
     await sleep(400);
-    const card = await app.evaluate(`(() => { const el = document.querySelector('#board .card[data-beat-id="${beat0.id}"]'); return { excerpt: el.querySelector('.excerpt').textContent, summary: el.querySelector('.summary').value }; })()`);
-    assert(card.excerpt.includes("LIVE-EDIT"), `excerpt '${card.excerpt}'`);
-    assert(card.summary === beat0.summary, "summary unchanged");
+    // Cards are planning cards: logline and summary, never a copy of the scene.
+    const cardSel = `#board .card[data-beat-id="${beat0.id}"]`;
+    const card = await app.evaluate(`(() => { const el = document.querySelector('${cardSel}'); return { all: el.textContent + [...el.querySelectorAll('input, textarea')].map(i => i.value).join(' '), summary: el.querySelector('.summary').value, logline: el.querySelector('.logline').value }; })()`);
+    assert(!card.all.includes("LIVE-EDIT") && !card.all.includes(text((await blocks())[1]).slice(0, 20)), `card copies no script text: ${card.all}`);
+    assert(card.summary === beat0.summary && card.logline === "", "summary unchanged; logline empty until written");
+    // Write a logline: stored with the beat, kept after reopening.
+    await app.evaluate(`(() => { const i = document.querySelector('${cardSel} .logline'); i.value = 'The ledger goes missing'; i.dispatchEvent(new Event('change')); return true; })()`);
+    await sleep(300);
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(beat0.id)})?.logline === 'The ledger goes missing' && document.querySelector('${cardSel} .logline')?.value === 'The ledger goes missing'`, "logline kept after reopening");
+    await screenshot(app, "logline-cards");
     const order0 = (await app.evaluate("__cirth.scenes().map(s => s.sceneId)")).join();
     await app.evaluate("__cirth.setStructural(false)");
     await app.evaluate(`__cirth.moveCard(${JSON.stringify(beat0.id)}, null)`);
@@ -1400,7 +1410,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("document.querySelector('#board .card[tabindex=\"0\"]').focus()");
     assert((await focusedScene()) === cards0[0], "first card focused");
     const boardStops = await tabStops("#board .cards");
-    assert(boardStops === 4, `board tab stops: chosen card and its 3 controls, got ${boardStops}`);
+    assert(boardStops === 5, `board tab stops: chosen card and its 4 enabled controls (link, logline, summary, move), got ${boardStops}`);
     await press("ArrowRight", ["alt"]);
     await waitFor(app, `JSON.stringify([...document.querySelectorAll('#board .card')].map(c => c.dataset.item)) !== ${JSON.stringify(JSON.stringify(cards0))}`, "card moved");
     assert((await cardOrder())[1] === cards0[0], "card now second");
@@ -1410,7 +1420,9 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await press("ArrowRight");
     assert((await focusedScene()) === (await cardOrder())[2], "ArrowRight: next card");
     await press("Enter");
-    assert(await app.evaluate("document.activeElement?.dataset.part === 'summary'"), "Enter: edit the summary");
+    assert(await app.evaluate("document.activeElement?.dataset.part === 'logline'"), "Enter: edit the logline");
+    await press("Enter");
+    assert(await app.evaluate("document.activeElement?.dataset.part === 'summary'"), "Enter in the logline: on to the summary");
     await press("Escape");
     assert(await app.evaluate("document.activeElement?.classList.contains('card')"), "Escape: back to the card");
     // Linked mode: a card move changes the script; Mod+Z with the card focused undoes it.
@@ -1638,6 +1650,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await press("Enter");
     await waitFor(app, "!document.getElementById('view-menu').hidden", "View dropdown open");
     assert(await app.evaluate("document.activeElement?.dataset.panel === 'focus' && document.getElementById('view-menu-btn').getAttribute('aria-expanded') === 'true'"), "first item focused");
+    await press("ArrowDown"); // Typewriter mode
     await press("ArrowDown");
     assert(await app.evaluate("document.activeElement?.dataset.panel === 'nav' && document.activeElement.getAttribute('aria-checked') === 'false'"), "Scene list item shows it is hidden");
     await press("Enter");
@@ -1784,6 +1797,35 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert((await blocks())[ci].kind === "character" && (await app.evaluate("document.getElementById('block-kind').value")) === "character", "undo restores it and the control follows");
     await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 6]`);
     await screenshot(app, "island-toolbar");
+  });
+
+  await test("Typewriter mode: the typing line stays at the middle while typing and arrowing; a View toggle stored per user", async () => {
+    await openFixture("long-120");
+    const offset = () => app.evaluate(`(() => { const v = __cirth.view; const c = v.coordsAtPos(v.state.selection.head); const w = document.querySelector('.editor-wrap'); const b = w.getBoundingClientRect(); return Math.round((c.top + c.bottom) / 2 - (b.top + w.clientHeight / 2)) || 0; })()`); // -0 is not serialisable over DevTools
+    await caretAtEndOf(3);
+    await press("t", [MOD_KEY, "shift"]);
+    await waitFor(app, "__cirth.prefs().typewriter === true && document.body.hasAttribute('data-typewriter')", "typewriter on");
+    await waitAnnounced("Typewriter mode on", "announced");
+    await typeText(" kept centred");
+    assert(Math.abs(await offset()) <= 3, `typing line at the middle near the top of the script: ${await offset()} px`);
+    for (let i = 0; i < 25; i++) await press("ArrowDown");
+    assert(Math.abs(await offset()) <= 3, `still centred after arrowing down: ${await offset()} px`);
+    await press("Enter");
+    await typeText("New line in typewriter mode.");
+    assert(Math.abs(await offset()) <= 3, `still centred after a new line: ${await offset()} px`);
+    const items = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
+    assert(items.find((i) => i.id === "view_typewriter")?.checked === true, "View > Typewriter Mode is checked");
+    await clickHome(app, "#view-menu-btn");
+    assert((await app.evaluate("document.querySelector('#view-menu [data-panel=typewriter]').getAttribute('aria-checked')")) === "true", "the toolbar dropdown shows it");
+    await clickHome(app, "#view-menu [data-panel=typewriter]");
+    await waitFor(app, "__cirth.prefs().typewriter === false", "off from the dropdown");
+    await app.evaluate("__cirth.view.focus()");
+    // Off: typing does not move the script.
+    const top0 = await app.evaluate("document.querySelector('.editor-wrap').scrollTop");
+    await typeText(" x");
+    assert(Math.abs((await app.evaluate("document.querySelector('.editor-wrap').scrollTop")) - top0) < 2, "no recentring when off");
+    const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
+    assert(saved.typewriter === false, `stored ${JSON.stringify(saved)}`);
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {

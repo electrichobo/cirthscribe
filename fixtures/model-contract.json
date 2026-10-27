@@ -17,8 +17,8 @@
     { "id": "b-empty", "kind": "action", "runs": [{ "text": "" }] }
   ],
   "beats": [
-    { "id": "beat-1", "summary": "Zoë arrives", "scene_id": "s-1", "pos": 1.0 },
-    { "id": "beat-2", "summary": "Unlinked idea", "scene_id": null, "pos": 2.5 }
+    { "id": "beat-1", "logline": "Zoë finally comes home", "summary": "Zoë arrives", "scene_id": "s-1", "pos": 1.0 },
+    { "id": "beat-2", "logline": "", "summary": "Unlinked idea", "scene_id": null, "pos": 2.5 }
   ],
   "batch": {
     "tx_id": "tx-1",

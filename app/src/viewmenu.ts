@@ -8,7 +8,7 @@ import { PANEL_LABEL, currentPrefs, onPanelsChanged, togglePanel, type Panel } f
 
 const PANELS: Panel[] = ["nav", "board", "status", "toolbar"];
 
-export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => void) {
+export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => void, toggleTypewriter: () => void) {
   const menu = document.createElement("div");
   menu.id = "view-menu";
   menu.className = "popup-menu";
@@ -33,6 +33,13 @@ export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => voi
       close(false);
       toggleFocus();
     });
+    const typewriter = document.createElement("button");
+    typewriter.type = "button";
+    typewriter.setAttribute("role", "menuitemcheckbox");
+    typewriter.setAttribute("aria-checked", String(currentPrefs().typewriter));
+    typewriter.dataset.panel = "typewriter";
+    typewriter.textContent = "Typewriter mode";
+    typewriter.addEventListener("click", () => toggleTypewriter());
     const sep = document.createElement("div");
     sep.setAttribute("role", "separator");
     const checks = PANELS.map((p) => {
@@ -45,7 +52,7 @@ export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => voi
       b.addEventListener("click", () => void togglePanel(p));
       return b;
     });
-    menu.replaceChildren(focusItem, sep, ...checks);
+    menu.replaceChildren(focusItem, typewriter, sep, ...checks);
     for (const b of items()) b.tabIndex = -1;
     if (keep && !menu.hidden) items().find((b) => b.dataset.panel === keep)?.focus();
   }

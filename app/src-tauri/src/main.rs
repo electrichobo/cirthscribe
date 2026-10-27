@@ -278,7 +278,7 @@ async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<
         .iter()
         .take(12)
         .enumerate()
-        .map(|(i, sc)| Beat { id: cirth_core::model::new_id(), summary: format!("Beat {}: (summary is authored planning text)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
+        .map(|(i, sc)| Beat { id: cirth_core::model::new_id(), logline: String::new(), summary: format!("Beat {}: (summary is authored planning text)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
         .collect();
     start_new(&app, pkg, &doc, &beats, t0)
 }
@@ -1023,6 +1023,9 @@ struct UiPrefs {
     /// Older preference files have no panels entry: everything shown.
     #[serde(default)]
     panels: Panels,
+    /// Typewriter mode: the typing line stays centred (view only).
+    #[serde(default)]
+    typewriter: bool,
 }
 
 /// Panels of the script view the writer can hide (View menu).
@@ -1043,14 +1046,15 @@ impl Default for Panels {
 
 impl Default for UiPrefs {
     fn default() -> Self {
-        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default() }
+        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false }
     }
 }
 
 /// View menu check marks follow the stored panels (a click on a check item
 /// toggles its mark natively; this puts it back in line with the setting).
-fn sync_view_checks(app: &tauri::AppHandle, p: &Panels) {
-    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status)];
+fn sync_view_checks(app: &tauri::AppHandle, prefs: &UiPrefs) {
+    let p = &prefs.panels;
+    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status), ("view_typewriter", prefs.typewriter)];
     set_menu_checks(app.clone(), checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect());
 }
 
@@ -1066,19 +1070,19 @@ fn apply_zoom(window: &tauri::WebviewWindow, prefs: &UiPrefs) -> Result<(), Stri
 async fn ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<UiPrefs, String> {
     let prefs = std::fs::read_to_string(prefs_path(&app)).ok().and_then(|t| serde_json::from_str::<UiPrefs>(&t).ok()).unwrap_or_default();
     apply_zoom(&window, &prefs)?;
-    sync_view_checks(&handle, &prefs.panels);
+    sync_view_checks(&handle, &prefs);
     Ok(prefs)
 }
 
 #[tauri::command]
 async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tauri::WebviewWindow, prefs: UiPrefs) -> Result<UiPrefs, String> {
-    let prefs = UiPrefs { scale: (prefs.scale * 10.0).round().clamp(8.0, 20.0) / 10.0, contrast: if prefs.contrast == "high" { "high".into() } else { "system".into() }, panels: prefs.panels };
+    let prefs = UiPrefs { scale: (prefs.scale * 10.0).round().clamp(8.0, 20.0) / 10.0, contrast: if prefs.contrast == "high" { "high".into() } else { "system".into() }, panels: prefs.panels, typewriter: prefs.typewriter };
     let path = prefs_path(&app);
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, serde_json::to_string_pretty(&prefs).map_err(|e| e.to_string())?).map_err(io_err)?;
     cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)?;
     apply_zoom(&window, &prefs)?;
-    sync_view_checks(&handle, &prefs.panels);
+    sync_view_checks(&handle, &prefs);
     Ok(prefs)
 }
 
@@ -1213,6 +1217,7 @@ fn edit_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
 fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     tauri::menu::SubmenuBuilder::new(app, "View")
         .text("focus_mode", keyed("Focus Mode", "Shift+F"))
+        .item(&check_item(app, "view_typewriter", &keyed("Typewriter Mode", "Shift+T"), false)?)
         .separator()
         .item(&check_item(app, "view_nav", "Scene List", true)?)
         .item(&check_item(app, "view_board", "Board", true)?)

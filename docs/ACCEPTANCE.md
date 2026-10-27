@@ -15,7 +15,7 @@ These are proposed scenarios to implement and test. They have not been run. Use 
 
 ## B. Linked structure
 
-1. Link beat B to scene S. Edit S's dialogue. Any live excerpt reflects it, but B's authored summary remains unchanged.
+1. Link beat B to scene S. Edit S's dialogue. B's card shows no copy of the script text; its authored logline and summary remain unchanged. (Changed 2026-10-26 by owner decision: cards show logline and summary, not a live excerpt.)
 2. With structural permission off, drag B to another board column. S does not move in script order. "Planning only" remains visible.
 3. With permission on, move S through its linked card/navigator. Scene order changes exactly once across all linked views. One undo restores it. Block/scene IDs remain stable.
 4. Link two beats to S. Moving one beat cannot clone or unexpectedly relocate S; explicit scene-order commands identify their target.

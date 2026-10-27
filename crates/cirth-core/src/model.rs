@@ -137,6 +137,10 @@ pub struct Document {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Beat {
     pub id: Id,
+    /// One authored line saying what the scene is about (cards show it above
+    /// the summary). Empty until the writer fills it in.
+    #[serde(default)]
+    pub logline: String,
     pub summary: String,
     pub scene_id: Option<Id>,
     /// Planning order on the board; independent of script order.

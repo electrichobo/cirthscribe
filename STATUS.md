@@ -27,7 +27,7 @@ M1 progress:
 - 5 Page size (Letter/A4) stored per document; plain-text export from the page map, with a note on what text cannot keep.
 - 6 Accessibility (automated parts): F6 between panels; keyboard-only scene list and board with announced moves; quiet save status; UI size and high contrast in the View menu, kept across restarts. Testing with real screen readers is not part of M1 (owner, 2026-10-26).
 - About and licences screen (attribution, GPL, third-party licences); notices file generated and checked in CI.
-- M1b (accepted 2026-10-26) started: focus mode (full screen, script only; Ctrl/Cmd+Shift+F) and panel toggles in the View menu and a toolbar View dropdown, kept across restarts.
+- M1b (accepted 2026-10-26) in progress. Built: focus mode; panel toggles (View menu and toolbar dropdown); full menu bar on every OS; island toolbar with block type and B/I/U; typewriter mode; scene cards with logline and summary (schema v3, older files upgraded on open). Still to do: text colour and highlight (decision B pending), on-screen font and size, add-comment button (decision C pending).
 - 4 Free Writing: notes outside any project (own database), folders, search, Trash, autosave that survives a hard kill, .txt export, copy or move into the open script with provenance. Flow mode turns off editing so text only grows at the end.
 
 M1 exit review (2026-10-26, `docs/m1/EXIT_REVIEW.md`): **not done.** Features are built and tested on Windows (and Linux in CI), but the gate still needs a macOS editing run, a real IME run and latency measured on each OS. Closed since the review: a real kill-during-package-save test (and a crash during migration), a Rust/TypeScript model contract test, and an in-app offline test. Platforms (owner): Windows 10 or later (x64 only), macOS 11 or later, Linux distribution-agnostic; `.cirth` stays. Real-IME testing is waived by the owner (not run, not passed); screen-reader testing is not part of M1; the network-off check is deferred. Next: the macOS pass and latency on macOS and Linux (Help > Typing Latency… gives copyable numbers on any OS).
@@ -46,6 +46,7 @@ The repository contains a feasibility spike, not a usable application. Nothing h
 
 1. GNU-toolchain linker warning about manifests (Windows dev builds only).
 2. Windows e2e on the GitHub-hosted runner: WebView2 does not start; the e2e runner's own deadline also failed to fire there. Non-blocking in CI; see `docs/M1_PLAN.md` 1.3.
+3. End then Enter right after typing, under an artificially busy main thread: **1 miss in 500** in one full-suite run on 2026-10-26 (fix on). Three reruns gave 0/1,500, and every earlier run 0/500. So the fix from M1 item 1.1 is not airtight at about 1 in 2,000 under stress; the effect is that Enter splits the line at the previous caret position (no text lost, undoable). Not yet investigated: the run did not keep per-trial detail. Next: log the failing trial's keys and selection, and loop the stress test until it reproduces.
 
 Fixed: native End key right after typing missed by the editor (M1, see `docs/m0/FINDINGS.md`).
 

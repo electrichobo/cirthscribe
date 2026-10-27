@@ -58,7 +58,7 @@ fn main() {
             store.seed(&doc).unwrap();
             for (i, sc) in doc.scenes().iter().enumerate() {
                 store
-                    .put_beat(&cirth_core::model::Beat { id: cirth_core::model::new_id(), summary: format!("Beat {} (authored)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
+                    .put_beat(&cirth_core::model::Beat { id: cirth_core::model::new_id(), logline: String::new(), summary: format!("Beat {} (authored)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
                     .unwrap();
             }
             store.save_package(&out).unwrap();

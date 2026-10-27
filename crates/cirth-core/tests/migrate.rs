@@ -251,3 +251,45 @@ fn killed_during_migration_leaves_the_original_and_reopens_cleanly() {
     assert_eq!(ids, before.blocks.iter().map(|b| b.0.clone()).collect::<Vec<_>>());
     assert_eq!(std::fs::read_dir(&backups).unwrap().count(), 1, "no duplicate pre-migration copy");
 }
+
+#[test]
+fn opening_a_v2_project_adds_loglines_and_keeps_everything_else() {
+    // tests/data/schema-v2-*.cirth were written by the schema v2 code (frozen
+    // just before the v3 change), like the v1 files.
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v2-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v2-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 2, "fixture must be schema v2");
+        let before: Vec<(String, String, Option<String>)> = Connection::open_with_flags(&pkg, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .unwrap()
+            .prepare("SELECT id, summary, scene_id FROM beats ORDER BY pos")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert!(!before.is_empty());
+
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(2));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v2 copy kept");
+        assert_eq!(std::fs::read(&pkg).unwrap(), original, "opening must not modify the package");
+        let s = o.store;
+        let after = s.beats().unwrap();
+        assert_eq!(after.iter().map(|b| (b.id.clone(), b.summary.clone(), b.scene_id.clone())).collect::<Vec<_>>(), before, "beats unchanged");
+        assert!(after.iter().all(|b| b.logline.is_empty()), "existing beats get an empty logline");
+        // A logline can be written and survives saving in the new format.
+        let mut b = after[0].clone();
+        b.logline = "The deal goes wrong".into();
+        s.put_beat(&b).unwrap();
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+        store::remove_store_files(&d.join("work.db")).unwrap();
+        let again = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(again.migrated_from, None);
+        assert_eq!(again.store.beats().unwrap()[0].logline, "The deal goes wrong");
+    }
+}

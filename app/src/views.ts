@@ -1,6 +1,7 @@
 // Navigator and board: two more views of the same scenes. They read scene
-// headings and excerpts from the editor document and change the script only
-// through MoveScene transactions. Beat summaries are separate authored text.
+// headings from the editor document and change the script only through
+// MoveScene transactions. Cards show the beat's logline and summary, which
+// are separate authored text, never a copy of the scene.
 //
 // Keyboard: each list is one Tab stop (roving tabindex). Arrows choose an
 // item, Alt+arrows move it, and moves are announced to screen readers.
@@ -20,7 +21,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string,
 };
 
 const NAV_HINT = "Up and Down arrows choose a scene, Enter goes to it, Alt+Up and Alt+Down move it.";
-const BOARD_HINT = "Arrow keys choose a card, Enter edits its summary and Escape returns, Alt+arrows move it. Tab reaches the chosen card's buttons.";
+const BOARD_HINT = "Arrow keys choose a card, Enter edits its logline (Tab goes on to the summary) and Escape returns, Alt+arrows move it. Tab reaches the chosen card's buttons.";
 
 /** Go to a scene: caret at the end of its heading (so Enter continues the
  *  scene instead of inserting a block above the heading), and the heading
@@ -172,7 +173,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
   const add = el("button", { type: "button" }, "New beat for current scene");
   add.addEventListener("click", async () => {
     const s = sceneAtCursor(view);
-    const beat: Beat = { id: newId(), summary: "New beat", scene_id: s?.sceneId ?? null, pos: (order.at(-1)?.pos ?? 0) + 1 };
+    const beat: Beat = { id: newId(), logline: "", summary: "", scene_id: s?.sceneId ?? null, pos: (order.at(-1)?.pos ?? 0) + 1 };
     await invoke("put_beat", { beat });
     st.beats.push(beat);
     rerender();
@@ -184,7 +185,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
   grid.setAttribute("aria-describedby", "board-hint");
   const cards: HTMLElement[] = [];
   // Only the chosen card's own controls are in the Tab order.
-  const inner = (card: HTMLElement, on: boolean) => card.querySelectorAll<HTMLElement>("button, textarea").forEach((c) => (c.tabIndex = on ? 0 : -1));
+  const inner = (card: HTMLElement, on: boolean) => card.querySelectorAll<HTMLElement>("button, textarea, input").forEach((c) => (c.tabIndex = on ? 0 : -1));
   const move = async (id: string, dir: -1 | 1) => {
     const i = order.findIndex((b) => b.id === id);
     const j = i + dir;
@@ -208,22 +209,31 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
       : el("span", { className: "card-link missing" }, b.scene_id ? "Linked scene no longer exists" : "Not linked");
     link.dataset.part = "link";
     if (s) link.addEventListener("click", () => revealScene(view, s.sceneId));
-    const summary = el("textarea", { className: "summary", value: b.summary, rows: 2 });
+    // A planning card: the writer's logline and summary, never a copy of
+    // the scene's script text. Both are authored and stored with the beat.
+    const logline = el("input", { type: "text", className: "logline", value: b.logline, placeholder: "Logline: what this scene is about, in one line" });
+    logline.dataset.part = "logline";
+    logline.setAttribute("aria-label", "Logline (one line, planning text, never written into the script)");
+    const summary = el("textarea", { className: "summary", value: b.summary, rows: 3, placeholder: "Summary: what happens" });
     summary.dataset.part = "summary";
     summary.setAttribute("aria-label", "Beat summary (planning text, never written into the script)");
-    summary.addEventListener("change", async () => {
-      b.summary = summary.value;
-      await invoke("put_beat", { beat: b });
-    });
-    summary.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        card.focus();
-      }
-    });
-    const excerpt = el("p", { className: "excerpt" }, s ? (s.excerpt.length > 160 ? s.excerpt.slice(0, 157) + "…" : s.excerpt) || "(no action yet)" : "");
-    excerpt.title = "Live excerpt from the script (read-only)";
+    for (const [field, input] of [["logline", logline], ["summary", summary]] as const) {
+      input.addEventListener("change", async () => {
+        b[field] = input.value;
+        await invoke("put_beat", { beat: b });
+      });
+      (input as HTMLElement).addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          card.focus();
+        } else if (e.key === "Enter" && input === logline) {
+          // One line: Enter moves on to the summary.
+          e.preventDefault();
+          summary.focus();
+        }
+      });
+    }
     const left = el("button", { type: "button", disabled: i === 0 }, "◀");
     left.setAttribute("aria-label", "Move card earlier (Alt+Left)");
     left.dataset.part = "left";
@@ -242,7 +252,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === "Enter") {
         e.preventDefault();
-        summary.focus();
+        logline.focus();
         return;
       }
       const to = arrowTarget(cards, i, e.key, ["ArrowLeft", "ArrowUp"], ["ArrowRight", "ArrowDown"]);
@@ -260,7 +270,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
       const from = e.dataTransfer?.getData("text/x-beat");
       if (from && from !== b.id) void moveCard(view, st, from, b.id, rerender);
     });
-    card.append(link, summary, excerpt, el("div", { className: "card-moves" }, left, right));
+    card.append(link, logline, summary, el("div", { className: "card-moves" }, left, right));
     grid.append(card);
     cards.push(card);
   });

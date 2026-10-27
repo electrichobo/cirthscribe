@@ -71,9 +71,17 @@ Jared raised these after the M1 feature work, which so far covered only the scri
    - Using them keeps the selection and focus in the script.
    - Colour, highlight and screen font/size are still to do.
 6. **Add comment button:** see decision C.
-7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording.
+7. **Scene cards as planning cards:** each card shows the scene's **logline** (one line, authored) and the **summary** (authored, exists). The live excerpt of script text is removed, so cards are no longer a copy of the scene. Needs a schema change (a logline field on beats, migration v3) and replaces acceptance B1's "live excerpt" wording. **Built 2026-10-26:**
+   - Schema v3 adds `logline` to beats. Older files are upgraded on open with the original kept; tested against real v2 files frozen before the change (`tests/data/schema-v2-*.cirth`).
+   - Cards show the linked scene's heading, an editable logline and the summary. The script excerpt is gone.
+   - Keyboard: Enter on a card edits the logline, Enter again goes to the summary, Escape returns to the card.
+   - The Rust/TypeScript contract includes the field.
 
-8. **Typewriter mode** (owner, 2026-10-26): a View toggle, like focus mode, that keeps the line being typed at a fixed height (centred) in the window. The text scrolls up instead of the caret running down the page. It works on its own or together with focus mode, and the choice is stored per user. It changes the view only, never pages or exports.
+8. **Typewriter mode** (owner, 2026-10-26): a View toggle, like focus mode, that keeps the line being typed at a fixed height (centred) in the window. The text scrolls up instead of the caret running down the page. It works on its own or together with focus mode, and the choice is stored per user. It changes the view only, never pages or exports. **Built 2026-10-26:**
+   - On or off from View > Typewriter Mode, the toolbar's View dropdown, or Ctrl/Cmd+Shift+T.
+   - The caret's line is kept at the middle after typing and keyboard movement, but not after mouse clicks, so the text never jumps under the pointer.
+   - Extra space above and below the script lets the first and last lines reach the middle.
+   - Stored in `preferences.json`.
 
 **Dual dialogue across the app** (owner asked to make sure it is handled everywhere):
 

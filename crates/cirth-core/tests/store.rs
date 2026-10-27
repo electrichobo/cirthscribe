@@ -157,7 +157,7 @@ fn package_save_is_atomic_and_reopen_detects_recovery() {
     {
         let mut s = Store::open(&work).unwrap();
         s.seed(&doc).unwrap();
-        s.put_beat(&Beat { id: "beat-1".into(), summary: "Zoë orders".into(), scene_id: doc.scenes().first().map(|x| x.scene_id.clone()), pos: 1.0 }).unwrap();
+        s.put_beat(&Beat { id: "beat-1".into(), logline: "Zoë makes her choice".into(), summary: "Zoë orders".into(), scene_id: doc.scenes().first().map(|x| x.scene_id.clone()), pos: 1.0 }).unwrap();
         assert_eq!(s.save_package(&pkg).unwrap(), 1);
         assert!(!s.has_unsaved_work().unwrap());
         // A stray temp file from an interrupted save does not disturb the package.
@@ -177,6 +177,7 @@ fn package_save_is_atomic_and_reopen_detects_recovery() {
     assert!(recovered);
     assert_eq!(s.load().unwrap().blocks[0].text(), "unsaved at crash");
     assert_eq!(s.beats().unwrap().len(), 1);
+    assert_eq!(s.beats().unwrap()[0].logline, "Zoë makes her choice", "logline saved and reopened");
     drop(s);
     // Without a newer working store, the package opens as saved.
     cirth_core::store::remove_store_files(&work).unwrap();
