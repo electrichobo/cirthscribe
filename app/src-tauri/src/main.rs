@@ -614,7 +614,8 @@ async fn export_pdf(app: State<'_, App>, profile_name: String) -> Result<Exporte
     let (p, doc) = paginate_current(&app, &profile_name)?;
     let prof = profile(&profile_name);
     let t0 = Instant::now();
-    let bytes = pdf::render(&p.map, &prof, &doc.title)?;
+    let tp = with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))?;
+    let bytes = pdf::render_with_title(&p.map, &prof, &doc.title, Some(&tp))?;
     let pdf_ms = t0.elapsed().as_secs_f64() * 1e3;
     let name = with_session(&app, |s| Ok(s.key.clone()))?;
     let dir = data_dir(&app).join("exports");
@@ -652,6 +653,22 @@ async fn set_document_profile(app: State<'_, App>, profile: String) -> Result<&'
     })
 }
 
+/// The current document's title page (empty fields if none yet).
+#[tauri::command]
+async fn title_page(app: State<'_, App>) -> Result<cirth_core::title::TitlePage, String> {
+    with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))
+}
+
+/// Store the title page. Like the page size, the next save writes it into
+/// the project file; exports include it when it has a title.
+#[tauri::command]
+async fn set_title_page(app: State<'_, App>, page: cirth_core::title::TitlePage) -> Result<(), String> {
+    with_session(&app, |s| {
+        let doc = s.store.default_document().map_err(err)?;
+        s.store.set_title_page(&doc, &page).map_err(err)
+    })
+}
+
 #[derive(Serialize)]
 struct TxtExported {
     path: String,
@@ -666,7 +683,8 @@ struct TxtExported {
 async fn export_txt(app: State<'_, App>, path: String) -> Result<TxtExported, String> {
     let name = with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
     let (p, doc) = paginate_current(&app, name)?;
-    let t = cirth_core::txt::render(&p.map, &profile(name));
+    let tp = with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))?;
+    let t = cirth_core::txt::render_with_title(&p.map, &profile(name), Some(&tp));
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("txt.tmp");
     std::fs::write(&tmp, &t.text).map_err(io_err)?;
@@ -1236,6 +1254,8 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("save_as", keyed("Save As…", "Shift+S"))
         .item(&export)
         .separator()
+        .text("title_page", "Title Page…")
+        .separator()
         .text("free_writing", "Free Writing")
         .separator()
         .text("home", "Close Project");
@@ -1487,6 +1507,8 @@ fn main() {
             set_ui_prefs,
             focus_window,
             set_menu_checks,
+            title_page,
+            set_title_page,
             menu_items,
             document_profile,
             set_document_profile,

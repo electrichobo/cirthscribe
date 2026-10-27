@@ -19,10 +19,34 @@ pub struct Exported {
 }
 
 pub fn render(map: &PageMap, p: &Profile) -> Exported {
+    render_with_title(map, p, None)
+}
+
+/// Like `render`, with a title page first (then a form feed) when one is
+/// given and not empty. Page numbers are unchanged: the title page is unnumbered.
+pub fn render_with_title(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>) -> Exported {
     let col = |x_in: f32| ((x_in - p.action.left_in) * p.chars_per_inch).round().max(0.0) as usize;
     // Page numbers end where the PDF's do: 1 inch from the right edge.
     let right = col(p.page_w_in - 1.0);
     let mut out = String::new();
+    if let Some(tp) = title_page.filter(|t| !t.is_empty()) {
+        let lines = crate::title::layout(tp, p);
+        let rows = lines.iter().map(|l| l.row + 1).max().unwrap_or(0);
+        let mut grid = vec![String::new(); rows];
+        for l in lines {
+            let row = &mut grid[l.row];
+            let at = col(l.x_in);
+            let used = UnicodeWidthStr::width(row.as_str());
+            row.push_str(&" ".repeat(at.saturating_sub(used).max(if used > 0 { 1 } else { 0 })));
+            row.push_str(&l.text);
+        }
+        for r in grid {
+            out.push_str(r.trim_end());
+            out.push('\n');
+        }
+        out.push('\u{c}');
+        out.push('\n');
+    }
     let mut styled = 0usize;
     for (i, page) in map.pages.iter().enumerate() {
         if i > 0 {
@@ -119,5 +143,23 @@ mod tests {
         let right: String = dual[0].segs.iter().map(|s| s.text.as_str()).collect();
         let line = t.text.lines().find(|l| l.contains(&right)).unwrap();
         assert!(line.trim_start().len() > right.len() + 2, "left cue on the same line: {line:?}");
+    }
+
+    #[test]
+    fn title_page_comes_first_and_page_numbers_are_unchanged() {
+        let p = Profile::us_letter();
+        let doc = crate::fixtures::page_boundaries().to_document().unwrap();
+        let map = crate::layout::paginate(&doc.blocks, &p, 1);
+        let plain = render(&map, &p);
+        let tp = crate::title::TitlePage { title: "THE TIDE LEDGER".into(), contact: "jared@example.invalid".into(), ..Default::default() };
+        let with = render_with_title(&map, &p, Some(&tp));
+        let (title_page, rest) = with.text.split_once("\u{c}\n").unwrap();
+        assert_eq!(rest, plain.text, "script pages unchanged after the title page");
+        let t = title_page.lines().find(|l| l.contains("THE TIDE LEDGER")).unwrap();
+        // Centred on the 60-column text area (columns count from the action margin).
+        let indent = t.len() - t.trim_start().len();
+        assert!((22..=23).contains(&indent), "centred: {indent} {t:?}");
+        assert!(title_page.trim_end().ends_with("jared@example.invalid"), "contact on the last line");
+        assert_eq!(render_with_title(&map, &p, Some(&Default::default())).text, plain.text, "empty title page: none printed");
     }
 }

@@ -8,6 +8,7 @@ pub mod model;
 pub mod ops;
 pub mod pdf;
 pub mod spell;
+pub mod title;
 pub mod txt;
 pub mod store;
 pub mod words;

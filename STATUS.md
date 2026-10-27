@@ -2,7 +2,7 @@
 
 Updated 2026-10-26.
 
-**Current milestone: M1 in progress (plan: `docs/M1_PLAN.md`). M0 complete on Windows only.**
+**Current milestone: M2 (plan: `docs/M2_PLAN.md`), started 2026-10-27.** M1 and M1b closed by the owner on 2026-10-27, with Linux latency, reference machines, defect 3 and macOS check N20 carried forward (`docs/m1/EXIT_REVIEW.md`). M0 complete.
 
 M1 progress:
 - 1.1 done: End-key selection defect fixed; regression and stress tests.

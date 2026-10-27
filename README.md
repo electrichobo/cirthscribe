@@ -32,7 +32,7 @@ Each stage builds on the one before. Stages are goals, not dates.
 
 Proved the hard parts before building on them: an editor that keeps up with a 120-page script, accurate page layout, safe saving, and crash recovery. The app framework was chosen with measurements: Rust and Tauri.
 
-### 🔨 Stage 1: A writing app you can rely on (in progress)
+### ✅ Stage 1: A writing app you can rely on (done)
 
 Done:
 - [x] Screenplay editor with automatic formatting, keyboard shortcuts and undo
@@ -52,11 +52,10 @@ Done:
 - [x] About screen with the licence and every third-party licence
 - [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
 
-Still to do:
-- [ ] Recheck the latest fixes on macOS
+Carried into Stage 2:
 - [ ] Typing-speed check on a Linux desktop
 
-### 🔨 Stage 1b: Writing workspace (in progress)
+### ✅ Stage 1b: Writing workspace (done)
 
 Done:
 - [x] Focus mode: full screen with only the script page
@@ -68,12 +67,12 @@ Done:
 - [x] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
 - [x] Text colour and highlight as your own on-screen markup (never printed)
 
-Still to do:
-- [ ] Hands-on checks of the new workspace features on macOS
 
-### Stage 2: Professional pages and file exchange
+### 🔨 Stage 2: Professional pages and file exchange (in progress)
 
-- [ ] Final production-quality PDF and title pages
+- [x] Title page (PDF and text export)
+- [ ] Fountain import and export
+- [ ] Final production-quality PDF
 - [ ] Scene numbers, revision colours, locked pages (A/B pages)
 - [ ] Import and export Final Draft (FDX), Word (DOCX), RTF, HTML and text, each with a report of what carried over (including dual dialogue)
 

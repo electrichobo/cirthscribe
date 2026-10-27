@@ -18,7 +18,7 @@ Also still open:
 - STATUS defect 3: a rare End-then-Enter stress miss, about 1 in 4,000 trials, with no text lost. It is logged and has instrumentation in place; the cause is not found.
 - macOS recheck N20.
 
-**Proposal:** close M1 with these carried forward (Linux latency, reference machines, defect 3, N20), since none is a data-loss defect. The owner's call.
+**M1 closed by the owner on 2026-10-27,** with these carried into M2: Linux latency, reference machines, defect 3, N20. None is a data-loss defect.
 
 Original verdict (2026-10-26): **M1 is not done.**
 

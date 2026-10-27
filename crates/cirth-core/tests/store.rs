@@ -374,3 +374,26 @@ fn killed_during_package_save_keeps_a_valid_package_and_every_edit() {
         assert_eq!(Store::inspect(&pkg).unwrap().saved_version, 2);
     }
 }
+
+#[test]
+fn title_page_is_stored_per_document_and_saved_with_the_package() {
+    use cirth_core::title::TitlePage;
+    let d = tmpdir("titlepage");
+    let work = d.join("w.db");
+    let pkg = d.join("script.cirth");
+    let tp = TitlePage { title: "THE TIDE LEDGER".into(), credit: "Written by".into(), authors: "Jared Hoy".into(), wga: "1234567".into(), draft_label: "Blue Revision".into(), ..Default::default() };
+    {
+        let mut s = Store::open(&work).unwrap();
+        s.seed(&fixtures::unicode_marks().to_document().unwrap()).unwrap();
+        let main = s.default_document().unwrap();
+        let other = s.create_document("Episode 2").unwrap();
+        assert!(s.title_page(&main).unwrap().is_empty(), "no title page until written");
+        s.set_title_page(&main, &tp).unwrap();
+        assert!(s.title_page(&other).unwrap().is_empty(), "only that document has it");
+        assert!(matches!(s.set_title_page("no-such-doc", &tp), Err(StoreError::Invalid(_))));
+        s.save_package(&pkg).unwrap();
+    }
+    cirth_core::store::remove_store_files(&work).unwrap();
+    let s = Store::open_package(&pkg, &work, None).unwrap().store;
+    assert_eq!(s.title_page(&s.default_document().unwrap()).unwrap(), tp, "kept in the project file");
+}

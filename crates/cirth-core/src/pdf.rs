@@ -15,6 +15,12 @@ fn mm(inches: f32) -> Mm {
 }
 
 pub fn render(map: &PageMap, p: &Profile, title: &str) -> Result<Vec<u8>, String> {
+    render_with_title(map, p, title, None)
+}
+
+/// Like `render`, with a title page first when one is given and not empty.
+/// The title page has no page number and does not count as page 1.
+pub fn render_with_title(map: &PageMap, p: &Profile, title: &str, title_page: Option<&crate::title::TitlePage>) -> Result<Vec<u8>, String> {
     let (doc, page1, layer1) = PdfDocument::new(title, mm(p.page_w_in), mm(p.page_h_in), "text");
     let load = |b: &[u8]| doc.add_external_font(Cursor::new(b.to_vec())).map_err(|e| e.to_string());
     let fonts: [IndirectFontRef; 4] = [load(REGULAR)?, load(BOLD)?, load(ITALIC)?, load(BOLD_ITALIC)?];
@@ -22,8 +28,17 @@ pub fn render(map: &PageMap, p: &Profile, title: &str) -> Result<Vec<u8>, String
     // Baseline sits about 0.8 of the line box below its top.
     let baseline = |row: usize| p.page_h_in - p.top_in - (row as f32) * line_in - 0.8 * line_in;
     let char_in = 1.0 / p.chars_per_inch;
-    for (i, page) in map.pages.iter().enumerate() {
-        let (pi, li) = if i == 0 { (page1, layer1) } else { doc.add_page(mm(p.page_w_in), mm(p.page_h_in), "text") };
+    let mut first = Some((page1, layer1));
+    let mut next_page = || first.take().unwrap_or_else(|| doc.add_page(mm(p.page_w_in), mm(p.page_h_in), "text"));
+    if let Some(tp) = title_page.filter(|t| !t.is_empty()) {
+        let (pi, li) = next_page();
+        let layer = doc.get_page(pi).get_layer(li);
+        for l in crate::title::layout(tp, p) {
+            layer.use_text(l.text, p.font_pt, mm(l.x_in), mm(baseline(l.row)), &fonts[0]);
+        }
+    }
+    for page in &map.pages {
+        let (pi, li) = next_page();
         let layer = doc.get_page(pi).get_layer(li);
         if page.number > 1 {
             let label = format!("{}.", page.number);

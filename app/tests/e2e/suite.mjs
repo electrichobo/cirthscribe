@@ -2039,6 +2039,46 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(s.layout !== "overlay" && s.nav && s.board, `back beside the script at 100%: ${JSON.stringify(s)}`);
   });
 
+  await test("Title page: File > Title Page… fields are kept in the project and printed before page 1 in text and PDF exports", async () => {
+    await openFixture("page-boundaries");
+    await app.evaluate("__cirth.menu('title_page')");
+    await waitFor(app, "document.getElementById('title-dialog')?.open === true", "Title page dialog open");
+    assert((await app.evaluate("document.getElementById('tp-title').value")) === "", "empty at first");
+    await audit("title page dialog");
+    const fill = { title: "THE TIDE LEDGER", credit: "Written by", authors: "Jared Hoy", draft_label: "Second Draft", draft_date: "27 October 2026", wga: "1234567", contact: "jared@example.invalid\n555 0100" };
+    await app.evaluate(`(() => { const f = ${JSON.stringify(fill)}; for (const k in f) document.getElementById('tp-' + k).value = f[k]; document.getElementById('tp-save').click(); return true; })()`);
+    await waitFor(app, "!document.getElementById('title-dialog').open", "saved and closed");
+    await waitAnnounced("Title page saved", "save announced");
+    // Kept in the project file.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await app.evaluate("__cirth.menu('title_page')");
+    await waitFor(app, "document.getElementById('title-dialog').open && document.getElementById('tp-title').value === 'THE TIDE LEDGER' && document.getElementById('tp-wga').value === '1234567'", "fields kept after reopening");
+    await app.evaluate("(() => { document.getElementById('tp-cancel').click(); return true; })()");
+    // Text export: the title page, a form feed, then the same script pages.
+    const pages = await app.evaluate("window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => p.map.pages.length)");
+    const out = join(dataDir, "with-title.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out)})`), "text exported");
+    const txt = readFileSync(out, "utf8");
+    const parts = txt.split("\f");
+    assert(parts.length === pages + 1, `${parts.length} text pages for ${pages} script pages plus the title page`);
+    assert(/^ {20,}THE TIDE LEDGER$/m.test(parts[0]) && parts[0].includes("WGA Registration No. 1234567") && parts[0].includes("555 0100"), `title page text: ${parts[0].trim().slice(0, 300)}`);
+    assert(!/^\s*\d+\.\s*$/m.test(parts[0]), "the title page has no page number");
+    // PDF: one more page than the script.
+    const pdf = await app.evaluate("window.__TAURI_INTERNALS__.invoke('export_pdf', { profileName: 'letter' })");
+    const bytes = readFileSync(pdf.path, "latin1");
+    const pdfPages = (bytes.match(/\/Type\s*\/Page(?!s)/g) ?? []).length;
+    assert(pdfPages === pages + 1, `PDF has ${pdfPages} pages for ${pages} script pages plus the title page`);
+    // No title: no title page.
+    await app.evaluate("__cirth.menu('title_page')");
+    await waitFor(app, "document.getElementById('title-dialog').open", "reopened");
+    await app.evaluate("(() => { document.getElementById('tp-title').value = ''; document.getElementById('tp-save').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('title-dialog').open", "saved without a title");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out)})`), "text exported again");
+    assert(readFileSync(out, "utf8").split("\f").length === pages, "no title page without a title");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

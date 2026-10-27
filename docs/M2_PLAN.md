@@ -1,6 +1,6 @@
 # Milestone 2 plan: professional pages and file exchange
 
-Status: **proposed, 2026-10-27.** Builds on M1 and M1b. ROADMAP's M2 gate: locked-page editing and PDF rendering pass boundary fixtures; imports never silently discard content; results with external editors and Google are labelled from actual tests, never assumed from the file extension.
+Status: **accepted by the owner, 2026-10-27**: order as proposed (title page → Fountain → FDX); `quick-xml` and `zip` (both MIT) approved for steps 3 and 8; title page also gets WGA registration and a revision/draft label. M1 closed with its items carried forward. Builds on M1 and M1b. ROADMAP's M2 gate: locked-page editing and PDF rendering pass boundary fixtures; imports never silently discard content; results with external editors and Google are labelled from actual tests, never assumed from the file extension.
 
 ## Starting point (what exists)
 
@@ -15,7 +15,13 @@ Status: **proposed, 2026-10-27.** Builds on M1 and M1b. ROADMAP's M2 gate: locke
 
 Each step is a working, tested slice. Every export gets a capability/loss report, and every import reports what it could not keep.
 
-1. **Title page.**
+1. **Title page.** **Built 2026-10-27:**
+   - Fields: title, credit, authors, source, draft/revision label, draft date, WGA registration, contact, notes. Stored per document in the project's settings, so no schema change was needed (`cirth_core::title`).
+   - Edited in File > Title Page… (also under More).
+   - Printed before page 1 in PDF and text exports when it has a title; the title page is unnumbered and the script's page numbers are unchanged.
+   - Layout: centre block about a third of the way down; contact bottom left; draft, date, WGA and notes bottom right.
+   - Tests: core (layout, text export, storage with save/reopen) and e2e (dialog, reopen, text and PDF page counts, no title means no title page).
+   - Not yet: a preview inside the app; FDX/Fountain carry it in their own steps.
    - Data: authored fields per document (title, credit, authors, source, draft date, contact, notes), stored in the project. This needs a schema v4 migration.
    - Display and editing: a title-page panel or dialog.
    - Exports: PDF and TXT.

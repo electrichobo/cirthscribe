@@ -32,6 +32,7 @@ import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
 import { icon, iconButton, iconSelect } from "./icons";
 import { createLayoutMode } from "./layout-mode";
+import { createTitlePageDialog } from "./titlepage";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -534,8 +535,12 @@ const free = createFreeWriting($("freewrite"), {
   notify: (m) => showBanner(m),
 });
 $("go-free").addEventListener("click", () => void openFreeWriting());
+$("open-title-page").addEventListener("click", () => void runMenu("title_page"));
 
 const about = createAbout();
+// Title page fields are settings, not versioned edits, so write the file now
+// (as a page-size change does) instead of waiting for autosave.
+const titlePage = createTitlePageDialog(() => saveFile(false));
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
 // Screen font and size: on screen only (pages and exports keep Courier Prime 12 pt).
 {
@@ -836,6 +841,9 @@ async function runMenu(id: string): Promise<void> {
     case "focus_next":
       cycleRegions(regions(), false);
       break;
+    case "title_page":
+      if (lastOpen) await titlePage.open();
+      break;
     case "free_writing":
       await openFreeWriting();
       break;
@@ -954,6 +962,7 @@ $("structural").addEventListener("change", (e) => {
   latency,
   focusMode,
   layoutMode,
+  titlePage,
   selSync,
   blocks: () => {
     const out: Block[] = [];

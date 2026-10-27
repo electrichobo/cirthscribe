@@ -276,6 +276,20 @@ impl Store {
         Ok(rows)
     }
 
+    /// A document's title page (empty if never set).
+    pub fn title_page(&self, document_id: &str) -> Result<crate::title::TitlePage> {
+        let json = self.setting(&format!("document:{document_id}"), "title_page")?;
+        Ok(json.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default())
+    }
+
+    pub fn set_title_page(&self, document_id: &str, tp: &crate::title::TitlePage) -> Result<()> {
+        if self.conn.query_row("SELECT COUNT(*) FROM documents WHERE id = ?1", [document_id], |r| r.get::<_, i64>(0))? == 0 {
+            return Err(StoreError::Invalid(format!("no document {document_id}")));
+        }
+        let json = serde_json::to_string(tp).map_err(|e| StoreError::Invalid(e.to_string()))?;
+        self.set_setting(&format!("document:{document_id}"), "title_page", &json)
+    }
+
     pub fn setting(&self, scope: &str, key: &str) -> Result<Option<String>> {
         Ok(self.conn.query_row("SELECT value FROM settings WHERE scope = ?1 AND key = ?2", [scope, key], |r| r.get(0)).optional()?)
     }
