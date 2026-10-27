@@ -212,7 +212,8 @@ dialog.about h3 { font-size: 13px; margin: 14px 0 6px; }
 .about-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .about-tabs button { border: none; background: none; color: var(--ink); padding: 6px 10px; border-bottom: 2px solid transparent; cursor: pointer; }
 .about-tabs button.current { border-bottom-color: var(--accent); font-weight: 600; }
-.about-page { overflow: auto; min-height: 0; flex: 1; }
+/* flex-basis auto, not 0: WebKit collapsed a 0-basis child of a column dialog that has only max-height (empty About tabs, macOS pass 2026-10-26). */
+.about-page { overflow: auto; min-height: 0; flex: 1 1 auto; }
 .about-main p { margin: 0 0 8px; line-height: 1.45; }
 .about-attribution { font-size: 15px; font-weight: 600; }
 .about-url { user-select: all; }

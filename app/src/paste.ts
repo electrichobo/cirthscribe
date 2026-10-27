@@ -12,7 +12,7 @@
 // Copy: blocks are written as plain text separated by blank lines, with cues,
 // headings and transitions in capitals (as they print).
 
-import { Fragment, Slice, type Node as PMNode } from "prosemirror-model";
+import { DOMParser as PMDOMParser, Fragment, Slice, type Node as PMNode } from "prosemirror-model";
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { schema, type Kind } from "./schema";
@@ -100,15 +100,40 @@ export function insertBlocks(view: EditorView, nodes: PMNode[]): boolean {
   return true;
 }
 
-/** handlePaste prop: multi-line plain text (no HTML) becomes typed blocks. */
+const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * Bold, italic and underline from another app's HTML, laid onto the typed
+ * blocks parsed from its plain text. Used only when the HTML's paragraphs
+ * have the same text as those blocks, one for one; otherwise null (types
+ * matter more than styling, so the plain-text result wins).
+ */
+function styledFrom(html: string, typed: { kind: Kind; text: string }[]): PMNode[] | null {
+  const dom = new DOMParser().parseFromString(html, "text/html");
+  const paras: PMNode[] = [];
+  PMDOMParser.fromSchema(schema).parse(dom.body).forEach((n) => {
+    if (squash(n.textContent)) paras.push(n);
+  });
+  if (paras.length !== typed.length || paras.some((p, i) => squash(p.textContent) !== squash(typed[i].text))) return null;
+  return paras.map((p, i) => schema.nodes.block.create({ kind: typed[i].kind }, p.content));
+}
+
+/**
+ * handlePaste prop. Our own copies (HTML with block types) go through
+ * ProseMirror's parser and keep everything. Multi-line text from anywhere
+ * else becomes typed blocks by the plain-text rules above, including rich
+ * text from TextEdit, Word or a browser (WebKit offers RTF as HTML too),
+ * keeping its inline styles when the paragraphs line up.
+ */
 export function handlePaste(view: EditorView, event: ClipboardEvent): boolean {
   const data = event.clipboardData;
   if (!data) return false;
-  // Our own copies and other apps' HTML go through ProseMirror's parser.
-  if (data.getData("text/html")) return false;
+  const html = data.getData("text/html");
+  if (html.includes("data-kind")) return false;
   const text = data.getData("text/plain").replace(/\r\n?/g, "\n");
   if (!text.includes("\n")) return false;
-  const nodes = parsePlainText(text).map((b) => schema.nodes.block.create({ kind: b.kind }, b.text ? schema.text(b.text) : null));
+  const typed = parsePlainText(text);
+  const nodes = (html && styledFrom(html, typed)) || typed.map((b) => schema.nodes.block.create({ kind: b.kind }, b.text ? schema.text(b.text) : null));
   return insertBlocks(view, nodes);
 }
 

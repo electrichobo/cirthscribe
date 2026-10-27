@@ -21,6 +21,7 @@ Build: `cargo test -p cirth-core`, `cd app && npm ci && npm run build`, `cargo b
 | M9 | Fixture "Long script". Type fast in the middle for 30 s. | No visible lag or dropped characters. |
 | M10 | Type a marker, wait for "Stored", Force Quit the app, reopen. | Recovery notice; the marker is present. |
 | M11 | Open a second copy of the app. | It reports the project is open elsewhere. |
+| M12 | Fixture "Long script", scroll to the top. Click a scene about halfway down in the scene list, then press Enter. | The script scrolls so that heading is visible; the caret is at the end of the heading; Enter adds an empty line after the heading, not a heading above it. (Fixed after the 2026-10-26 pass; recheck.) |
 
 ## 1b. Native Open and Save As dialogs (all platforms)
 
@@ -46,6 +47,7 @@ Tests run the menu actions through the same handler (`__cirth.menu(id)`); the OS
 | N5 | Click and arrow-key through a dual-dialogue pair (left column, then right) | The caret moves through the left speech, then the right; typing stays in the column you are in. |
 | N7 | Help > About CirthScribe and Licences (Windows/Linux); CirthScribe > About CirthScribe (macOS) | The About screen opens with the attribution, GPL tab and third-party licences tab. |
 | N8 | Export Plain Text, open the file in Notepad / TextEdit / gedit | Indents line up in a fixed-pitch font; pages are separated by a form feed (some editors show it as a symbol or nothing). |
+| N9 | macOS: type a word, then press Cmd+Q at once; reopen | The app quits (CirthScribe > Quit CirthScribe), and the word is in the file. File has no Quit on macOS. (Added after the 2026-10-26 pass.) |
 | N6 | Free Writing, Flow mode on: type with a real IME (Japanese, Pinyin), then try the trackpad/mouse to select and drag text | Composed text lands at the end; nothing already written is selected, moved or deleted. Esc turns editing back on. |
 
 ## 1e. Typing latency (M1 exit test), macOS and Linux desktop

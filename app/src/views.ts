@@ -22,11 +22,19 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string,
 const NAV_HINT = "Up and Down arrows choose a scene, Enter goes to it, Alt+Up and Alt+Down move it.";
 const BOARD_HINT = "Arrow keys choose a card, Enter edits its summary and Escape returns, Alt+arrows move it. Tab reaches the chosen card's buttons.";
 
+/** Go to a scene: caret at the end of its heading (so Enter continues the
+ *  scene instead of inserting a block above the heading), and the heading
+ *  scrolled to the top of the script. WebKit did not reliably scroll for the
+ *  selection alone (macOS pass, 2026-10-26), so the heading is scrolled
+ *  explicitly after focusing. */
 export function revealScene(view: EditorView, sceneId: string) {
   const s = scenesOf(view.state.doc).find((x) => x.sceneId === sceneId);
   if (!s) return;
-  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, s.from + 1)).scrollIntoView());
+  const heading = view.state.doc.nodeAt(s.from);
+  const end = s.from + 1 + (heading?.content.size ?? 0);
+  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, end)).scrollIntoView());
   view.focus();
+  (view.nodeDOM(s.from) as HTMLElement | null)?.scrollIntoView({ block: "start" });
 }
 
 export function sceneAtCursor(view: EditorView): SceneInfo | undefined {

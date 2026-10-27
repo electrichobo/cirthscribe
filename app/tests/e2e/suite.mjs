@@ -317,6 +317,25 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const html = b.slice(n1 - 1);
     assert(html.some((x) => x.runs.some((r) => r.bold && r.text === "bold")), `bold kept: ${JSON.stringify(html)}`);
     assert(html.some((x) => text(x) === "Second & last" && x.kind === "action"), "second paragraph as action");
+    // Rich text from TextEdit (macOS offers its RTF as HTML too): typed by the
+    // plain-text rules, inline styles kept when the paragraphs line up.
+    let n2 = b.length;
+    await caretAtEndOf(n2 - 1);
+    await pasteEvent({
+      "text/html": '<meta charset="UTF-8"><p class="p1"><b>KAITO</b></p><p class="p1">The clipboard came <i>from</i> the OS.</p>',
+      "text/plain": "KAITO\nThe clipboard came from the OS.",
+    });
+    b = await blocks();
+    let rich = b.slice(n2);
+    assert(rich.map((x) => x.kind).join(",") === "character,dialogue", `rich text typed: ${JSON.stringify(rich)}`);
+    assert(rich[0].runs.some((r) => r.bold) && rich[1].runs.some((r) => r.italic && r.text === "from"), `styles kept: ${JSON.stringify(rich)}`);
+    // HTML whose paragraphs do not match the text: types win, styling dropped.
+    n2 = b.length;
+    await caretAtEndOf(n2 - 1);
+    await pasteEvent({ "text/html": "<div><b>NOOR</b><br>Hello there.</div>", "text/plain": "NOOR\nHello there." });
+    b = await blocks();
+    rich = b.slice(n2);
+    assert(rich.map((x) => x.kind).join(",") === "character,dialogue", `mismatched HTML still typed: ${JSON.stringify(rich)}`);
     const ids = b.map((x) => x.id);
     assert(new Set(ids).size === ids.length, "unique ids");
     assert(await storedMatchesEditor(), "stored equals editor");
@@ -1180,14 +1199,19 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await clickHome(app, "#open-about");
     await waitFor(app, "document.getElementById('about-dialog')?.open === true", "About open");
     const pageText = () => app.evaluate("document.querySelector('#about-dialog .about-page').textContent");
+    // Text in the DOM is not enough: on WebKit the page area once collapsed to 0 px (macOS pass).
+    const pageHeight = () => app.evaluate("document.querySelector('#about-dialog .about-page').getBoundingClientRect().height");
     const t = await pageText();
+    assert((await pageHeight()) > 150, `About tab visible: ${await pageHeight()} px`);
     assert(t.includes("Based on CirthScribe by Jared Hoy"), "attribution");
     assert(/GNU General Public License, version 3 only/.test(t) && /no warranty/i.test(t), "GPL notice and no warranty");
     assert(t.includes("ADDITIONAL TERMS UNDER SECTION 7(b)"), "NOTICE text with the 7(b) term");
     await clickHome(app, '[data-about-tab="gpl"]');
     assert((await pageText()).includes("GNU GENERAL PUBLIC LICENSE") && (await pageText()).includes("Version 3, 29 June 2007"), "full GPL text");
+    assert((await pageHeight()) > 150, `GPL tab visible: ${await pageHeight()} px`);
     await clickHome(app, '[data-about-tab="third"]');
     const third = await pageText();
+    assert((await pageHeight()) > 150, `third-party tab visible: ${await pageHeight()} px`);
     for (const name of ["Courier Prime", "SCOWL dictionary en_US-large", "spellbook 0.4.2", "prosemirror-view", "tauri "]) assert(third.includes(name), `third-party list has ${name}`);
     assert(third.includes("SIL OPEN FONT LICENSE"), "OFL text included");
     await screenshot(app, "about");
@@ -1510,6 +1534,30 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const otherRefusals = net.refused.filter((r) => !r.includes("offline-check.invalid"));
     assert(otherRefusals.length === 0, `the app itself tried something the policy refused: ${otherRefusals.join(", ")}`);
     return { scheme, requests: net.urls.length, origins: [...new Set(net.urls.map((u) => { try { return new URL(u).origin; } catch { return u.slice(0, 10); } }))] };
+  });
+
+  await test("Navigator click goes to the scene: heading scrolled into view, caret at its end, Enter continues the scene", async () => {
+    await openFixture("long-120");
+    await app.evaluate("(() => { document.querySelector('.editor-wrap').scrollTop = 0; return true; })()");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    const target = scenes[Math.floor(scenes.length * 0.6)];
+    await clickHome(app, `#navigator [data-item="${target}"] [data-part="go"]`);
+    await sleep(300);
+    const where = await app.evaluate(`(() => {
+      const v = __cirth.view; const h = document.querySelector('.ProseMirror [data-scene-id="${target}"]').getBoundingClientRect();
+      const wrap = document.querySelector('.editor-wrap').getBoundingClientRect();
+      const $p = v.state.selection.$from;
+      return { top: h.top - wrap.top, bottom: wrap.bottom - h.bottom, inHeading: $p.parent.attrs.sceneId === ${JSON.stringify(target)}, atEnd: $p.parentOffset === $p.parent.content.size, focused: v.hasFocus() };
+    })()`);
+    assert(where.top >= 0 && where.bottom >= 0, `heading visible in the script: ${JSON.stringify(where)}`);
+    assert(where.inHeading && where.atEnd && where.focused, `caret at the end of the heading: ${JSON.stringify(where)}`);
+    const before = await blocks();
+    const i = before.findIndex((b) => b.scene_id === target);
+    await press("Enter");
+    const after = await blocks();
+    assert(after.length === before.length + 1, "one block added");
+    assert(after[i].id === before[i].id && text(after[i]) === text(before[i]), "heading unchanged and still in place");
+    assert(after[i + 1].kind !== "heading" && text(after[i + 1]) === "", `Enter adds an empty ${after[i + 1].kind} after the heading, not a heading above it`);
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {

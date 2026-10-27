@@ -1116,13 +1116,28 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
         .text("export_pdf", "Export PDF (proof)")
         .text("export_txt", "Export Plain Text…")
         .separator()
-        .text("home", "Close Project")
-        .text("quit", "Quit")
-        .build()?;
+        .text("home", "Close Project");
+    // On macOS Quit lives in the app menu (Cmd+Q), not in File.
+    #[cfg(not(target_os = "macos"))]
+    let file = file.text("quit", "Quit");
+    let file = file.build()?;
     #[cfg(target_os = "macos")]
     {
         // Our own About screen (with the licences) instead of the bare native one.
-        let app_menu = SubmenuBuilder::new(app, "CirthScribe").text("about", "About CirthScribe").separator().services().separator().hide().hide_others().show_all().build()?;
+        // Quit is our own item, not the predefined one: the predefined Quit
+        // exits without running the close handler that saves the last edits.
+        let quit = tauri::menu::MenuItemBuilder::with_id("quit", "Quit CirthScribe").accelerator("Cmd+Q").build(app)?;
+        let app_menu = SubmenuBuilder::new(app, "CirthScribe")
+            .text("about", "About CirthScribe")
+            .separator()
+            .services()
+            .separator()
+            .hide()
+            .hide_others()
+            .show_all()
+            .separator()
+            .item(&quit)
+            .build()?;
         let edit = SubmenuBuilder::new(app, "Edit")
             .text("undo", "Undo")
             .text("redo", "Redo")

@@ -12,7 +12,7 @@ Gate sources: ROADMAP.md (M1 exit) and the exit tests in docs/M1_PLAN.md.
 | - | - | - |
 | Core library: store, transactions, migrations, layout, word counts, spell check, text export, Free Writing store | `cargo test -p cirth-core`: 18 lib, 3 contract, 4 layout, 7 migrate and 14 store tests (plus the TypeScript contract test, 4 checks) | Windows (local); Linux, macOS and Windows in CI |
 | Hard-kill crash tests at the store level: acknowledged batches survive `kill`; a mid-transaction kill leaves the previous state | `tests/store.rs` (`killed_process_keeps_every_acknowledged_batch`, `killed_mid_transaction_leaves_previous_state`) | All three, in CI |
-| End-to-end app suite (editing, paste, Unicode, simulated IME, autosave and recovery after a hard kill, second instance, migrations, find/replace, autocomplete, word counts, spelling, dual dialogue, page view, Save As, outside-change conflict copies, backups, Free Writing and Flow mode, About, page size and TXT export, accessibility audit, keyboard-only, display preferences) | `app/tests/e2e/suite.mjs` | Windows local: DevTools 35/35; WebDriver 34/34, 1 skipped (simulated IME needs DevTools) |
+| End-to-end app suite (editing, paste, Unicode, simulated IME, autosave and recovery after a hard kill, second instance, migrations, find/replace, autocomplete, word counts, spelling, dual dialogue, page view, Save As, outside-change conflict copies, backups, Free Writing and Flow mode, About, page size and TXT export, accessibility audit, keyboard-only, display preferences) | `app/tests/e2e/suite.mjs` | Windows local: DevTools 36/36; WebDriver 35/35, 1 skipped (simulated IME needs DevTools) |
 | Same suite on Linux | CI, WebKitGTK under Xvfb | Linux CI (green as of `d20f479`, including the third-party notices check; see section 4 for `16af402`) |
 | Latency and open time on the long fixture (127 pages) | FINDINGS: p95 input-to-paint 29 to 35 ms over four runs (target < 50 ms); warm open 65 ms (target < 3 s) | Windows dev machine only |
 | No open data-loss or corruption defect | STATUS "Open defects": the two open items are a Windows dev-build linker warning and Windows e2e on the hosted runner. The End-key defect is fixed, with a 0/500 stress result | n/a |
@@ -87,6 +87,32 @@ Run 40438344525 on `16af402` is **green** on all three jobs:
 - Windows: core tests and the app build.
 
 The two Windows e2e steps also show "success", but they are `continue-on-error`. The public API reports such a step as a success even when it fails, and reading the job log needs a GitHub sign-in. So this does not show that Windows e2e ran on the runner.
+
+## 4b. macOS pass (2026-10-26)
+
+Run by a Claude session with computer use plus Jared on an M4 Pro MacBook. Setup:
+- macOS 26.2 (25C56), Safari 26.2 / WebKit 21623.1.14.11.9.
+- Commit `14a38b5`, release profile, built as an app bundle.
+- The detailed log is in `docs/testing/MANUAL_CHECKS.md` on branch `macos-pass` (not yet merged here).
+
+**Results: 22 passed, 2 failed, 8 not run.**
+- Build and tests on the Mac: core 46/46, contract 4/4; the binary's minimum OS is 11.0.
+- Typing latency (three runs): p95 24, 25 and 26 ms; p99 at most 42 ms; no long tasks; warm open 115 ms. This meets the M1 target on macOS.
+- Big Sur itself is not covered (this Mac cannot run it).
+
+Defects found, and fixed on main after the pass. Each needs a recheck on a Mac:
+- **M5:** rich text from TextEdit pasted as Action blocks, because WebKit offers RTF as HTML. Fixed: text from other apps is now typed by the plain-text rules, and inline styles are kept when the paragraphs line up. e2e covers the TextEdit-shaped clipboard.
+- **N7:** About tabs were empty on WebKit; the page area collapsed to 0 px. Fixed: the page area now sizes from its content instead of starting at zero. e2e now checks the visible height of each tab, which Linux CI runs on WebKitGTK.
+- **Cmd+Q did nothing.** Fixed: the app menu has its own Quit (Cmd+Q) that goes through the save-first close. The predefined macOS Quit would skip it. Recheck: N9.
+- **Scene-list click + Enter:** clicking a scene did not scroll there on WebKit, and Enter then inserted an empty heading above it. Fixed: the caret goes to the end of the heading and the heading is scrolled into view explicitly. The caret and Enter behaviour is tested by e2e on both drivers. Only Linux CI and a Mac recheck (M12) can prove the scroll part, because WebView2 already scrolled.
+
+Still open from the pass: Cmd+Z on the board while it has focus does nothing (works from the editor).
+
+Not run:
+- **D4:** needs a synced folder.
+- **N6:** needs a real IME; waived.
+- **O1 and O2:** turning Wi-Fi off cuts the computer-use session, so a person has to do this.
+- **A1–A10 (VoiceOver):** declined by the owner after VoiceOver froze the session.
 
 ## 5. Proposed order to close M1
 
