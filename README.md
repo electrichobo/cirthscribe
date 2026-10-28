@@ -57,26 +57,30 @@ Carried into Stage 2:
 
 ### ✅ Stage 1b: Writing workspace (done)
 
-Done:
 - [x] Focus mode: full screen with only the script page
-- [x] Show or hide the scene list, board, toolbar and status bar (View menu and a toolbar dropdown)
-- [x] Full menu bar on every system: File, Edit, View, Format, Help
-- [x] Island-style toolbar with block type, bold, italic and underline
 - [x] Typewriter mode: the line you are typing stays centred while the text scrolls
+- [x] A floating toolbar centred over the script: undo, line type, bold, italic, underline, text colour, highlight, on-screen font and size, scene list and board buttons, find, focus mode, and a ⋮ menu for the rest
+- [x] Full menu bar on every system: File, Edit, View, Format, Help
+- [x] Show or hide the scene list, board, toolbar and status bar
+- [x] In narrow windows the side panels step aside and open over the script, so the page always fits
 - [x] Scene cards with a logline and summary instead of a copy of the scene
 - [x] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
 - [x] Text colour and highlight as your own on-screen markup (never printed)
 
-
 ### 🔨 Stage 2: Professional pages and file exchange (in progress)
 
-- [x] Title page (PDF and text export)
+Done:
+- [x] Title page, printed before page 1 in PDF and text exports
 - [x] Fountain import and export, with a report of anything that changed
-- [ ] Final production-quality PDF
-- [x] Scene numbers: lock, A/B numbers for new scenes, omit and restore
-- [ ] Revision colours, locked pages (A/B pages)
 - [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
+- [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
+
+Still to do:
+- [ ] Production-quality PDF (headers and footers, scene numbers, no more "draft proof" label)
+- [ ] Revision colours and revision marks
+- [ ] Locked pages: later changes create A/B pages instead of moving everything
 - [ ] Word (DOCX), RTF and HTML export, each with a report of what carried over
+- [ ] Tested exchange with other screenwriting apps
 
 ### Stage 3: Story planning
 
@@ -125,8 +129,8 @@ Done:
 [STATUS.md](STATUS.md) lists what works, what was tested on which platform, open defects and what is untested. Highlights:
 
 - Windows: built and tested locally (two end-to-end test drivers plus core tests).
-- Linux: tested in CI (WebKitGTK under Xvfb).
-- macOS: builds and passes core tests in CI. Hands-on editing tests have not been run yet.
+- Linux: tested in CI (WebKitGTK under Xvfb). Not yet tried on a Linux desktop.
+- macOS: builds and passes core tests in CI, and has had hands-on checks of editing and the writing workspace on macOS 26 (Apple silicon). macOS 11, the oldest supported version, has not been tried.
 
 ### Building from source
 
@@ -142,7 +146,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 
 ### How it is built
 
-- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, PDF, word counts, spell check and Free Writing. It has no UI code.
+- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, PDF and text export, title pages, scene numbering, Fountain and Final Draft exchange, word counts, spell check and Free Writing. It has no UI code.
 - **App** (`app/`, Tauri 2 + TypeScript + ProseMirror): the desktop shell and editor. The editor is a view of the core's document and sends versioned edits to it, so there is one saved copy of the script.
 - **Tests**: Rust unit and integration tests, plus an end-to-end suite that drives the real app through two drivers (DevTools and WebDriver).
 
@@ -152,13 +156,14 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | - | - |
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
-| [docs/M1_PLAN.md](docs/M1_PLAN.md) | Current milestone plan and what is done |
+| [docs/M2_PLAN.md](docs/M2_PLAN.md) | Current milestone plan (Stage 2) and what is done |
+| [docs/M1_PLAN.md](docs/M1_PLAN.md) and [docs/m1/EXIT_REVIEW.md](docs/m1/EXIT_REVIEW.md) | Stage 1 plan and its exit review |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, persistence and layout strategy |
 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Observable acceptance scenarios |
 | [docs/INTEROPERABILITY.md](docs/INTEROPERABILITY.md) | Export matrix and fidelity rules |
 | [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/adr/](docs/adr/) | Accepted decisions and open questions |
 | [docs/m0/FINDINGS.md](docs/m0/FINDINGS.md) | Proof-of-concept measurements and risks |
-| [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person (macOS, input methods, screen readers) |
+| [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person (macOS, other screenwriting apps, input methods), with results |
 | [docs/ART_ASSETS.md](docs/ART_ASSETS.md) | Art the app needs (icons, logo, installer art) and their sizes |
 | [CLAUDE.md](CLAUDE.md) and [START_HERE.md](START_HERE.md) | Rules and first brief for AI coding agents working on this repository |
 
