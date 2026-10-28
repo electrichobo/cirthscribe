@@ -506,6 +506,16 @@ impl Store {
         self.set_setting(&format!("document:{document_id}"), "title_page", &json)
     }
 
+    /// "Board may reorder script" for a document (PRODUCT_SPEC 3: a stored,
+    /// per-document permission; off unless the writer turns it on).
+    pub fn board_structural(&self, document_id: &str) -> Result<bool> {
+        Ok(self.setting(&format!("document:{document_id}"), "board_structural")?.as_deref() == Some("1"))
+    }
+
+    pub fn set_board_structural(&self, document_id: &str, on: bool) -> Result<()> {
+        self.set_setting(&format!("document:{document_id}"), "board_structural", if on { "1" } else { "0" })
+    }
+
     /// The project's notes panel: free text saved with the project and tied
     /// to no document, scene or block (owner, 2026-10-28). Empty if never written.
     pub fn project_notes(&self) -> Result<String> {
@@ -526,6 +536,12 @@ impl Store {
     /// with newer script edits.
     pub fn set_setting(&self, scope: &str, key: &str, value: &str) -> Result<()> {
         self.conn.execute("INSERT OR REPLACE INTO settings(scope, key, value) VALUES (?1, ?2, ?3)", params![scope, key, value])?;
+        self.mark_unsaved()
+    }
+
+    /// Count a change that is not a script commit (a setting, a planning
+    /// edit), so `has_unsaved_work` sees it. The meta key keeps its first name.
+    fn mark_unsaved(&self) -> Result<()> {
         let n = self.meta_count("settings_changes")? + 1;
         Self::set_meta(&self.conn, "settings_changes", &n.to_string())
     }
@@ -649,13 +665,65 @@ impl Store {
         Ok(beats)
     }
 
-    /// Planning edits. They never touch script text or script order.
+    /// Planning edits. They never touch script text or script order. Like a
+    /// settings change, they count as unsaved work until the next save.
     pub fn put_beat(&self, beat: &Beat) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, ?5, (SELECT value FROM meta WHERE key = 'default_document'))",
             params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos],
         )?;
-        Ok(())
+        self.mark_unsaved()
+    }
+
+    pub fn beat(&self, id: &str) -> Result<Option<Beat>> {
+        Ok(self
+            .conn
+            .query_row("SELECT id, logline, summary, scene_id, pos FROM beats WHERE id = ?1", [id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)? }))
+            .optional()?)
+    }
+
+    /// The planning data's version: one more for every planning command.
+    pub fn planning_version(&self) -> Result<u64> {
+        self.meta_count("planning_version")
+    }
+
+    /// Apply a planning command (cirth_core::planning), checked against
+    /// `base` when given. Returns the new planning version and the command
+    /// that undoes this one.
+    pub fn apply_planning(&self, op: &crate::planning::PlanningOp, base: Option<u64>) -> Result<(u64, crate::planning::PlanningOp)> {
+        use crate::planning::PlanningOp;
+        let current = self.planning_version()?;
+        if let Some(base) = base {
+            if base != current {
+                return Err(StoreError::Stale { base, current });
+            }
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        let backward = match op {
+            PlanningOp::PutBeat(b) => {
+                if b.id.trim().is_empty() || !b.pos.is_finite() {
+                    return Err(StoreError::Invalid("a card needs an id and a position".into()));
+                }
+                let before = self.beat(&b.id)?;
+                self.put_beat(b)?;
+                match before {
+                    Some(old) => PlanningOp::PutBeat(old),
+                    None => PlanningOp::DeleteBeat(b.id.clone()),
+                }
+            }
+            PlanningOp::DeleteBeat(id) => {
+                let Some(old) = self.beat(id)? else {
+                    return Err(StoreError::Invalid(format!("no card {id}")));
+                };
+                self.conn.execute("DELETE FROM beats WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::PutBeat(old)
+            }
+        };
+        let version = current + 1;
+        Self::set_meta(&self.conn, "planning_version", &version.to_string())?;
+        tx.commit()?;
+        Ok((version, backward))
     }
 
     /// Write a consistent snapshot to `dest` via temp file and rename.

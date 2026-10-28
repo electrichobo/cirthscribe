@@ -23,6 +23,13 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
    - Planning edits (card text, planning moves, links) become core commands with a base version, and get undo and redo.
    - Ctrl/Cmd+Z goes to whatever has focus: the script's own history in the script, the planning history in a planning view. A move that changes the script lives only in the script history. ADR 0003 records this.
    - Tests: B2, B3, B4 (two beats on one scene: moving one never clones or moves the scene), undo of each planning edit, permission survives reopen.
+   - **Built 2026-10-28** (ADR 0003, docs/adr/0003-planning-undo.md):
+     - `cirth_core::planning`: planning commands (`PutBeat`, `DeleteBeat`) checked against the planning version (a stale one is refused and the board reloads), each recording its exact inverse; a history of 200 steps per open project with undo and redo.
+     - Planning edits now count as unsaved work, so they are recovered after a crash like script edits (they were not before).
+     - Ctrl/Cmd+Z in the board undoes the board's last action: a card change (text, new card, planning move) in the planning history, or a move that reordered the script through the script's history, and only if the script has not changed since (otherwise it says so and leaves the script alone). The scene list and the script keep the script's history. Pop-out board windows follow the same rules.
+     - "Board may reorder script" is stored per document (`document:<id>` / `board_structural`), off by default.
+     - Card changes are stored one at a time, and the board's undo waits for any still being stored (found by the e2e run: Ctrl/Cmd+Z right after committing a card's text found no step yet).
+     - Tests: core (base check, exact undo and redo of create, edit, move and delete, the script untouched, crash recovery); e2e "Planning undo (ADR 0003)" on both drivers (card text undo and redo, new card undo, B2 planning move and its undo, B4 two cards on one scene, B3 a script-reordering move undone once from the board, the board refusing to undo after a later script edit, the permission kept after reopening and off in another project).
 2. **Episodes and series.**
    - A project tree of containers and documents (in the schema since v2): create, rename, move and open episodes. The scene list, board and exports follow the open document.
    - One shared bible per project (step 7), with facts scoped to a season or episode.

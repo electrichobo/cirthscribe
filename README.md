@@ -104,7 +104,8 @@ First, from the owner's notes on the current build:
 - [ ] Outline editor, and an overview map of the whole script
 - [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
 - [ ] Beat and pacing board, split into acts wherever you choose
-- [ ] Reordering scenes from the board (only with your permission, and undoable)
+- [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo
+- [x] Reordering scenes from the board (only with your permission, which is remembered per script, and undoable)
 - [ ] Story timeline, kept separate from script order
 - [ ] Character, location and world profiles
 

@@ -14,6 +14,7 @@ pub mod model;
 pub mod numbering;
 pub mod ops;
 pub mod pdf;
+pub mod planning;
 pub mod printdoc;
 pub mod revisions;
 pub mod rtf;

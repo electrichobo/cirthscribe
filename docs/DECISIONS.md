@@ -18,7 +18,8 @@ The following defaults allow progress without pretending the owner has already s
 | Pop-out panels | Panel windows are remote views; the main window stays the only authority and applies every change (ADR 0004, 2026-10-28) | Done |
 | Comments | All comment work, including the add-comment button, stays in M5 (owner, 2026-10-27) | Done |
 | Formatting priority | US screenplay first; UK and other templates retained in roadmap | Fixed priority, refinable with owner |
-| Structural sync | Off by default; explicit per-document permission | M3 behavior |
+| Structural sync | Off by default; explicit per-document permission, stored with the document (M3 step 1) | Done |
+| Planning undo | Two histories routed by focus: the script's in the editor, planning edits in the core; no step is in both (ADR 0003, owner decision A, 2026-10-27) | Done |
 | Timing language | Estimates separate from measured on-screen duration | Fixed semantic rule |
 | Google support | Tested DOCX/XLSX/CSV profiles first; live feedback later | M2/M4, integration ADR later |
 | AI | Optional BYO provider/endpoint, disabled by default | M7 |

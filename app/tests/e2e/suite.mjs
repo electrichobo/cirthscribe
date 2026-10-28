@@ -505,6 +505,82 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.setStructural(false)");
   });
 
+  await test("Planning undo (ADR 0003): card text, new cards and planning moves undo and redo from the board; a move that reorders the script undoes once from the board; two cards on one scene never clone it (B2-B4); the permission is stored per document", async () => {
+    await openFixture("page-boundaries");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    const order = () => app.evaluate("__cirth.scenes().map(s => s.sceneId).join()");
+    const cards = () => app.evaluate("JSON.parse(JSON.stringify(__cirth.board.beats))");
+    const boardOrder = () => app.evaluate("[...document.querySelectorAll('#board .card')].map(c => c.dataset.beatId).join()");
+    const undoInBoard = async (again = false) => {
+      await app.evaluate("(document.querySelector('#board .card[tabindex=\"0\"]').focus(), true)");
+      await press("z", again ? [MOD_KEY, "shift"] : [MOD_KEY]);
+    };
+    const heard = (part, what) => waitFor(app, `(document.getElementById('announce')?.textContent ?? '').includes(${JSON.stringify(part)})`, what);
+    const order0 = await order();
+    const script0 = JSON.stringify(await blocks());
+    // Card text: committed once, undone from the board, redone.
+    const c0 = (await cards())[0];
+    const sel = `#board .card[data-beat-id="${c0.id}"]`;
+    await app.evaluate(`(() => { const i = document.querySelector('${sel} .logline'); i.value = 'A logline to undo'; i.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).logline === 'A logline to undo'`, "logline stored");
+    await undoInBoard();
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).logline === '' && document.querySelector('${sel} .logline').value === ''`, "Ctrl/Cmd+Z in the board undoes the card text");
+    await heard("Card change undone", "announced");
+    await undoInBoard(true);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).logline === 'A logline to undo'`, "redo puts it back");
+    // A new card: undo removes it.
+    const n0 = (await cards()).length;
+    await app.evaluate("(document.querySelector('#board .board-head button:not(.panel-pop)').click(), true)");
+    await waitFor(app, `__cirth.board.beats.length === ${n0 + 1}`, "new card added");
+    await undoInBoard();
+    await waitFor(app, `__cirth.board.beats.length === ${n0}`, "undo removes the new card");
+    // B2: a planning-only move leaves the script alone; undo restores the board order.
+    await app.evaluate("__cirth.setStructural(false)");
+    const b0 = await boardOrder();
+    await app.evaluate(`__cirth.moveCard(${JSON.stringify(c0.id)}, null)`);
+    await waitFor(app, `[...document.querySelectorAll('#board .card')].map(c => c.dataset.beatId).join() !== ${JSON.stringify(b0)}`, "card moved on the board");
+    assert((await order()) === order0, "B2: script order unchanged");
+    await undoInBoard();
+    await waitFor(app, `[...document.querySelectorAll('#board .card')].map(c => c.dataset.beatId).join() === ${JSON.stringify(b0)}`, "undo restores the board order");
+    assert(JSON.stringify(await blocks()) === script0, "no planning step touched the script");
+    // B4: two cards on one scene. Moving one never clones or moves the scene.
+    const extra = { id: "b4-second-card", logline: "Second card on scene 2", summary: "", scene_id: scenes[1], pos: 999 };
+    await app.evaluate(`__cirth.putBeat(${JSON.stringify(extra)})`);
+    await waitFor(app, "__cirth.board.beats.filter(b => b.scene_id === " + JSON.stringify(scenes[1]) + ").length === 2", "two cards on scene 2");
+    const ids0 = (await blocks()).map((b) => b.id).sort().join();
+    await app.evaluate(`__cirth.moveCard('b4-second-card', null)`);
+    await sleep(200);
+    assert((await order()) === order0 && (await blocks()).map((b) => b.id).sort().join() === ids0, "B4: moving one of two cards leaves the scene where it is, unclone");
+    // B3 from the board: with permission on, a card move reorders the script once; Ctrl/Cmd+Z in the board undoes it once.
+    await app.evaluate("__cirth.setStructural(true)");
+    const first = (await cards()).find((b) => b.scene_id === scenes[0]);
+    const third = (await cards()).find((b) => b.scene_id === scenes[2]);
+    await app.evaluate(`__cirth.moveCard(${JSON.stringify(first.id)}, ${JSON.stringify(third.id)})`);
+    await waitFor(app, `__cirth.scenes()[0].sceneId === ${JSON.stringify(scenes[1])}`, "the script order changed");
+    assert((await blocks()).map((b) => b.id).sort().join() === ids0, "B3: same block ids, no clones");
+    await undoInBoard();
+    await waitFor(app, `__cirth.scenes().map(s => s.sceneId).join() === ${JSON.stringify(order0)}`, "one undo in the board restores the script order");
+    await heard("Scene move undone", "announced");
+    assert(await storedMatchesEditor(), "stored order equals the editor");
+    // If the script changed after the move, the board does not undo something else.
+    await app.evaluate(`__cirth.moveCard(${JSON.stringify(first.id)}, ${JSON.stringify(third.id)})`);
+    await waitFor(app, `__cirth.scenes()[0].sceneId === ${JSON.stringify(scenes[1])}`, "moved again");
+    await caretAtEndOf(1);
+    await typeText(" EDIT");
+    await sleep(700);
+    const typed = JSON.stringify(await blocks());
+    await undoInBoard();
+    await heard("The script has changed since that move", "the board explains");
+    assert(JSON.stringify(await blocks()) === typed, "the board left the script alone");
+    // The permission is stored per document: kept after reopening, off in another project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, "document.getElementById('structural').checked && __cirth.board.structural", "permission kept after reopening");
+    await openFixture("unicode-marks");
+    assert(!(await app.evaluate("document.getElementById('structural').checked")), "another document starts with it off");
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

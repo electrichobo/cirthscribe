@@ -36,6 +36,8 @@ struct Session {
     stamp: Option<FileStamp>,
     /// Built on first use for the project's spelling language.
     speller: Option<cirth_core::spell::Speller>,
+    /// Undo and redo for planning edits while this project is open (ADR 0003).
+    planning: cirth_core::planning::PlanningHistory,
 }
 
 #[derive(Default)]
@@ -227,7 +229,7 @@ fn open_file(app: &App, pkg: &Path, t0: Instant) -> Result<Opened, String> {
     let work = work_path(app, &key);
     std::fs::create_dir_all(work.parent().unwrap()).map_err(io_err)?;
     let o = Store::open_package(pkg, &work, Some(&backup_policy(app).dir)).map_err(err)?;
-    let s = Session { key, store: o.store, package: normalize(pkg), stamp: Some(FileStamp::of(pkg).map_err(io_err)?), speller: None };
+    let s = Session { key, store: o.store, package: normalize(pkg), stamp: Some(FileStamp::of(pkg).map_err(io_err)?), speller: None, planning: Default::default() };
     let out = opened(&s, o.recovered, o.migrated_from, o.pre_migration_backup, t0)?;
     remember(app, &s.package)?;
     *guard = Some(s);
@@ -260,7 +262,7 @@ fn start_new(app: &App, pkg: PathBuf, doc: &Document, beats: &[Beat], t0: Instan
         store.put_beat(b).map_err(err)?;
     }
     store.save_package(&pkg).map_err(err)?;
-    let s = Session { key, store, stamp: Some(FileStamp::of(&pkg).map_err(io_err)?), package: normalize(&pkg), speller: None };
+    let s = Session { key, store, stamp: Some(FileStamp::of(&pkg).map_err(io_err)?), package: normalize(&pkg), speller: None, planning: Default::default() };
     let out = opened(&s, false, None, None, t0)?;
     *guard = Some(s);
     Ok(out)
@@ -670,9 +672,60 @@ async fn load_document(app: State<'_, App>) -> Result<Document, String> {
     with_session(&app, |s| s.store.load().map_err(err))
 }
 
+/// The board's data after a planning command (ADR 0003): cards, the planning
+/// version the next command must be based on, and what undo and redo can do.
+#[derive(Serialize)]
+struct PlanningState {
+    version: u64,
+    beats: Vec<Beat>,
+    structural: bool,
+    can_undo: bool,
+    can_redo: bool,
+    /// False when undo or redo had nothing to do.
+    done: bool,
+}
+
+fn planning_state(s: &Session, done: bool) -> Result<PlanningState, String> {
+    let doc = s.store.default_document().map_err(err)?;
+    Ok(PlanningState {
+        version: s.store.planning_version().map_err(err)?,
+        beats: s.store.beats().map_err(err)?,
+        structural: s.store.board_structural(&doc).map_err(err)?,
+        can_undo: s.planning.can_undo(),
+        can_redo: s.planning.can_redo(),
+        done,
+    })
+}
+
 #[tauri::command]
-async fn put_beat(app: State<'_, App>, beat: Beat) -> Result<(), String> {
-    with_session(&app, |s| s.store.put_beat(&beat).map_err(err))
+async fn planning_state_now(app: State<'_, App>) -> Result<PlanningState, String> {
+    with_session(&app, |s| planning_state(s, true))
+}
+
+/// A card created, changed or deleted, based on planning version `base`. A
+/// stale base is refused ("stale change: …"); the board then reloads.
+#[tauri::command]
+async fn planning_command(app: State<'_, App>, op: cirth_core::planning::PlanningOp, base: u64) -> Result<PlanningState, String> {
+    with_session(&app, |s| {
+        s.planning.apply(&s.store, op, base).map_err(err)?;
+        planning_state(s, true)
+    })
+}
+
+#[tauri::command]
+async fn planning_undo(app: State<'_, App>, redo: bool) -> Result<PlanningState, String> {
+    with_session(&app, |s| {
+        let done = if redo { s.planning.redo(&s.store) } else { s.planning.undo(&s.store) }.map_err(err)?.is_some();
+        planning_state(s, done)
+    })
+}
+
+#[tauri::command]
+async fn set_board_structural(app: State<'_, App>, on: bool) -> Result<(), String> {
+    with_session(&app, |s| {
+        let doc = s.store.default_document().map_err(err)?;
+        s.store.set_board_structural(&doc, on).map_err(err)
+    })
 }
 
 // --- Saving -------------------------------------------------------------------------
@@ -2088,7 +2141,10 @@ fn main() {
             close_project,
             apply_batch,
             load_document,
-            put_beat,
+            planning_state_now,
+            planning_command,
+            planning_undo,
+            set_board_structural,
             save_package,
             save_as,
             check_outside_change,

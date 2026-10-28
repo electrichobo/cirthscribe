@@ -1,7 +1,7 @@
 import "./styles.css";
 import { EditorState, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { history, undo, redo } from "prosemirror-history";
+import { history, undo, redo, undoDepth, redoDepth } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { invoke } from "@tauri-apps/api/core";
@@ -166,13 +166,96 @@ function updateInfo() {
 let navTimer: number | undefined;
 let pageTimer: number | undefined;
 
-/** Store a beat and keep the board's list in step (the main window's panels and pop-out windows both use it). */
-async function putBeat(beat: Beat): Promise<void> {
-  await invoke("put_beat", { beat });
-  const i = board.beats.findIndex((b) => b.id === beat.id);
-  if (i < 0) board.beats.push(beat);
-  else if (board.beats[i] !== beat) board.beats[i] = beat;
+// Planning edits (ADR 0003): every card change is a planning command based on
+// the planning version, undone in the planning history. The board keeps its
+// own sequence of steps so Ctrl/Cmd+Z there undoes the board's last action:
+// a planning step, or a card move that reordered the script (undone through
+// the script's history, only if the script has not changed since).
+interface PlanningState {
+  version: number;
+  beats: Beat[];
+  structural: boolean;
+  can_undo: boolean;
+  can_redo: boolean;
+  done: boolean;
+}
+type BoardStep = { kind: "planning" } | { kind: "script"; depth: number };
+let planningVersion = 0;
+let boardSteps: BoardStep[] = [];
+let boardRedo: BoardStep[] = [];
+
+/** Take the core's cards, keeping each card's object (open cards hold references). */
+function takePlanning(st: PlanningState) {
+  planningVersion = st.version;
+  const old = new Map(board.beats.map((b) => [b.id, b]));
+  board.beats = st.beats.map((b) => Object.assign(old.get(b.id) ?? b, b));
+  board.structural = st.structural;
+  ($("structural") as HTMLInputElement).checked = st.structural;
+}
+
+async function refreshPlanning() {
+  takePlanning(await invoke<PlanningState>("planning_state_now"));
+  boardSteps = [];
+  boardRedo = [];
+}
+
+/** Planning writes run one at a time, and undo waits for any still in flight. */
+let planningQueue: Promise<unknown> = Promise.resolve();
+const queued = <T>(f: () => Promise<T>): Promise<T> => {
+  const next = planningQueue.then(f, f);
+  planningQueue = next.catch(() => undefined);
+  return next;
+};
+
+/** Store a beat (new or changed) as one planning step (the main window's panels and pop-out windows both use it). */
+function putBeat(beat: Beat): Promise<void> {
+  return queued(() => putBeatNow(beat));
+}
+
+async function putBeatNow(beat: Beat): Promise<void> {
+  try {
+    takePlanning(await invoke<PlanningState>("planning_command", { op: { PutBeat: beat }, base: planningVersion }));
+    boardSteps.push({ kind: "planning" });
+    boardRedo = [];
+  } catch (e) {
+    await refreshPlanning().catch(() => undefined);
+    showBanner(String(e).includes("stale") ? "The board had changed, so it was reloaded; that card change was not applied. Make it again." : `Card not saved: ${e}`);
+    rerenderSide();
+  }
   panelHost.broadcast();
+}
+
+/** A scene move made from the board: a script edit, recorded so the board can undo it. */
+function boardMove(sceneId: string, before: string | null) {
+  script().move(sceneId, before);
+  boardSteps.push({ kind: "script", depth: undoDepth(view.state) });
+  boardRedo = [];
+}
+
+/** Ctrl/Cmd+Z (or redo) with focus in the board, after any card change still being stored. */
+function boardUndo(again: boolean): Promise<void> {
+  return queued(() => boardUndoNow(again));
+}
+
+async function boardUndoNow(again: boolean) {
+  const from = again ? boardRedo : boardSteps;
+  const to = again ? boardSteps : boardRedo;
+  const step = from.pop();
+  if (!step) return announce(again ? "Nothing to redo on the board" : "Nothing to undo on the board");
+  if (step.kind === "planning") {
+    const st = await invoke<PlanningState>("planning_undo", { redo: again });
+    takePlanning(st);
+    if (st.done) to.push(step);
+    rerenderSide();
+    return announce(again ? "Card change redone" : "Card change undone");
+  }
+  if ((again ? redoDepth(view.state) : undoDepth(view.state)) !== step.depth) {
+    from.length = 0;
+    return announce(`The script has changed since that move, so the board leaves it alone. ${again ? "Redo" : "Undo"} it in the script instead.`);
+  }
+  (again ? redo : undo)(view.state, view.dispatch);
+  to.push({ kind: "script", depth: again ? undoDepth(view.state) : redoDepth(view.state) });
+  announce(again ? "Scene move redone in the script" : "Scene move undone; the script order is restored");
 }
 
 /** A header button that moves a panel into its own window (ADR 0004). */
@@ -199,7 +282,7 @@ function rerenderSide() {
   const typing = a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === "text");
   if (!boardEl.contains(a) || !typing) {
     const key = focusKey(boardEl);
-    renderBoard(boardBody, script(), board, rerenderSide, key?.split("|")[0]);
+    renderBoard(boardBody, { ...script(), move: boardMove }, board, rerenderSide, key?.split("|")[0]);
     restoreFocus(boardEl, key);
   }
   panelHost.broadcast();
@@ -322,6 +405,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   $("find-bar").hidden = true; // a new editor state has no search
   $("project-title").textContent = o.doc.title || o.name;
   board.beats = o.beats;
+  await refreshPlanning();
   const state = makeState(o.doc.blocks);
   if (view) view.updateState(state);
   else
@@ -635,21 +719,25 @@ const panelHost = createPanelHost({
   structural: () => board.structural,
   setStructural: (on) => setStructural(on),
   reveal: (id) => revealScene(view, id),
-  move: (id, before) => script().move(id, before),
+  move: (id, before, panel) => (panel === "board" ? boardMove(id, before) : script().move(id, before)),
   putBeat: async (beat) => {
     await putBeat(beat);
     rerenderSide();
   },
   notesText: () => notesPanel.value,
   setNotes: (text) => notesPanel.set(text),
-  undo: (again) => {
-    if (view && lastOpen) (again ? redo : undo)(view.state, view.dispatch);
+  undo: (again, panel) => {
+    if (!view || !lastOpen) return;
+    if (panel === "board") void boardUndo(again);
+    else (again ? redo : undo)(view.state, view.dispatch);
   },
   changed: () => layoutMode.apply(),
 });
+/** "Board may reorder script": stored per document (ADR 0003). */
 function setStructural(on: boolean) {
   ($("structural") as HTMLInputElement).checked = on;
   board.structural = on;
+  if (lastOpen) void invoke("set_board_structural", { on }).catch((e) => showBanner(`Could not store the board setting: ${e}`));
   rerenderSide();
 }
 const notesPanel = createNotesPanel($("notes"), { focusScript: () => view?.focus(), close: () => void togglePanel("notes") });
@@ -876,12 +964,13 @@ window.addEventListener(
     if (!mod || e.altKey || e.isComposing) return;
     const k = e.key.toLowerCase();
     if ((k === "z" || (k === "y" && !isMac)) && view && lastOpen && inPanelNotField(e.target)) {
-      // Undo/redo from the scene list or the board: the script's one undo
-      // history (structural moves are script changes). Text fields such as a
-      // beat summary keep their own undo. Planning-only card moves are not
-      // script changes and are not in the history.
+      // Undo follows focus (ADR 0003). The scene list: the script's history
+      // (its moves are script edits). The board: its own last action, a card
+      // change (planning history) or a move that reordered the script. Text
+      // fields keep their own undo while typing.
       e.preventDefault();
       const again = k === "y" || e.shiftKey;
+      if (boardEl.contains(e.target as Node)) return void boardUndo(again);
       const done = (again ? redo : undo)(view.state, view.dispatch);
       announce(done ? (again ? "Redone" : "Undone") : again ? "Nothing to redo" : "Nothing to undo");
     }
@@ -1350,10 +1439,7 @@ $("zoom").addEventListener("input", (e) => {
   editorEl.style.zoom = `${(e.target as HTMLInputElement).value}%`;
   layoutMode.apply();
 });
-$("structural").addEventListener("change", (e) => {
-  board.structural = (e.target as HTMLInputElement).checked;
-  rerenderSide();
-});
+$("structural").addEventListener("change", (e) => setStructural((e.target as HTMLInputElement).checked));
 
 // Test and measurement hooks (used by app/tests via the WebView DevTools protocol).
 (window as any).__cirth = {
@@ -1407,9 +1493,11 @@ $("structural").addEventListener("change", (e) => {
     if (tr) view.dispatch(tr);
     return !!tr;
   },
-  moveCard: (id: string, before: string | null) => moveCard(script(), board, id, before, rerenderSide),
+  moveCard: (id: string, before: string | null) => moveCard({ ...script(), move: boardMove }, board, id, before, rerenderSide),
   setStructural,
   panels: panelHost,
+  putBeat,
+  reloadPlanning: refreshPlanning,
   /** Send a command exactly as a pop-out panel window does (tests). */
   panelCommand: (c: unknown) => emitTo("main", "panel-command", c),
   open,

@@ -43,11 +43,11 @@ export function createPanelHost(hooks: {
   structural: () => boolean;
   setStructural: (on: boolean) => void;
   reveal: (sceneId: string) => void;
-  move: (sceneId: string, before: string | null) => void;
+  move: (sceneId: string, before: string | null, panel: PopPanel) => void;
   putBeat: (beat: Beat) => Promise<void>;
   notesText: () => string;
   setNotes: (text: string) => void;
-  undo: (redo: boolean) => void;
+  undo: (redo: boolean, panel: PopPanel) => void;
   /** The main window's layout changed (a panel left or came back). */
   changed: () => void;
 }) {
@@ -117,7 +117,7 @@ export function createPanelHost(hooks: {
         hooks.reveal(c.sceneId);
         break;
       case "move":
-        hooks.move(c.sceneId, c.before);
+        hooks.move(c.sceneId, c.before, c.panel);
         break;
       case "putBeat":
         void hooks.putBeat(c.beat);
@@ -130,7 +130,7 @@ export function createPanelHost(hooks: {
         break;
       case "undo":
       case "redo":
-        hooks.undo(c.cmd === "redo");
+        hooks.undo(c.cmd === "redo", c.panel);
         break;
       case "dock":
         void dock(c.panel);

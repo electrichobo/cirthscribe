@@ -436,6 +436,64 @@ Zoë's line in 12 → maybe cut?
 }
 
 #[test]
+fn planning_commands_check_their_base_undo_exactly_and_never_touch_the_script() {
+    use cirth_core::model::Beat;
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    let d = tmpdir("planning");
+    let work = d.join("w.db");
+    let pkg = d.join("script.cirth");
+    let mut s = Store::open(&work).unwrap();
+    s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+    s.save_package(&pkg).unwrap();
+    let script = (serde_json::to_string(&s.load().unwrap()).unwrap(), s.version().unwrap());
+    let scene = s.load().unwrap().blocks.iter().find_map(|b| b.scene_id.clone()).unwrap();
+    let mut h = PlanningHistory::default();
+    let v0 = s.planning_version().unwrap();
+
+    // A new card, then its text, then a planning-only move.
+    let card = Beat { id: "card-1".into(), logline: String::new(), summary: "The storm".into(), scene_id: Some(scene.clone()), pos: 10.0 };
+    let v1 = h.apply(&s, PlanningOp::PutBeat(card.clone()), v0).unwrap();
+    let written = Beat { logline: "Ada decides to stay".into(), ..card.clone() };
+    let v2 = h.apply(&s, PlanningOp::PutBeat(written.clone()), v1).unwrap();
+    let moved = Beat { pos: -5.0, ..written.clone() };
+    let v3 = h.apply(&s, PlanningOp::PutBeat(moved.clone()), v2).unwrap();
+    assert_eq!((v1, v2, v3), (v0 + 1, v0 + 2, v0 + 3));
+    assert!(s.has_unsaved_work().unwrap(), "planning edits count as unsaved work");
+
+    // A command based on an older version is refused and changes nothing.
+    let err = h.apply(&s, PlanningOp::DeleteBeat("card-1".into()), v1).unwrap_err();
+    assert!(matches!(err, StoreError::Stale { base, current } if base == v1 && current == v3));
+    assert_eq!(s.beat("card-1").unwrap(), Some(moved.clone()));
+
+    // Undo steps back exactly; redo replays; a new command clears redo.
+    h.undo(&s).unwrap();
+    assert_eq!(s.beat("card-1").unwrap(), Some(written.clone()), "undo the move");
+    h.undo(&s).unwrap();
+    assert_eq!(s.beat("card-1").unwrap(), Some(card.clone()), "undo the text");
+    h.undo(&s).unwrap();
+    assert_eq!(s.beat("card-1").unwrap(), None, "undo creating it removes it");
+    assert_eq!(h.undo(&s).unwrap(), None, "nothing left to undo");
+    h.redo(&s).unwrap();
+    h.redo(&s).unwrap();
+    assert_eq!(s.beat("card-1").unwrap(), Some(written.clone()), "redo twice");
+    assert!(h.can_redo());
+    let v = s.planning_version().unwrap();
+    h.apply(&s, PlanningOp::DeleteBeat("card-1".into()), v).unwrap();
+    assert!(!h.can_redo(), "a new command clears redo");
+    h.undo(&s).unwrap();
+    assert_eq!(s.beat("card-1").unwrap(), Some(written.clone()), "undo a delete restores the card as it was");
+
+    // None of it touched the script or its history.
+    assert_eq!((serde_json::to_string(&s.load().unwrap()).unwrap(), s.version().unwrap()), script);
+
+    // A crash after planning edits: the working store is recovered.
+    drop(s);
+    let o = Store::open_package(&pkg, &work, None).unwrap();
+    assert!(o.recovered, "planning edits after the last save are recovered");
+    assert_eq!(o.store.beat("card-1").unwrap(), Some(written));
+}
+
+#[test]
 fn scene_numbers_lock_keep_through_edits_take_letters_and_omit() {
     let d = tmpdir("scenenumbers");
     let work = d.join("w.db");
