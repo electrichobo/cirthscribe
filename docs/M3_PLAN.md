@@ -77,7 +77,24 @@ The owner's notes after using the current build. Proposed as steps W1–W5, done
 - **W4. Themes:** Day, Night, Midnight, OLED (true black) and Match System, each checked for contrast like the current two.
 - **W5. Keyboard shortcut remapping:** a list of commands with their keys, conflict warnings, reset to defaults; stored per user.
 
-Questions for the owner (they change what gets built):
+**W1 built 2026-10-28:**
+- **File:** New, Open, **Import…** (Final Draft by content or extension; Fountain, .spmd and .txt read as Fountain; anything else is refused with the formats named), Save, Save As, **Export…** (Ctrl/Cmd+E: a dialog listing PDF, changed-pages PDF (only with an active revision set), plain text, Fountain, Final Draft, Word, RTF and HTML, each with what it keeps; each then runs its own export and report), Close Project, Quit. Free Writing left File; it stays in the island's More menu and on Home.
+- **Edit:** undo, redo, cut, copy, paste, select all, find. Spelling moved to Format.
+- **View:** Mode (Normal View, Page View, Typewriter Mode, Focus Mode, Full Screen with F11; full screen keeps the menu bar); Tools (Scene List, Board); Toolbar and Status Bar; Appearance (interface size, high contrast; themes come in W4); Go To (Page… Ctrl/Cmd+G by printed label such as 12A; Scene… Ctrl/Cmd+Shift+G by locked number, position or heading words); Window (Minimise, Zoom, Next Panel).
+- **Format:** bold, italic, underline, text colour, highlight; **Element** (was Block Type); dual dialogue, page break; Screen Font (moved from View); Page Size; Title Page…; Headers and Footers…; Scene Numbers, Locked Pages, Revisions; Spelling.
+- **Help:** Keyboard Shortcuts… (the list; remapping is W5), Typing Latency…, Check for Updates… (opens the releases page in the browser only when clicked), Licences…, About.
+- "Element" replaces "block type" in the toolbar and find bar.
+- The island has a comment button marked inactive: it says comments come in a later version and changes nothing (owner answer 1).
+- Tests: e2e "Menus" checks every item's place, mode check marks, import detection, the Export dialog's formats, Go To page and scene, the shortcut list and the comment placeholder. Manual check N29 covers minimise, zoom, full screen, the browser and real imports.
+
+Owner answers (2026-10-28):
+1. **Comment icon on the island:** a placeholder icon now; comments stay in M5.
+2. **Reports dashboard:** StoryScry.
+3. **Import:** TXT read as Fountain now; RTF and DOCX import later.
+4. **Screenplay pages stay standard:** page size is the only screenplay page setting; margins, spacing and fonts are for other document kinds (M6).
+5. **Check for Updates:** opens the releases page in the browser when clicked; no background checks.
+
+The questions as asked:
 1. **Comment icon on the island.** On 2026-10-27 comments went wholly to M5 (decision C, option 2: no button before then). Bring a basic anchored comment forward into M3 so the icon works, or add the icon when M5 builds comments?
 2. **Name of the reports dashboard:** the README says StoryScry; your notes say ScriptScry. Which one?
 3. **Import formats:** Fountain and FDX import exist. TXT can be read as Fountain. RTF and DOCX import are new work (no dependency for RTF; DOCX can reuse the approved `zip` crate). In M3, or later?

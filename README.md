@@ -91,7 +91,12 @@ Carried forward:
 
 ### 🔜 Stage 3: Story planning (next; plan accepted)
 
-First, from the owner's notes on the current build: reorganised menus, a notes scratchpad, panels that pop out into their own windows, more themes and remappable shortcuts.
+First, from the owner's notes on the current build:
+- [x] Reorganised menus: one Import (it recognises Fountain, Final Draft and plain text) and one Export dialog; View > Mode, Tools, Appearance, Go To (page or scene) and Window; elements, screen font, title page and spelling under Format; a keyboard shortcut list
+- [ ] A notes scratchpad saved with the project
+- [ ] Panels that pop out into their own windows
+- [ ] Themes: Day, Night, Midnight, OLED, Match System
+- [ ] Remappable keyboard shortcuts
 
 
 - [ ] Episodes and series sharing one story bible

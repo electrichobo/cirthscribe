@@ -14,6 +14,7 @@ const PATHS: Record<string, string> = {
   colour: '<path d="M7 16 12 4.5 17 16M8.8 12h6.4"/><path d="M4.5 20h15" class="swatch" stroke-width="3"/>',
   highlight: '<path d="m13.5 5 5.5 5.5-7.5 7.5H6v-5.5z"/><path d="m11 7.5 5.5 5.5"/><path d="M4.5 20.5h15" class="swatch" stroke-width="3"/>',
   font: '<text x="2.5" y="17" font-size="13" font-family="Georgia, serif" fill="currentColor" stroke="none">Aa</text>',
+  comment: '<path d="M5 5.5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7l-4.5 3.5v-3.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 12.5h5"/>',
   more: '<circle cx="12" cy="5.5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="18.5" r="1.3" fill="currentColor"/>',
 };
 

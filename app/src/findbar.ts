@@ -14,7 +14,7 @@ export function installFindBar(root: HTMLElement, getView: () => EditorView | un
   const wholeWord = $<HTMLInputElement>("#find-word");
   const kind = $<HTMLSelectElement>("#find-kind");
   const count = $<HTMLElement>("#find-count");
-  kind.replaceChildren(new Option("All block types", "all"), ...KINDS.map((k) => new Option(KIND_LABEL[k], k)));
+  kind.replaceChildren(new Option("All elements", "all"), ...KINDS.map((k) => new Option(KIND_LABEL[k], k)));
 
   const opts = (): FindOptions => ({ query: query.value, matchCase: matchCase.checked, wholeWord: wholeWord.checked, kind: kind.value as Kind | "all" });
 

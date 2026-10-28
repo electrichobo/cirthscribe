@@ -1524,6 +1524,69 @@ struct AboutInfo {
     third_party: &'static str,
 }
 
+/// View > Window and View > Mode > Full Screen. Returns whether the window is
+/// full screen afterwards. Full screen keeps the menu bar (focus mode hides it).
+#[tauri::command]
+fn window_command(window: tauri::WebviewWindow, action: String) -> Result<bool, String> {
+    let e = |e: tauri::Error| e.to_string();
+    match action.as_str() {
+        "minimize" => window.minimize().map_err(e)?,
+        "zoom" => {
+            if window.is_maximized().map_err(e)? {
+                window.unmaximize().map_err(e)?
+            } else {
+                window.maximize().map_err(e)?
+            }
+        }
+        "fullscreen" => {
+            let on = !window.is_fullscreen().map_err(e)?;
+            window.set_fullscreen(on).map_err(e)?;
+            // As in focus mode: hand keyboard focus back to the web view.
+            window.set_focus().map_err(e)?;
+            AsRef::<tauri::Webview<_>>::as_ref(&window).set_focus().map_err(e)?;
+        }
+        _ => return Err(format!("unknown window action {action}")),
+    }
+    window.is_fullscreen().map_err(e)
+}
+
+/// File > Import…: the start of a file (up to 4 KB, as text), so the app can
+/// tell Final Draft XML from Fountain or plain text by content as well as by
+/// extension. Reads only; the importers do the rest.
+#[tauri::command]
+fn peek_file(path: String) -> Result<String, String> {
+    use std::io::Read;
+    let mut buf = vec![0u8; 4096];
+    let n = std::fs::File::open(&path).and_then(|mut f| f.read(&mut buf)).map_err(|e| format!("{path}: {e}"))?;
+    Ok(String::from_utf8_lossy(&buf[..n]).into_owned())
+}
+
+/// Help > Check for Updates…: opens the project's releases page in the
+/// writer's browser. Only on that click: the app never checks by itself.
+#[tauri::command]
+fn open_releases_page() -> Result<(), String> {
+    const URL: &str = "https://github.com/electrichobo/cirthscribe/releases";
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("rundll32");
+        c.args(["url.dll,FileProtocolHandler", URL]);
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("open");
+        c.arg(URL);
+        c
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut cmd = {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(URL);
+        c
+    };
+    cmd.spawn().map(|_| ()).map_err(|e| format!("could not open the browser: {e}"))
+}
+
 #[tauri::command]
 fn about_info() -> AboutInfo {
     AboutInfo {
@@ -1574,21 +1637,16 @@ fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Resul
 
 fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF…").text("export_changed_pdf", "Changed Pages (PDF)…").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").text("export_docx", "Word (.docx)…").text("export_rtf", "Rich Text (.rtf)…").text("export_html", "Web Page (.html)…").build()?;
+    // One Import (the format is read from the file) and one Export (a dialog
+    // listing every format with its options).
     let file = SubmenuBuilder::new(app, "File")
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
-        .text("import_fountain", "Import Fountain…")
-        .text("import_fdx", "Import Final Draft (.fdx)…")
+        .text("import", "Import…")
         .separator()
         .text("save", keyed("Save", "S"))
         .text("save_as", keyed("Save As…", "Shift+S"))
-        .item(&export)
-        .separator()
-        .text("title_page", "Title Page…")
-        .text("page_furniture", "Headers and Footers…")
-        .separator()
-        .text("free_writing", "Free Writing")
+        .text("export", keyed("Export…", "E"))
         .separator()
         .text("home", "Close Project");
     // On macOS Quit lives in the app menu (Cmd+Q), not in File.
@@ -1599,13 +1657,6 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
 
 fn edit_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let spelling = SubmenuBuilder::new(app, "Spelling")
-        .text("spell_suggest", keyed("Suggestions", "."))
-        .separator()
-        .item(&check_item(app, "spell_en_US", "US English", true)?)
-        .item(&check_item(app, "spell_en_GB", "UK English", false)?)
-        .item(&check_item(app, "spell_off", "Off", false)?)
-        .build()?;
     SubmenuBuilder::new(app, "Edit")
         .text("undo", keyed("Undo", "Z"))
         .text("redo", keyed("Redo", "Shift+Z"))
@@ -1616,45 +1667,59 @@ fn edit_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .select_all()
         .separator()
         .text("find", keyed("Find and Replace…", "F"))
-        .item(&spelling)
         .build()
 }
 
-/// Display: panels, focus mode, UI size and contrast. Panel check marks are
-/// set from preferences at startup.
+/// Display: modes, tool panels, appearance, going to a place, the window.
+/// Check marks are set from preferences at startup.
 fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
-    // Screen only: pages and exports always use Courier Prime 12 pt.
-    let font = tauri::menu::SubmenuBuilder::new(app, "Screen Font")
-        .item(&check_item(app, "font_courier-prime", "Courier Prime (standard)", true)?)
-        .item(&check_item(app, "font_mono", "System Monospace", false)?)
-        .item(&check_item(app, "font_serif", "Serif", false)?)
-        .item(&check_item(app, "font_sans", "Sans Serif", false)?)
+    use tauri::menu::SubmenuBuilder;
+    let mode = SubmenuBuilder::new(app, "Mode")
+        .item(&check_item(app, "mode_normal", "Normal View", true)?)
+        .item(&check_item(app, "mode_page", "Page View", false)?)
         .separator()
-        .text("font_larger", "Larger Text")
-        .text("font_smaller", "Smaller Text")
-        .text("font_reset", "Standard Size (12 pt)")
-        .build()?;
-    tauri::menu::SubmenuBuilder::new(app, "View")
-        .text("focus_mode", keyed("Focus Mode", "Shift+F"))
         .item(&check_item(app, "view_typewriter", &keyed("Typewriter Mode", "Shift+T"), false)?)
-        .item(&font)
-        .separator()
+        .text("focus_mode", keyed("Focus Mode", "Shift+F"))
+        .item(&check_item(app, "full_screen", "Full Screen (F11)", false)?)
+        .build()?;
+    // Every panel the writer can show or hide. Later panels (outline, bible,
+    // timeline, notes) join here as they are built.
+    let tools = SubmenuBuilder::new(app, "Tools")
         .item(&check_item(app, "view_nav", "Scene List", true)?)
         .item(&check_item(app, "view_board", "Board", true)?)
-        .item(&check_item(app, "view_toolbar", "Toolbar", true)?)
-        .item(&check_item(app, "view_status", "Status Bar", true)?)
-        .separator()
+        .build()?;
+    let appearance = SubmenuBuilder::new(app, "Appearance")
         .text("ui_larger", keyed("Larger Interface", "="))
         .text("ui_smaller", keyed("Smaller Interface", "-"))
         .text("ui_reset", keyed("Actual Size", "0"))
         .separator()
         .text("ui_contrast", "High Contrast")
+        .build()?;
+    let go_to = SubmenuBuilder::new(app, "Go To")
+        .text("goto_page", keyed("Page…", "G"))
+        .text("goto_scene", keyed("Scene…", "Shift+G"))
+        .build()?;
+    let window = SubmenuBuilder::new(app, "Window")
+        .text("win_minimize", "Minimise")
+        .text("win_zoom", "Zoom")
         .separator()
         .text("focus_next", "Next Panel (F6)")
+        .build()?;
+    SubmenuBuilder::new(app, "View")
+        .item(&mode)
+        .item(&tools)
+        .separator()
+        .item(&check_item(app, "view_toolbar", "Toolbar", true)?)
+        .item(&check_item(app, "view_status", "Status Bar", true)?)
+        .separator()
+        .item(&appearance)
+        .item(&go_to)
+        .item(&window)
         .build()
 }
 
-/// Text style, block type (same order as Ctrl/Cmd+1 to 9) and page size.
+/// Text style, elements (same order as Ctrl/Cmd+1 to 9), screen font, page,
+/// title page and furniture, production numbering, spelling.
 fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
     let kinds = [
@@ -1668,7 +1733,7 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         ("section", "Section"),
         ("lyric", "Lyric"),
     ];
-    let mut block = SubmenuBuilder::new(app, "Block Type");
+    let mut block = SubmenuBuilder::new(app, "Element");
     for (i, (id, label)) in kinds.iter().enumerate() {
         block = block.text(format!("kind_{id}"), keyed(label, &(i + 1).to_string()));
     }
@@ -1681,6 +1746,24 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
     for c in ["yellow", "green", "blue", "pink", "orange"] {
         highlight = highlight.text(format!("highlight_{c}"), format!("{}{}", c[..1].to_uppercase(), &c[1..]));
     }
+    // Screen only: pages and exports always use Courier Prime 12 pt.
+    let font = SubmenuBuilder::new(app, "Screen Font")
+        .item(&check_item(app, "font_courier-prime", "Courier Prime (standard)", true)?)
+        .item(&check_item(app, "font_mono", "System Monospace", false)?)
+        .item(&check_item(app, "font_serif", "Serif", false)?)
+        .item(&check_item(app, "font_sans", "Sans Serif", false)?)
+        .separator()
+        .text("font_larger", "Larger Text")
+        .text("font_smaller", "Smaller Text")
+        .text("font_reset", "Standard Size (12 pt)")
+        .build()?;
+    let spelling = SubmenuBuilder::new(app, "Spelling")
+        .text("spell_suggest", keyed("Suggestions", "."))
+        .separator()
+        .item(&check_item(app, "spell_en_US", "US English", true)?)
+        .item(&check_item(app, "spell_en_GB", "UK English", false)?)
+        .item(&check_item(app, "spell_off", "Off", false)?)
+        .build()?;
     let page = SubmenuBuilder::new(app, "Page Size")
         .item(&check_item(app, "page_letter", "US Letter", true)?)
         .item(&check_item(app, "page_a4", "A4", false)?)
@@ -1712,20 +1795,30 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .item(&block.build()?)
         .text("dual", keyed("Dual Dialogue", "D"))
         .text("page_break", keyed("Page Break Before", "Enter"))
+        .item(&font)
+        .separator()
+        .item(&page)
+        .text("title_page", "Title Page…")
+        .text("page_furniture", "Headers and Footers…")
         .separator()
         .item(&numbers)
         .item(&page_lock)
         .item(&revisions)
         .separator()
-        .item(&page)
+        .item(&spelling)
         .build()
 }
 
 fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{MenuBuilder, SubmenuBuilder};
-    let help = SubmenuBuilder::new(app, "Help").text("latency", "Typing Latency…");
+    let help = SubmenuBuilder::new(app, "Help")
+        .text("shortcuts", "Keyboard Shortcuts…")
+        .text("latency", "Typing Latency…")
+        .separator()
+        .text("updates", "Check for Updates…")
+        .text("licences", "Licences…");
     #[cfg(not(target_os = "macos"))]
-    let help = help.separator().text("about", "About Kolbítar and Licences");
+    let help = help.text("about", "About Kolbítar");
     let help = help.build()?;
     let (file, edit, view, format) = (file_menu(app)?, edit_menu(app)?, view_menu(app)?, format_menu(app)?);
     #[cfg(target_os = "macos")]
@@ -1859,6 +1952,9 @@ fn main() {
             ui_prefs,
             set_ui_prefs,
             focus_window,
+            window_command,
+            open_releases_page,
+            peek_file,
             set_menu_checks,
             title_page,
             set_title_page,

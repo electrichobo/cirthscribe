@@ -36,6 +36,9 @@ import { icon, iconButton, iconSelect } from "./icons";
 import { createLayoutMode } from "./layout-mode";
 import { createTitlePageDialog } from "./titlepage";
 import { createFurnitureDialog } from "./furniture";
+import { createExportDialog, type ExportFormat } from "./exportdlg";
+import { createGoToDialog } from "./goto";
+import { createShortcutsDialog } from "./shortcuts";
 import { createRevisions, revisionsPlugin } from "./revisions";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
@@ -527,6 +530,8 @@ function chooseOption(id: string, value: string) {
 function setViewMode(mode: string) {
   document.body.dataset.pageview = mode === "pages" ? "pages" : "continuous";
   ($("view-mode") as HTMLSelectElement).value = document.body.dataset.pageview;
+  const pages = mode === "pages";
+  void invoke("set_menu_checks", { checks: { mode_normal: !pages, mode_page: pages } }).catch(() => undefined);
   try {
     localStorage.setItem("cirth.viewMode", document.body.dataset.pageview);
   } catch {
@@ -567,6 +572,9 @@ const about = createAbout();
 // (as a page-size change does) instead of waiting for autosave.
 const titlePage = createTitlePageDialog(() => saveFile(false));
 const furniture = createFurnitureDialog(() => saveFile(false));
+const exportDialog = createExportDialog({ hasActiveRevision: () => !!revisions.state.active, run: (f) => exportAs(f) });
+const goTo = createGoToDialog({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], numbers: () => sceneNumbers });
+const shortcuts = createShortcutsDialog();
 const revisions = createRevisions(() => view ?? null, () => {
   syncMenuChecks();
   void repaginate();
@@ -641,7 +649,13 @@ const layoutMode = createLayoutMode({
   });
   const focusBtn = iconButton("tool-focus", "focus", "Focus mode", `Focus mode: only the script, full screen (${mod}+Shift+F)`);
   focusBtn.addEventListener("click", () => void focusMode.toggle());
-  $("island-panels").append(navBtn, boardBtn, findBtn, focusBtn);
+  // Comments come with M5 (anchored threads). Until then the button only says
+  // so (owner, 2026-10-28): it changes nothing.
+  const commentBtn = iconButton("tool-comments", "comment", "Comments (not available yet)", "Comments: coming in a later version");
+  commentBtn.setAttribute("aria-disabled", "true");
+  commentBtn.classList.add("placeholder");
+  commentBtn.addEventListener("click", () => showBanner("Comments are not built yet: they come in a later version (milestone 5). Nothing was changed."));
+  $("island-panels").append(navBtn, boardBtn, findBtn, commentBtn, focusBtn);
   ($("view-menu-btn") as HTMLButtonElement).append(icon("more"));
   const showPressed = () => {
     const overlay = layoutMode.mode === "overlay";
@@ -751,6 +765,9 @@ window.addEventListener(
     if (e.key === "F6" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing && !document.querySelector("dialog[open]")) {
       e.preventDefault();
       cycleRegions(regions(), e.shiftKey);
+    } else if (e.key === "F11" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      void toggleFullScreen();
     }
   },
   true,
@@ -779,6 +796,12 @@ window.addEventListener(
     } else if (k === "o" && !e.shiftKey) {
       e.preventDefault();
       void openViaDialog();
+    } else if (k === "e" && !e.shiftKey) {
+      e.preventDefault();
+      if (lastOpen) exportDialog.open();
+    } else if (k === "g") {
+      e.preventDefault();
+      if (lastOpen) goTo.open(e.shiftKey ? "scene" : "page");
     } else if (k === "=" || k === "+" || k === "-" || k === "0") {
       e.preventDefault();
       void stepScale(k === "0" ? 0 : k === "-" ? -1 : 1);
@@ -839,6 +862,41 @@ async function runMenu(id: string): Promise<void> {
       break;
     case "revision_clear":
       if (lastOpen) await revisions.clearActive();
+      break;
+    case "import":
+      await importAny();
+      break;
+    case "export":
+      if (lastOpen) exportDialog.open();
+      break;
+    case "mode_normal":
+    case "mode_page":
+      setViewMode(id === "mode_page" ? "pages" : "continuous");
+      break;
+    case "full_screen":
+      await toggleFullScreen();
+      break;
+    case "goto_page":
+    case "goto_scene":
+      if (lastOpen) goTo.open(id === "goto_page" ? "page" : "scene");
+      break;
+    case "win_minimize":
+    case "win_zoom":
+      await invoke("window_command", { action: id.slice(4) === "zoom" ? "zoom" : "minimize" }).catch((e) => showBanner(`Window: ${e}`));
+      break;
+    case "shortcuts":
+      shortcuts.open();
+      break;
+    case "updates":
+      try {
+        await invoke("open_releases_page");
+        showBanner("The releases page is opening in your browser. Kolbítar never checks for updates by itself.");
+      } catch (e) {
+        showBanner(`Could not open the releases page (https://github.com/electrichobo/cirthscribe/releases): ${e}`);
+      }
+      break;
+    case "licences":
+      await about.open("gpl");
       break;
     case "import_fountain":
       await importFountain();
@@ -1058,6 +1116,68 @@ async function sceneNumbersAction(id: string) {
   }
 }
 
+/** The importer for a file: Final Draft XML by its content or extension,
+ *  otherwise plain text read as Fountain (Fountain is plain text, so a
+ *  screenplay saved as .txt imports the same way). */
+export function importerFor(path: string, head: string): "fdx" | "fountain" | null {
+  const ext = path.toLowerCase().split(".").pop() ?? "";
+  if (ext === "fdx" || /<FinalDraft[\s>]/.test(head)) return "fdx";
+  if (["fountain", "spmd", "txt", "text"].includes(ext)) return "fountain";
+  return null;
+}
+
+/** File > Import…: a new project from a Fountain, Final Draft or plain-text
+ *  file; the format is read from the file. */
+async function importAny(path?: string): Promise<boolean> {
+  const source =
+    path ??
+    (await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [
+        { name: "Screenplays (Fountain, Final Draft, plain text)", extensions: ["fountain", "spmd", "fdx", "txt", "text"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    }));
+  if (!source || Array.isArray(source)) return false;
+  const head = await invoke<string>("peek_file", { path: source }).catch(() => "");
+  const kind = importerFor(source, head);
+  if (!kind) {
+    showBanner(`Kolbítar cannot import this file: ${source}. It reads Fountain (.fountain, .spmd), Final Draft (.fdx) and plain text (.txt). Word and RTF import are planned.`);
+    return false;
+  }
+  return kind === "fdx" ? importFdx(source) : importFountain(source);
+}
+
+/** File > Export…: run the chosen format's own export. */
+async function exportAs(format: ExportFormat): Promise<boolean> {
+  switch (format) {
+    case "pdf":
+      return exportPdf();
+    case "pdf_changed":
+      return exportPdf(undefined, true);
+    case "txt":
+      return exportText();
+    case "fountain":
+      return exportFountain();
+    case "fdx":
+      return exportFdx();
+    default:
+      return exportDocument(format);
+  }
+}
+
+/** View > Mode > Full Screen (F11): the window fills the screen; menus stay. */
+async function toggleFullScreen(): Promise<void> {
+  try {
+    const on = await invoke<boolean>("window_command", { action: "fullscreen" });
+    void invoke("set_menu_checks", { checks: { full_screen: on } }).catch(() => undefined);
+    announce(on ? "Full screen" : "Full screen off");
+  } catch (e) {
+    showBanner(`Full screen: ${e}`);
+  }
+}
+
 /** File > Import Fountain…: a new project from a .fountain file. */
 async function importFountain(path?: string): Promise<boolean> {
   const source = path ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Fountain screenplay", extensions: ["fountain", "spmd", "txt"] }] }));
@@ -1158,6 +1278,13 @@ $("structural").addEventListener("change", (e) => {
   regions,
   exportText,
   importFountain,
+  importAny,
+  importerFor,
+  exportDialog,
+  exportAs,
+  goTo,
+  shortcuts,
+  toggleFullScreen,
   exportFountain,
   importFdx,
   exportFdx,

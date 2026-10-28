@@ -1,4 +1,4 @@
-// The toolbar's format island: block type, bold, italic, underline, text
+// The toolbar's format island: element (the block type), bold, italic, underline, text
 // colour and highlight. The controls show the state at the caret and run the
 // same commands as the keys and the Format menu. Pressing the buttons never
 // takes focus from the script, so the selection stays where it was. Colour
@@ -50,8 +50,8 @@ export function createFormatBar(root: HTMLElement, getView: () => EditorView | u
   const mod = isMac ? "Cmd" : "Ctrl";
   const kind = document.createElement("select");
   kind.id = "block-kind";
-  kind.setAttribute("aria-label", "Block type");
-  kind.title = `Block type of the line with the caret (Tab, Shift+Tab, or ${mod}+1 to 9)`;
+  kind.setAttribute("aria-label", "Element");
+  kind.title = `Element of the line with the caret (Tab, Shift+Tab, or ${mod}+1 to 9)`;
   for (const k of KINDS) kind.append(new Option(KIND_LABEL[k], k));
   kind.addEventListener("change", () => {
     const v = getView();

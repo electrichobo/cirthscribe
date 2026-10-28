@@ -1734,22 +1734,31 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!(await app.evaluate("document.body.dataset.focus")), "Home ends focus mode");
   });
 
-  await test("Menus: File, Edit, View, Format, Help hold every action; formatting, block type, page size and spelling work from them; check marks follow", async () => {
+  await test("Menus: File, Edit, View, Format, Help hold every action; formatting, elements, page size and spelling work from them; check marks follow", async () => {
     await openFixture("unicode-marks");
     const menu = () => app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
     let items = await menu();
     const tops = [...new Set(items.map((i) => i.path.split(" > ")[0]))];
     assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
     const ids = new Set(items.map((i) => i.id));
-    const want = ["new", "open", "save", "save_as", "export_pdf", "export_txt", "free_writing", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
-      "focus_mode", "view_nav", "view_board", "view_toolbar", "view_status", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast", "focus_next",
-      "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "latency", "about",
+    const want = ["new", "open", "import", "save", "save_as", "export", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
+      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
+      "goto_page", "goto_scene", "win_minimize", "win_zoom", "focus_next",
+      "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "latency", "updates", "licences", "about",
       ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
     const missing = want.filter((id) => !ids.has(id));
     assert(!missing.length, `missing menu items: ${missing}`);
     const editNative = items.filter((i) => i.path.startsWith("Edit > ") && !want.includes(i.id));
     assert(editNative.length >= 4, `Edit has the OS's Cut, Copy, Paste and Select All: ${editNative.map((i) => i.path)}`);
-    assert(items.some((i) => i.path === "File > Export > PDF…") && items.some((i) => i.path.startsWith("Format > Block Type > Dialogue (")), `nested Export and Block Type menus: ${items.filter((i) => /Export |Block Type > D/.test(i.path)).map((i) => i.path)}`);
+    // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
+    // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
+    const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
+    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", ui_contrast: "View > Appearance > High Contrast",
+      goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
+      font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
+    for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
+    assert(at("export").startsWith("File > Export…") && items.some((i) => i.path.startsWith("Format > Element > Dialogue (")), `one Export and an Element menu: ${at("export")}`);
+    assert(!ids.has("free_writing") && !ids.has("import_fountain") && !ids.has("export_pdf") && !items.some((i) => i.path.startsWith("Edit > Spelling")), "no separate imports or exports, no Free Writing in File, no Spelling in Edit");
     const checked = (id) => items.find((i) => i.id === id)?.checked;
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'page_letter').checked && !m.find(i => i.id === 'page_a4').checked && m.find(i => i.id === 'spell_en_US').checked)", "check marks match this document on open");
 
@@ -1762,7 +1771,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.menu('bold')");
     assert(!(await blocks())[ai].runs.some((r) => r.bold), "Format > Bold again removes it");
     await app.evaluate("__cirth.menu('kind_transition')");
-    assert((await blocks())[ai].kind === "transition", "Format > Block Type > Transition");
+    assert((await blocks())[ai].kind === "transition", "Format > Element > Transition");
     await press("z", [MOD_KEY]);
     assert((await blocks())[ai].kind === "action", "one undo restores the type");
 
@@ -1773,13 +1782,48 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.menu('page_letter')");
     await waitFor(app, "document.getElementById('profile').value === 'letter'", "back to Letter");
     await app.evaluate("__cirth.menu('spell_en_GB')");
-    await waitFor(app, "document.getElementById('spelling').value === 'en_GB'", "UK spelling from the Edit menu");
+    await waitFor(app, "document.getElementById('spelling').value === 'en_GB'", "UK spelling from the Format menu");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'spell_en_GB').checked && !m.find(i => i.id === 'spell_en_US').checked)", "UK checked");
     await app.evaluate("__cirth.menu('spell_en_US')");
     await waitFor(app, "document.getElementById('spelling').value === 'en_US'", "back to US");
-    // File > Free Writing.
+    // View > Mode: Page View and Normal View switch the view and keep their check marks in step.
+    await app.evaluate("__cirth.menu('mode_page')");
+    await waitFor(app, "document.body.dataset.pageview === 'pages'", "View > Mode > Page View");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'mode_page').checked && !m.find(i => i.id === 'mode_normal').checked)", "Page View checked");
+    await app.evaluate("__cirth.menu('mode_normal')");
+    await waitFor(app, "document.body.dataset.pageview === 'continuous'", "View > Mode > Normal View");
+    // Import reads the format from the file: Final Draft by content or extension, otherwise Fountain/plain text.
+    const det = await app.evaluate(`[__cirth.importerFor('a.fdx', ''), __cirth.importerFor('script.txt', '<?xml version="1.0"?><FinalDraft DocumentType="Script">'), __cirth.importerFor('b.fountain', 'INT. ROOM'), __cirth.importerFor('c.txt', 'INT. ROOM'), __cirth.importerFor('d.pdf', '%PDF')]`);
+    assert(JSON.stringify(det) === JSON.stringify(["fdx", "fdx", "fountain", "fountain", null]), `import detection: ${det}`);
+    // File > Export… lists every format; changed pages only with an active revision set.
+    await app.evaluate("(__cirth.menu('export'), true)");
+    await waitFor(app, "document.getElementById('export-dialog').open", "File > Export… opens the dialog");
+    const formats = await app.evaluate("[...document.querySelectorAll('#export-dialog input[name=export-format]')].map(r => r.value + (r.disabled ? ':off' : ''))");
+    assert(formats.join() === "pdf,pdf_changed:off,txt,fountain,fdx,docx,rtf,html", `export formats: ${formats}`);
+    await app.evaluate("(document.getElementById('export-cancel').click(), true)");
+    // View > Go To > Scene… and Page…: the caret moves there.
+    const scenes = await app.evaluate("__cirth.scenes()");
+    await app.evaluate("(__cirth.menu('goto_scene'), true)");
+    await waitFor(app, "document.getElementById('goto-dialog').open", "Go To Scene opens");
+    await app.evaluate(`(() => { const i = document.getElementById('goto-input'); i.value = ${JSON.stringify(String(scenes.length))}; document.getElementById('goto-go').click(); return true; })()`);
+    await waitFor(app, `!document.getElementById('goto-dialog').open && __cirth.view.state.selection.from >= __cirth.scenes()[${scenes.length - 1}].from`, "Go To Scene: caret in the last scene");
+    await app.evaluate("(__cirth.menu('goto_page'), true)");
+    await app.evaluate("(() => { const i = document.getElementById('goto-input'); i.value = '999'; document.getElementById('goto-go').click(); return true; })()");
+    assert(/no page 999/.test(await app.evaluate("document.getElementById('goto-error').textContent")) && (await app.evaluate("document.getElementById('goto-dialog').open")), "Go To Page: a page that does not exist is reported, the dialog stays");
+    await app.evaluate("(() => { const i = document.getElementById('goto-input'); i.value = '1'; document.getElementById('goto-go').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('goto-dialog').open && __cirth.view.state.selection.from <= 2", "Go To Page 1: caret at the start");
+    // Help > Keyboard Shortcuts… lists the shortcuts.
+    await app.evaluate("(__cirth.menu('shortcuts'), true)");
+    await waitFor(app, "document.getElementById('shortcuts-dialog').open && document.querySelectorAll('#shortcuts-dialog .shortcut-table tr').length >= 15", "Help > Keyboard Shortcuts…");
+    await app.evaluate("(document.getElementById('shortcuts-close').click(), true)");
+    // The comment button is a placeholder until M5: it says so and changes nothing.
+    const before = JSON.stringify(await blocks());
+    await app.evaluate("(document.getElementById('tool-comments').click(), true)");
+    assert((await app.evaluate("document.getElementById('tool-comments').getAttribute('aria-disabled')")) === "true" && /not built yet/.test(await app.evaluate("document.getElementById('banner').textContent")), "comment placeholder says comments are not built yet");
+    assert(JSON.stringify(await blocks()) === before, "the comment placeholder changes nothing");
+    // Free Writing is in the island's More menu (and on Home), no longer in File.
     await app.evaluate("__cirth.menu('free_writing')");
-    await waitFor(app, "document.body.dataset.view === 'free'", "File > Free Writing");
+    await waitFor(app, "document.body.dataset.view === 'free'", "Free Writing still opens");
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);
     items = await menu();
@@ -2410,7 +2454,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!/<script|https?:\/\//.test(html), "nothing to run or fetch");
     // Menus.
     const items = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
-    for (const label of ["Word (.docx)…", "Rich Text (.rtf)…", "Web Page (.html)…"]) assert(items.some((i) => i.path === `File > Export > ${label}`), `File > Export > ${label}`);
+    assert(items.some((i) => i.id === "export" && i.path.startsWith("File > Export…")), "File > Export… holds every format (its dialog is tested in Menus)");
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
