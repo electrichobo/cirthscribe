@@ -1,5 +1,7 @@
 # Milestone 2 plan: professional pages and file exchange
 
+**Closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md), carrying into M3: external app tests (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print), the Mac recheck of pack v2, manual checks N20–N28, and the M1 carry-overs (Linux latency, reference machines, defect 3). Non-Latin PDF text stays a reported limitation.
+
 Status: **accepted by the owner, 2026-10-27**: order as proposed (title page → Fountain → FDX); `quick-xml` and `zip` (both MIT) approved for steps 3 and 8; title page also gets WGA registration and a revision/draft label. M1 closed with its items carried forward. Builds on M1 and M1b. ROADMAP's M2 gate: locked-page editing and PDF rendering pass boundary fixtures; imports never silently discard content; results with external editors and Google are labelled from actual tests, never assumed from the file extension.
 
 ## Starting point (what exists)
@@ -155,7 +157,7 @@ Each step is a working, tested slice. Every export gets a capability/loss report
      Results and the remaining losses are in docs/COMPATIBILITY.md. A recheck on v2 is pending.
    - Open: external results for every format. These need the apps (Final Draft, Word, Google Docs, LibreOffice, a Fountain app, browser print) and the manual checks N22, N23, N25 and N28.
 
-The exit review comes after 7–9. **Exit review drafted 2026-10-27: docs/m2/EXIT_REVIEW.md. Verdict: not done yet.** Linux e2e is green in CI again (92a2cf9); external app results are missing; the Mac recheck is deferred; owner decisions A (non-Latin PDF font) and B (how to close) are open. Steps 2 and 3 can swap if the owner wants FDX first.
+The exit review comes after 7–9. **Exit review 2026-10-27: docs/m2/EXIT_REVIEW.md. M2 closed by the owner the same day** (decision B option 2: close and carry; decision A option 2: non-Latin PDF text stays a reported limitation). Linux e2e is green in CI again (92a2cf9). Steps 2 and 3 can swap if the owner wants FDX first.
 
 ## Carried from M1 (not blockers for starting M2)
 

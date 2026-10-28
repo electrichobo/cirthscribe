@@ -4,7 +4,9 @@ Date: 2026-10-27. Commit reviewed: 65462b7, plus the Linux CI fix attempt in the
 
 Gate sources: ROADMAP.md (M2 and its exit line), ACCEPTANCE.md section D, docs/M2_PLAN.md and docs/COMPATIBILITY.md.
 
-**Verdict: M2 is not done.**
+**M2 closed by the owner on 2026-10-27 (decision B, option 2),** as M1 was: Linux CI is green again (92a2cf9), and these are carried into M3: external app tests (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print), the Mac recheck of pack v2, manual checks N20–N28, and the M1 carry-overs (Linux latency, reference machines, defect 3). Decision A: non-Latin PDF text stays a reported limitation (option 2); the fallback font is chosen in a later milestone. None of the carried items is a data-loss defect.
+
+Original verdict (2026-10-27): **M2 is not done.**
 - Everything M2 promised is built, with tests on Windows.
 - The exit gate needs external results that do not exist yet:
   - (resolved after the review: Linux end-to-end, red in CI since M2 step 3, is green again from 92a2cf9);

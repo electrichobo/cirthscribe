@@ -35,6 +35,8 @@ Statuses: not implemented · implemented, unverified · verified within profile 
 
 ## Deferred
 
+M2 closed on 2026-10-27 with this record as a baseline; the missing external results below are carried into M3.
+
 - **Mac recheck of pack v2: deferred (owner, 2026-10-27).** The test Mac is busy with other work. When it is free, revisit:
   - cross-OS hashes, especially the DOCX;
   - the PDF Producer and page size in Preview;

@@ -41,6 +41,8 @@ Exit: a user can write and safely recover a complete screenplay. Editing smoke t
 
 Exit: locked-page editing and PDF rendering pass boundary fixtures. Imports do not silently discard content. External editor/Google results are labeled by actual tests, not assumed from file extensions.
 
+**Closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md). Carried into M3: the external app tests (the compatibility matrix is a baseline only), the Mac recheck, manual checks N20–N28 and the M1 carry-overs. Non-Latin PDF text is a reported limitation until a fallback font is chosen.
+
 ## M1b: Writing workspace (accepted by the owner 2026-10-26)
 
 Jared raised these after the M1 feature work, which so far covered only the script window. Each is recorded here so nothing is lost. The owner accepted M1b as proposed and chose font option A(1). Decisions B and C are still open. Build order: focus mode and the View menu and panel toggles first.

@@ -4,9 +4,9 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 ## Current stage (2026-10-27)
 
-A working application, not yet released, plus its product brief. M0, M1 and M1b are closed by the owner. **M2 is in progress** (docs/M2_PLAN.md).
+A working application, not yet released, plus its product brief. M0, M1, M1b and M2 are closed by the owner. **Next: M3** (ROADMAP); no plan written yet.
 - Built, steps 1–8: title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports.
-- In progress: step 9 (external tests, docs/COMPATIBILITY.md). The exit review is drafted (docs/m2/EXIT_REVIEW.md: not done yet).
+- Carried from M2 (docs/m2/EXIT_REVIEW.md): external app tests, the Mac recheck, manual checks.
 
 Later milestones (ROADMAP.md) are only planned. Never present a planned feature as working. Open items are listed in STATUS.md and docs/testing/MANUAL_CHECKS.md.
 
@@ -108,7 +108,7 @@ AI agents take turns on this repository (Claude Code, OpenAI Codex, Google Antig
 ### 1. Startup sequence (read before writing)
 
 At the start of any session, or when asked to "continue" or "pick up where we left off":
-1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M2_PLAN.md`).
+1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M3_PLAN.md`; until written, ROADMAP's M3).
 2. Inspect uncommitted work: run `git status`, `git diff` and `git diff --staged`.
 3. **Stop and summarize** before modifying any file:
    - the uncommitted changes in the working tree;

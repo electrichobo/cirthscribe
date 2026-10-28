@@ -52,7 +52,7 @@ Done:
 - [x] About screen with the licence and every third-party licence
 - [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
 
-Carried into Stage 2:
+Carried forward:
 - [ ] Typing-speed check on a Linux desktop
 
 ### ✅ Stage 1b: Writing workspace (done)
@@ -67,24 +67,29 @@ Carried into Stage 2:
 - [x] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
 - [x] Text colour and highlight as your own on-screen markup (never printed)
 
-### 🔨 Stage 2: Professional pages and file exchange (in progress)
+### ✅ Stage 2: Professional pages and file exchange (done)
 
 Done:
 - [x] Title page, printed before page 1 in PDF and text exports
 - [x] Fountain import and export, with a report of anything that changed
 - [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
 - [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
-
-Still to do:
 - [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
-- [ ] Check the page measurements against an industry-standard PDF
 - [x] Revision sets (label, colour, date, mark), revision mode that marks changed lines, and a changed-pages PDF
 - [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
-- [x] Word (DOCX), RTF and HTML export, each with a report of what carried over (not yet tried in Word, Google Docs or LibreOffice)
-- [ ] Compatibility matrix from real tests in other apps ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md); test pack and record started)
+- [x] Word (DOCX), RTF and HTML export, each with a report of what carried over
+- [x] A compatibility test pack and record ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)); first results from Preview, TextEdit and Safari on macOS
+
+Known limits:
+- Letters Courier Prime doesn't have (Chinese, Japanese, Korean, Hebrew, Arabic, emoji) print blank in PDFs; the export warns you. A fallback font comes later.
+- In Word, RTF and HTML exports, dual dialogue is printed one speech after the other.
+
+Carried forward:
+- [ ] Results from Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages and browser print
+- [ ] Check the page measurements against an industry-standard PDF
 - [ ] Tested exchange with other screenwriting apps
 
-### Stage 3: Story planning
+### 🔜 Stage 3: Story planning (next)
 
 - [ ] Episodes and series sharing one story bible
 - [ ] Tabbed navigator: scenes (length, summary, characters), characters, notes, outline
@@ -131,8 +136,8 @@ Still to do:
 [STATUS.md](STATUS.md) lists what works, what was tested on which platform, open defects and what is untested. Highlights:
 
 - Windows: built and tested locally (two end-to-end test drivers plus core tests).
-- Linux: tested in CI (WebKitGTK under Xvfb). Not yet tried on a Linux desktop.
-- macOS: builds and passes core tests in CI, and has had hands-on checks of editing and the writing workspace on macOS 26 (Apple silicon). macOS 11, the oldest supported version, has not been tried.
+- Linux: tested in CI (WebKitGTK under Xvfb), including the full end-to-end suite. Not yet tried on a Linux desktop.
+- macOS: builds and passes core tests in CI, and has had hands-on checks of editing and the writing workspace on macOS 26 (Apple silicon), plus a first round of export checks in Preview, TextEdit and Safari. macOS 11, the oldest supported version, has not been tried.
 
 ### Building from source
 
@@ -148,7 +153,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 
 ### How it is built
 
-- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, PDF and text export, title pages, scene numbering, Fountain and Final Draft exchange, word counts, spell check and Free Writing. It has no UI code.
+- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, title pages, scene numbering, revision sets and locked pages, PDF, text, Word, RTF and HTML export, Fountain and Final Draft exchange, word counts, spell check and Free Writing. It has no UI code.
 - **App** (`app/`, Tauri 2 + TypeScript + ProseMirror): the desktop shell and editor. The editor is a view of the core's document and sends versioned edits to it, so there is one saved copy of the script.
 - **Tests**: Rust unit and integration tests, plus an end-to-end suite that drives the real app through two drivers (DevTools and WebDriver).
 
@@ -158,7 +163,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | - | - |
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
-| [docs/M2_PLAN.md](docs/M2_PLAN.md) | Current milestone plan (Stage 2) and what is done |
+| [docs/M2_PLAN.md](docs/M2_PLAN.md) and [docs/m2/EXIT_REVIEW.md](docs/m2/EXIT_REVIEW.md) | Stage 2 plan, what each step built, and its exit review |
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Which formats have been tested in which other apps, and how to test |
 | [docs/M1_PLAN.md](docs/M1_PLAN.md) and [docs/m1/EXIT_REVIEW.md](docs/m1/EXIT_REVIEW.md) | Stage 1 plan and its exit review |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, persistence and layout strategy |
@@ -168,7 +173,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | [docs/m0/FINDINGS.md](docs/m0/FINDINGS.md) | Proof-of-concept measurements and risks |
 | [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person (macOS, other screenwriting apps, input methods), with results |
 | [docs/ART_ASSETS.md](docs/ART_ASSETS.md) | Art the app needs (icons, logo, installer art) and their sizes |
-| [CLAUDE.md](CLAUDE.md) and [START_HERE.md](START_HERE.md) | Rules and first brief for AI coding agents working on this repository |
+| [AGENTS.md](AGENTS.md), [START_HERE.md](START_HERE.md) and [HANDOFF.md](HANDOFF.md) | Rules, first brief and session handoff for AI coding agents working on this repository |
 
 ### Contributing
 
