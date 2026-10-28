@@ -338,6 +338,7 @@ name = "cirth-core"
 version = "0.0.1"
 dependencies = [
  "printpdf",
+ "quick-xml",
  "rusqlite",
  "serde",
  "serde_json",

@@ -2112,6 +2112,55 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(shapeOf(await blocks()) === before, "round trip keeps every block, type and emphasis");
   });
 
+  await test("Final Draft: import a .fdx file as a new project (with report), export it back, and the round trip keeps the script", async () => {
+    const src = join(dataDir, "forge scene.fdx");
+    writeFileSync(src, `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<FinalDraft DocumentType="Script" Template="No" Version="5">
+  <Content>
+    <Paragraph Number="3" Type="Scene Heading"><Text>INT. FORGE - NIGHT</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Sparks fly &amp; a </Text><Text Style="Italic">bell</Text><Text> rings.</Text></Paragraph>
+    <Paragraph><DualDialogue>
+      <Paragraph Type="Character"><Text>MARA</Text></Paragraph>
+      <Paragraph Type="Dialogue"><Text Style="Bold">Now</Text><Text>.</Text></Paragraph>
+      <Paragraph Type="Character"><Text>BRAM</Text></Paragraph>
+      <Paragraph Type="Dialogue"><Text>No.</Text></Paragraph>
+    </DualDialogue></Paragraph>
+    <Paragraph Type="Cast List"><Text>MARA, BRAM</Text></Paragraph>
+    <Paragraph StartsNewPage="Yes" Type="Scene Heading"><Text>EXT. QUAY - DAWN</Text></Paragraph>
+  </Content>
+  <TitlePage><Content>
+    <Paragraph Alignment="Center"><Text>FORGE SCENE</Text></Paragraph>
+    <Paragraph Alignment="Center"><Text>Written by</Text></Paragraph>
+    <Paragraph Alignment="Center"><Text>Jared Hoy</Text></Paragraph>
+  </Content></TitlePage>
+</FinalDraft>`);
+    await app.evaluate(`__cirth.importFdx(${JSON.stringify(src)})`);
+    await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.doc.title === 'FORGE SCENE'", "imported project open");
+    const b = await blocks();
+    assert(b.map((x) => x.kind).join() === "heading,action,character,dialogue,character,dialogue,action,heading", `kinds: ${b.map((x) => x.kind)}`);
+    assert(text(b[1]) === "Sparks fly & a bell rings." && b[1].runs.some((r) => r.italic && r.text === "bell"), "text, entities and italic");
+    assert(!b[2].dual && b[4].dual && b[7].break_before, "dual dialogue and page break");
+    const banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(banner.includes("Imported") && banner.includes("Cast List") && banner.includes("3"), `import report shown: ${banner}`);
+    const tp = await app.evaluate("window.__TAURI_INTERNALS__.invoke('title_page')");
+    assert(tp.title === "FORGE SCENE" && tp.credit === "Written by" && tp.authors === "Jared Hoy", `title page: ${JSON.stringify(tp)}`);
+    // Export and re-import: same script.
+    const out = join(dataDir, "forge export.fdx");
+    assert(await app.evaluate(`__cirth.exportFdx(${JSON.stringify(out)})`), "exported");
+    const xml = readFileSync(out, "utf8");
+    assert(xml.includes("<DualDialogue>") && xml.includes('StartsNewPage="Yes"') && xml.includes('Style="Italic"') && xml.includes("&amp;"), `FDX text: ${xml.slice(0, 300)}`);
+    const shapeOf = (bs) => JSON.stringify(bs.map((x) => [x.kind, x.runs.filter((r) => r.text).map((r) => [r.text, !!r.bold, !!r.italic, !!r.underline]), !!x.dual, !!x.break_before]));
+    const before = shapeOf(await blocks());
+    await app.evaluate(`__cirth.importFdx(${JSON.stringify(out)})`);
+    await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.name === 'forge-scene-2'", "re-imported as a second project");
+    assert(shapeOf(await blocks()) === before, "round trip keeps every block, type and emphasis");
+    // Not an FDX: refused with a message, nothing opened.
+    const bad = join(dataDir, "not a script.fdx");
+    writeFileSync(bad, "<html><body>hello</body></html>");
+    assert(!(await app.evaluate(`__cirth.importFdx(${JSON.stringify(bad)})`)), "refused");
+    assert(/not an \.fdx script/.test(await app.evaluate("document.getElementById('banner').textContent")), "says why");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

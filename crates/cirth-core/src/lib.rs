@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod fdx;
 pub mod fixtures;
 pub mod fsutil;
 pub mod fontcheck;

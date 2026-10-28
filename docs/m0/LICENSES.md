@@ -2,6 +2,8 @@
 
 Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dictionaries) by `node app/scripts/license-inventory.mjs` from `Cargo.lock` / `cargo metadata` and `app/package-lock.json`. License fields are as declared by each package; they have not been audited file by file. Re-run on every dependency change.
 
+**2026-10-27, M2:** `quick-xml` 0.42.0 (MIT) added as a direct dependency of cirth-core for FDX import and export, with the owner's approval. It was already in the shipped tree through Tauri, so the bundled notices file did not change; its default features add only `memchr` (MIT OR Unlicense), which was also already present.
+
 ## Not from package managers
 
 | Item | License | Shipped? | Notes |

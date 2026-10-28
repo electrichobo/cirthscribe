@@ -805,6 +805,12 @@ async function runMenu(id: string): Promise<void> {
     case "export_fountain":
       await exportFountain();
       break;
+    case "import_fdx":
+      await importFdx();
+      break;
+    case "export_fdx":
+      await exportFdx();
+      break;
     case "export_txt":
       await exportText();
       break;
@@ -946,6 +952,29 @@ async function exportFountain(path?: string): Promise<boolean> {
   }
 }
 
+/** File > Import Final Draft…: a new project from a .fdx file. */
+async function importFdx(path?: string): Promise<boolean> {
+  const source = path ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Final Draft", extensions: ["fdx"] }] }));
+  if (!source || Array.isArray(source)) return false;
+  return openWith("import_fdx", { path: source });
+}
+
+/** File > Export > Final Draft…: the script and title page as .fdx XML. */
+async function exportFdx(path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".fdx"), filters: [{ name: "Final Draft", extensions: ["fdx"] }] }));
+  if (!target) return false;
+  await syncer.flush();
+  try {
+    const r = await invoke<{ path: string; notes: string[] }>("export_fdx", { path: target });
+    showBanner(`Final Draft file written: ${r.path}. ${r.notes.join(" ")}`);
+    return true;
+  } catch (e) {
+    showBanner(`Final Draft export failed: ${e}`);
+    return false;
+  }
+}
+
 /** Plain text with the PDF's line breaks and pages (cirth_core::txt). */
 async function exportText(path?: string): Promise<boolean> {
   if (!lastOpen) return false;
@@ -978,6 +1007,8 @@ $("structural").addEventListener("change", (e) => {
   exportText,
   importFountain,
   exportFountain,
+  importFdx,
+  exportFdx,
   exportPdf,
   get view() {
     return view;

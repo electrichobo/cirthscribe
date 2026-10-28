@@ -38,7 +38,24 @@ Each step is a working, tested slice. Every export gets a capability/loss report
      - reports joined line breaks, centred text, synopses and removed scene numbers.
    - Tests: three fixtures round-trip with identical blocks and title page; a hand-written file covers the spec features; forcing rules; e2e import, Home, export and re-import.
    - Not yet: Fountain's own scene numbers (step 4); line breaks inside a paragraph (blocks hold none). It needs no dependency, is easy to inspect, and gives a real round-trip test of the model, dual dialogue included (`^`). It also covers "bring an existing script in" before FDX.
-3. **FDX export and import** (Final Draft XML). This is the interchange priority in INTEROPERABILITY.md.
+3. **FDX export and import** (Final Draft XML). **Built 2026-10-27** (`cirth_core::fdx`, quick-xml 0.42):
+   - **Support matrix:**
+
+     | Kolbítar | FDX written | Read back |
+     | - | - | - |
+     | Heading, action, character, parenthetical, dialogue, transition, shot | Same `Paragraph Type` | Same |
+     | Section | `General` | Action (reported on export) |
+     | Lyric | `Dialogue` | Dialogue (reported on export) |
+     | Bold, italic, underline | `Text Style` | Same |
+     | Dual dialogue | `DualDialogue` group | Second cue is the right column |
+     | Forced page break | `StartsNewPage="Yes"` | Same |
+     | Title page | Aligned `TitlePage` paragraphs | Read by position (reported) |
+     | Colour, highlight | Left out (reported) | n/a |
+     | Other FDX paragraph types | n/a | Action, text kept (reported) |
+     | FDX scene numbers, script notes, settings | n/a | Not kept (listed in the report) |
+
+   - Tests: three fixtures round-trip; a hand-written FDX with the cases above; escaping; broken XML and non-FDX files are refused; e2e import, report, export, re-import.
+   - **Not checked against Final Draft itself**: manual check N23 is needed before any compatibility claim. This is the interchange priority in INTEROPERABILITY.md.
    - Covers paragraph types, emphasis, dual dialogue, the title page, and scene numbers once they exist.
    - Unknown elements are kept as text where possible and always listed in the import report.
    - A tested element/attribute support matrix.

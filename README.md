@@ -74,7 +74,8 @@ Done:
 - [x] Fountain import and export, with a report of anything that changed
 - [ ] Final production-quality PDF
 - [ ] Scene numbers, revision colours, locked pages (A/B pages)
-- [ ] Import and export Final Draft (FDX), Word (DOCX), RTF, HTML and text, each with a report of what carried over (including dual dialogue)
+- [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
+- [ ] Word (DOCX), RTF and HTML export, each with a report of what carried over
 
 ### Stage 3: Story planning
 

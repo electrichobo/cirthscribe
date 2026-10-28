@@ -341,6 +341,42 @@ async fn import_fountain(app: State<'_, App>, path: String) -> Result<Opened, St
     Ok(out)
 }
 
+/// File > Import Final Draft…: a new library project from a .fdx file
+/// (the file itself is only read). The import report comes back with it.
+#[tauri::command]
+async fn import_fdx(app: State<'_, App>, path: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let bytes = std::fs::read(&path).map_err(io_err)?;
+    let text = String::from_utf8(bytes).map_err(|_| "This .fdx file is not UTF-8 XML, so it cannot be read.".to_string())?;
+    let stem = Path::new(&path).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Imported".into());
+    let r = cirth_core::fdx::import(&text, &stem)?;
+    let name = unused_library_name(&app, &r.document.title);
+    let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
+    if !r.title_page.is_empty() {
+        with_session(&app, |s| {
+            let doc = s.store.default_document().map_err(err)?;
+            s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            s.store.save_package(&s.package).map_err(err)?;
+            Ok(())
+        })?;
+    }
+    out.import_notes = r.notes;
+    Ok(out)
+}
+
+/// File > Export > Final Draft…: the current document and its title page.
+#[tauri::command]
+async fn export_fdx(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
+    let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
+    let out = cirth_core::fdx::export(&doc.blocks, &tp);
+    let target = normalize(Path::new(&path));
+    let tmp = target.with_extension("fdx.tmp");
+    std::fs::write(&tmp, &out.text).map_err(io_err)?;
+    cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
+    Ok(FountainExported { path: target.display().to_string(), notes: out.notes })
+}
+
 #[derive(Serialize)]
 struct FountainExported {
     path: String,
@@ -1297,11 +1333,12 @@ fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Resul
 
 fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF (proof)").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").build()?;
+    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF (proof)").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").build()?;
     let file = SubmenuBuilder::new(app, "File")
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
         .text("import_fountain", "Import Fountain…")
+        .text("import_fdx", "Import Final Draft (.fdx)…")
         .separator()
         .text("save", keyed("Save", "S"))
         .text("save_as", keyed("Save As…", "Shift+S"))
@@ -1564,6 +1601,8 @@ fn main() {
             set_title_page,
             import_fountain,
             export_fountain,
+            import_fdx,
+            export_fdx,
             menu_items,
             document_profile,
             set_document_profile,
