@@ -50,6 +50,8 @@ Gate sources: ROADMAP.md (M2 and its exit line), ACCEPTANCE.md section D, docs/M
    - Likely cause: step 1 added a Title Page button to More, so Shift+Tab is now pressed from a `<select>`, which WebKitGTK handles differently. This is an inference: it cannot be run on this machine.
    - Fix attempt in the commit that adds this review: the trap never lets focus leave, settings are no longer moved while More is open, and the test reports where focus went.
    - Confirmed only when CI runs it.
+   - **CI on b94b0de, 2026-10-27: still failing**, now with a diagnosis: "from select#view-mode, focus now on button#view-menu-btn". That is the browser's own Shift+Tab, so the popover's keydown handler never cancelled it: on WebKitGTK a focused `<select>` keeps the event from the popover's bubbling listener.
+   - Second fix, in the next commit: Tab is handled in the capture phase on the document, which accepts GTK's `ISO_Left_Tab` and keyCode 9, with a focus-in safety net. It passes on Windows under both drivers; it needs another CI run.
    - Earlier, in 24466e0, the Linux run failed once on "Narrow script column"; later runs got past it.
    - The failures went unnoticed because several runs in between were cancelled by newer pushes and no one read the results.
 2. **External compatibility results** (above). Needs the owner's apps.

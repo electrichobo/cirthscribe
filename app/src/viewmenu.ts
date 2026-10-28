@@ -96,25 +96,47 @@ export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => voi
       open();
     }
   });
+  // Tab cycles inside the popover: the menu (as one stop), then each
+  // setting. Leaving by Tab would drop focus into the script, where Tab
+  // changes the block type (macOS check N18). Escape is the way out.
+  // Handled in the capture phase on the document: on Linux (WebKitGTK) a
+  // focused <select> keeps Shift+Tab from reaching listeners on the popover,
+  // and GTK may name the key ISO_Left_Tab.
+  let lastTab = { at: 0, back: false };
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (menu.hidden || !menu.contains(document.activeElement)) return;
+      if (!(e.key === "Tab" || e.key === "ISO_Left_Tab" || e.keyCode === 9)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const back = e.shiftKey || e.key === "ISO_Left_Tab";
+      lastTab = { at: performance.now(), back };
+      step(back);
+    },
+    true,
+  );
+  function step(back: boolean) {
+    const all = items();
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    const controls = [...settings.querySelectorAll<HTMLElement>("select, input, button")].filter((el) => !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0);
+    const ring: HTMLElement[] = [all[Math.max(at, 0)], ...controls];
+    const i = at >= 0 ? 0 : Math.max(ring.indexOf(document.activeElement as HTMLElement), 0);
+    ring[(i + (back ? ring.length - 1 : 1)) % ring.length]?.focus();
+    // Some engines refuse focus on a control mid-keystroke: fall back to the first item.
+    if (!menu.contains(document.activeElement)) all[0]?.focus();
+  }
+  // Safety net: if a Tab still moved focus out of the open popover, bring it back.
+  document.addEventListener("focusin", (e) => {
+    if (menu.hidden || menu.contains(e.target as Node) || performance.now() - lastTab.at > 300) return;
+    items()[0]?.focus();
+  });
   menu.addEventListener("keydown", (e) => {
     const all = items();
     const at = all.indexOf(document.activeElement as HTMLButtonElement);
     if (e.key === "Escape") {
       e.preventDefault();
       close(true);
-    } else if (e.key === "Tab") {
-      // Tab cycles inside the popover: the menu (as one stop), then each
-      // setting. Leaving by Tab would drop focus into the script, where Tab
-      // changes the block type (macOS check N18). Escape is the way out.
-      e.preventDefault();
-      e.stopPropagation();
-      const controls = [...settings.querySelectorAll<HTMLElement>("select, input, button")].filter((el) => !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0);
-      const ring: HTMLElement[] = [all[Math.max(at, 0)], ...controls];
-      const i = at >= 0 ? 0 : Math.max(ring.indexOf(document.activeElement as HTMLElement), 0);
-      ring[(i + (e.shiftKey ? ring.length - 1 : 1)) % ring.length]?.focus();
-      // Never let focus leave the popover (some engines refuse focus on a
-      // control mid-keystroke): fall back to the first item.
-      if (!menu.contains(document.activeElement)) all[0]?.focus();
     } else if (at < 0) {
       // In the settings: their own keys.
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {

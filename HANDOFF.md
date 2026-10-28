@@ -13,7 +13,8 @@ M2, production screenplay output. Steps 1–8 are built; step 9 (compatibility m
   - the trap never lets focus leave;
   - settings are not moved while More is open;
   - the test reports where focus went.
-  It passes on Windows under both drivers. Linux is unverified until the next CI run.
+  CI on b94b0de still failed, but with a diagnosis: "from select#view-mode, focus now on button#view-menu-btn" (the browser's default Shift+Tab; the popover's bubbling keydown never cancelled it on WebKitGTK).
+  Second fix: Tab is handled in the capture phase on the document (Tab, ISO_Left_Tab, keyCode 9), plus a focus-in safety net. It passes on Windows under both drivers (50/50, 49/49); Linux needs another CI run.
 - Mac recheck of pack v2: **deferred by the owner** (recorded in docs/COMPATIBILITY.md).
 - Checks run on Windows 11: `npm run test:contract` (4), `npm run e2e:cdp` (50/50), `npm run e2e:webdriver` (49/49, 1 skipped: IME). CI on 65462b7: macOS and Windows jobs green (including the new PDF, DOCX and RTF tests); Linux failed on the same More Shift+Tab test (before this fix).
 - Not verified:
