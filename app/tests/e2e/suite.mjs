@@ -1702,7 +1702,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     for (const p of ["board", "toolbar", "status"]) await app.evaluate(`__cirth.menu('view_${p}')`);
     await waitFor(app, "['#board', '.toolbar', 'footer', '#navigator'].every(s => document.querySelector(s).getClientRects().length > 0)", "all panels back");
     const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
-    assert(JSON.stringify(saved.panels) === JSON.stringify({ nav: true, board: true, toolbar: true, status: true }), `stored ${JSON.stringify(saved.panels)}`);
+    assert(JSON.stringify(saved.panels) === JSON.stringify({ nav: true, board: true, toolbar: true, status: true, notes: false }), `stored ${JSON.stringify(saved.panels)}`);
 
     // Focus mode: Ctrl/Cmd+Shift+F, only the script, full screen; Escape leaves.
     await caretAtEndOf(1);
@@ -2455,6 +2455,43 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Menus.
     const items = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
     assert(items.some((i) => i.id === "export" && i.path.startsWith("File > Export…")), "File > Export… holds every format (its dialog is tested in Menus)");
+  });
+
+  await test("Notes panel: View > Tools > Notes opens a scratchpad kept with the project (through Home and a hard kill); the script is untouched", async () => {
+    await openFixture("page-boundaries");
+    const before = JSON.stringify(await blocks());
+    assert(!(await app.evaluate("document.getElementById('notes').getClientRects().length")), "notes are hidden at first");
+    await app.evaluate("__cirth.menu('view_notes')");
+    await waitFor(app, "document.getElementById('notes').getClientRects().length > 0 && document.activeElement?.id === 'notes-text'", "View > Tools > Notes shows the panel and focuses it");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'view_notes').checked)", "Notes checked in View > Tools");
+    const text = "Call Sam about the lighthouse.\nZoë's line → cut? 🌊";
+    await app.evaluate(`(() => { const t = document.getElementById('notes-text'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input')); return true; })()`);
+    await waitFor(app, "document.querySelector('.notes-state').textContent === 'Kept'", "written to the working store after a pause");
+    assert(JSON.stringify(await blocks()) === before, "the script is unchanged");
+    // Moved with the arrow keys on its title bar; it stays inside the script area.
+    const left0 = await app.evaluate("document.getElementById('notes').offsetLeft");
+    await app.evaluate("(document.querySelector('.notes-grip').focus(), true)");
+    await press("ArrowLeft");
+    assert((await app.evaluate("document.getElementById('notes').offsetLeft")) < left0, "ArrowLeft on the title bar moves the panel");
+    // Home and back: the notes come back with the project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `document.getElementById('notes-text').value === ${JSON.stringify(text)}`, "notes kept through Home and reopening");
+    // A hard kill right after typing keeps the text too (it is in the working store at once).
+    await app.evaluate(`(() => { const t = document.getElementById('notes-text'); t.value += '\\nafter save'; t.dispatchEvent(new Event('input')); return true; })()`);
+    await waitFor(app, "document.querySelector('.notes-state').textContent === 'Kept'", "second note kept");
+    await app.kill();
+    await sleep(1500);
+    app = await driver.launch("after-notes-kill");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `document.getElementById('notes-text').value === ${JSON.stringify(text + "\nafter save")}`, "notes survive a hard kill");
+    // Another project has its own (empty) notes; hiding the panel keeps the text.
+    await openFixture("unicode-marks");
+    assert((await app.evaluate("document.getElementById('notes-text').value")) === "", "notes belong to their project");
+    await app.evaluate("__cirth.menu('view_notes')");
+    await waitFor(app, "!document.getElementById('notes').getClientRects().length", "View > Tools > Notes hides it again");
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {

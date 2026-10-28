@@ -9,7 +9,7 @@
 
 import { PANEL_LABEL, currentPrefs, onPanelsChanged, togglePanel, type Panel } from "./a11y";
 
-const PANELS: Panel[] = ["nav", "board", "status", "toolbar"];
+const PANELS: Panel[] = ["nav", "board", "notes", "status", "toolbar"];
 
 export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => void, toggleTypewriter: () => void, settings: HTMLElement) {
   // The popover holds a menu of toggles and a group of form controls.

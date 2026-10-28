@@ -506,13 +506,32 @@ impl Store {
         self.set_setting(&format!("document:{document_id}"), "title_page", &json)
     }
 
+    /// The project's notes panel: free text saved with the project and tied
+    /// to no document, scene or block (owner, 2026-10-28). Empty if never written.
+    pub fn project_notes(&self) -> Result<String> {
+        Ok(self.setting("project", "notes")?.unwrap_or_default())
+    }
+
+    pub fn set_project_notes(&self, text: &str) -> Result<()> {
+        self.set_setting("project", "notes", text)
+    }
+
     pub fn setting(&self, scope: &str, key: &str) -> Result<Option<String>> {
         Ok(self.conn.query_row("SELECT value FROM settings WHERE scope = ?1 AND key = ?2", [scope, key], |r| r.get(0)).optional()?)
     }
 
+    /// Settings are not script commits, so they do not move `version`. A
+    /// counter marks them as unsaved instead: after a crash, a working store
+    /// with newer settings (notes, title page, headers) is recovered like one
+    /// with newer script edits.
     pub fn set_setting(&self, scope: &str, key: &str, value: &str) -> Result<()> {
         self.conn.execute("INSERT OR REPLACE INTO settings(scope, key, value) VALUES (?1, ?2, ?3)", params![scope, key, value])?;
-        Ok(())
+        let n = self.meta_count("settings_changes")? + 1;
+        Self::set_meta(&self.conn, "settings_changes", &n.to_string())
+    }
+
+    fn meta_count(&self, key: &str) -> Result<u64> {
+        Ok(self.meta(key)?.and_then(|v| v.parse().ok()).unwrap_or(0))
     }
 
     pub fn path(&self) -> &Path {
@@ -536,10 +555,10 @@ impl Store {
         Ok(self.meta("saved_version")?.unwrap_or_default().parse().unwrap_or(0))
     }
 
-    /// True when the working store holds commits newer than the last package save,
-    /// for example after a crash.
+    /// True when the working store holds commits or settings newer than the
+    /// last package save, for example after a crash.
     pub fn has_unsaved_work(&self) -> Result<bool> {
-        Ok(self.version()? > self.saved_version()?)
+        Ok(self.version()? > self.saved_version()? || self.meta_count("settings_changes")? > self.meta_count("settings_saved")?)
     }
 
     /// Project title (also the default document's title while projects hold
@@ -653,6 +672,7 @@ impl Store {
             crate::backup::before_replace(dest, name, current, policy, now, force)?;
         }
         let version = self.version()?;
+        let settings = self.meta_count("settings_changes")?;
         let tmp = dest.with_extension("cirth.tmp");
         if tmp.exists() {
             std::fs::remove_file(&tmp)?;
@@ -662,6 +682,7 @@ impl Store {
         {
             let pkg = Connection::open(&tmp)?;
             pkg.execute("UPDATE meta SET value = ?1 WHERE key = 'saved_version'", [version.to_string()])?;
+            pkg.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('settings_saved', ?1), ('settings_changes', ?1)", [settings.to_string()])?;
             pkg.execute("DELETE FROM meta WHERE key = 'opened_at'", [])?;
             let ok: String = pkg.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
             if ok != "ok" {
@@ -673,6 +694,7 @@ impl Store {
         crate::fsutil::replace_file(&tmp, dest)?;
         crash_point("package-replaced");
         Self::set_meta(&self.conn, "saved_version", &version.to_string())?;
+        Self::set_meta(&self.conn, "settings_saved", &settings.to_string())?;
         Ok(version)
     }
 

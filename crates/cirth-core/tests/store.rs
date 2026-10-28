@@ -399,6 +399,43 @@ fn title_page_is_stored_per_document_and_saved_with_the_package() {
 }
 
 #[test]
+fn project_notes_are_saved_with_the_package_and_touch_no_document() {
+    let d = tmpdir("notes");
+    let work = d.join("w.db");
+    let pkg = d.join("script.cirth");
+    let text = "Call Sam re: the lighthouse.
+Zoë's line in 12 → maybe cut?
+
+- ideas: 🌊 storm open";
+    let before;
+    {
+        let mut s = Store::open(&work).unwrap();
+        s.seed(&fixtures::unicode_marks().to_document().unwrap()).unwrap();
+        assert_eq!(s.project_notes().unwrap(), "", "empty until written");
+        before = (serde_json::to_string(&s.load().unwrap()).unwrap(), s.version().unwrap());
+        s.set_project_notes(text).unwrap();
+        assert_eq!((serde_json::to_string(&s.load().unwrap()).unwrap(), s.version().unwrap()), before, "the script and its history are untouched");
+        s.save_package(&pkg).unwrap();
+    }
+    cirth_core::store::remove_store_files(&work).unwrap();
+    let s = Store::open_package(&pkg, &work, None).unwrap().store;
+    assert_eq!(s.project_notes().unwrap(), text, "kept in the project file, Unicode and line breaks intact");
+    assert_eq!(serde_json::to_string(&s.load().unwrap()).unwrap(), before.0);
+    assert!(!s.has_unsaved_work().unwrap(), "a freshly opened package has nothing unsaved");
+
+    // Notes written after the last save, then a crash (the working store is
+    // left behind): reopening recovers them, as it recovers script edits.
+    s.set_project_notes("written after the save").unwrap();
+    assert!(s.has_unsaved_work().unwrap(), "a settings change counts as unsaved work");
+    drop(s);
+    let o = Store::open_package(&pkg, &work, None).unwrap();
+    assert!(o.recovered, "the working store is recovered, not replaced by the older file");
+    assert_eq!(o.store.project_notes().unwrap(), "written after the save");
+    o.store.save_package(&pkg).unwrap();
+    assert!(!o.store.has_unsaved_work().unwrap(), "saving clears it");
+}
+
+#[test]
 fn scene_numbers_lock_keep_through_edits_take_letters_and_omit() {
     let d = tmpdir("scenenumbers");
     let work = d.join("w.db");

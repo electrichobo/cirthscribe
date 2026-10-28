@@ -39,6 +39,7 @@ import { createFurnitureDialog } from "./furniture";
 import { createExportDialog, type ExportFormat } from "./exportdlg";
 import { createGoToDialog } from "./goto";
 import { createShortcutsDialog } from "./shortcuts";
+import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
@@ -326,13 +327,19 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   const t2 = performance.now();
   (window as any).__cirth.openTimings = { ipcAndStoreMs: t1 - t0, rustOpenMs: o.open_ms, buildAndFirstPaintMs: t2 - t1, totalMs: t2 - t0, blocks: o.doc.blocks.length };
   const notes: string[] = [];
-  if (o.recovered) notes.push(`Recovered unsaved work from the working store (v${o.doc.version}; the file was saved at v${o.saved_version}).`);
+  if (o.recovered)
+    notes.push(
+      o.doc.version > o.saved_version
+        ? `Recovered unsaved work from the working store (v${o.doc.version}; the file was saved at v${o.saved_version}).`
+        : "Recovered settings or notes changed after the last save (the script itself was saved).",
+    );
   if (o.import_notes?.length) notes.push(`Imported. ${o.import_notes.join(" ")}`);
   if (o.migrated_from) notes.push(`Upgraded this project from file format ${o.migrated_from} to the current format. The original file is kept unchanged at ${o.pre_migration_backup ?? "(no copy kept)"}; the project file is written in the new format at the next save.`);
   showBanner(notes.length ? notes.join(" ") : null);
   fileSavedVersion = o.saved_version;
   fileSavedAt = null;
   scheduleAutosave();
+  await notesPanel.load(true);
   lastOpen = o; // set last: tests treat it as "open finished"
   showFileStatus();
   rerenderSide();
@@ -399,10 +406,13 @@ function afterWrite(r: Saved) {
 }
 
 /** Flush pending edits, then write the project file. Throws on failure. */
+/** Notes typed in the last half second reach the store before any save. */
+let notesFlush: () => Promise<void> = async () => {};
 async function saveFile(explicit: boolean): Promise<void> {
   while (saving) await saving;
   saving = (async () => {
     await syncer.flush();
+    await notesFlush();
     afterWrite(await invoke<Saved>("save_package", { explicit }));
   })();
   try {
@@ -496,6 +506,7 @@ async function goHome() {
       return;
     }
     lastOpen = null;
+    await notesPanel.load(false);
     window.clearTimeout(pageTimer);
     window.clearInterval(autosaveTimer);
     showFileStatus();
@@ -575,6 +586,11 @@ const furniture = createFurnitureDialog(() => saveFile(false));
 const exportDialog = createExportDialog({ hasActiveRevision: () => !!revisions.state.active, run: (f) => exportAs(f) });
 const goTo = createGoToDialog({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], numbers: () => sceneNumbers });
 const shortcuts = createShortcutsDialog();
+const notesPanel = createNotesPanel($("notes"), { focusScript: () => view?.focus(), close: () => void togglePanel("notes") });
+notesFlush = () => notesPanel.flush();
+onPanelsChanged(() => {
+  if (currentPrefs().panels.notes) notesPanel.shown();
+});
 const revisions = createRevisions(() => view ?? null, () => {
   syncMenuChecks();
   void repaginate();
@@ -756,7 +772,7 @@ function inPanelNotField(t: EventTarget | null): boolean {
 function regions(): HTMLElement[] {
   const v = document.body.dataset.view;
   const q = (s: string) => document.querySelector<HTMLElement>(s);
-  const list = v === "home" ? [q(".home-side"), q(".home-main")] : v === "free" ? [q(".fw-side"), q(".fw-main")] : [q(".toolbar"), navEl, q(".editor-wrap"), boardEl];
+  const list = v === "home" ? [q(".home-side"), q(".home-main")] : v === "free" ? [q(".fw-side"), q(".fw-main")] : [q(".toolbar"), navEl, q(".editor-wrap"), $("notes"), boardEl];
   return list.filter((r): r is HTMLElement => !!r);
 }
 window.addEventListener(
@@ -1027,7 +1043,9 @@ async function runMenu(id: string): Promise<void> {
     case "view_board":
     case "view_toolbar":
     case "view_status":
-      await togglePanel(id.slice(5) as "nav" | "board" | "toolbar" | "status");
+    case "view_notes":
+      await togglePanel(id.slice(5) as "nav" | "board" | "toolbar" | "status" | "notes");
+      if (id === "view_notes" && currentPrefs().panels.notes && lastOpen) notesPanel.focus();
       break;
   }
 }
@@ -1279,6 +1297,7 @@ $("structural").addEventListener("change", (e) => {
   exportText,
   importFountain,
   importAny,
+  notes: notesPanel,
   importerFor,
   exportDialog,
   exportAs,

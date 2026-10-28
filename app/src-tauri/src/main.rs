@@ -982,6 +982,19 @@ async fn title_page(app: State<'_, App>) -> Result<cirth_core::title::TitlePage,
     with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))
 }
 
+/// The notes panel's text: saved with the project, tied to nothing else.
+#[tauri::command]
+async fn project_notes(app: State<'_, App>) -> Result<String, String> {
+    with_session(&app, |s| s.store.project_notes().map_err(err))
+}
+
+/// Store the notes in the working copy at once (so a crash keeps them); the
+/// next save, autosave or close writes them into the project file.
+#[tauri::command]
+async fn set_project_notes(app: State<'_, App>, text: String) -> Result<(), String> {
+    with_session(&app, |s| s.store.set_project_notes(&text).map_err(err))
+}
+
 /// Store the title page. Like the page size, the next save writes it into
 /// the project file; exports include it when it has a title.
 #[tauri::command]
@@ -1400,11 +1413,13 @@ struct Panels {
     board: bool,
     toolbar: bool,
     status: bool,
+    /// The notes panel; off until the writer opens it.
+    notes: bool,
 }
 
 impl Default for Panels {
     fn default() -> Self {
-        Panels { nav: true, board: true, toolbar: true, status: true }
+        Panels { nav: true, board: true, toolbar: true, status: true, notes: false }
     }
 }
 
@@ -1418,7 +1433,7 @@ impl Default for UiPrefs {
 /// toggles its mark natively; this puts it back in line with the setting).
 fn sync_view_checks(app: &tauri::AppHandle, prefs: &UiPrefs) {
     let p = &prefs.panels;
-    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status), ("view_typewriter", prefs.typewriter)];
+    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status), ("view_notes", p.notes), ("view_typewriter", prefs.typewriter)];
     let mut map: std::collections::HashMap<String, bool> = checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
     for f in SCREEN_FONTS {
         map.insert(format!("font_{f}"), prefs.editor_font == f);
@@ -1687,6 +1702,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
     let tools = SubmenuBuilder::new(app, "Tools")
         .item(&check_item(app, "view_nav", "Scene List", true)?)
         .item(&check_item(app, "view_board", "Board", true)?)
+        .item(&check_item(app, "view_notes", "Notes", false)?)
         .build()?;
     let appearance = SubmenuBuilder::new(app, "Appearance")
         .text("ui_larger", keyed("Larger Interface", "="))
@@ -1958,6 +1974,8 @@ fn main() {
             set_menu_checks,
             title_page,
             set_title_page,
+            project_notes,
+            set_project_notes,
             page_furniture,
             set_page_furniture,
             scene_numbers_command,

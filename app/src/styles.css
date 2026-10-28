@@ -84,6 +84,14 @@ body[data-layout="overlay"][data-float-nav]:not([data-focus]) #navigator { displ
 body[data-layout="overlay"][data-float-board]:not([data-focus]) #board { display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 340px; z-index: 15; box-shadow: -6px 0 18px rgba(0, 0, 0, .3); }
 body[data-hide-nav] { --nav-w: 0; }
 body[data-hide-board] { --board-w: 0; }
+/* Notes: a scratchpad floating over the script, moved by its title bar. */
+.notes-panel { position: absolute; z-index: 6; right: calc(var(--board-w, 320px) + 16px); top: 12px; width: 300px; height: 260px; min-width: 200px; min-height: 140px; resize: both; overflow: hidden; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, .22); }
+.notes-bar { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+.notes-grip { flex: 1; text-align: left; border: 0; background: none; padding: 5px 10px; font-weight: 600; cursor: move; touch-action: none; }
+.notes-close { border: 0; background: none; padding: 4px 10px; }
+#notes-text { flex: 1; resize: none; border: 0; padding: 8px 10px; background: var(--panel); color: var(--ink); font: 13px/1.45 system-ui, sans-serif; outline-offset: -2px; }
+.notes-state { position: absolute; right: 18px; bottom: 4px; font-size: 11px; color: var(--muted); pointer-events: none; }
+body[data-hide-notes] #notes { display: none; }
 body[data-hide-nav] #navigator, body[data-hide-board] #board, body[data-hide-toolbar] > .toolbar, body[data-hide-status] > footer { display: none; }
 .popup-menu { position: absolute; z-index: 20; min-width: 180px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .2); display: grid; }
 .popup-menu[hidden] { display: none; }
