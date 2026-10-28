@@ -46,6 +46,8 @@ interface Opened {
   work_path: string;
   package_path: string;
   open_ms: number;
+  /** What an import changed or could not keep. */
+  import_notes: string[];
 }
 interface Paginated {
   map: { doc_version: number; pages: unknown[]; page_starts: PageStart[]; warnings: string[]; profile: string };
@@ -300,6 +302,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   (window as any).__cirth.openTimings = { ipcAndStoreMs: t1 - t0, rustOpenMs: o.open_ms, buildAndFirstPaintMs: t2 - t1, totalMs: t2 - t0, blocks: o.doc.blocks.length };
   const notes: string[] = [];
   if (o.recovered) notes.push(`Recovered unsaved work from the working store (v${o.doc.version}; the file was saved at v${o.saved_version}).`);
+  if (o.import_notes?.length) notes.push(`Imported. ${o.import_notes.join(" ")}`);
   if (o.migrated_from) notes.push(`Upgraded this project from file format ${o.migrated_from} to the current format. The original file is kept unchanged at ${o.pre_migration_backup ?? "(no copy kept)"}; the project file is written in the new format at the next save.`);
   showBanner(notes.length ? notes.join(" ") : null);
   fileSavedVersion = o.saved_version;
@@ -796,6 +799,12 @@ async function runMenu(id: string): Promise<void> {
     case "export_pdf":
       if (lastOpen) await exportPdf();
       break;
+    case "import_fountain":
+      await importFountain();
+      break;
+    case "export_fountain":
+      await exportFountain();
+      break;
     case "export_txt":
       await exportText();
       break;
@@ -914,6 +923,29 @@ async function exportPdf() {
     showBanner(`PDF export failed: ${e}`);
   }
 }
+/** File > Import Fountain…: a new project from a .fountain file. */
+async function importFountain(path?: string): Promise<boolean> {
+  const source = path ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Fountain screenplay", extensions: ["fountain", "spmd", "txt"] }] }));
+  if (!source || Array.isArray(source)) return false;
+  return openWith("import_fountain", { path: source });
+}
+
+/** File > Export > Fountain…: the script and title page as Fountain text. */
+async function exportFountain(path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".fountain"), filters: [{ name: "Fountain screenplay", extensions: ["fountain"] }] }));
+  if (!target) return false;
+  await syncer.flush();
+  try {
+    const r = await invoke<{ path: string; notes: string[] }>("export_fountain", { path: target });
+    showBanner(`Fountain written: ${r.path}. ${r.notes.join(" ")}`);
+    return true;
+  } catch (e) {
+    showBanner(`Fountain export failed: ${e}`);
+    return false;
+  }
+}
+
 /** Plain text with the PDF's line breaks and pages (cirth_core::txt). */
 async function exportText(path?: string): Promise<boolean> {
   if (!lastOpen) return false;
@@ -944,6 +976,8 @@ $("structural").addEventListener("change", (e) => {
   prefs: currentPrefs,
   regions,
   exportText,
+  importFountain,
+  exportFountain,
   exportPdf,
   get view() {
     return view;

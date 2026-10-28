@@ -27,7 +27,17 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - Exports: PDF and TXT.
    - Acceptance: D1 (title page).
    - Why first: it is small, it is needed by every export format below, and it touches the schema once.
-2. **Fountain import and export** (plain-text screenplay interchange). It needs no dependency, is easy to inspect, and gives a real round-trip test of the model, dual dialogue included (`^`). It also covers "bring an existing script in" before FDX.
+2. **Fountain import and export** (plain-text screenplay interchange). **Built 2026-10-27** (`cirth_core::fountain`, no dependency):
+   - **Export** (File > Export > Fountain…):
+     - writes every block type, emphasis, dual dialogue (`^`), page breaks and the title page;
+     - forces (`!`, `@`, `.`, `>`) whatever plain rules would misread;
+     - reports that shots become action and that colour and highlight are left out.
+   - **Import** (File > Import Fountain…, creating a new library project):
+     - reads the title page, headings, action, cues, dual dialogue, parentheticals, dialogue, lyrics, transitions, sections, page breaks and emphasis;
+     - keeps notes and boneyard as visible text;
+     - reports joined line breaks, centred text, synopses and removed scene numbers.
+   - Tests: three fixtures round-trip with identical blocks and title page; a hand-written file covers the spec features; forcing rules; e2e import, Home, export and re-import.
+   - Not yet: Fountain's own scene numbers (step 4); line breaks inside a paragraph (blocks hold none). It needs no dependency, is easy to inspect, and gives a real round-trip test of the model, dual dialogue included (`^`). It also covers "bring an existing script in" before FDX.
 3. **FDX export and import** (Final Draft XML). This is the interchange priority in INTEROPERABILITY.md.
    - Covers paragraph types, emphasis, dual dialogue, the title page, and scene numbers once they exist.
    - Unknown elements are kept as text where possible and always listed in the import report.

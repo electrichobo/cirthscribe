@@ -2079,6 +2079,39 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(readFileSync(out, "utf8").split("\f").length === pages, "no title page without a title");
   });
 
+  await test("Fountain: import a .fountain file as a new project (with report), export it back, and the round trip keeps the script", async () => {
+    const src = join(dataDir, "salt and iron.fountain");
+    writeFileSync(src, "Title: SALT AND IRON\nCredit: Written by\nAuthor: Jared Hoy\nDraft date: 1 May 2026\n\nINT. FORGE - NIGHT #12#\n\nSparks fly. *Somewhere* a bell rings.\n\nMARA\n(quietly)\nHand me the **tongs**.\n\nBRAM ^\nNo.\n\nCUT TO:\n\n===\n\nEXT. QUAY - DAWN\n\nThe tide is out.\n");
+    await app.evaluate(`__cirth.importFountain(${JSON.stringify(src)})`);
+    await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.doc.title === 'SALT AND IRON'", "imported project open");
+    const b = await blocks();
+    assert(b.map((x) => x.kind).join() === "heading,action,character,parenthetical,dialogue,character,dialogue,transition,heading,action", `kinds: ${b.map((x) => x.kind)}`);
+    assert(text(b[0]) === "INT. FORGE - NIGHT" && b[2].kind === "character" && b[5].dual === true && b[8].break_before === true, `structure: ${JSON.stringify(b.map((x) => [x.kind, text(x), x.dual, x.break_before]))}`);
+    assert(b[1].runs.some((r) => r.italic && r.text === "Somewhere") && b[4].runs.some((r) => r.bold && r.text === "tongs"), "emphasis imported");
+    const banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(banner.includes("Imported") && banner.includes("12"), `import report shown: ${banner}`);
+    const tp = await app.evaluate("window.__TAURI_INTERNALS__.invoke('title_page')");
+    assert(tp.title === "SALT AND IRON" && tp.authors === "Jared Hoy" && tp.draft_date === "1 May 2026", `title page imported: ${JSON.stringify(tp)}`);
+    assert(await storedMatchesEditor(), "stored equals editor");
+    // It is a normal library project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    assert(await app.evaluate("[...document.querySelectorAll('#home [data-project]')].some(e => e.dataset.project === 'salt-and-iron')"), "listed on Home");
+    await clickHome(app, '[data-project="salt-and-iron"]');
+    await waitOpen(app);
+    // Export and re-import: same script.
+    const out = join(dataDir, "salt export.fountain");
+    assert(await app.evaluate(`__cirth.exportFountain(${JSON.stringify(out)})`), "exported");
+    const exported = readFileSync(out, "utf8");
+    assert(exported.startsWith("Title: SALT AND IRON\n") && exported.includes("\nBRAM ^\n") && exported.includes("\n===\n") && exported.includes("*Somewhere*"), `Fountain text: ${exported.slice(0, 400)}`);
+    assert((await app.evaluate("document.getElementById('banner').textContent")).includes("Fountain written"), "export reported");
+    const shapeOf = (bs) => JSON.stringify(bs.map((x) => [x.kind, x.runs.filter((r) => r.text).map((r) => [r.text, !!r.bold, !!r.italic, !!r.underline]), !!x.dual, !!x.break_before]));
+    const before = shapeOf(await blocks());
+    await app.evaluate(`__cirth.importFountain(${JSON.stringify(out)})`);
+    await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.name === 'salt-and-iron-2'", "re-imported as a second project");
+    assert(shapeOf(await blocks()) === before, "round trip keeps every block, type and emphasis");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

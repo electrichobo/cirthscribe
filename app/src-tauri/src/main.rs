@@ -60,6 +60,9 @@ struct Opened {
     work_path: String,
     package_path: String,
     open_ms: f64,
+    /// What an import changed or could not keep (shown after opening).
+    #[serde(default)]
+    import_notes: Vec<String>,
 }
 
 fn fixture_source(name: &str) -> Result<&'static str, String> {
@@ -202,6 +205,7 @@ fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migratio
         beats: s.store.beats().map_err(err)?,
         recovered,
         migrated_from,
+        import_notes: Vec::new(),
         pre_migration_backup: pre_migration_backup.map(|p| p.display().to_string()),
         saved_version: s.store.saved_version().map_err(err)?,
         work_path: s.store.path().display().to_string(),
@@ -297,15 +301,63 @@ fn slug(title: &str) -> String {
 async fn create_project(app: State<'_, App>, title: String) -> Result<Opened, String> {
     let t0 = Instant::now();
     let title = if title.trim().is_empty() { "Untitled".to_string() } else { title.trim().to_string() };
-    let base = slug(&title);
+    let name = unused_library_name(&app, &title);
+    let doc = Document { title, version: 0, blocks: vec![cirth_core::model::Block::new(cirth_core::model::BlockKind::Heading, "")] };
+    start_new(&app, library_path(&app, &name), &doc, &[], t0)
+}
+
+/// A library file name for `title` that no project or sample uses yet.
+fn unused_library_name(app: &App, title: &str) -> String {
+    let base = slug(title);
     let mut name = base.clone();
     let mut n = 2;
-    while library_path(&app, &name).exists() || SAMPLES.contains(&name.as_str()) {
+    while library_path(app, &name).exists() || SAMPLES.contains(&name.as_str()) {
         name = format!("{base}-{n}");
         n += 1;
     }
-    let doc = Document { title, version: 0, blocks: vec![cirth_core::model::Block::new(cirth_core::model::BlockKind::Heading, "")] };
-    start_new(&app, library_path(&app, &name), &doc, &[], t0)
+    name
+}
+
+/// File > Import Fountain…: a new library project from a .fountain file
+/// (the file itself is only read). The import report comes back with it.
+#[tauri::command]
+async fn import_fountain(app: State<'_, App>, path: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let bytes = std::fs::read(&path).map_err(io_err)?;
+    let text = String::from_utf8(bytes).map_err(|_| "This file is not UTF-8 text. Save it as UTF-8 in your editor and try again.".to_string())?;
+    let stem = Path::new(&path).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Imported".into());
+    let r = cirth_core::fountain::import(&text, &stem);
+    let name = unused_library_name(&app, &r.document.title);
+    let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
+    if !r.title_page.is_empty() {
+        with_session(&app, |s| {
+            let doc = s.store.default_document().map_err(err)?;
+            s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            s.store.save_package(&s.package).map_err(err)?;
+            Ok(())
+        })?;
+    }
+    out.import_notes = r.notes;
+    Ok(out)
+}
+
+#[derive(Serialize)]
+struct FountainExported {
+    path: String,
+    notes: Vec<String>,
+}
+
+/// File > Export > Fountain…: the current document and its title page.
+#[tauri::command]
+async fn export_fountain(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
+    let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
+    let out = cirth_core::fountain::export(&doc.blocks, &tp);
+    let target = normalize(Path::new(&path));
+    let tmp = target.with_extension("fountain.tmp");
+    std::fs::write(&tmp, &out.text).map_err(io_err)?;
+    cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
+    Ok(FountainExported { path: target.display().to_string(), notes: out.notes })
 }
 
 /// Release the project (and its lock). The UI saves before closing.
@@ -1245,10 +1297,11 @@ fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Resul
 
 fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF (proof)").text("export_txt", "Plain Text…").build()?;
+    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF (proof)").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").build()?;
     let file = SubmenuBuilder::new(app, "File")
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
+        .text("import_fountain", "Import Fountain…")
         .separator()
         .text("save", keyed("Save", "S"))
         .text("save_as", keyed("Save As…", "Shift+S"))
@@ -1509,6 +1562,8 @@ fn main() {
             set_menu_checks,
             title_page,
             set_title_page,
+            import_fountain,
+            export_fountain,
             menu_items,
             document_profile,
             set_document_profile,

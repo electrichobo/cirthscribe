@@ -71,7 +71,7 @@ Done:
 ### 🔨 Stage 2: Professional pages and file exchange (in progress)
 
 - [x] Title page (PDF and text export)
-- [ ] Fountain import and export
+- [x] Fountain import and export, with a report of anything that changed
 - [ ] Final production-quality PDF
 - [ ] Scene numbers, revision colours, locked pages (A/B pages)
 - [ ] Import and export Final Draft (FDX), Word (DOCX), RTF, HTML and text, each with a report of what carried over (including dual dialogue)
