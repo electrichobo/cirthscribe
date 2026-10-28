@@ -95,6 +95,15 @@ export const schema = new Schema({
       parseDOM: [{ tag: "mark[data-highlight]", getAttrs: (el) => ({ value: (el as HTMLElement).dataset.highlight }) }],
       toDOM: (m) => ["mark", { "data-highlight": m.attrs.value, class: `hl hl-${m.attrs.value}` }, 0],
     },
+    // Text added or changed in a revision set (revisions.ts), by set id.
+    // Not inclusive: typing next to revised text outside revision mode is
+    // not revised. No parseDOM: pasted text is only revised if revision
+    // mode tags it.
+    revision: {
+      attrs: { set: {} },
+      inclusive: false,
+      toDOM: (m) => ["span", { "data-rev": m.attrs.set, class: "rev" }, 0],
+    },
   },
 });
 
@@ -110,6 +119,8 @@ export interface Run {
   underline?: boolean;
   color?: string;
   highlight?: string;
+  /** Revision set id (revisions.ts). */
+  revision?: string;
 }
 export interface Block {
   id: string;
@@ -141,6 +152,8 @@ export function nodeToBlock(n: PMNode): Block {
     if (color) r.color = color.attrs.value;
     const hl = t.marks.find((m) => m.type.name === "highlight");
     if (hl) r.highlight = hl.attrs.value;
+    const rev = t.marks.find((m) => m.type.name === "revision");
+    if (rev) r.revision = rev.attrs.set;
     runs.push(r);
   });
   if (runs.length === 0) runs.push({ text: "" });
@@ -161,6 +174,7 @@ export function blockToNode(b: Block): PMNode {
       if (r.underline) marks.push(schema.marks.underline.create());
       if (r.color) marks.push(schema.marks.color.create({ value: r.color }));
       if (r.highlight) marks.push(schema.marks.highlight.create({ value: r.highlight }));
+      if (r.revision) marks.push(schema.marks.revision.create({ set: r.revision }));
       return schema.text(r.text, marks);
     });
   return schema.nodes.block.create(

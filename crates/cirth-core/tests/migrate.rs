@@ -314,3 +314,27 @@ fn opening_a_v3_project_adds_scene_numbers_unlocked() {
         assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
     }
 }
+
+#[test]
+fn opening_a_v4_project_adds_revision_sets_with_none_active() {
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v4-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v4-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 4, "fixture must be schema v4");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(4));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v4 copy kept");
+        let s = o.store;
+        let main = s.default_document().unwrap();
+        let before = s.load().unwrap();
+        assert!(s.revision_sets(&main).unwrap().is_empty() && s.active_revision(&main).unwrap().is_none() && !s.revision_mode(&main).unwrap());
+        assert!(!cirth_core::revisions::any(&before.blocks), "no text is tagged");
+        let set = cirth_core::revisions::RevisionSet { id: "r1".into(), label: "Blue Revision".into(), colour: "blue".into(), ..Default::default() };
+        s.put_revision_set(&main, &set).unwrap();
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}

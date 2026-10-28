@@ -62,5 +62,30 @@ fn numbered_script_with_an_omitted_scene_header_and_footer() {
         numbers.insert(id.clone(), SceneNumber { scene_id: id, number: (i + 1).to_string(), omitted: i == 2 });
     }
     let map = paginate_numbered(&doc.blocks, &p, 0, &numbers);
-    check("page-boundaries-numbered-letter", &txt::render_document(&map, &p, None, "PAGE BOUNDARIES - Blue Revision", "Confidential").text);
+    check("page-boundaries-numbered-letter", &txt::render_document(&map, &p, None, "PAGE BOUNDARIES - Blue Revision", "Confidential", "").text);
+}
+
+#[test]
+fn revised_dialogue_marks_its_lines_and_the_changed_pages_print_alone() {
+    let mut doc = fixture("page-boundaries.json");
+    let p = Profile::us_letter();
+    // Revise the second dialogue block: its middle words go into the Blue set.
+    let i = doc.blocks.iter().enumerate().filter(|(_, b)| b.kind == cirth_core::model::BlockKind::Dialogue).nth(1).map(|(i, _)| i).unwrap();
+    let text = doc.blocks[i].text();
+    let words: Vec<&str> = text.split(' ').collect();
+    let (a, rest) = words.split_at(words.len() / 3);
+    let (b, c) = rest.split_at(3.min(rest.len()));
+    let plain = |t: String| cirth_core::model::Run::plain(t);
+    doc.blocks[i].runs = vec![
+        plain(format!("{} ", a.join(" "))),
+        cirth_core::model::Run { revision: Some("blue".into()), ..plain(format!("{} ", b.join(" "))) },
+        plain(c.join(" ")),
+    ];
+    let set = cirth_core::revisions::RevisionSet { id: "blue".into(), label: "Blue Revision".into(), colour: "blue".into(), date: "2026-10-27".into(), mark: "*".into(), author: String::new() };
+    let mut map = paginate(&doc.blocks, &p, 0);
+    assert_eq!(cirth_core::revisions::mark_pages(&mut map, &doc.blocks, &set), 1);
+    let header = cirth_core::revisions::header(&set);
+    check("page-boundaries-revised-letter", &txt::render_document(&map, &p, None, "", "", &header).text);
+    map.pages.retain(|pg| pg.revised);
+    check("page-boundaries-revised-changed-pages-letter", &txt::render_document(&map, &p, None, "", "", &header).text);
 }

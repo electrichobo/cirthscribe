@@ -85,7 +85,15 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - scene numbers in both margins;
    - the "draft proof" label dropped once acceptance D1, D2 and D7 pass on all three OSes;
    - repeatable output (fixed metadata), so tests can compare files.
-6. **Revision sets:**
+6. **Revision sets.** **Built 2026-10-27** (`cirth_core::revisions`; schema v5 table `revision_sets`; tested against frozen v4 files):
+   - Format > Revisions > Revision Sets…: sets with label, paper colour, date and margin mark, in the usual colour order (Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, White, then "Double Blue" and so on). One set is active. A set that still marks text cannot be deleted.
+   - Format > Revisions > Revision Mode: changed text is tagged with the active set (`Run::revision`, a mark on the text). The tag is added in the same editor transaction as the change, so undo removes both. A change is found by comparing each block with its previous version by stable id, on text plus printed formatting. A deletion tags the character where it happened. A block whose kind, dual setting or page break changed is tagged whole. Colour and highlight (screen only) never count; undo and redo are never tagged.
+   - Printing: every line holding the active set's text gets the set's mark in the right margin (7.9 in). Those pages get the set's label and date before the page number. File > Export > Changed Pages (PDF)… prints only those pages, keeping their script page numbers (D6). Earlier sets' tags stay in the script but do not print while another set is active.
+   - On screen: the active set's text is underlined in its colour, and its blocks show the mark in the margin; the status bar names the set. Colour is never the only sign.
+   - Format > Revisions > Clear Marks of This Set… asks first and can be undone.
+   - Fountain and FDX exports write the revised text without marks and say so in their reports. FDX revision sets are a later step if needed.
+   - Not yet: marking scene moves made from the board or scene list (text that is moved, not edited, is not tagged); A/B pages (step 7). Tests: core (colour order, line marks, changed pages, store, v4→v5 migration), a golden text file of a revised dialogue page and the changed page alone, and an e2e flow on both drivers.
+   Original plan:
    - named sets with date and colour (colour never the only identifier);
    - a revision mode that marks changed lines (asterisk in the margin);
    - a changed-pages export (D6).

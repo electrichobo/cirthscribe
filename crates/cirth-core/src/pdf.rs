@@ -45,6 +45,8 @@ pub struct PdfOptions {
     pub header: String,
     /// Printed centred at the bottom from page 2.
     pub footer: String,
+    /// Printed before the page number on pages flagged `revised`.
+    pub revision_header: String,
 }
 
 /// Replace {title}, {draft} and {date} with the title page's values.
@@ -96,10 +98,17 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
     for page in &map.pages {
         let (pi, li) = next_page();
         let layer = doc.get_page(pi).get_layer(li);
+        let top = mm(p.page_h_in - 0.5 - 0.8 * line_in);
+        let rev = opts.revision_header.trim();
+        if page.revised && !rev.is_empty() {
+            // Ends four characters before the page number (or at its place on page 1).
+            let number_w = if page.number > 1 { (format!("{}.", page.number).chars().count() + 4) as f32 * char_in } else { 0.0 };
+            let w = unicode_width::UnicodeWidthStr::width(rev) as f32 * char_in;
+            layer.use_text(rev, p.font_pt, mm(p.page_w_in - 1.0 - number_w - w), top, &fonts[0]);
+        }
         if page.number > 1 {
             let label = format!("{}.", page.number);
             let x = p.page_w_in - 1.0 - label.chars().count() as f32 * char_in;
-            let top = mm(p.page_h_in - 0.5 - 0.8 * line_in);
             layer.use_text(label, p.font_pt, mm(x), top, &fonts[0]);
             if !opts.header.trim().is_empty() {
                 layer.use_text(opts.header.trim(), p.font_pt, mm(p.action.left_in), top, &fonts[0]);

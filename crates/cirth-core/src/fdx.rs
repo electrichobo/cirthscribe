@@ -164,6 +164,9 @@ pub fn export(blocks: &[Block], title_page: &TitlePage, numbers: &crate::numberi
     if omitted > 0 {
         notes.push(format!("{omitted} omitted scene{} written with their text and number (not marked omitted in the file).", plural(omitted)));
     }
+    if crate::revisions::any(blocks) {
+        notes.push("Revision marks left out: this export does not write Final Draft revision sets yet. The revised text itself is written.".into());
+    }
     notes.push("Final Draft lays out its own pages; page breaks you forced are kept. Not yet checked against Final Draft itself.".into());
     Exported { text: out, notes }
 }
@@ -261,7 +264,7 @@ pub fn import(source: &str, fallback_title: &str) -> Result<Imported, String> {
                     // Entity references arrive separately as GeneralRef events.
                     let text = t.xml_content(XmlVersion::Implicit1_0).replace(['\n', '\r', '\t'], " ");
                     let has = |s: &str| style.split('+').any(|x| x.trim().eq_ignore_ascii_case(s));
-                    p.runs.push(Run { text, bold: has("Bold"), italic: has("Italic"), underline: has("Underline"), color: None, highlight: None });
+                    p.runs.push(Run { text, bold: has("Bold"), italic: has("Italic"), underline: has("Underline"), color: None, highlight: None, revision: None });
                 }
             }
             Event::GeneralRef(r) => {
@@ -279,7 +282,7 @@ pub fn import(source: &str, fallback_title: &str) -> Result<Imported, String> {
                         }
                     };
                     let has = |s: &str| style.split('+').any(|x| x.trim().eq_ignore_ascii_case(s));
-                    p.runs.push(Run { text: ch, bold: has("Bold"), italic: has("Italic"), underline: has("Underline"), color: None, highlight: None });
+                    p.runs.push(Run { text: ch, bold: has("Bold"), italic: has("Italic"), underline: has("Underline"), color: None, highlight: None, revision: None });
                 }
             }
             Event::End(e) => {

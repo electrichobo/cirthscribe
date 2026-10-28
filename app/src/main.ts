@@ -36,6 +36,7 @@ import { icon, iconButton, iconSelect } from "./icons";
 import { createLayoutMode } from "./layout-mode";
 import { createTitlePageDialog } from "./titlepage";
 import { createFurnitureDialog } from "./furniture";
+import { createRevisions, revisionsPlugin } from "./revisions";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -248,6 +249,7 @@ function makeState(blocks: Block[]) {
       findPlugin(),
       spellPlugin(),
       dualPlugin(),
+      revisionsPlugin(),
     ],
   });
 }
@@ -302,6 +304,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   // Ids may have been repaired on load (should not happen for store data).
   syncer = new Syncer(view.state.doc, o.doc.version);
   syncer.onStatus = setStatus;
+  await revisions.refresh().catch(() => undefined);
   syncer.onAck = () => {
     schedulePaginate();
     scheduleCounts(true);
@@ -504,7 +507,7 @@ function syncMenuChecks() {
   const page = ($("profile") as HTMLSelectElement).value;
   const lang = ($("spelling") as HTMLSelectElement).value;
   void invoke("set_menu_checks", {
-    checks: { page_letter: page === "letter", page_a4: page === "a4", spell_en_US: lang === "en_US", spell_en_GB: lang === "en_GB", spell_off: lang === "off" },
+    checks: { revision_mode: revisions.state.mode, page_letter: page === "letter", page_a4: page === "a4", spell_en_US: lang === "en_US", spell_en_GB: lang === "en_GB", spell_off: lang === "off" },
   }).catch(() => undefined);
 }
 
@@ -561,6 +564,11 @@ const about = createAbout();
 // (as a page-size change does) instead of waiting for autosave.
 const titlePage = createTitlePageDialog(() => saveFile(false));
 const furniture = createFurnitureDialog(() => saveFile(false));
+const revisions = createRevisions(() => view ?? null, () => {
+  syncMenuChecks();
+  void repaginate();
+  void saveFile(false).catch(() => undefined);
+});
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
 // Screen font and size: on screen only (pages and exports keep Courier Prime 12 pt).
 {
@@ -816,6 +824,19 @@ async function runMenu(id: string): Promise<void> {
     case "export_pdf":
       await exportPdf();
       break;
+    case "export_changed_pdf":
+      await exportPdf(undefined, true);
+      break;
+    case "revision_mode":
+      if (lastOpen) await revisions.setMode(!revisions.state.mode);
+      syncMenuChecks();
+      break;
+    case "revision_sets":
+      if (lastOpen) await revisions.open();
+      break;
+    case "revision_clear":
+      if (lastOpen) await revisions.clearActive();
+      break;
     case "import_fountain":
       await importFountain();
       break;
@@ -947,16 +968,19 @@ void loadPrefs();
 $("save").addEventListener("click", () => void saveNow());
 /** PDF proof from the canonical store (File > Export > PDF). */
 /** File > Export > PDF…: asks where to save (a path skips the dialog). */
-async function exportPdf(path?: string): Promise<boolean> {
+/** File > Export > PDF… (or Changed Pages (PDF)…: only the pages with the active revision set's changes). */
+async function exportPdf(path?: string, changedOnly = false): Promise<boolean> {
   if (!lastOpen) return false;
-  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".pdf"), filters: [{ name: "PDF", extensions: ["pdf"] }] }));
+  const suffix = changedOnly ? "-changed-pages.pdf" : ".pdf";
+  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, suffix), filters: [{ name: "PDF", extensions: ["pdf"] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
-    const r = await invoke<{ path: string; pages: number; doc_version: number; layout_ms: number; pdf_ms: number; missing_glyphs: string[] }>("export_pdf", { profileName: ($("profile") as HTMLSelectElement).value, path: target });
+    const r = await invoke<{ path: string; pages: number; doc_version: number; layout_ms: number; pdf_ms: number; missing_glyphs: string[]; page_numbers: number[] }>("export_pdf", { profileName: ($("profile") as HTMLSelectElement).value, path: target, changedOnly });
     const glyphs = r.missing_glyphs.length ? ` The font has no ${r.missing_glyphs.join(" ")}, so those characters may not print.` : "";
+    const pages = changedOnly ? `changed page${r.pages === 1 ? "" : "s"} ${r.page_numbers.join(", ")}` : `${r.pages} pages`;
     // Honest until MANUAL_CHECKS N25 compares the margins with an industry reference.
-    showBanner(`PDF written: ${r.path} · ${r.pages} pages from v${r.doc_version}.${glyphs} Page measurements follow published guidance and have not yet been checked against an industry PDF.`);
+    showBanner(`PDF written: ${r.path} · ${pages} from v${r.doc_version}.${glyphs} Page measurements follow published guidance and have not yet been checked against an industry PDF.`);
     return true;
   } catch (e) {
     showBanner(`PDF export failed: ${e}`);
@@ -1045,13 +1069,13 @@ async function exportFdx(path?: string): Promise<boolean> {
 }
 
 /** Plain text with the PDF's line breaks and pages (cirth_core::txt). */
-async function exportText(path?: string): Promise<boolean> {
+async function exportText(path?: string, changedOnly = false): Promise<boolean> {
   if (!lastOpen) return false;
   const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".txt"), filters: [{ name: "Plain text", extensions: ["txt"] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
-    const r = await invoke<{ path: string; pages: number; doc_version: number; profile: string; notes: string[] }>("export_txt", { path: target });
+    const r = await invoke<{ path: string; pages: number; doc_version: number; profile: string; notes: string[] }>("export_txt", { path: target, changedOnly });
     showBanner(`Plain text written: ${r.path} · ${r.pages} pages (${r.profile === "a4" ? "A4" : "US Letter"}) from v${r.doc_version}. ${r.notes.join(" ")}`);
     return true;
   } catch (e) {
@@ -1098,6 +1122,7 @@ $("structural").addEventListener("change", (e) => {
   layoutMode,
   titlePage,
   furniture,
+  revisions,
   selSync,
   blocks: () => {
     const out: Block[] = [];

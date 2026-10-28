@@ -1748,7 +1748,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!missing.length, `missing menu items: ${missing}`);
     const editNative = items.filter((i) => i.path.startsWith("Edit > ") && !want.includes(i.id));
     assert(editNative.length >= 4, `Edit has the OS's Cut, Copy, Paste and Select All: ${editNative.map((i) => i.path)}`);
-    assert(items.some((i) => i.path === "File > Export > PDF…") && items.some((i) => i.path.startsWith("Format > Block Type > Dialogue (")), "nested Export and Block Type menus");
+    assert(items.some((i) => i.path === "File > Export > PDF…") && items.some((i) => i.path.startsWith("Format > Block Type > Dialogue (")), `nested Export and Block Type menus: ${items.filter((i) => /Export |Block Type > D/.test(i.path)).map((i) => i.path)}`);
     const checked = (id) => items.find((i) => i.id === id)?.checked;
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'page_letter').checked && !m.find(i => i.id === 'page_a4').checked && m.find(i => i.id === 'spell_en_US').checked)", "check marks match this document on open");
 
@@ -2221,6 +2221,88 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "asked again");
     await app.evaluate("(() => { document.getElementById('confirm-ok').click(); return true; })()");
     await waitFor(app, "document.querySelectorAll('#navigator .nav-go .num').length === 0 && document.querySelectorAll('.ProseMirror .scene-num').length === 0", "numbers removed after unlocking");
+  });
+
+  await test("Revision sets: revision mode marks changed text (undo removes it); changed pages print alone with label, date and marks; sets kept; a new set takes over; clearing marks asks first", async () => {
+    await openFixture("page-boundaries");
+    const rev = (expr) => app.evaluate(`(() => { const r = __cirth.revisions.state; return ${expr}; })()`);
+    const revSpans = (set) => app.evaluate(`[...document.querySelectorAll('.ProseMirror .rev${set ? `[data-rev="${set}"]` : ""}')].map(e => e.textContent).join('|')`);
+    await app.evaluate("__cirth.menu('revision_sets')");
+    await waitFor(app, "document.getElementById('revisions-dialog')?.open === true", "Revision Sets dialog open");
+    await audit("revision sets dialog");
+    await app.evaluate("(() => { document.getElementById('rev-add').click(); return true; })()");
+    await waitFor(app, "__cirth.revisions.state.sets.length === 1 && __cirth.revisions.state.active === __cirth.revisions.state.sets[0].id", "first set added and active");
+    assert((await rev("r.sets[0].label + '/' + r.sets[0].colour")) === "Blue Revision/blue", "the first set is Blue");
+    const blue = await rev("r.active");
+    await app.evaluate("(() => { document.getElementById('rev-close').click(); return true; })()");
+    // Nothing changed yet: no changed pages to print.
+    const changed = join(dataDir, "changed.txt");
+    assert(!(await app.evaluate(`__cirth.exportText(${JSON.stringify(changed)}, true)`)), "changed pages refused without changes");
+    assert(/No page has changes in Blue Revision/.test(await app.evaluate("document.getElementById('banner').textContent")), "says why");
+    // Revision mode on: typed text is marked, and undo takes the mark with the text.
+    await app.evaluate("__cirth.menu('revision_mode')");
+    await waitFor(app, "__cirth.revisions.state.mode === true", "revision mode on");
+    assert(/Revising: Blue Revision/.test(await app.evaluate("document.getElementById('revision-status').textContent")), "status bar names the set (not colour alone)");
+    const b0 = await blocks();
+    const dlg = b0.findIndex((b, i) => b.kind === "dialogue" && i > 3);
+    await caretAtEndOf(dlg);
+    await typeText(" Count it again.");
+    await waitSynced();
+    assert((await revSpans(blue)).includes("Count it again."), `typed text marked: ${await revSpans(blue)}`);
+    assert(await app.evaluate(`document.querySelectorAll('.ProseMirror p.revised[data-rev-mark="*"]').length === 1`), "the block shows the mark in the margin");
+    assert((await blocks())[dlg].runs.some((r) => r.revision === blue && r.text.includes("again")), "the run carries the set id");
+    for (let i = 0; i < 20 && (await revSpans()); i++) await press("z", [MOD_KEY]);
+    await waitSynced();
+    assert(!(await revSpans()) && text((await blocks())[dlg]) === text(b0[dlg]), "undo removes the text and its mark");
+    // A deletion marks where it happened.
+    await caretAtEndOf(dlg);
+    await press("Backspace");
+    await typeText(" Count it again.");
+    await waitSynced();
+    assert((await revSpans(blue)).length > 0, "deletion and typing marked");
+    // Text export: the changed page alone, with the set's header and line marks.
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(changed)}, true)`), "changed pages exported");
+    const ch = readFileSync(changed, "utf8");
+    const today = await rev("r.sets[0].date");
+    assert(ch.split("\f").length === 1, `one changed page: ${ch.split("\f").length}`);
+    assert(new RegExp(`Blue Revision \\(${today}\\)`).test(ch), `revision header: ${ch.slice(0, 200)}`);
+    assert(ch.split("\n").some((l) => l.includes("again") && / \*$/.test(l)), `a mark beside the changed line: ${ch}`);
+    const full = join(dataDir, "full.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(full)})`), "full export");
+    const fullTxt = readFileSync(full, "utf8");
+    assert((fullTxt.match(/\*$/gm) ?? []).length === (ch.match(/\*$/gm) ?? []).length, "the full script carries the same marks");
+    // Revision mode off: typing is not marked.
+    await app.evaluate("__cirth.menu('revision_mode')");
+    await waitFor(app, "__cirth.revisions.state.mode === false", "revision mode off");
+    await caretAtEndOf(1);
+    await typeText(" Plain words.");
+    await waitSynced();
+    assert(!(await revSpans()).includes("Plain words."), "unmarked outside revision mode");
+    // Kept in the project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `__cirth.revisions.state.active === ${JSON.stringify(blue)}`, "set kept after reopening");
+    assert((await revSpans(blue)).includes("again."), "marks kept after reopening");
+    // A second set takes over: Blue's marks no longer print.
+    await app.evaluate("__cirth.menu('revision_sets')");
+    await waitFor(app, "document.getElementById('revisions-dialog')?.open === true", "dialog again");
+    await app.evaluate("(() => { document.getElementById('rev-add').click(); return true; })()");
+    await waitFor(app, "__cirth.revisions.state.sets.length === 2 && __cirth.revisions.state.sets[1].label === 'Pink Revision' && __cirth.revisions.state.active === __cirth.revisions.state.sets[1].id", "Pink added and active");
+    assert(!(await app.evaluate(`__cirth.exportText(${JSON.stringify(changed)}, true)`)), "no Pink changes yet");
+    assert(await app.evaluate(`document.querySelector('#revisions-dialog tr[data-id="${blue}"] .rev-delete').disabled`), "a set that marks text cannot be deleted");
+    // Back to Blue, clear its marks (asks first), then it can be deleted.
+    await app.evaluate(`(() => { const r = document.querySelector('#revisions-dialog tr[data-id="${blue}"] input[type=radio]'); r.click(); return true; })()`);
+    await waitFor(app, `__cirth.revisions.state.active === ${JSON.stringify(blue)}`, "Blue active again");
+    await app.evaluate("(() => { document.getElementById('rev-close').click(); return true; })()");
+    await app.evaluate("(__cirth.menu('revision_clear'), true)"); // not awaited in the page: WebDriver runs one script at a time
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "clearing asks first");
+    await app.evaluate("(() => { document.getElementById('confirm-ok').click(); return true; })()");
+    await waitFor(app, `!document.querySelector('.ProseMirror .rev[data-rev="${blue}"]')`, "Blue marks cleared");
+    await waitSynced();
+    await app.evaluate("__cirth.menu('revision_sets')");
+    await waitFor(app, `document.getElementById('revisions-dialog')?.open === true && !document.querySelector('#revisions-dialog tr[data-id="${blue}"] .rev-delete').disabled`, "deletable once unused");
+    await app.evaluate("(() => { document.getElementById('rev-close').click(); return true; })()");
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {

@@ -442,3 +442,34 @@ fn scene_numbers_lock_keep_through_edits_take_letters_and_omit() {
     s.unlock_scene_numbers(&main).unwrap();
     assert!(!s.scene_numbers_locked(&main).unwrap() && s.scene_numbers(&main).unwrap().is_empty(), "unlock removes the numbers");
 }
+
+#[test]
+fn revision_sets_are_kept_and_a_used_set_cannot_be_deleted() {
+    use cirth_core::revisions::RevisionSet;
+    let d = tmpdir("revisions");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+    let main = s.default_document().unwrap();
+    assert!(s.set_revision_mode(&main, true).is_err(), "no mode without a set");
+    let blue = RevisionSet { id: "blue-1".into(), label: "Blue Revision".into(), colour: "blue".into(), date: "2026-10-27".into(), mark: "*".into(), author: "".into() };
+    s.put_revision_set(&main, &blue).unwrap();
+    assert!(s.put_revision_set(&main, &RevisionSet { id: "x".into(), label: "X".into(), colour: "mauve".into(), ..Default::default() }).is_err(), "unknown colour refused");
+    s.set_active_revision(&main, Some("blue-1")).unwrap();
+    s.set_revision_mode(&main, true).unwrap();
+    assert!(s.revision_mode(&main).unwrap());
+    // Rename in place; order and id stay.
+    s.put_revision_set(&main, &RevisionSet { label: "Blue Rev.".into(), ..blue.clone() }).unwrap();
+    assert_eq!(s.revision_sets(&main).unwrap().len(), 1);
+    assert_eq!(s.active_revision(&main).unwrap().unwrap().label, "Blue Rev.");
+    // Tag some text with it: deleting is refused until the text is untagged.
+    let doc = s.load().unwrap();
+    let mut b = doc.blocks[1].clone();
+    b.runs[0].revision = Some("blue-1".into());
+    s.apply(&batch(doc.version, vec![Op::Update { block: b.clone() }])).unwrap();
+    assert!(s.delete_revision_set(&main, "blue-1").is_err());
+    b.runs[0].revision = None;
+    s.apply(&batch(doc.version + 1, vec![Op::Update { block: b }])).unwrap();
+    s.delete_revision_set(&main, "blue-1").unwrap();
+    assert!(s.revision_sets(&main).unwrap().is_empty());
+    assert!(s.active_revision(&main).unwrap().is_none() && !s.revision_mode(&main).unwrap(), "deleting the active set ends revision mode");
+}

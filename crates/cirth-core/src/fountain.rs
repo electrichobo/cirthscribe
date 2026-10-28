@@ -190,6 +190,9 @@ pub fn export(blocks: &[Block], title_page: &TitlePage, numbers: &crate::numberi
     if omitted > 0 {
         notes.push(format!("{omitted} omitted scene{} written with their text and number (Fountain has no omitted scenes).", if omitted == 1 { "" } else { "s" }));
     }
+    if crate::revisions::any(blocks) {
+        notes.push("Revision marks left out (Fountain has no revisions); the revised text itself is written.".into());
+    }
     notes.push("Fountain keeps the text, element types, emphasis, dual dialogue, page breaks and the title page; it has no layout, so pages are decided by the app that opens it.".into());
     Exported { text: out, notes }
 }
@@ -239,7 +242,7 @@ fn parse_runs(line: &str) -> Vec<Run> {
     let mut cur = String::new();
     let flush = |cur: &mut String, runs: &mut Vec<Run>, b: bool, it: bool, u: bool| {
         if !cur.is_empty() {
-            runs.push(Run { text: std::mem::take(cur), bold: b, italic: it, underline: u, color: None, highlight: None });
+            runs.push(Run { text: std::mem::take(cur), bold: b, italic: it, underline: u, color: None, highlight: None, revision: None });
         }
     };
     let mut i = 0;

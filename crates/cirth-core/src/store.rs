@@ -21,7 +21,7 @@ use crate::ops::{Ack, Batch, Op};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -186,10 +186,28 @@ fn migrate_v4(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v4 -> v5: revision sets per document (revisions.rs). Revision tags live
+/// on text runs (`Run::revision`, already free-form JSON); no set exists yet.
+fn migrate_v5(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE revision_sets (
+          id TEXT PRIMARY KEY,
+          document_id TEXT NOT NULL,
+          label TEXT NOT NULL,
+          colour TEXT NOT NULL,
+          date TEXT NOT NULL,
+          mark TEXT NOT NULL,
+          author TEXT NOT NULL,
+          pos REAL NOT NULL
+        );",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -369,6 +387,82 @@ impl Store {
             return Err(StoreError::Invalid("only scenes with a locked number can be omitted".into()));
         }
         Ok(())
+    }
+
+    // --- Revision sets (revisions.rs) ---------------------------------------
+
+    /// A document's revision sets in the order they were created.
+    pub fn revision_sets(&self, document_id: &str) -> Result<Vec<crate::revisions::RevisionSet>> {
+        let mut stmt = self.conn.prepare("SELECT id, label, colour, date, mark, author FROM revision_sets WHERE document_id = ?1 ORDER BY pos")?;
+        let rows = stmt
+            .query_map([document_id], |r| Ok(crate::revisions::RevisionSet { id: r.get(0)?, label: r.get(1)?, colour: r.get(2)?, date: r.get(3)?, mark: r.get(4)?, author: r.get(5)? }))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Add a set (at the end) or change an existing one in place.
+    pub fn put_revision_set(&self, document_id: &str, set: &crate::revisions::RevisionSet) -> Result<()> {
+        if set.id.trim().is_empty() || set.label.trim().is_empty() {
+            return Err(StoreError::Invalid("a revision set needs an id and a label".into()));
+        }
+        if !crate::revisions::COLOURS.contains(&set.colour.as_str()) {
+            return Err(StoreError::Invalid(format!("unknown revision colour {}", set.colour)));
+        }
+        let n = self.conn.execute(
+            "UPDATE revision_sets SET label = ?3, colour = ?4, date = ?5, mark = ?6, author = ?7 WHERE id = ?1 AND document_id = ?2",
+            params![set.id, document_id, set.label.trim(), set.colour, set.date.trim(), set.mark.trim(), set.author.trim()],
+        )?;
+        if n == 0 {
+            self.conn.execute(
+                "INSERT INTO revision_sets(id, document_id, label, colour, date, mark, author, pos) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, (SELECT COALESCE(MAX(pos), 0) + 1 FROM revision_sets))",
+                params![set.id, document_id, set.label.trim(), set.colour, set.date.trim(), set.mark.trim(), set.author.trim()],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Remove a set that no text is tagged with (mistakes); a set in use is refused.
+    pub fn delete_revision_set(&self, document_id: &str, id: &str) -> Result<()> {
+        if crate::revisions::passages(&self.load_document(document_id)?.blocks, id) > 0 {
+            return Err(StoreError::Invalid("this revision set still marks text in the script; clear its marks first".into()));
+        }
+        self.conn.execute("DELETE FROM revision_sets WHERE id = ?1 AND document_id = ?2", [id, document_id])?;
+        if self.active_revision(document_id)?.is_none() {
+            self.set_active_revision(document_id, None)?;
+        }
+        Ok(())
+    }
+
+    /// The set new changes go into and exports print (if any).
+    pub fn active_revision(&self, document_id: &str) -> Result<Option<crate::revisions::RevisionSet>> {
+        let id = self.setting(&format!("document:{document_id}"), "revision_active")?.unwrap_or_default();
+        Ok(self.revision_sets(document_id)?.into_iter().find(|s| s.id == id))
+    }
+
+    pub fn set_active_revision(&self, document_id: &str, id: Option<&str>) -> Result<()> {
+        if let Some(id) = id {
+            if !self.revision_sets(document_id)?.iter().any(|s| s.id == id) {
+                return Err(StoreError::Invalid(format!("no revision set {id}")));
+            }
+        }
+        let scope = format!("document:{document_id}");
+        self.set_setting(&scope, "revision_active", id.unwrap_or(""))?;
+        if id.is_none() {
+            self.set_setting(&scope, "revision_mode", "0")?;
+        }
+        Ok(())
+    }
+
+    /// Revision mode: the editor tags changes with the active set.
+    pub fn revision_mode(&self, document_id: &str) -> Result<bool> {
+        Ok(self.setting(&format!("document:{document_id}"), "revision_mode")?.as_deref() == Some("1") && self.active_revision(document_id)?.is_some())
+    }
+
+    pub fn set_revision_mode(&self, document_id: &str, on: bool) -> Result<()> {
+        if on && self.active_revision(document_id)?.is_none() {
+            return Err(StoreError::Invalid("choose or add a revision set first".into()));
+        }
+        self.set_setting(&format!("document:{document_id}"), "revision_mode", if on { "1" } else { "0" })
     }
 
     /// A document's title page (empty if never set).

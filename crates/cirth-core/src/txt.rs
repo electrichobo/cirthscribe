@@ -25,13 +25,15 @@ pub fn render(map: &PageMap, p: &Profile) -> Exported {
 /// Like `render`, with a title page first (then a form feed) when one is
 /// given and not empty. Page numbers are unchanged: the title page is unnumbered.
 pub fn render_with_title(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>) -> Exported {
-    render_document(map, p, title_page, "", "")
+    render_document(map, p, title_page, "", "", "")
 }
 
 /// Like `render_with_title`, with a header (left of the page number) and a
-/// footer (centred after the page) from page 2, as in the PDF.
-pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>, header: &str, footer: &str) -> Exported {
-    let (header, footer) = (header.trim(), footer.trim());
+/// footer (centred after the page) from page 2, as in the PDF, and a
+/// revision header (e.g. "Blue Revision (2026-10-27)") before the page number
+/// on pages flagged `revised` (revisions.rs).
+pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>, header: &str, footer: &str, revision: &str) -> Exported {
+    let (header, footer, revision) = (header.trim(), footer.trim(), revision.trim());
     // Columns count from the action margin, or from the left scene numbers
     // when the script has them (they sit in the left margin).
     let origin = map.pages.iter().flat_map(|pg| pg.lines.iter().map(|l| l.x_in)).fold(p.action.left_in, f32::min);
@@ -63,12 +65,16 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
             out.push('\u{c}');
             out.push('\n');
         }
-        if page.number > 1 {
-            let label = format!("{}.", page.number);
+        let rev = if page.revised { revision } else { "" };
+        if page.number > 1 || !rev.is_empty() {
+            let number = if page.number > 1 { format!("{}.", page.number) } else { String::new() };
+            let label = [rev, number.as_str()].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join("    ");
+            let label_w = UnicodeWidthStr::width(label.as_str());
+            let header = if page.number > 1 { header } else { "" };
             let left = format!("{}{header}", " ".repeat(col(p.action.left_in)));
-            let gap = right.saturating_sub(label.len()).saturating_sub(UnicodeWidthStr::width(left.as_str())).max(if header.is_empty() { 0 } else { 2 });
+            let gap = right.saturating_sub(label_w).saturating_sub(UnicodeWidthStr::width(left.as_str())).max(if header.is_empty() { 0 } else { 2 });
             out.push_str(if header.is_empty() { "" } else { &left });
-            out.push_str(&" ".repeat(if header.is_empty() { right.saturating_sub(label.len()) } else { gap }));
+            out.push_str(&" ".repeat(if header.is_empty() { right.saturating_sub(label_w) } else { gap }));
             out.push_str(&label);
             out.push_str("\n\n");
         }

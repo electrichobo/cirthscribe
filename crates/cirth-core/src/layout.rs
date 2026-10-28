@@ -136,6 +136,8 @@ pub struct PLine {
 pub struct Page {
     pub number: usize,
     pub lines: Vec<PLine>,
+    /// Holds text of the revision set being printed (revisions.rs).
+    pub revised: bool,
 }
 
 /// Where each page starts in the manuscript, for editor markers.
@@ -345,7 +347,7 @@ impl<'p> Pager<'p> {
     }
     fn new_page(&mut self) {
         let n = self.pages.len() + 1;
-        self.pages.push(Page { number: n, lines: Vec::new() });
+        self.pages.push(Page { number: n, lines: Vec::new(), revised: false });
         self.row = 0;
     }
     fn avail(&self) -> usize {

@@ -87,6 +87,10 @@ pub struct Run {
     /// Writer's highlight, on screen only, like `color`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub highlight: Option<String>,
+    /// Revision set (revisions.rs) this text was added or changed in while
+    /// revision mode was on. Printed as a margin mark on its lines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -95,7 +99,7 @@ fn is_false(b: &bool) -> bool {
 
 impl Run {
     pub fn plain(text: impl Into<String>) -> Run {
-        Run { text: text.into(), bold: false, italic: false, underline: false, color: None, highlight: None }
+        Run { text: text.into(), bold: false, italic: false, underline: false, color: None, highlight: None, revision: None }
     }
 }
 

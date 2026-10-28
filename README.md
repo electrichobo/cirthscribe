@@ -78,7 +78,7 @@ Done:
 Still to do:
 - [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
 - [ ] Check the page measurements against an industry-standard PDF
-- [ ] Revision colours and revision marks
+- [x] Revision sets (label, colour, date, mark), revision mode that marks changed lines, and a changed-pages PDF
 - [ ] Locked pages: later changes create A/B pages instead of moving everything
 - [ ] Word (DOCX), RTF and HTML export, each with a report of what carried over
 - [ ] Tested exchange with other screenwriting apps

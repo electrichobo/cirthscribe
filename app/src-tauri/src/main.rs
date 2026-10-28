@@ -19,6 +19,7 @@ use cirth_core::layout::{self, PageMap, Profile};
 use cirth_core::model::{Beat, Document};
 use cirth_core::ops::{Ack, Batch};
 use cirth_core::store::{Store, StoreError};
+use cirth_core::revisions::{self, RevisionSet};
 use cirth_core::{backup, fontcheck, pdf};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -538,6 +539,64 @@ async fn apply_batch(app: State<'_, App>, batch: Batch) -> Result<Ack, String> {
     })
 }
 
+/// Revision sets of this document, which is active, whether revision mode is
+/// on, and what the next set would be called.
+#[derive(Serialize)]
+struct RevisionState {
+    sets: Vec<RevisionSet>,
+    /// Tagged passages per set (same order as `sets`).
+    passages: Vec<usize>,
+    active: Option<String>,
+    mode: bool,
+    next_colour: String,
+    next_label: String,
+}
+
+fn revision_state_of(s: &Session) -> Result<RevisionState, String> {
+    let main = s.store.default_document().map_err(err)?;
+    let sets = s.store.revision_sets(&main).map_err(err)?;
+    let blocks = s.store.load().map_err(err)?.blocks;
+    let (next_colour, next_label) = revisions::next_set(&sets);
+    Ok(RevisionState {
+        passages: sets.iter().map(|set| revisions::passages(&blocks, &set.id)).collect(),
+        active: s.store.active_revision(&main).map_err(err)?.map(|a| a.id),
+        mode: s.store.revision_mode(&main).map_err(err)?,
+        sets,
+        next_colour,
+        next_label,
+    })
+}
+
+#[tauri::command]
+async fn revision_state(app: State<'_, App>) -> Result<RevisionState, String> {
+    with_session(&app, |s| revision_state_of(s))
+}
+
+/// Format > Revisions: "put" adds a set (which becomes active) or changes
+/// one; "delete" removes an unused set; "activate" picks the set changes go
+/// into (`id` None = none); "mode" turns revision mode on or off.
+#[tauri::command]
+async fn revision_command(app: State<'_, App>, action: String, set: Option<RevisionSet>, id: Option<String>, on: Option<bool>) -> Result<RevisionState, String> {
+    with_session(&app, |s| {
+        let main = s.store.default_document().map_err(err)?;
+        match action.as_str() {
+            "put" => {
+                let set = set.ok_or("no revision set")?;
+                let new = !s.store.revision_sets(&main).map_err(err)?.iter().any(|x| x.id == set.id);
+                s.store.put_revision_set(&main, &set).map_err(err)?;
+                if new {
+                    s.store.set_active_revision(&main, Some(&set.id)).map_err(err)?;
+                }
+            }
+            "delete" => s.store.delete_revision_set(&main, &id.ok_or("no revision set")?).map_err(err)?,
+            "activate" => s.store.set_active_revision(&main, id.as_deref()).map_err(err)?,
+            "mode" => s.store.set_revision_mode(&main, on.unwrap_or(false)).map_err(err)?,
+            other => return Err(format!("unknown revision action {other}")),
+        }
+        revision_state_of(s)
+    })
+}
+
 /// Format > Scene Numbers: lock (number 1..N), unlock, omit or restore.
 #[tauri::command]
 async fn scene_numbers_command(app: State<'_, App>, action: String, scene_id: Option<String>) -> Result<usize, String> {
@@ -704,23 +763,27 @@ struct Paginated {
     /// Locked scene numbers (empty when unlocked), for the scene list and margins.
     scene_numbers: Vec<cirth_core::numbering::SceneNumber>,
     scene_numbers_locked: bool,
+    /// The active revision set: its text is marked and its pages flagged `revised`.
+    revision: Option<RevisionSet>,
+    revised_pages: usize,
 }
 
 fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Document), String> {
     let t0 = Instant::now();
     // Hold the lock only while reading the canonical document.
-    let (doc, numbers, locked) = with_session(app, |s| {
+    let (doc, numbers, locked, revision) = with_session(app, |s| {
         let main = s.store.default_document().map_err(err)?;
-        Ok((s.store.load().map_err(err)?, s.store.scene_numbers(&main).map_err(err)?, s.store.scene_numbers_locked(&main).map_err(err)?))
+        Ok((s.store.load().map_err(err)?, s.store.scene_numbers(&main).map_err(err)?, s.store.scene_numbers_locked(&main).map_err(err)?, s.store.active_revision(&main).map_err(err)?))
     })?;
     let t1 = Instant::now();
-    let map = layout::paginate_numbered(&doc.blocks, &profile(profile_name), doc.version, &numbers);
+    let mut map = layout::paginate_numbered(&doc.blocks, &profile(profile_name), doc.version, &numbers);
+    let revised_pages = revision.as_ref().map_or(0, |set| revisions::mark_pages(&mut map, &doc.blocks, set));
     let t2 = Instant::now();
     let font = fontcheck::FontInfo::parse(pdf::REGULAR).ok_or("bundled font unreadable")?;
     let all: String = doc.blocks.iter().map(|b| b.text()).collect::<Vec<_>>().join(" ");
     let missing_glyphs = fontcheck::missing_chars(&font, &all);
     let scene_numbers = numbers.into_values().collect();
-    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked }, doc))
+    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked, revision, revised_pages }, doc))
 }
 
 #[tauri::command]
@@ -737,6 +800,10 @@ struct Exported {
     pdf_ms: f64,
     bytes: usize,
     missing_glyphs: Vec<char>,
+    /// Pages with the active revision set's changes (in the whole script).
+    revised_pages: usize,
+    /// Numbers of the pages written (changed pages keep their script numbers).
+    page_numbers: Vec<usize>,
 }
 
 /// Header and footer text for this document (settings; tokens unexpanded).
@@ -769,11 +836,28 @@ async fn set_page_furniture(app: State<'_, App>, header: String, footer: String)
     })
 }
 
+/// Keep only the pages with the active revision set's changes (their
+/// numbers stay as in the full script). Refused when there are none.
+fn changed_pages_only(p: &mut Paginated) -> Result<(), String> {
+    let Some(set) = &p.revision else { return Err("Choose a revision set first (Format > Revisions).".into()) };
+    if p.revised_pages == 0 {
+        return Err(format!("No page has changes in {}.", set.label));
+    }
+    p.map.pages.retain(|pg| pg.revised);
+    Ok(())
+}
+
 /// File > Export > PDF…: the page map with title page, scene numbers,
-/// header and footer. Without `path` (tests) it goes to the app's exports folder.
+/// header and footer, revision marks and headers of the active set. With
+/// `changed_only`, just the pages that set changed (no title page). Without
+/// `path` (tests) it goes to the app's exports folder.
 #[tauri::command]
-async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<String>) -> Result<Exported, String> {
-    let (p, doc) = paginate_current(&app, &profile_name)?;
+async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<String>, changed_only: Option<bool>) -> Result<Exported, String> {
+    let (mut p, doc) = paginate_current(&app, &profile_name)?;
+    let changed_only = changed_only.unwrap_or(false);
+    if changed_only {
+        changed_pages_only(&mut p)?;
+    }
     let prof = profile(&profile_name);
     let t0 = Instant::now();
     let (tp, furniture, project_id) = with_session(&app, |s| Ok((s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?, s.store.project_id().map_err(err)?)))?;
@@ -785,8 +869,9 @@ async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<Stri
         document_id: project_id,
         header: pdf::expand_tokens(&furniture.header, &tp),
         footer: pdf::expand_tokens(&furniture.footer, &tp),
+        revision_header: p.revision.as_ref().map(revisions::header).unwrap_or_default(),
     };
-    let bytes = pdf::render_document(&p.map, &prof, Some(&tp), &opts)?;
+    let bytes = pdf::render_document(&p.map, &prof, if changed_only { None } else { Some(&tp) }, &opts)?;
     let pdf_ms = t0.elapsed().as_secs_f64() * 1e3;
     let path = match path {
         Some(target) => normalize(Path::new(&target)),
@@ -801,7 +886,7 @@ async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<Stri
     std::fs::write(&tmp, &bytes).map_err(io_err)?;
     cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
     cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)?;
-    Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs })
+    Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs, revised_pages: p.revised_pages, page_numbers: p.map.pages.iter().map(|pg| pg.number).collect() })
 }
 
 // --- Page profile per document and plain-text export --------------------------------
@@ -857,13 +942,19 @@ struct TxtExported {
     notes: Vec<String>,
 }
 
-/// Plain text from the same page map as the PDF, in this document's page size.
+/// Plain text from the same page map as the PDF, in this document's page
+/// size; `changed_only` as for the PDF.
 #[tauri::command]
-async fn export_txt(app: State<'_, App>, path: String) -> Result<TxtExported, String> {
+async fn export_txt(app: State<'_, App>, path: String, changed_only: Option<bool>) -> Result<TxtExported, String> {
     let name = with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
-    let (p, doc) = paginate_current(&app, name)?;
+    let (mut p, doc) = paginate_current(&app, name)?;
+    let changed_only = changed_only.unwrap_or(false);
+    if changed_only {
+        changed_pages_only(&mut p)?;
+    }
     let (tp, furniture) = with_session(&app, |s| Ok((s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?)))?;
-    let t = cirth_core::txt::render_document(&p.map, &profile(name), Some(&tp), &pdf::expand_tokens(&furniture.header, &tp), &pdf::expand_tokens(&furniture.footer, &tp));
+    let rev = p.revision.as_ref().map(revisions::header).unwrap_or_default();
+    let t = cirth_core::txt::render_document(&p.map, &profile(name), if changed_only { None } else { Some(&tp) }, &pdf::expand_tokens(&furniture.header, &tp), &pdf::expand_tokens(&furniture.footer, &tp), &rev);
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("txt.tmp");
     std::fs::write(&tmp, &t.text).map_err(io_err)?;
@@ -1424,7 +1515,7 @@ fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Resul
 
 fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF…").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").build()?;
+    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF…").text("export_changed_pdf", "Changed Pages (PDF)…").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").build()?;
     let file = SubmenuBuilder::new(app, "File")
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
@@ -1542,6 +1633,12 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .text("scene_omit", "Omit This Scene")
         .text("scene_restore", "Restore This Scene")
         .build()?;
+    let revisions = SubmenuBuilder::new(app, "Revisions")
+        .item(&check_item(app, "revision_mode", "Revision Mode", false)?)
+        .text("revision_sets", "Revision Sets…")
+        .separator()
+        .text("revision_clear", "Clear Marks of This Set…")
+        .build()?;
     SubmenuBuilder::new(app, "Format")
         .text("bold", keyed("Bold", "B"))
         .text("italic", keyed("Italic", "I"))
@@ -1554,6 +1651,7 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .text("page_break", keyed("Page Break Before", "Enter"))
         .separator()
         .item(&numbers)
+        .item(&revisions)
         .separator()
         .item(&page)
         .build()
@@ -1703,6 +1801,8 @@ fn main() {
             page_furniture,
             set_page_furniture,
             scene_numbers_command,
+            revision_state,
+            revision_command,
             import_fountain,
             export_fountain,
             import_fdx,

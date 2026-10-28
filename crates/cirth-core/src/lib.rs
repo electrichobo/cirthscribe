@@ -10,6 +10,7 @@ pub mod model;
 pub mod numbering;
 pub mod ops;
 pub mod pdf;
+pub mod revisions;
 pub mod spell;
 pub mod title;
 pub mod txt;
