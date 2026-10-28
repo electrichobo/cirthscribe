@@ -43,7 +43,7 @@ export interface RevisionState {
 }
 
 /** Paper colours in the usual order (cirth_core::revisions::COLOURS). */
-export const COLOURS = ["blue", "pink", "yellow", "green", "goldenrod", "buff", "salmon", "cherry", "tan"] as const;
+export const COLOURS = ["white", "blue", "pink", "yellow", "green", "goldenrod", "buff", "salmon", "cherry"] as const;
 
 interface PluginState {
   /** Set new changes go into; null when revision mode is off. */
@@ -285,8 +285,7 @@ export function createRevisions(getView: () => EditorView | null, onChange: () =
       const colour = cell(document.createElement("select")) as HTMLSelectElement;
       colour.className = "rev-colour";
       colour.setAttribute("aria-label", `Colour of ${s.label}`);
-      // An older project may have a white set (before tan replaced it).
-      for (const c of s.colour === "white" ? [...COLOURS, "white"] : COLOURS) colour.add(new Option(c[0].toUpperCase() + c.slice(1), c, false, c === s.colour));
+      for (const c of COLOURS) colour.add(new Option(c[0].toUpperCase() + c.slice(1), c, false, c === s.colour));
       colour.addEventListener("change", () => void command("put", { set: { ...s, colour: colour.value } }));
       text("date", "Date", 10);
       text("mark", "Mark", 2);

@@ -75,7 +75,7 @@ Done:
 - [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
 - [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
 - [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
-- [x] Revision sets (label, colour, date, mark) in the usual colour order (Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, Tan, then Second Blue and so on), revision mode that marks changed lines, and a changed-pages PDF
+- [x] Revision sets (label, colour, date, mark) in the Writers Guild colour order (White original, then Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, then Double Blue and so on), revision mode that marks changed lines, and a changed-pages PDF
 - [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
 - [x] Word (DOCX), RTF and HTML export, each with a report of what carried over
 - [x] A compatibility test pack and record ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)); first results from Preview, TextEdit and Safari on macOS

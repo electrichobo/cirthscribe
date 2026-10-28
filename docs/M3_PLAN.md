@@ -72,7 +72,7 @@ The exit review comes after 9. Steps 5 and 6 can swap.
 - **A. Undo for planning edits:** Ctrl/Cmd+Z goes to the view with focus. The script keeps its ProseMirror history; planning edits get a core-side history per document; an action that changes the script lives only in the script history. (Option 1. Not chosen: one project-wide history in the core.) To be written up as ADR 0003 in step 1.
 - **B. Beats become outline items** (option 1): the outline, board and pacing board are views of one tree.
 - **C. Colour labels on scenes and planning items:** a fixed named palette whose names the writer can rename; a label always has a name, never colour alone. Separate from revision colours.
-  - The owner also gave the revision colour order while answering, which corrected M2: Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, Tan, then a second cycle "Second Blue", "Second Pink" and so on; white is the unrevised draft. Fixed in the commit that accepts this plan (it had White ninth and "Double Blue").
+  - Revision colours (M2), settled by the owner on 2026-10-28 to the Writers Guild order: White (original production draft), Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, then "Double Blue", "Double Pink" and so on. New sets start at Blue; White can be chosen to label the original draft.
 - **D. Episodes in M3,** placed for the most interconnection: step 2, before every view that should reach across episodes.
 - **E. Images packaged in the project file** by default, with a size warning; never absolute paths.
 - **Dependencies:** none expected. Images are shown by the WebView and stored as bytes; type checks read the file header. Anything that turns out to need a crate or package comes back to the owner first.

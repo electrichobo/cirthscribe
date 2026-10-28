@@ -176,7 +176,7 @@ mark.hl { color: inherit; border-radius: 2px; }
 .b-dialogue, .b-lyric { --ml: 2.5in; } .b-transition { --ml: 5.5in; }
 .ProseMirror p.revised { position: relative; }
 .ProseMirror p.revised::after { content: attr(data-rev-mark); position: absolute; top: 0; left: calc(7.9in - var(--ml, 1.5in)); font-weight: 700; color: var(--ink); user-select: none; pointer-events: none; text-transform: none; }
-:root { --rev-blue: #2f6fd6; --rev-pink: #d6458f; --rev-yellow: #b38f00; --rev-green: #2c9a44; --rev-goldenrod: #c88a12; --rev-buff: #a8875a; --rev-salmon: #e0735a; --rev-cherry: #b5133b; --rev-tan: #9c7a4f; --rev-white: #888; }
+:root { --rev-blue: #2f6fd6; --rev-pink: #d6458f; --rev-yellow: #b38f00; --rev-green: #2c9a44; --rev-goldenrod: #c88a12; --rev-buff: #a8875a; --rev-salmon: #e0735a; --rev-cherry: #b5133b; --rev-white: #888; }
 #revision-status { color: var(--ink); }
 #revision-status.revising { font-weight: 600; }
 .rev-table { border-collapse: collapse; margin: 6px 0 10px; width: 100%; }
