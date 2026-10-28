@@ -142,7 +142,11 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - DOCX (Google Docs profile; needs a zip writer, decision B);
    - RTF;
    - HTML.
-9. **Compatibility matrix:** fixtures exchanged with real external apps where available. Every external result is labelled by an actual test and its date.
+9. **Compatibility matrix:** fixtures exchanged with real external apps where available. Every external result is labelled by an actual test and its date. **Started 2026-10-27:**
+   - `cirth-cli compat-pack` writes the test pack (`cirth_core::compat`): the three samples in all seven export formats, with a title page, locked scene numbers and a header. Output is byte-for-byte repeatable, with a `MANIFEST.md` of sizes and FNV-1a hashes. It is in `out/`, not committed: regenerate it from the commit being tested.
+   - docs/COMPATIBILITY.md holds the status of each format, the results log, and how to test and record.
+     - Recorded so far: the owner's informal HTML check, and Kolbítar's automated Fountain and FDX round trips of the whole pack (internal, not external).
+   - Open: external results for every format. These need the apps (Final Draft, Word, Google Docs, LibreOffice, TextEdit, a Fountain app, browsers) and the manual checks N22, N23, N25 and N28.
 
 The exit review comes after 7–9. Steps 2 and 3 can swap if the owner wants FDX first.
 

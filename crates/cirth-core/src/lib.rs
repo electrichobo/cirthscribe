@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod compat;
 pub mod docx;
 pub mod fdx;
 pub mod fixtures;

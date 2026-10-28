@@ -81,6 +81,7 @@ Still to do:
 - [x] Revision sets (label, colour, date, mark), revision mode that marks changed lines, and a changed-pages PDF
 - [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
 - [x] Word (DOCX), RTF and HTML export, each with a report of what carried over (not yet tried in Word, Google Docs or LibreOffice)
+- [ ] Compatibility matrix from real tests in other apps ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md); test pack and record started)
 - [ ] Tested exchange with other screenwriting apps
 
 ### Stage 3: Story planning
@@ -158,6 +159,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
 | [docs/M2_PLAN.md](docs/M2_PLAN.md) | Current milestone plan (Stage 2) and what is done |
+| [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Which formats have been tested in which other apps, and how to test |
 | [docs/M1_PLAN.md](docs/M1_PLAN.md) and [docs/m1/EXIT_REVIEW.md](docs/m1/EXIT_REVIEW.md) | Stage 1 plan and its exit review |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, persistence and layout strategy |
 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Observable acceptance scenarios |
