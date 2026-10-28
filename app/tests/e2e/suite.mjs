@@ -784,6 +784,41 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(JSON.stringify(await blocks()) === script0, "the script is unchanged");
   });
 
+  await test("Overview map: scenes as blocks sized by length, coloured by label or act, a list view as text, arrow keys and Enter go to a scene; the project's episodes too", async () => {
+    await openFixture("page-boundaries");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    await waitFor(app, `document.querySelectorAll('#navigator .nav-list li .nav-page').length === ${scenes.length}`, "stats ready");
+    // A label on the first scene, an act holding the second scene's card.
+    await app.evaluate("(() => { const s = document.querySelectorAll('#navigator .nav-list li .nav-label')[0]; s.value = 'green'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `document.querySelector('#navigator .nav-list li[data-scene-id="${scenes[0]}"]')?.dataset.label === 'green'`, "labelled");
+    await app.evaluate("__cirth.menu('overview')");
+    await waitFor(app, `document.getElementById('overview-dialog').open && document.querySelectorAll('#overview-dialog .overview-block').length === ${scenes.length}`, "one block per scene");
+    const blocks = await app.evaluate("[...document.querySelectorAll('#overview-dialog .overview-block')].map(b => ({ w: b.getBoundingClientRect().width, tint: b.style.getPropertyValue('--tint'), title: b.title, current: b.classList.contains('current') }))");
+    const stats = await app.evaluate("__cirth.pagination.scene_stats.map(s => s.eighths)");
+    assert(Math.abs(blocks[0].w / blocks[3].w - Math.max(1, stats[0]) / Math.max(1, stats[3])) < 0.25, `widths follow lengths: ${blocks.map((b) => Math.round(b.w))} for eighths ${stats}`);
+    assert(blocks[0].tint.includes("label-green") && !blocks[1].tint, `coloured by label: ${blocks.map((b) => b.tint)}`);
+    assert(/estimate/.test(blocks[0].title) && blocks[0].current, "titles say lengths are estimates; the caret's scene is marked");
+    await screenshot(app, "overview-map");
+    // The list view is the same data as text.
+    await app.evaluate("(document.getElementById('overview-list-toggle').click(), true)");
+    const rows = await app.evaluate("[...document.querySelectorAll('#overview-dialog .overview-table tbody tr')].map(tr => [...tr.cells].map(c => c.textContent))");
+    assert(rows.length === scenes.length && rows[0][2] === "1" && rows[0][4] === "Green", `list rows: ${JSON.stringify(rows[0])}`);
+    await app.evaluate("(document.getElementById('overview-list-toggle').click(), true)");
+    // Arrow keys and Enter: to the third scene.
+    await app.evaluate("(document.querySelector('#overview-dialog .overview-block[tabindex=\"0\"]').focus(), true)");
+    await press("ArrowRight");
+    await press("ArrowRight");
+    await press("Enter");
+    await waitFor(app, `!document.getElementById('overview-dialog').open && (() => { const at = __cirth.view.state.selection.from; const s = __cirth.scenes().find(x => at >= x.from && at < x.to); return s?.sceneId === ${JSON.stringify(scenes[2])}; })()`, "Enter goes to that scene");
+    // Project scope: another episode's scenes as their own row.
+    const ep = await app.evaluate("window.__TAURI_INTERNALS__.invoke('create_episode', { title: 'Episode 2', folder: null })");
+    await app.evaluate("__cirth.menu('overview')");
+    await waitFor(app, "document.getElementById('overview-dialog').open", "open again");
+    await app.evaluate("(() => { const s = document.getElementById('overview-scope'); s.value = 'project'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `document.querySelectorAll('#overview-dialog .overview-row').length === 2 && document.querySelectorAll('#overview-dialog .overview-block[data-doc="${ep}"]').length === 1`, "two scripts, the episode's one scene");
+    await app.evaluate("(document.getElementById('overview-close').click(), true)");
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

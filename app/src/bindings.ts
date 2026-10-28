@@ -49,6 +49,7 @@ export const BINDINGS: Binding[] = [
   { id: "dual", group: "Writing", label: "Dual dialogue", menu: "Dual Dialogue", scope: "script", defaults: ["Mod+D"] },
   { id: "page_break", group: "Writing", label: "Page break before", menu: "Page Break Before", scope: "script", defaults: ["Mod+Enter"] },
   ...KIND_MENU.map(([k, name], i): Binding => ({ id: `kind_${k}`, group: "Elements", label: name, menu: name, scope: "script", defaults: [`Mod+${i + 1}`] })),
+  { id: "overview", group: "Moving around", label: "Overview of the script", menu: "Overview…", scope: "app", defaults: [] },
   { id: "goto_page", group: "Moving around", label: "Go to page", menu: "Page…", scope: "app", defaults: ["Mod+G"] },
   { id: "goto_scene", group: "Moving around", label: "Go to scene", menu: "Scene…", scope: "app", defaults: ["Mod+Shift+G"] },
   { id: "focus_mode", group: "View", label: "Focus mode", menu: "Focus Mode", scope: "app", defaults: ["Mod+Shift+F"] },

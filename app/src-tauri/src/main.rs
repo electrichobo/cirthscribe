@@ -235,6 +235,10 @@ struct ProjectScene {
     document_title: String,
     scene_id: String,
     heading: String,
+    /// Page, length in eighths and position in its own document (the overview map).
+    page: String,
+    eighths: u32,
+    position: f64,
 }
 
 /// What the navigator needs besides the open script: scene labels and their
@@ -260,11 +264,17 @@ async fn navigator_info(app: State<'_, App>, project: bool) -> Result<NavigatorI
         };
         let characters = cirth_core::navigator::characters(&docs.iter().map(|(id, _, b)| (id.clone(), b.clone())).collect::<Vec<_>>());
         let project_scenes = if project {
-            docs.iter()
-                .flat_map(|(id, title, blocks)| {
-                    blocks.iter().filter(|b| b.kind == cirth_core::model::BlockKind::Heading && b.scene_id.is_some()).map(move |b| ProjectScene { document_id: id.clone(), document_title: title.clone(), scene_id: b.scene_id.clone().unwrap(), heading: b.text() })
-                })
-                .collect()
+            let mut out = Vec::new();
+            for (id, title, blocks) in &docs {
+                // Each document laid out on its own page size, for lengths and positions.
+                let prof = if s.store.document_profile(id).map_err(err)? == "a4" { Profile::a4() } else { Profile::us_letter() };
+                let map = layout::paginate(blocks, &prof, 0);
+                let stats = cirth_core::navigator::scene_stats(blocks, &map);
+                for (b, st) in blocks.iter().filter(|b| b.kind == cirth_core::model::BlockKind::Heading && b.scene_id.is_some()).zip(stats) {
+                    out.push(ProjectScene { document_id: id.clone(), document_title: title.clone(), scene_id: st.scene_id, heading: b.text(), page: st.page, eighths: st.eighths, position: st.position });
+                }
+            }
+            out
         } else {
             Vec::new()
         };
@@ -1941,6 +1951,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_nav", "Scene List", true)?)
         .item(&check_item(app, "view_board", "Board", true)?)
         .item(&check_item(app, "view_notes", "Notes", false)?)
+        .text("overview", "Overview…")
         .separator()
         .text("popout_nav", "Scene List in Its Own Window")
         .text("popout_board", "Board in Its Own Window")

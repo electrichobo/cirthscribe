@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). All workspace steps W1–W5 are built. M3 steps 1–4 and **5 (beat and pacing board)** are built; next step 6, the overview map.
+**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). All workspace steps W1–W5 are built. M3 steps 1–5 and **6 (overview map)** are built; next step 7, the project bible.
 
 ## Completed & Verified
 
@@ -24,6 +24,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - M3 step 3 built: navigator.rs, schema v6 scene_labels, label names, PlanningOp::SetSceneLabel, paginate returns scene_stats, navigator_info / set_label_name commands; views.ts renderNavigator with tabs, filter, scope; labelnames.ts; pop-out window gets nav data. Checks: `cargo test -p cirth-core` (all pass; new navigator and v5-upgrade tests), e2e CDP 57/57, WebDriver 56/56 (1 skipped: IME), contract 4.
 - M3 step 4 built: schema v7 (beats kind/title/parent), check_outline_place, Outline tab in views.ts (planWith runs moves in the write queue), board shows beats in outline order, reorderFromOutline under the permission, delete via DeleteBeat. Checks: `cargo test -p cirth-core` (all pass; outline and v6-upgrade tests), e2e CDP 58/58, WebDriver 57/57 (1 skipped: IME), contract 4.
 - M3 step 5 built: board grouped into acts (views.ts renderBoard), Add acts… starting structures, card Act menu, drop onto an act, pacing strip; SceneStat.position in core; navigator layout fixes found by screenshot. Checks: `cargo test -p cirth-core` (all pass), e2e CDP 59/59, WebDriver 58/58 (1 skipped: IME), contract 4.
+- M3 step 6 built: overview.ts dialog (map and list), navigator_info project scenes carry page/eighths/position per document, View > Tools > Overview…, bindings entry without a default key. Checks: `cargo test -p cirth-core` (all pass), e2e CDP 60/60, WebDriver 59/59 (1 skipped: IME), contract 4.
 - M3 plan drafted from ROADMAP M3, PRODUCT_SPEC 3–4, ACCEPTANCE B and C, and the current code (one document in the UI; structural permission not stored; planning edits not undoable).
 - Not verified (carried into M3):
   - external app results (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print);
@@ -34,10 +35,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-None once the step 5 commit is made.
+None once the step 6 commit is made.
 
 ## Next Immediate Step
 
-1. M3 step 6, overview map: a read-only zoomed-out map of the script or the whole series, scenes as blocks sized by length (SceneStat.eighths/position) and coloured by label or act, with a text alternative (the same data as a list); click or Enter jumps. Likely a View > Tools panel (pop-out capable, ADR 0004).
+1. M3 step 7, project bible (ACCEPTANCE C1–C3): entities (character, location, world) with authored and custom fields and aliases, project-scoped with optional season/episode scope; non-AI extraction of cue names and heading locations as candidates with evidence (document, scene, block, version) to accept, reject or merge as alias; occurrences refresh; unreferenced flagged, never deleted; previewed rename of cues and headings only. Needs schema v8 (freeze v7 files first). The Characters tab and autocomplete then use entities.
 2. Then M3 step 1: write ADR 0003 (focus-routed undo), store the structural permission in `document:<id>` settings (store.rs, main.ts `structural`), then planning commands with a core-side undo history.
 3. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.

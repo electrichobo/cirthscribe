@@ -104,7 +104,7 @@ First, from the owner's notes on the current build:
 - [x] Tabbed navigator: Scenes (page, length in eighths, colour label, characters, the card's logline) and Characters (speeches, words, scenes, first appearance), with a filter and a whole-project view
 - [ ] Navigator tabs for notes and the outline
 - [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
-- [ ] An overview map of the whole script
+- [x] An overview map of the whole script or series: scenes as blocks sized by length, coloured by label or act, with a list view (View > Tools > Overview…)
 - [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
 - [x] Beat and pacing board: cards divided into any number of acts (start from three or five), with a pacing strip and page and minute estimates
 - [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo

@@ -178,6 +178,19 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 /* A pop-out board window is wide enough for acts side by side. */
 body[data-panel="board"] .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; }
 body[data-panel="board"] .board-act { flex: 0 0 260px; }
+/* Overview map (M3 step 6): scenes as blocks, width = length. */
+dialog.overview { width: min(1100px, 94vw); }
+.overview-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.overview-note { margin: 0; }
+.overview-body { overflow: auto; min-height: 0; flex: 1 1 auto; }
+.overview-doc { font-size: 12px; margin: 10px 0 4px; }
+.overview-row { display: flex; flex-wrap: wrap; gap: 2px; }
+.overview-block { height: 38px; padding: 2px 3px; border: 1px solid var(--line); border-radius: 3px; background: color-mix(in srgb, var(--tint, var(--muted)) 35%, var(--panel)); border-top: 4px solid var(--tint, var(--line)); color: var(--ink); font-size: 9px; line-height: 1.2; text-align: left; overflow: hidden; white-space: normal; word-break: break-word; }
+.overview-block.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+.overview-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.overview-table th, .overview-table td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); }
+.overview-go { border: 0; background: none; padding: 0; text-align: left; color: var(--accent); }
+:root { --act-0: #3b73d6; --act-1: #3a9a4a; --act-2: #d4b106; --act-3: #8a55c8; --act-4: #e07b21; --act-5: #d65a9f; }
 /* Outline tab (M3 step 4): acts, sequences and beats as one tree. */
 .outline-tools { display: flex; gap: 4px; margin: 0 0 6px; }
 .outline-tools button { font-size: 12px; padding: 2px 8px; }

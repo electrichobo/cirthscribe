@@ -42,6 +42,7 @@ import { createGoToDialog } from "./goto";
 import { createShortcutsDialog } from "./shortcuts";
 import { createProjectTree } from "./projecttree";
 import { createLabelNamesDialog } from "./labelnames";
+import { createOverview, type OverviewData, type OverviewScene } from "./overview";
 import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
@@ -396,6 +397,51 @@ function reorderFromOutline(id: string) {
   script().move(b.scene_id, want);
   announce("The script's scene order follows the outline. Undo in the script reverts it.");
 }
+
+/** The overview map's data: this script from the editor and its page map; the project from the core. */
+async function overviewData(project: boolean): Promise<OverviewData> {
+  const labels = new Map(Object.entries(navData.labels));
+  // Acts: the outermost act of the first card linked to each scene (this script's outline).
+  const byId = new Map(board.beats.map((b) => [b.id, b]));
+  const acts = outlineOrder(board.beats).map((x) => x.it).filter((b) => b.kind === "act");
+  const actOf = new Map<string, OverviewScene["act"]>();
+  for (const { it } of outlineOrder(board.beats)) {
+    if (it.kind !== "beat" || !it.scene_id || actOf.has(it.scene_id)) continue;
+    let p = it.parent ? byId.get(it.parent) : undefined;
+    while (p && p.kind !== "act") p = p.parent ? byId.get(p.parent) : undefined;
+    actOf.set(it.scene_id, p ? { id: p.id, title: p.title || "(untitled act)", index: acts.indexOf(p) } : null);
+  }
+  const stats = new Map((lastPagination?.scene_stats ?? []).map((x) => [x.scene_id, x]));
+  const here: OverviewScene[] = scenesOf(view.state.doc).map((s) => ({
+    sceneId: s.sceneId,
+    heading: s.heading,
+    number: sceneNumbers.get(s.sceneId)?.number,
+    page: stats.get(s.sceneId)?.page ?? "",
+    eighths: stats.get(s.sceneId)?.eighths ?? 1,
+    label: labels.get(s.sceneId) ?? "",
+    act: actOf.get(s.sceneId) ?? null,
+  }));
+  const current = { id: lastOpen!.document_id, title: lastOpen!.doc.title, current: true, scenes: here };
+  let docs = [current];
+  if (project) {
+    const info = await invoke<{ project_scenes: { document_id: string; document_title: string; scene_id: string; heading: string; page: string; eighths: number }[] }>("navigator_info", { project: true });
+    docs = [];
+    for (const p of info.project_scenes) {
+      if (p.document_id === current.id) {
+        if (!docs.includes(current)) docs.push(current);
+        continue;
+      }
+      let d = docs.find((x) => x.id === p.document_id);
+      if (!d) docs.push((d = { id: p.document_id, title: p.document_title, current: false, scenes: [] }));
+      d.scenes.push({ sceneId: p.scene_id, heading: p.heading, page: p.page, eighths: p.eighths, label: labels.get(p.scene_id) ?? "", act: null });
+    }
+  }
+  return { docs, labelNames: navData.label_names, currentScene: sceneAtCursor(view)?.sceneId ?? null };
+}
+const overview = createOverview({
+  data: overviewData,
+  go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+});
 
 const script = (): ScriptView => ({
   ...editorScript(view, (b) => putBeat(b, "nav").then(() => rerenderSide()), popButton),
@@ -1197,6 +1243,9 @@ async function runMenu(id: string): Promise<void> {
     case "import":
       await importAny();
       break;
+    case "overview":
+      if (lastOpen) await overview.open();
+      break;
     case "project_tree":
       if (lastOpen) await projectTree.open();
       break;
@@ -1624,6 +1673,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   exportText,
   importFountain,
   importAny,
+  overview,
   projectTree,
   openDocument: (id: string) => openWith("open_document", { id }),
   notes: notesPanel,
