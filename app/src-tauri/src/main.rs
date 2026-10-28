@@ -386,7 +386,7 @@ async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<
         .iter()
         .take(12)
         .enumerate()
-        .map(|(i, sc)| Beat { id: cirth_core::model::new_id(), logline: String::new(), summary: format!("Beat {}: (summary is authored planning text)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64 })
+        .map(|(i, sc)| Beat { id: cirth_core::model::new_id(), logline: String::new(), summary: format!("Beat {}: (summary is authored planning text)", i + 1), scene_id: Some(sc.scene_id.clone()), pos: i as f64, ..Default::default() })
         .collect();
     start_new(&app, pkg, &doc, &beats, t0)
 }

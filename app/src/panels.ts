@@ -46,6 +46,7 @@ export type PanelCommand =
   | { panel: PopPanel; cmd: "structural"; on: boolean }
   | { panel: PopPanel; cmd: "notes"; text: string }
   | { panel: PopPanel; cmd: "label"; sceneId: string; label: string }
+  | { panel: PopPanel; cmd: "deleteItem"; id: string }
   | { panel: PopPanel; cmd: "scope"; project: boolean }
   | { panel: PopPanel; cmd: "openElsewhere"; documentId: string; sceneId: string }
   | { panel: PopPanel; cmd: "undo" | "redo" | "dock" }
@@ -65,7 +66,8 @@ export function createPanelHost(hooks: {
   setStructural: (on: boolean) => void;
   reveal: (sceneId: string) => void;
   move: (sceneId: string, before: string | null, panel: PopPanel) => void;
-  putBeat: (beat: Beat) => Promise<void>;
+  putBeat: (beat: Beat, panel: PopPanel) => Promise<void>;
+  deleteItem: (id: string) => void;
   notesText: () => string;
   setNotes: (text: string) => void;
   nav: () => NavInfo;
@@ -147,13 +149,16 @@ export function createPanelHost(hooks: {
         hooks.move(c.sceneId, c.before, c.panel);
         break;
       case "putBeat":
-        void hooks.putBeat(c.beat);
+        void hooks.putBeat(c.beat, c.panel);
         break;
       case "structural":
         hooks.setStructural(c.on);
         break;
       case "notes":
         hooks.setNotes(c.text);
+        break;
+      case "deleteItem":
+        hooks.deleteItem(c.id);
         break;
       case "label":
         hooks.setLabel(c.sceneId, c.label);

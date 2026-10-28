@@ -61,6 +61,14 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
    - Reordering under the structural permission moves the script once and undoably; otherwise planning only, with the indicator.
    - The board shows the same items: one planning tree, no copies.
    - Keyboard: arrows, indent and outdent, Alt+arrows to move.
+   - **Built 2026-10-28:**
+     - Schema v7: beats became outline items with a kind (act, sequence, beat), a title and a parent. Every existing beat keeps its id, text, link and order, as a top-level beat (frozen v6 files and an upgrade test).
+     - The navigator's **Outline** tab shows acts, sequences and beats as one tree. Add an act, a sequence or a beat (inside the chosen act or sequence when it fits there); edit the chosen item's title or logline and summary below the tree; link a beat to a scene; delete (an act or sequence that holds items cannot be deleted until it is empty).
+     - Keyboard: Up/Down choose, Enter edits, Alt+Up/Down move among siblings, Alt+Right puts the item inside the act or sequence above, Alt+Left takes it out, Delete removes it. Moves pressed quickly one after another all count (each is worked out when its turn comes).
+     - The board shows the same beats (acts and sequences are not cards), in outline order. A planning-only card move puts the card beside its new neighbour, in that neighbour's act or sequence.
+     - Every outline change is a planning step (ADR 0003): Ctrl/Cmd+Z in the outline undoes it. With "Board may reorder script" on, a beat moved in the outline moves its scene to match, once, as a script edit (undone in the script). Moving an act or sequence does not reorder the script yet.
+     - The core checks every place: known kinds; a parent that is an act or sequence of the same document; an act only at the top; a sequence never inside a sequence; never inside itself; an act or sequence holding items cannot become a beat.
+     - Tests: core (nesting rules, refused places, delete refused while holding items, move and undo; v6 upgrade keeps every beat; the model contract includes the new fields); e2e "Outline tab" on both drivers.
 5. **Beat and pacing board** (item 12).
    - The writer divides beats into any number of acts. Optional starting structures with generic names (three-act, five-act), never a trademarked method.
    - Pacing: each beat's position against estimated page and estimated minutes, labelled as estimates.

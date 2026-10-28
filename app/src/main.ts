@@ -16,7 +16,7 @@ import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
 import { sceneNumbersPlugin, sceneNumbersKey, buildSceneNumberDecorations, type SceneNumber } from "./scenenums";
 import { confirmDialog } from "./confirm";
-import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, navUi, type BoardState, type ScriptView, type NavInfo, type CharacterStat, setSceneNumbers, sceneAtCursor } from "./views";
+import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, navUi, outlineOrder, type BoardState, type ScriptView, type NavInfo, type CharacterStat, setSceneNumbers, sceneAtCursor } from "./views";
 import { createPanelHost, POP_LABEL, type PopPanel } from "./panels";
 import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
@@ -226,15 +226,21 @@ const queued = <T>(f: () => Promise<T>): Promise<T> => {
 };
 
 /** Store a beat (new or changed) as one planning step (the main window's panels and pop-out windows both use it). */
-function putBeat(beat: Beat): Promise<void> {
-  return queued(() => putBeatNow(beat));
+function putBeat(beat: Beat, from: "board" | "nav" = "board"): Promise<void> {
+  return queued(() => putBeatNow(beat, from));
 }
 
-async function putBeatNow(beat: Beat): Promise<void> {
+async function putBeatNow(beat: Beat, from: "board" | "nav"): Promise<void> {
   try {
     takePlanning(await invoke<PlanningState>("planning_command", { op: { PutBeat: beat }, base: planningVersion }));
-    boardSteps.push({ kind: "planning" });
-    boardRedo = [];
+    // Undo goes to the panel the change was made in (ADR 0003).
+    if (from === "board") {
+      boardSteps.push({ kind: "planning" });
+      boardRedo = [];
+    } else {
+      navSteps.push("planning");
+      navRedo = [];
+    }
   } catch (e) {
     await refreshPlanning().catch(() => undefined);
     showBanner(String(e).includes("stale") ? "The board had changed, so it was reloaded; that card change was not applied. Make it again." : `Card not saved: ${e}`);
@@ -358,8 +364,51 @@ async function openElsewhere(documentId: string, sceneId: string) {
   if (await openWith("open_document", { id: documentId })) revealScene(view, sceneId);
 }
 
+/** Delete an outline item from the Outline tab (a planning step; Ctrl/Cmd+Z there brings it back). */
+async function deleteItem(id: string) {
+  const it = board.beats.find((b) => b.id === id);
+  await queued(async () => {
+    try {
+      takePlanning(await invoke<PlanningState>("planning_command", { op: { DeleteBeat: id }, base: planningVersion }));
+      navSteps.push("planning");
+      navRedo = [];
+      announce(`${it?.title || it?.logline || "Item"} deleted. Undo brings it back.`);
+    } catch (e) {
+      showBanner(`Not deleted: ${e}`);
+    }
+  });
+  rerenderSide();
+}
+
+/** After a beat moves in the outline: with "Board may reorder script" on, its
+ *  scene moves to match (one script edit, before the next linked beat's scene). */
+function reorderFromOutline(id: string) {
+  const b = board.beats.find((x) => x.id === id);
+  if (!board.structural || !b?.scene_id || !view) return;
+  const linked = outlineOrder(board.beats).map((x) => x.it).filter((x) => x.kind === "beat" && x.scene_id);
+  const at = linked.findIndex((x) => x.id === id);
+  const next = linked.slice(at + 1).find((x) => x.scene_id !== b.scene_id && scenesOf(view.state.doc).some((sc) => sc.sceneId === x.scene_id));
+  const order = scenesOf(view.state.doc).map((sc) => sc.sceneId);
+  const want = next?.scene_id ?? null;
+  const i = order.indexOf(b.scene_id);
+  if (i < 0 || order[i + 1] === want || (want === null && i === order.length - 1)) return;
+  script().move(b.scene_id, want);
+  announce("The script's scene order follows the outline. Undo in the script reverts it.");
+}
+
 const script = (): ScriptView => ({
-  ...editorScript(view, putBeat, popButton),
+  ...editorScript(view, (b) => putBeat(b, "nav").then(() => rerenderSide()), popButton),
+  deleteItem: (id) => void deleteItem(id),
+  reorderFromOutline,
+  planWith: (plan) =>
+    queued(async () => {
+      const r = plan(board.beats.map((b) => ({ ...b })));
+      if (typeof r !== "string") await putBeatNow(r, "nav");
+      return r;
+    }).then((r) => {
+      rerenderSide();
+      return r;
+    }),
   nav: navInfo,
   redraw: () => renderNav(),
   setScope: () => void refreshNav(),
@@ -376,7 +425,7 @@ function rerenderSide() {
   const typing = a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === "text");
   if (!boardEl.contains(a) || !typing) {
     const key = focusKey(boardEl);
-    renderBoard(boardBody, { ...script(), move: boardMove }, board, rerenderSide, key?.split("|")[0]);
+    renderBoard(boardBody, { ...script(), putBeat, move: boardMove }, board, rerenderSide, key?.split("|")[0]);
     restoreFocus(boardEl, key);
   }
   panelHost.broadcast();
@@ -831,10 +880,12 @@ const panelHost = createPanelHost({
   setStructural: (on) => setStructural(on),
   reveal: (id) => revealScene(view, id),
   move: (id, before, panel) => (panel === "board" ? boardMove(id, before) : script().move(id, before)),
-  putBeat: async (beat) => {
-    await putBeat(beat);
+  putBeat: async (beat, panel) => {
+    await putBeat(beat, panel === "nav" ? "nav" : "board");
+    if (panel === "nav") reorderFromOutline(beat.id);
     rerenderSide();
   },
+  deleteItem: (id) => void deleteItem(id),
   notesText: () => notesPanel.value,
   nav: () => navInfo(),
   project: () => navUi.project,

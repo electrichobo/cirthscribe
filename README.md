@@ -103,7 +103,8 @@ First, from the owner's notes on the current build:
 - [ ] One story bible shared by every episode
 - [x] Tabbed navigator: Scenes (page, length in eighths, colour label, characters, the card's logline) and Characters (speeches, words, scenes, first appearance), with a filter and a whole-project view
 - [ ] Navigator tabs for notes and the outline
-- [ ] Outline editor, and an overview map of the whole script
+- [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
+- [ ] An overview map of the whole script
 - [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
 - [ ] Beat and pacing board, split into acts wherever you choose
 - [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo

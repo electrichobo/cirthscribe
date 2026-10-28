@@ -698,6 +698,67 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(() => { const s = document.getElementById('nav-scope'); s.value = 'doc'; s.dispatchEvent(new Event('change')); return true; })()");
   });
 
+  await test("Outline tab: acts, sequences and beats in one tree with the board; add, nest, edit, move, delete, undo; with permission a beat move reorders the script once", async () => {
+    await openFixture("page-boundaries");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    const items = () => app.evaluate("JSON.parse(JSON.stringify(__cirth.board.beats))");
+    const rowsText = () => app.evaluate("[...document.querySelectorAll('#navigator .outline-list li')].map(li => li.querySelector('.outline-go')?.textContent + '@' + li.style.paddingLeft)");
+    const focusRow = (id) => app.evaluate(`(() => { const b = document.querySelector('#navigator .outline-list li[data-item="${id}"] .outline-go'); b.click(); b.focus(); return true; })()`);
+    await app.evaluate("(document.getElementById('nav-tab-outline').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#navigator .outline-list li').length === 4", "the outline lists the four beats");
+    const beats0 = await items();
+    // An act, moved to the top, titled.
+    await app.evaluate("(document.getElementById('outline-add-act').click(), true)");
+    await waitFor(app, "__cirth.board.beats.some(b => b.kind === 'act')", "act added");
+    const act = (await items()).find((b) => b.kind === "act");
+    await focusRow(act.id);
+    for (let i = 0; i < 4; i++) await press("ArrowUp", ["alt"]);
+    await waitFor(app, `document.querySelector('#navigator .outline-list li')?.dataset.item === ${JSON.stringify(act.id)}`, "the act is first");
+    await app.evaluate("(() => { const t = document.getElementById('outline-title'); t.value = 'Act One'; t.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(act.id)}).title === 'Act One'`, "act titled");
+    // The first beat goes inside the act (Alt+Right); the board still shows four cards, no act.
+    await focusRow(beats0[0].id);
+    await press("ArrowRight", ["alt"]);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(beats0[0].id)}).parent === ${JSON.stringify(act.id)}`, "beat nested in the act");
+    assert((await rowsText()).some((r) => r.endsWith("@14px")), `nested row indented: ${await rowsText()}`);
+    assert((await app.evaluate("document.querySelectorAll('#board .card').length")) === 4, "the board shows beats only");
+    // A beat's logline edited in the outline is the board card's logline: one item.
+    await focusRow(beats0[1].id);
+    await app.evaluate("(() => { const t = document.getElementById('outline-title'); t.value = 'Edited in the outline'; t.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `document.querySelector('#board .card[data-beat-id="${beats0[1].id}"] .logline')?.value === 'Edited in the outline'`, "the board card shows the outline's text");
+    // Undo in the outline list.
+    await focusRow(beats0[1].id);
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(beats0[1].id)}).logline === ''`, "Ctrl/Cmd+Z in the outline undoes the edit");
+    // An act that holds a beat cannot be deleted; an empty sequence can, and undo brings it back.
+    await focusRow(act.id);
+    await press("Delete");
+    await waitFor(app, "/Not deleted/.test(document.getElementById('banner').textContent)", "deleting an act that holds items is refused");
+    await focusRow(act.id);
+    await app.evaluate("(document.getElementById('outline-add-sequence').click(), true)");
+    await waitFor(app, `__cirth.board.beats.some(b => b.kind === 'sequence' && b.parent === ${JSON.stringify(act.id)})`, "a sequence inside the act");
+    const seq = (await items()).find((b) => b.kind === "sequence");
+    await focusRow(seq.id);
+    await press("Delete");
+    await waitFor(app, "!__cirth.board.beats.some(b => b.kind === 'sequence')", "empty sequence deleted");
+    await focusRow(act.id);
+    await press("z", [MOD_KEY]);
+    await waitFor(app, "__cirth.board.beats.some(b => b.kind === 'sequence')", "undo brings it back");
+    // With "Board may reorder script" on, a beat moved below the next one moves its scene once.
+    await app.evaluate("__cirth.setStructural(true)");
+    const order0 = await app.evaluate("__cirth.scenes().map(s => s.sceneId).join()");
+    const b2 = beats0.find((b) => b.scene_id === scenes[1]);
+    await focusRow(b2.id);
+    await press("ArrowDown", ["alt"]);
+    await waitFor(app, `__cirth.scenes().map(s => s.sceneId).join() === ${JSON.stringify([scenes[0], scenes[2], scenes[1], scenes[3]].join())}`, "the script follows the outline");
+    assert(await storedMatchesEditor(), "stored order equals the editor");
+    await app.evaluate("__cirth.view.focus()");
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `__cirth.scenes().map(s => s.sceneId).join() === ${JSON.stringify(order0)}`, "one undo in the script restores its order");
+    await app.evaluate("__cirth.setStructural(false)");
+    await app.evaluate("(document.getElementById('nav-tab-scenes').click(), true)");
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

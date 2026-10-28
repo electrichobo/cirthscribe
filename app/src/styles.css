@@ -158,6 +158,21 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 .nav-list li[data-label="blue"] { --label-color: var(--label-blue); } .nav-list li[data-label="purple"] { --label-color: var(--label-purple); }
 .nav-list li[data-label="pink"] { --label-color: var(--label-pink); } .nav-list li[data-label="grey"] { --label-color: var(--label-grey); }
 :root { --label-red: #d64545; --label-orange: #e07b21; --label-yellow: #d4b106; --label-green: #3a9a4a; --label-blue: #3b73d6; --label-purple: #8a55c8; --label-pink: #d65a9f; --label-grey: #8a8a8a; }
+/* Outline tab (M3 step 4): acts, sequences and beats as one tree. */
+.outline-tools { display: flex; gap: 4px; margin: 0 0 6px; }
+.outline-tools button { font-size: 12px; padding: 2px 8px; }
+.outline-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.outline-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.outline-go { flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 3px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outline-go[aria-current="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.outline-row.act .outline-go { font-weight: 700; }
+.outline-row.sequence .outline-go { font-weight: 600; }
+.outline-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.outline-scene { flex-basis: 100%; padding-left: 22px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outline-editor { display: grid; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.outline-editor h3 { margin: 0; font-size: 12px; }
+.outline-editor input, .outline-editor textarea, .outline-editor select { width: 100%; padding: 4px 6px; }
+.outline-editor #outline-delete { justify-self: start; font-size: 12px; }
 .char-list { list-style: none; margin: 0; padding: 0; }
 .char-list li { display: grid; gap: 1px; padding: 3px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
 .char-go { text-align: left; border: 0; background: none; padding: 2px 4px; }

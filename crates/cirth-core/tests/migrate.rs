@@ -372,3 +372,30 @@ fn opening_a_v5_project_adds_scene_labels_with_none_set() {
         assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
     }
 }
+
+#[test]
+fn opening_a_v6_project_makes_beats_outline_items_keeping_ids_text_links_and_order() {
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v6-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v6-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 6, "fixture must be schema v6");
+        let before: Vec<(String, String, Option<String>, f64)> = {
+            let c = rusqlite::Connection::open_with_flags(&pkg, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+            let mut st = c.prepare("SELECT id, summary, scene_id, pos FROM beats ORDER BY pos").unwrap();
+            st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).unwrap().map(|x| x.unwrap()).collect()
+        };
+        assert!(!before.is_empty());
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(6));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v6 copy kept");
+        let s = o.store;
+        let after = s.beats().unwrap();
+        assert_eq!(after.iter().map(|b| (b.id.clone(), b.summary.clone(), b.scene_id.clone(), b.pos)).collect::<Vec<_>>(), before, "ids, text, links and order kept");
+        assert!(after.iter().all(|b| b.kind == "beat" && b.title.is_empty() && b.parent.is_none()), "every old beat is a top-level beat");
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}

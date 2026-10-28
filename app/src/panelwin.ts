@@ -62,6 +62,7 @@ const script: ScriptView = {
   redraw: () => draw(),
   setScope: (project) => send({ cmd: "scope", project }),
   setLabel: (sceneId, label) => send({ cmd: "label", sceneId, label }),
+  deleteItem: (id) => send({ cmd: "deleteItem", id }),
   openElsewhere: (documentId, sceneId) => send({ cmd: "openElsewhere", documentId, sceneId }),
 };
 

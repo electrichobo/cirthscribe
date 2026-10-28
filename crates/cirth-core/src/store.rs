@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -229,10 +229,22 @@ fn migrate_v6(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v6 -> v7: beats become outline items (M3 step 4, decision B): a kind
+/// (act, sequence, beat), a title and a parent. Existing beats keep their
+/// ids, text, links and order, as top-level beats.
+fn migrate_v7(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "ALTER TABLE beats ADD COLUMN kind TEXT NOT NULL DEFAULT 'beat';
+         ALTER TABLE beats ADD COLUMN title TEXT NOT NULL DEFAULT '';
+         ALTER TABLE beats ADD COLUMN parent_id TEXT;",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -887,9 +899,9 @@ impl Store {
     /// The current document's cards.
     pub fn beats(&self) -> Result<Vec<Beat>> {
         let doc = self.current_document()?;
-        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos FROM beats WHERE document_id = ?1 ORDER BY pos")?;
+        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id FROM beats WHERE document_id = ?1 ORDER BY pos")?;
         let beats = stmt
-            .query_map([&doc], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)? }))?
+            .query_map([&doc], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(beats)
     }
@@ -898,16 +910,57 @@ impl Store {
     /// settings change, they count as unsaved work until the next save.
     pub fn put_beat(&self, beat: &Beat) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, ?5, COALESCE((SELECT document_id FROM beats WHERE id = ?1), ?6))",
-            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos, self.current_document()?],
+            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id, kind, title, parent_id) VALUES (?1, ?2, ?3, ?4, ?5, COALESCE((SELECT document_id FROM beats WHERE id = ?1), ?6), ?7, ?8, ?9)",
+            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos, self.current_document()?, beat.kind, beat.title, beat.parent],
         )?;
         self.mark_unsaved()
+    }
+
+    /// An outline item's kind and place are valid: a known kind; a parent
+    /// that is an act or sequence of the same document; never inside itself;
+    /// an act only at the top, a sequence never inside another sequence; an
+    /// act or sequence that holds items stays one.
+    fn check_outline_place(&self, b: &Beat) -> Result<()> {
+        if !crate::model::OUTLINE_KINDS.contains(&b.kind.as_str()) {
+            return Err(StoreError::Invalid(format!("unknown outline kind {}", b.kind)));
+        }
+        let before = self.beat(&b.id)?;
+        if b.kind == "beat" && before.as_ref().is_some_and(|o| o.kind != "beat") && self.conn.query_row("SELECT COUNT(*) FROM beats WHERE parent_id = ?1", [&b.id], |r| r.get::<_, i64>(0))? > 0 {
+            return Err(StoreError::Invalid("an act or sequence that holds items cannot become a beat".into()));
+        }
+        let Some(parent) = &b.parent else { return Ok(()) };
+        if b.kind == "act" {
+            return Err(StoreError::Invalid("an act sits at the top of the outline".into()));
+        }
+        let doc: String = match self.conn.query_row("SELECT document_id FROM beats WHERE id = ?1", [&b.id], |r| r.get(0)).optional()? {
+            Some(d) => d,
+            None => self.current_document()?,
+        };
+        let mut at = Some(parent.clone());
+        let mut first = true;
+        while let Some(p) = at {
+            if p == b.id {
+                return Err(StoreError::Invalid("an outline item cannot go inside itself".into()));
+            }
+            let row: Option<(String, Option<String>, String)> = self.conn.query_row("SELECT kind, parent_id, document_id FROM beats WHERE id = ?1", [&p], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+            let Some((kind, up, pdoc)) = row else {
+                return Err(StoreError::Invalid(format!("no outline item {p}")));
+            };
+            if first {
+                if kind == "beat" || pdoc != doc || (b.kind == "sequence" && kind == "sequence") {
+                    return Err(StoreError::Invalid("an item goes inside an act or a sequence of the same document; a sequence goes inside an act".into()));
+                }
+                first = false;
+            }
+            at = up;
+        }
+        Ok(())
     }
 
     pub fn beat(&self, id: &str) -> Result<Option<Beat>> {
         Ok(self
             .conn
-            .query_row("SELECT id, logline, summary, scene_id, pos FROM beats WHERE id = ?1", [id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)? }))
+            .query_row("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id FROM beats WHERE id = ?1", [id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)? }))
             .optional()?)
     }
 
@@ -933,6 +986,7 @@ impl Store {
                 if b.id.trim().is_empty() || !b.pos.is_finite() {
                     return Err(StoreError::Invalid("a card needs an id and a position".into()));
                 }
+                self.check_outline_place(b)?;
                 let before = self.beat(&b.id)?;
                 self.put_beat(b)?;
                 match before {
@@ -949,6 +1003,9 @@ impl Store {
                 let Some(old) = self.beat(id)? else {
                     return Err(StoreError::Invalid(format!("no card {id}")));
                 };
+                if self.conn.query_row("SELECT COUNT(*) FROM beats WHERE parent_id = ?1", [id], |r| r.get::<_, i64>(0))? > 0 {
+                    return Err(StoreError::Invalid("move or delete what is inside it first".into()));
+                }
                 self.conn.execute("DELETE FROM beats WHERE id = ?1", [id])?;
                 self.mark_unsaved()?;
                 PlanningOp::PutBeat(old)

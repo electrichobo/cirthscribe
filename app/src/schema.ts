@@ -136,7 +136,14 @@ export interface Beat {
   logline: string;
   summary: string;
   scene_id: string | null;
+  /** Order among its outline siblings. */
   pos: number;
+  /** Outline item kind (M3 step 4): "act", "sequence" or "beat"; only beats show on the board. */
+  kind: "act" | "sequence" | "beat";
+  /** Title of an act or sequence (a beat's own line is its logline). */
+  title: string;
+  /** The act or sequence it sits in; null at the top of the outline. */
+  parent: string | null;
 }
 
 const has = (marks: readonly Mark[], name: string) => marks.some((m) => m.type.name === name);

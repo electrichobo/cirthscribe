@@ -157,7 +157,7 @@ fn package_save_is_atomic_and_reopen_detects_recovery() {
     {
         let mut s = Store::open(&work).unwrap();
         s.seed(&doc).unwrap();
-        s.put_beat(&Beat { id: "beat-1".into(), logline: "Zoë makes her choice".into(), summary: "Zoë orders".into(), scene_id: doc.scenes().first().map(|x| x.scene_id.clone()), pos: 1.0 }).unwrap();
+        s.put_beat(&Beat { id: "beat-1".into(), logline: "Zoë makes her choice".into(), summary: "Zoë orders".into(), scene_id: doc.scenes().first().map(|x| x.scene_id.clone()), pos: 1.0, ..Default::default() }).unwrap();
         assert_eq!(s.save_package(&pkg).unwrap(), 1);
         assert!(!s.has_unsaved_work().unwrap());
         // A stray temp file from an interrupted save does not disturb the package.
@@ -451,7 +451,7 @@ fn planning_commands_check_their_base_undo_exactly_and_never_touch_the_script() 
     let v0 = s.planning_version().unwrap();
 
     // A new card, then its text, then a planning-only move.
-    let card = Beat { id: "card-1".into(), logline: String::new(), summary: "The storm".into(), scene_id: Some(scene.clone()), pos: 10.0 };
+    let card = Beat { id: "card-1".into(), logline: String::new(), summary: "The storm".into(), scene_id: Some(scene.clone()), pos: 10.0, ..Default::default() };
     let v1 = h.apply(&s, PlanningOp::PutBeat(card.clone()), v0).unwrap();
     let written = Beat { logline: "Ada decides to stay".into(), ..card.clone() };
     let v2 = h.apply(&s, PlanningOp::PutBeat(written.clone()), v1).unwrap();
@@ -527,7 +527,7 @@ fn series_tree_folders_and_episodes_each_with_their_own_script_cards_and_numbers
         let line = Block::new(BlockKind::Action, "The harbour empties.");
         s.apply(&Batch { tx_id: cirth_core::model::new_id(), base_version: base, document_id: None, ops: vec![Op::Put { block: line.clone(), after: Some(ep1_doc.blocks[0].id.clone()) }] }).unwrap();
         assert_eq!(s.load().unwrap().blocks.len(), 2, "a batch without a document edits the current one");
-        let card = Beat { id: "ep1-card".into(), logline: "Low water".into(), summary: String::new(), scene_id: ep1_doc.blocks[0].scene_id.clone(), pos: 1.0 };
+        let card = Beat { id: "ep1-card".into(), logline: "Low water".into(), summary: String::new(), scene_id: ep1_doc.blocks[0].scene_id.clone(), pos: 1.0, ..Default::default() };
         s.put_beat(&card).unwrap();
         assert_eq!(s.beats().unwrap(), vec![card.clone()], "the board shows this episode's cards only");
         s.lock_scene_numbers(&ep1).unwrap();
@@ -564,6 +564,51 @@ fn series_tree_folders_and_episodes_each_with_their_own_script_cards_and_numbers
     assert!(titles.contains(&"Episode 2: Neap Tide".to_string()) && titles.contains(&"Series One".to_string()) && titles.contains(&"Tide Ledger (Pilot)".to_string()), "{titles:?}");
     assert_eq!(s.load_document(&pilot).unwrap().title, "Tide Ledger (Pilot)");
     assert_eq!(s.load_document(&ep2).unwrap().title, "Episode 2: Neap Tide");
+}
+
+#[test]
+fn outline_items_nest_acts_sequences_and_beats_and_refuse_bad_places() {
+    use cirth_core::model::Beat;
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    let d = tmpdir("outline");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+    let mut h = PlanningHistory::default();
+    let put = |h: &mut PlanningHistory, s: &Store, b: &Beat| {
+        let v = s.planning_version().unwrap();
+        h.apply(s, PlanningOp::PutBeat(b.clone()), v)
+    };
+    let act = Beat { id: "act-1".into(), kind: "act".into(), title: "Act One".into(), pos: 1.0, ..Default::default() };
+    let seq = Beat { id: "seq-1".into(), kind: "sequence".into(), title: "The weighing".into(), parent: Some("act-1".into()), pos: 1.0, ..Default::default() };
+    let beat = Beat { id: "b-1".into(), logline: "The scale is wrong".into(), parent: Some("seq-1".into()), pos: 1.0, ..Default::default() };
+    put(&mut h, &s, &act).unwrap();
+    put(&mut h, &s, &seq).unwrap();
+    put(&mut h, &s, &beat).unwrap();
+    assert_eq!(s.beat("b-1").unwrap().unwrap().parent.as_deref(), Some("seq-1"));
+
+    // Refused: unknown kinds, a beat as a parent, an act inside anything, a sequence inside a sequence, a loop.
+    let bad = [
+        Beat { id: "x".into(), kind: "chapter".into(), ..Default::default() },
+        Beat { id: "x".into(), parent: Some("b-1".into()), ..Default::default() },
+        Beat { id: "x".into(), kind: "act".into(), parent: Some("act-1".into()), ..Default::default() },
+        Beat { id: "x".into(), kind: "sequence".into(), parent: Some("seq-1".into()), ..Default::default() },
+        Beat { parent: Some("seq-1".into()), ..act.clone() },
+        Beat { id: "x".into(), parent: Some("nowhere".into()), ..Default::default() },
+    ];
+    for b in &bad {
+        assert!(matches!(put(&mut h, &s, b), Err(StoreError::Invalid(_))), "refused: {b:?}");
+    }
+    assert!(matches!(put(&mut h, &s, &Beat { kind: "beat".into(), ..act.clone() }), Err(StoreError::Invalid(_))), "an act holding items cannot become a beat");
+    let v = s.planning_version().unwrap();
+    assert!(matches!(h.apply(&s, PlanningOp::DeleteBeat("seq-1".into()), v), Err(StoreError::Invalid(_))), "a sequence holding a beat cannot be deleted");
+
+    // Out of the sequence to the top level, then undone: back where it was.
+    put(&mut h, &s, &Beat { parent: None, pos: 9.0, ..beat.clone() }).unwrap();
+    assert_eq!(s.beat("b-1").unwrap().unwrap().parent, None);
+    h.undo(&s).unwrap();
+    assert_eq!(s.beat("b-1").unwrap().unwrap(), beat);
+    let all = s.beats().unwrap();
+    assert_eq!(all.iter().filter(|b| b.kind == "beat").count(), 1);
 }
 
 #[test]

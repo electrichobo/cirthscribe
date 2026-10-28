@@ -155,8 +155,31 @@ pub struct Beat {
     pub logline: String,
     pub summary: String,
     pub scene_id: Option<Id>,
-    /// Planning order on the board; independent of script order.
+    /// Planning order among its outline siblings; independent of script order.
     pub pos: f64,
+    /// Outline item kind (M3 step 4, decision B: beats are outline items):
+    /// "act", "sequence" or "beat". Only beats show on the board.
+    #[serde(default = "beat_kind")]
+    pub kind: String,
+    /// Title of an act or sequence (a beat's own line is its logline).
+    #[serde(default)]
+    pub title: String,
+    /// The act or sequence it sits in; None at the top of the outline.
+    #[serde(default)]
+    pub parent: Option<Id>,
+}
+
+fn beat_kind() -> String {
+    "beat".into()
+}
+
+/// Outline item kinds, from the outside in.
+pub const OUTLINE_KINDS: [&str; 3] = ["act", "sequence", "beat"];
+
+impl Default for Beat {
+    fn default() -> Self {
+        Beat { id: String::new(), logline: String::new(), summary: String::new(), scene_id: None, pos: 0.0, kind: beat_kind(), title: String::new(), parent: None }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

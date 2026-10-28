@@ -51,6 +51,12 @@ export interface ScriptView {
   renameLabels?(): void;
   /** Open another document of the project at one of its scenes. */
   openElsewhere?(documentId: string, sceneId: string): void;
+  /** Delete an outline item (a planning step, undoable). */
+  deleteItem?(id: string): void;
+  /** After an outline move: reorder the script to match, when the board may (ADR 0003). */
+  reorderFromOutline?(id: string): void;
+  /** Run an outline change against the data as it is when its turn comes (a planning step). */
+  planWith?(plan: (all: Beat[]) => Beat | string): Promise<Beat | string>;
 }
 
 /** The editor as a ScriptView (main window). */
@@ -142,7 +148,7 @@ export interface NavInfo {
 }
 
 /** The navigator's own choices (per window): tab, filter text, scope. */
-export const navUi = { tab: "scenes" as "scenes" | "characters", filter: "", project: false };
+export const navUi = { tab: "scenes" as "scenes" | "outline" | "characters", filter: "", project: false, chosen: null as string | null };
 
 /** Page eighths as screenplay schedules write them: "1 2/8", "3/8", "2". */
 export function eighths(n: number): string {
@@ -161,8 +167,8 @@ function navShell(root: HTMLElement, script: ScriptView) {
   const tablist = el("div", { className: "nav-tabs" });
   tablist.setAttribute("role", "tablist");
   tablist.setAttribute("aria-label", "Navigator");
-  const tabs = (["scenes", "characters"] as const).map((t) => {
-    const b = el("button", { type: "button", className: "nav-tab", id: `nav-tab-${t}` }, t === "scenes" ? "Scenes" : "Characters");
+  const tabs = (["scenes", "outline", "characters"] as const).map((t) => {
+    const b = el("button", { type: "button", className: "nav-tab", id: `nav-tab-${t}` }, { scenes: "Scenes", outline: "Outline", characters: "Characters" }[t]);
     b.setAttribute("role", "tab");
     b.addEventListener("click", () => {
       navUi.tab = t;
@@ -174,7 +180,8 @@ function navShell(root: HTMLElement, script: ScriptView) {
   tablist.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    navUi.tab = navUi.tab === "scenes" ? "characters" : "scenes";
+    const order = ["scenes", "outline", "characters"] as const;
+    navUi.tab = order[(order.indexOf(navUi.tab) + (e.key === "ArrowRight" ? 1 : 2)) % 3];
     script.redraw?.();
     document.getElementById(`nav-tab-${navUi.tab}`)?.focus();
   });
@@ -222,6 +229,7 @@ export function renderNavigator(root: HTMLElement, script: ScriptView, focusScen
   sh.body.setAttribute("aria-labelledby", `nav-tab-${navUi.tab}`);
   const q = navUi.filter.trim().toLowerCase();
   if (navUi.tab === "characters") return renderCharacters(sh.body, script, info, q, focusScene);
+  if (navUi.tab === "outline") return renderOutline(sh.body, script, info, q, focusScene);
 
   const scenes = script.scenes();
   const current = script.current();
@@ -341,6 +349,198 @@ export function renderNavigator(root: HTMLElement, script: ScriptView, focusScen
   if (!shown) sh.body.append(el("p", { className: "form-note" }, q ? "No scene matches the filter." : "No scenes yet."));
 }
 
+
+const KIND_LABEL: Record<string, string> = { act: "Act", sequence: "Sequence", beat: "Beat" };
+
+/** The Outline tab (M3 step 4): acts, sequences and beats as one tree; the board shows the same beats. */
+function renderOutline(body: HTMLElement, script: ScriptView, info: NavInfo | undefined, q: string, focusItem?: string | null) {
+  const items = info?.beats ?? [];
+  const scenes = script.scenes();
+  const heading = new Map(scenes.map((s) => [s.sceneId, s.heading || "(empty heading)"]));
+  const flat = outlineOrder(items);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const name = (b: Beat) => b.title || b.logline || (b.scene_id && heading.get(b.scene_id)) || `(untitled ${KIND_LABEL[b.kind ?? "beat"].toLowerCase()})`;
+  if (!navUi.chosen || !byId.has(navUi.chosen)) navUi.chosen = flat[0]?.it.id ?? null;
+  const chosen = navUi.chosen ? byId.get(navUi.chosen) : undefined;
+  const siblingsIn = (all: Beat[], parent: string | null) => all.filter((b) => (b.parent ?? null) === parent).sort((a, b) => a.pos - b.pos);
+  const siblings = (parent: string | null) => siblingsIn(items, parent);
+  /** Plan a change from the outline as it is when its turn comes (moves pressed in quick succession all count). */
+  type Plan = (all: Beat[]) => Beat | string;
+  const apply = (plan: Plan, announcement: string) => {
+    const run =
+      script.planWith ??
+      (async (f: Plan) => {
+        const r = f(items);
+        if (typeof r !== "string") await script.putBeat(r);
+        return r;
+      });
+    void run(plan).then((r) => {
+      if (typeof r === "string") return announce(r);
+      announce(announcement);
+      script.reorderFromOutline?.(r.id);
+    });
+  };
+  const put = (b: Beat, announcement: string) => apply(() => b, announcement);
+  /** A new item: inside the chosen act or sequence when it can hold it, else beside the chosen item. */
+  const add = (kind: "act" | "sequence" | "beat") => {
+    let parent: string | null = null;
+    if (kind !== "act" && chosen) {
+      if (chosen.kind === "act" || (chosen.kind === "sequence" && kind === "beat")) parent = chosen.id;
+      else parent = chosen.parent ?? null;
+      const p = parent ? byId.get(parent) : undefined;
+      if (kind === "sequence" && p?.kind === "sequence") parent = p.parent ?? null;
+    }
+    const b: Beat = { id: newId(), kind, title: kind === "beat" ? "" : kind === "act" ? `Act ${items.filter((x) => x.kind === "act").length + 1}` : "New sequence", logline: "", summary: "", scene_id: null, parent, pos: Math.max(0, ...siblings(parent).map((x) => x.pos)) + 1 };
+    navUi.chosen = b.id;
+    put(b, `${KIND_LABEL[kind]} added`);
+  };
+  /** Up or down among its siblings. */
+  const move = (id: string, dir: -1 | 1) =>
+    apply((all) => {
+      const b = all.find((x) => x.id === id)!;
+      const sib = siblingsIn(all, b.parent ?? null);
+      const j = sib.findIndex((x) => x.id === id) + dir;
+      if (j < 0 || j >= sib.length) return dir < 0 ? "Already first in its place" : "Already last in its place";
+      const far = sib[j + dir];
+      return { ...b, pos: far ? (sib[j].pos + far.pos) / 2 : sib[j].pos + dir };
+    }, `Moved ${dir < 0 ? "up" : "down"}`);
+  /** Into the act or sequence above it (indent), or out to its parent's level after it (outdent). */
+  const indent = (id: string) =>
+    apply((all) => {
+      const b = all.find((x) => x.id === id)!;
+      const sib = siblingsIn(all, b.parent ?? null);
+      const above = sib[sib.findIndex((x) => x.id === id) - 1];
+      if (!above || above.kind === "beat" || b.kind === "act" || (b.kind === "sequence" && above.kind !== "act")) return "It cannot go inside the item above it";
+      return { ...b, parent: above.id, pos: Math.max(0, ...siblingsIn(all, above.id).map((x) => x.pos)) + 1 };
+    }, "Moved inside the item above");
+  const outdent = (id: string) =>
+    apply((all) => {
+      const b = all.find((x) => x.id === id)!;
+      const p = b.parent ? all.find((x) => x.id === b.parent) : undefined;
+      if (!p) return "Already at the top of the outline";
+      // Out to its parent's level, just after the parent.
+      const up = p.parent ?? null;
+      const sib = siblingsIn(all, up);
+      const i = sib.findIndex((x) => x.id === p.id);
+      return { ...b, parent: up, pos: sib[i + 1] ? (p.pos + sib[i + 1].pos) / 2 : p.pos + 1 };
+    }, "Moved out of its act or sequence");
+
+  const tools = el("div", { className: "outline-tools" });
+  for (const k of ["act", "sequence", "beat"] as const) {
+    const bt = el("button", { type: "button", id: `outline-add-${k}`, title: `Add ${k === "act" ? "an act" : `a ${k}`} (inside the chosen act or sequence when it can go there)` }, `+ ${KIND_LABEL[k]}`);
+    bt.addEventListener("click", () => add(k));
+    tools.append(bt);
+  }
+  const list = el("ul", { className: "outline-list" });
+  list.setAttribute("aria-label", "Outline");
+  list.setAttribute("aria-describedby", "outline-hint");
+  const gos: HTMLButtonElement[] = [];
+  for (const { it, depth } of flat) {
+    const linked = it.scene_id ? heading.get(it.scene_id) : undefined;
+    if (q && !`${it.title} ${it.logline} ${it.summary} ${linked ?? ""}`.toLowerCase().includes(q)) continue;
+    const li = el("li", { className: `outline-row ${it.kind}` });
+    li.dataset.item = it.id;
+    li.style.paddingLeft = `${depth * 14}px`;
+    const go = el("button", { type: "button", className: "outline-go" }, el("span", { className: "outline-kind" }, KIND_LABEL[it.kind] ?? "Beat"), " ", name(it));
+    go.dataset.part = "go";
+    go.dataset.roving = "";
+    go.title = [it.summary, linked && `Scene: ${linked}`].filter(Boolean).join("\n");
+    go.setAttribute("aria-label", `${KIND_LABEL[it.kind]}: ${name(it)}${linked ? `, scene ${linked}` : it.kind === "beat" ? ", not linked to a scene" : ""}`);
+    if (it.id === navUi.chosen) go.setAttribute("aria-current", "true");
+    go.addEventListener("click", () => {
+      navUi.chosen = it.id;
+      script.redraw?.();
+      document.querySelector<HTMLElement>(`.outline-list li[data-item="${CSS.escape(it.id)}"] .outline-go`)?.focus();
+    });
+    li.append(go);
+    if (linked) li.append(el("span", { className: "outline-scene" }, linked));
+    list.append(li);
+    gos.push(go);
+  }
+  setRoving(gos, gos.find((g) => g.parentElement!.dataset.item === (focusItem ?? navUi.chosen)) ?? gos[0]);
+  list.addEventListener("keydown", (e) => {
+    const at = gos.indexOf(e.target as HTMLButtonElement);
+    if (at < 0) return;
+    const b = byId.get(gos[at].parentElement!.dataset.item!)!;
+    navUi.chosen = b.id;
+    if (e.altKey && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault();
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") move(b.id, e.key === "ArrowUp" ? -1 : 1);
+      else if (e.key === "ArrowRight") indent(b.id);
+      else outdent(b.id);
+      return;
+    }
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      script.redraw?.();
+      document.getElementById("outline-title")?.focus();
+      return;
+    }
+    if (e.key === "Delete") {
+      e.preventDefault();
+      script.deleteItem?.(b.id);
+      return;
+    }
+    const to = arrowTarget(gos, at, e.key, ["ArrowUp"], ["ArrowDown"]);
+    if (to) {
+      e.preventDefault();
+      navUi.chosen = to.parentElement!.dataset.item!;
+      setRoving(gos, to);
+      to.focus();
+      script.redraw?.();
+      document.querySelector<HTMLElement>(`.outline-list li[data-item="${CSS.escape(navUi.chosen)}"] .outline-go`)?.focus();
+    }
+  });
+
+  // The chosen item's fields. Changes are committed on Enter or leaving a field (one planning step each).
+  const editor = el("div", { className: "outline-editor" });
+  if (chosen) {
+    const isBeat = chosen.kind === "beat";
+    const title = el("input", { type: "text", id: "outline-title", value: isBeat ? chosen.logline : chosen.title, placeholder: isBeat ? "Logline: what happens, in one line" : "Title" });
+    title.setAttribute("aria-label", isBeat ? "Logline of the chosen beat" : `Title of the chosen ${chosen.kind}`);
+    const summary = el("textarea", { id: "outline-summary", value: chosen.summary, rows: 3, placeholder: "Summary (planning text, never written into the script)" });
+    summary.setAttribute("aria-label", "Summary of the chosen item");
+    const commit = () => {
+      const next: Beat = { ...chosen, summary: summary.value, ...(isBeat ? { logline: title.value } : { title: title.value }) };
+      if (next.summary !== chosen.summary || next.logline !== chosen.logline || next.title !== chosen.title) put(next, "Outline item saved");
+    };
+    for (const f of [title, summary] as HTMLElement[]) {
+      f.addEventListener("change", commit);
+      f.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          document.querySelector<HTMLElement>(`.outline-list li[data-item="${CSS.escape(chosen.id)}"] .outline-go`)?.focus();
+        } else if (e.key === "Enter" && f === title) {
+          e.preventDefault();
+          summary.focus();
+        }
+      });
+    }
+    editor.append(el("h3", {}, `${KIND_LABEL[chosen.kind]}: ${name(chosen)}`), title, summary);
+    if (isBeat) {
+      const link = el("select", { id: "outline-link" });
+      link.setAttribute("aria-label", "Scene this beat is linked to");
+      link.append(new Option("Not linked to a scene", ""), ...scenes.map((s) => new Option(s.heading || "(empty heading)", s.sceneId)));
+      link.value = chosen.scene_id ?? "";
+      link.addEventListener("change", () => put({ ...chosen, scene_id: link.value || null }, link.value ? "Linked to the scene" : "Link removed"));
+      editor.append(link);
+    }
+    const del = el("button", { type: "button", id: "outline-delete", title: "Delete the chosen item (Delete). Undo brings it back." }, "Delete");
+    del.addEventListener("click", () => script.deleteItem?.(chosen.id));
+    editor.append(del);
+  }
+  body.replaceChildren(
+    el("h2", {}, `Outline (${flat.length})`),
+    el("p", { className: "sr-only", id: "outline-hint" }, "Up and Down choose an item, Enter edits it, Alt+Up and Alt+Down move it, Alt+Right puts it inside the act or sequence above, Alt+Left takes it out, Delete removes it."),
+    tools,
+    list,
+    editor,
+  );
+  if (!flat.length) list.append(el("li", { className: "form-note" }, "No outline yet. Add an act, a sequence or a beat."));
+}
+
 function renderCharacters(body: HTMLElement, script: ScriptView, info: NavInfo | undefined, q: string, focusItem?: string | null) {
   const chars = (info?.characters ?? []).filter((c) => !q || c.name.toLowerCase().includes(q));
   const headings = new Map<string, string>();
@@ -389,8 +589,31 @@ export interface BoardState {
   structural: boolean;
 }
 
-export function boardOrder(beats: Beat[], scenes: SceneInfo[], structural: boolean): Beat[] {
-  if (!structural) return [...beats].sort((a, b) => a.pos - b.pos);
+/** Outline items in reading order: each item, then what it holds (by position among siblings). */
+export function outlineOrder(items: Beat[]): { it: Beat; depth: number }[] {
+  const kids = new Map<string | null, Beat[]>();
+  const ids = new Set(items.map((i) => i.id));
+  for (const it of items) {
+    const p = it.parent && ids.has(it.parent) ? it.parent : null;
+    if (!kids.has(p)) kids.set(p, []);
+    kids.get(p)!.push(it);
+  }
+  const out: { it: Beat; depth: number }[] = [];
+  const walk = (p: string | null, depth: number) => {
+    for (const it of (kids.get(p) ?? []).sort((a, b) => a.pos - b.pos)) {
+      out.push({ it, depth });
+      walk(it.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return out;
+}
+
+/** The board's cards: the outline's beats (acts and sequences are not cards). */
+export function boardOrder(items: Beat[], scenes: SceneInfo[], structural: boolean): Beat[] {
+  const flat = outlineOrder(items).map((x) => x.it);
+  const beats = flat.filter((b) => (b.kind ?? "beat") === "beat");
+  if (!structural) return beats;
   const idx = new Map(scenes.map((s) => [s.sceneId, s.index]));
   const key = (b: Beat) => (b.scene_id && idx.has(b.scene_id) ? idx.get(b.scene_id)! : Number.MAX_SAFE_INTEGER);
   return [...beats].sort((a, b) => key(a) - key(b) || a.pos - b.pos);
@@ -408,12 +631,19 @@ export async function moveCard(script: ScriptView, st: BoardState, id: string, b
     script.move(beat.scene_id, target ? target.scene_id : null);
     return;
   }
-  // Planning only: reorder beats; the script is untouched.
+  // Planning only: the card joins the outline beside its new neighbour (in
+  // that neighbour's act or sequence); the script is untouched.
   const rest = order.filter((b) => b.id !== id);
   const at = beforeId ? rest.findIndex((b) => b.id === beforeId) : rest.length;
-  const lo = at > 0 ? rest[at - 1].pos : (rest[0]?.pos ?? 0) - 2;
-  const hi = at < rest.length ? rest[at].pos : lo + 2;
-  beat.pos = (lo + hi) / 2;
+  const anchor = at < rest.length ? rest[at] : rest[rest.length - 1];
+  const parent = anchor?.parent ?? null;
+  const siblings = st.beats.filter((b) => (b.parent ?? null) === parent && b.id !== id).sort((a, b) => a.pos - b.pos);
+  if (at < rest.length) {
+    const i = siblings.findIndex((b) => b.id === anchor.id);
+    const lo = i > 0 ? siblings[i - 1].pos : anchor.pos - 2;
+    beat.pos = (lo + anchor.pos) / 2;
+  } else beat.pos = (siblings.at(-1)?.pos ?? 0) + 1;
+  beat.parent = parent;
   await script.putBeat(beat);
   rerender();
 }
@@ -426,7 +656,8 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
   const badge = el("span", { className: `badge ${st.structural ? "live" : "planning"}` }, st.structural ? "Moves reorder the script" : "Planning only");
   const add = el("button", { type: "button" }, "New beat for current scene");
   add.addEventListener("click", async () => {
-    const beat: Beat = { id: newId(), logline: "", summary: "", scene_id: script.current() ?? null, pos: (order.at(-1)?.pos ?? 0) + 1 };
+    const top = st.beats.filter((b) => !b.parent);
+    const beat: Beat = { id: newId(), logline: "", summary: "", scene_id: script.current() ?? null, pos: Math.max(0, ...top.map((b) => b.pos)) + 1, kind: "beat", title: "", parent: null };
     await script.putBeat(beat);
     rerender();
     announce("New beat added at the end of the board");
