@@ -7,6 +7,7 @@ pub mod fountain;
 pub mod freewrite;
 pub mod layout;
 pub mod model;
+pub mod numbering;
 pub mod ops;
 pub mod pdf;
 pub mod spell;

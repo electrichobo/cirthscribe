@@ -20,6 +20,12 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string,
   return e;
 };
 
+/** Locked scene numbers (main.ts sets them after each pagination). */
+let numbers = new Map<string, { number: string; omitted: boolean }>();
+export function setSceneNumbers(n: Map<string, { number: string; omitted: boolean }>) {
+  numbers = n;
+}
+
 const NAV_HINT = "Up and Down arrows choose a scene, Enter goes to it, Alt+Up and Alt+Down move it.";
 const BOARD_HINT = "Arrow keys choose a card, Enter edits its logline (Tab goes on to the summary) and Escape returns, Alt+arrows move it. Tab reaches the chosen card's buttons.";
 
@@ -92,7 +98,9 @@ export function renderNavigator(root: HTMLElement, view: EditorView, focusScene?
     // No scene numbers: they are assigned when the writer locks scene
     // numbers (a production feature, not built yet); order alone is shown.
     const name = s.heading || "(empty heading)";
-    const go = el("button", { type: "button", className: "nav-go", title: s.heading }, name);
+    const n = numbers.get(s.sceneId);
+    const go = el("button", { type: "button", className: "nav-go", title: s.heading }, ...(n ? [el("span", { className: "num" }, n.number), " "] : []), n?.omitted ? "OMITTED" : name);
+    if (n?.omitted) go.title = `${s.heading} (omitted)`;
     go.dataset.part = "go";
     go.dataset.roving = "";
     if (s.sceneId === current) go.setAttribute("aria-current", "location");

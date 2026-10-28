@@ -479,6 +479,58 @@ fn breaks_before(u: &Unit) -> bool {
     }
 }
 
+/// Scene-number margins: left number ends before the heading, right one
+/// starts after the text column.
+pub const SCENE_NUMBER_LEFT_IN: f32 = 0.75;
+pub const SCENE_NUMBER_RIGHT_IN: f32 = 7.4;
+
+/// Pages with locked scene numbers (numbering.rs). Omitted scenes collapse to
+/// one "OMITTED" heading (same block id, so page markers still line up) and
+/// their other blocks are left out of the pages, not the project. Numbered
+/// headings get their number in both margins on their first line.
+pub fn paginate_numbered(blocks: &[Block], p: &Profile, doc_version: u64, numbers: &crate::numbering::Numbers) -> PageMap {
+    if numbers.is_empty() {
+        return paginate(blocks, p, doc_version);
+    }
+    let mut shown: Vec<Block> = Vec::with_capacity(blocks.len());
+    let mut skipping = false;
+    for b in blocks {
+        if b.kind == BlockKind::Heading {
+            let n = b.scene_id.as_ref().and_then(|id| numbers.get(id));
+            skipping = n.is_some_and(|n| n.omitted);
+            if skipping {
+                let mut omitted = b.clone();
+                omitted.runs = vec![crate::model::Run::plain("OMITTED")];
+                shown.push(omitted);
+                continue;
+            }
+        }
+        if !skipping {
+            shown.push(b.clone());
+        }
+    }
+    let mut map = paginate(&shown, p, doc_version);
+    let number_of: std::collections::HashMap<&str, &str> = shown
+        .iter()
+        .filter(|b| b.kind == BlockKind::Heading)
+        .filter_map(|b| b.scene_id.as_ref().and_then(|id| numbers.get(id)).map(|n| (b.id.as_str(), n.number.as_str())))
+        .collect();
+    let char_in = 1.0 / p.chars_per_inch;
+    for page in &mut map.pages {
+        let mut extra = Vec::new();
+        for l in page.lines.iter().filter(|l| l.kind == "heading" && l.start == 0 && !l.synthetic) {
+            if let Some(n) = l.block_id.as_deref().and_then(|id| number_of.get(id)) {
+                let w = n.chars().count() as f32 * char_in;
+                for x in [SCENE_NUMBER_LEFT_IN + 0.5 - w - char_in, SCENE_NUMBER_RIGHT_IN] {
+                    extra.push(PLine { row: l.row, x_in: x.max(0.1), segs: vec![Seg { text: n.to_string(), bold: false, italic: false, underline: false }], block_id: None, kind: "scene-number", start: 0, end: 0, synthetic: true });
+                }
+            }
+        }
+        page.lines.extend(extra);
+    }
+    map
+}
+
 pub fn paginate(blocks: &[Block], p: &Profile, doc_version: u64) -> PageMap {
     let units = group(blocks);
     let mut pg = Pager { p, body: p.body_lines(), pages: Vec::new(), row: 0, warnings: Vec::new() };

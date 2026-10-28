@@ -60,7 +60,14 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - Unknown elements are kept as text where possible and always listed in the import report.
    - A tested element/attribute support matrix.
    - **Needs an XML parser dependency** (decision B).
-4. **Scene numbers and scene-number locking**, a separate feature from page locking:
+4. **Scene numbers and scene-number locking**, a separate feature from page locking. **Built 2026-10-27** (`cirth_core::numbering`, schema v4 table `scene_numbers` keyed by stable scene id; older files upgrade unlocked; tested against frozen v3 files):
+   - Format > Scene Numbers: Lock (1..N), Unlock… (asks first), Omit This Scene, Restore This Scene.
+   - While locked, new scenes get numbers from the scene before them (12A, 12B, 12AA, A1) and existing numbers never change. Undoing a deleted heading brings its number back.
+   - Omitted scenes print as "12 OMITTED 12"; their text stays in the project.
+   - Numbers appear in the scene list, both editor margins, the PDF and text exports (both margins), FDX (`Number`) and Fountain (`#12A#`). Imported numbers are kept and locked.
+   - Tests: rules, store, migration, layout, both formats' round trips, e2e.
+   - Not yet: FDX/Fountain have no way to mark a scene omitted, so omitted scenes are written with their text and the report says so.
+   Original plan:
    - number scenes;
    - lock them (inserted scenes get A/B numbers: 12A, 12B);
    - OMITTED scenes keep their number;

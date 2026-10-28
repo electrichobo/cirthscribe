@@ -25,7 +25,10 @@ pub fn render(map: &PageMap, p: &Profile) -> Exported {
 /// Like `render`, with a title page first (then a form feed) when one is
 /// given and not empty. Page numbers are unchanged: the title page is unnumbered.
 pub fn render_with_title(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>) -> Exported {
-    let col = |x_in: f32| ((x_in - p.action.left_in) * p.chars_per_inch).round().max(0.0) as usize;
+    // Columns count from the action margin, or from the left scene numbers
+    // when the script has them (they sit in the left margin).
+    let origin = map.pages.iter().flat_map(|pg| pg.lines.iter().map(|l| l.x_in)).fold(p.action.left_in, f32::min);
+    let col = |x_in: f32| ((x_in - origin) * p.chars_per_inch).round().max(0.0) as usize;
     // Page numbers end where the PDF's do: 1 inch from the right edge.
     let right = col(p.page_w_in - 1.0);
     let mut out = String::new();

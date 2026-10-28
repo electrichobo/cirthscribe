@@ -14,7 +14,9 @@ import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig
 import { Syncer, diff, type SyncStatus } from "./sync";
 import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks, parsePlainText } from "./paste";
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
-import { renderBoard, renderNavigator, moveCard, type BoardState } from "./views";
+import { sceneNumbersPlugin, sceneNumbersKey, buildSceneNumberDecorations, type SceneNumber } from "./scenenums";
+import { confirmDialog } from "./confirm";
+import { renderBoard, renderNavigator, moveCard, type BoardState, setSceneNumbers, sceneAtCursor } from "./views";
 import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
 import { adoptDomSelection, selSync } from "./selsync";
@@ -53,6 +55,8 @@ interface Paginated {
   map: { doc_version: number; pages: unknown[]; page_starts: PageStart[]; warnings: string[]; profile: string };
   load_ms: number;
   layout_ms: number;
+  scene_numbers: SceneNumber[];
+  scene_numbers_locked: boolean;
   missing_glyphs: string[];
 }
 
@@ -69,6 +73,7 @@ let view: EditorView;
 let syncer: Syncer;
 const board: BoardState = { beats: [], structural: false };
 let lastPagination: Paginated | null = null;
+let sceneNumbers = new Map<string, SceneNumber>();
 let lastOpen: Opened | null = null;
 const perf = installPerf(editorEl);
 
@@ -176,7 +181,16 @@ async function repaginate() {
     const p = await invoke<Paginated>("paginate", { profile });
     lastPagination = p;
     const stale = p.map.doc_version !== syncer.currentVersion || syncer.hasUnsynced;
-    view.dispatch(view.state.tr.setMeta(pageKey, buildDecorations(view.state.doc, p.map.page_starts, stale)).setMeta("addToHistory", false));
+    const changed = JSON.stringify([...sceneNumbers.values()]) !== JSON.stringify(p.scene_numbers.slice().sort((a, b) => a.scene_id.localeCompare(b.scene_id)));
+    sceneNumbers = new Map(p.scene_numbers.slice().sort((a, b) => a.scene_id.localeCompare(b.scene_id)).map((n) => [n.scene_id, n]));
+    setSceneNumbers(sceneNumbers);
+    view.dispatch(
+      view.state.tr
+        .setMeta(pageKey, buildDecorations(view.state.doc, p.map.page_starts, stale))
+        .setMeta(sceneNumbersKey, buildSceneNumberDecorations(view.state.doc, sceneNumbers))
+        .setMeta("addToHistory", false),
+    );
+    if (changed) rerenderSide();
     if (p.map.warnings.length) showBanner(`Layout warnings: ${p.map.warnings.join("; ")}`);
     if (stale && target !== syncer.currentVersion) schedulePaginate();
     updateInfo();
@@ -229,6 +243,7 @@ function makeState(blocks: Block[]) {
       keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
       keymap(baseKeymap),
       pageMarksPlugin(),
+      sceneNumbersPlugin(),
       findPlugin(),
       spellPlugin(),
       dualPlugin(),
@@ -856,6 +871,12 @@ async function runMenu(id: string): Promise<void> {
     case "focus_next":
       cycleRegions(regions(), false);
       break;
+    case "scenes_lock":
+    case "scenes_unlock":
+    case "scene_omit":
+    case "scene_restore":
+      if (lastOpen) await sceneNumbersAction(id);
+      break;
     case "title_page":
       if (lastOpen) await titlePage.open();
       break;
@@ -929,6 +950,41 @@ async function exportPdf() {
     showBanner(`PDF export failed: ${e}`);
   }
 }
+/** Format > Scene Numbers. Numbers live in Rust; this asks, then repaints. */
+async function sceneNumbersAction(id: string) {
+  const locked = !!lastPagination?.scene_numbers_locked;
+  const scene = sceneAtCursor(view);
+  if (id === "scenes_unlock") {
+    if (!locked) return showBanner("Scene numbers are not locked.");
+    const ok = await confirmDialog(
+      "Unlock scene numbers?",
+      "All scene numbers (and omitted marks) are removed. Locking again numbers the scenes 1, 2, 3… afresh, so numbers already sent out may change.",
+      "Unlock",
+    );
+    if (!ok) return;
+  }
+  if ((id === "scene_omit" || id === "scene_restore") && !locked) return showBanner("Lock scene numbers first: only numbered scenes can be omitted.");
+  if ((id === "scene_omit" || id === "scene_restore") && !scene) return showBanner("Put the caret in the scene to omit or restore.");
+  const action = { scenes_lock: "lock", scenes_unlock: "unlock", scene_omit: "omit", scene_restore: "restore" }[id]!;
+  try {
+    await syncer.flush();
+    const n = await invoke<number>("scene_numbers_command", { action, sceneId: scene?.sceneId ?? null });
+    await saveFile(false);
+    await repaginate();
+    announce(
+      action === "lock"
+        ? `Scene numbers locked: ${n} scenes numbered`
+        : action === "unlock"
+          ? "Scene numbers unlocked and removed"
+          : action === "omit"
+            ? "Scene omitted: it keeps its number and prints as OMITTED"
+            : "Scene restored",
+    );
+  } catch (e) {
+    showBanner(`Scene numbers: ${e}`);
+  }
+}
+
 /** File > Import Fountain…: a new project from a .fountain file. */
 async function importFountain(path?: string): Promise<boolean> {
   const source = path ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Fountain screenplay", extensions: ["fountain", "spmd", "txt"] }] }));

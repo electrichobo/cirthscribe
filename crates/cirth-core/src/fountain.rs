@@ -33,6 +33,9 @@ pub struct Exported {
 pub struct Imported {
     pub document: Document,
     pub title_page: TitlePage,
+    /// Scene numbers that came with the file (scene id, number): the app
+    /// locks them so they are kept.
+    pub scene_numbers: Vec<(String, String)>,
     /// What was changed or could not be kept (shown to the user after import).
     pub notes: Vec<String>,
 }
@@ -115,10 +118,10 @@ fn title_page_text(tp: &TitlePage) -> String {
     out
 }
 
-pub fn export(blocks: &[Block], title_page: &TitlePage) -> Exported {
+pub fn export(blocks: &[Block], title_page: &TitlePage, numbers: &crate::numbering::Numbers) -> Exported {
     let mut out = String::new();
     let mut notes = Vec::new();
-    let (mut shots, mut markup) = (0usize, 0usize);
+    let (mut shots, mut markup, mut omitted) = (0usize, 0usize, 0usize);
     if !title_page.is_empty() {
         out.push_str(&title_page_text(title_page));
         out.push('\n');
@@ -139,7 +142,14 @@ pub fn export(blocks: &[Block], title_page: &TitlePage) -> Exported {
         let starts_special = |t: &str| t.starts_with(['!', '@', '.', '~', '>', '=', '#', '[']) || t.trim().is_empty();
         let line = match b.kind {
             BlockKind::Heading => {
-                if is_heading_text(&plain) && !plain.starts_with('.') { text } else { format!(".{text}") }
+                let h = if is_heading_text(&plain) && !plain.starts_with('.') { text } else { format!(".{text}") };
+                match b.scene_id.as_ref().and_then(|id| numbers.get(id)) {
+                    Some(n) => {
+                        omitted += n.omitted as usize;
+                        format!("{h} #{}#", n.number)
+                    }
+                    None => h,
+                }
             }
             BlockKind::Character => {
                 let cue = if is_caps(&plain) && !starts_special(&plain) { text } else { format!("@{text}") };
@@ -176,6 +186,9 @@ pub fn export(blocks: &[Block], title_page: &TitlePage) -> Exported {
     }
     if markup > 0 {
         notes.push(format!("Text colour and highlight left out ({markup} marked run{}): they are on-screen markup only.", if markup == 1 { "" } else { "s" }));
+    }
+    if omitted > 0 {
+        notes.push(format!("{omitted} omitted scene{} written with their text and number (Fountain has no omitted scenes).", if omitted == 1 { "" } else { "s" }));
     }
     notes.push("Fountain keeps the text, element types, emphasis, dual dialogue, page breaks and the title page; it has no layout, so pages are decided by the app that opens it.".into());
     Exported { text: out, notes }
@@ -397,11 +410,16 @@ pub fn import(source: &str, fallback_title: &str) -> Imported {
         let forced_heading = t.starts_with('.') && !t.starts_with("..");
         if prev_blank && (forced_heading || is_heading_text(t)) {
             let mut h = if forced_heading { &t[1..] } else { t }.trim().to_string();
+            let mut number = None;
             if let Some(start) = h.rfind(" #").filter(|_| h.ends_with('#')) {
-                scene_numbers.push(h[start + 2..h.len() - 1].to_string());
+                number = Some(h[start + 2..h.len() - 1].to_string());
                 h.truncate(start);
             }
-            push(block(BlockKind::Heading, parse_runs(h.trim())), &mut pending_break, &mut blocks);
+            let heading = block(BlockKind::Heading, parse_runs(h.trim()));
+            if let (Some(n), Some(id)) = (number, heading.scene_id.clone()) {
+                scene_numbers.push((id, n));
+            }
+            push(heading, &mut pending_break, &mut blocks);
             i += 1;
             continue;
         }
@@ -479,7 +497,7 @@ pub fn import(source: &str, fallback_title: &str) -> Imported {
     }
     let plural = |n: usize| if n == 1 { "" } else { "s" };
     if !scene_numbers.is_empty() {
-        notes.push(format!("{} scene number{} removed from headings (scene numbering comes in a later step): {}.", scene_numbers.len(), plural(scene_numbers.len()), scene_numbers.join(", ")));
+        notes.push(format!("{} scene number{} kept and locked ({}); scenes without one were given A/B numbers.", scene_numbers.len(), plural(scene_numbers.len()), scene_numbers.iter().map(|(_, n)| n.as_str()).collect::<Vec<_>>().join(", ")));
     }
     if joined > 0 {
         notes.push(format!("{joined} paragraph{} or speech{} had line breaks; their lines were joined with spaces.", plural(joined), if joined == 1 { "" } else { "es" }));
@@ -497,7 +515,7 @@ pub fn import(source: &str, fallback_title: &str) -> Imported {
         notes.push(format!("{boneyard} boneyard section{} (/* */) kept as visible text so nothing is lost.", plural(boneyard)));
     }
     let title = if title_page.title.trim().is_empty() { fallback_title.to_string() } else { title_page.title.lines().next().unwrap_or("").trim().to_string() };
-    Imported { document: Document { title, version: 0, blocks }, title_page, notes }
+    Imported { document: Document { title, version: 0, blocks }, title_page, scene_numbers, notes }
 }
 
 #[cfg(test)]
@@ -533,7 +551,7 @@ mod tests {
         for f in [crate::fixtures::unicode_marks(), crate::fixtures::page_boundaries(), crate::fixtures::long_script(20)] {
             let doc = f.to_document().unwrap();
             let tp = TitlePage { title: "ROUND TRIP".into(), authors: "Jared Hoy\nA. N. Other".into(), contact: "jared@example.invalid".into(), wga: "1234567".into(), ..Default::default() };
-            let out = export(&doc.blocks, &tp);
+            let out = export(&doc.blocks, &tp, &Default::default());
             let back = import(&out.text, "fallback");
             assert_eq!(shape(&back.document.blocks), shape(&doc.blocks), "{}", doc.title);
             assert_eq!(back.title_page, tp);
@@ -571,7 +589,8 @@ MARA\n(quietly)\nHand me the **tongs**.\nNow.\n\nBRAM ^\nNo.\n\n\
         assert!(r.title_page.notes.contains("producer: Nobody"));
         assert_eq!(r.document.title, "SALT AND IRON");
         let all = r.notes.join(" ");
-        for expected in ["12A", "joined", "centred", "synopsis", "note", "boneyard", "producer"] {
+        assert_eq!(r.scene_numbers.iter().map(|(_, n)| n.as_str()).collect::<Vec<_>>(), ["12A"], "scene number kept");
+        for expected in ["kept and locked", "joined", "centred", "synopsis", "note", "boneyard", "producer"] {
             assert!(all.contains(expected), "report mentions {expected}: {all}");
         }
     }
@@ -589,12 +608,33 @@ MARA\n(quietly)\nHand me the **tongs**.\nNow.\n\nBRAM ^\nNo.\n\n\
             Block::new(BlockKind::Shot, "ANGLE ON THE DOOR"),
             Block::new(BlockKind::Action, "Price: 5 * 3 = 15_000"),
         ];
-        let out = export(&blocks, &TitlePage::default());
+        let out = export(&blocks, &TitlePage::default(), &Default::default());
         for line in [".ROOFTOP", "!BANG", "@McClane", "!(not a parenthetical) really.", ">Fade out.", "!ANGLE ON THE DOOR", "Price: 5 \\* 3 = 15\\_000"] {
             assert!(out.text.lines().any(|l| l == line), "{line:?} in:\n{}", out.text);
         }
         assert!(out.notes.iter().any(|n| n.contains("shot")) && out.notes.iter().any(|n| n.contains("colour")));
         let back = import(&out.text, "x");
         assert_eq!(shape(&back.document.blocks), shape(&blocks), "forced elements read back as written");
+    }
+
+    #[test]
+    fn scene_numbers_round_trip() {
+        use crate::numbering::{Numbers, SceneNumber};
+        let doc = crate::fixtures::page_boundaries().to_document().unwrap();
+        let mut numbers = Numbers::new();
+        let ids: Vec<String> = doc.blocks.iter().filter_map(|b| b.scene_id.clone()).collect();
+        for (i, id) in ids.iter().enumerate() {
+            numbers.insert(id.clone(), SceneNumber { scene_id: id.clone(), number: if i == 1 { "1A".into() } else { (i + 1).to_string() }, omitted: i == 2 });
+        }
+        let out = export(&doc.blocks, &TitlePage::default(), &numbers);
+        assert!(out.notes.iter().any(|n| n.contains("omitted")), "omitted scenes reported: {:?}", out.notes);
+        let back = import(&out.text, "x");
+        let got: Vec<String> = back.scene_numbers.iter().map(|(_, n)| n.clone()).collect();
+        let want: Vec<String> = ids.iter().map(|id| numbers[id].number.clone()).collect();
+        assert_eq!(got, want);
+        // Numbers belong to the imported headings, in order.
+        let heading_ids: Vec<String> = back.document.blocks.iter().filter_map(|b| b.scene_id.clone()).collect();
+        assert_eq!(back.scene_numbers.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>(), heading_ids);
+        assert_eq!(back.document.blocks.len(), doc.blocks.len(), "omitted scenes keep their text in interchange");
     }
 }

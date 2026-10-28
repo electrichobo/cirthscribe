@@ -397,3 +397,48 @@ fn title_page_is_stored_per_document_and_saved_with_the_package() {
     let s = Store::open_package(&pkg, &work, None).unwrap().store;
     assert_eq!(s.title_page(&s.default_document().unwrap()).unwrap(), tp, "kept in the project file");
 }
+
+#[test]
+fn scene_numbers_lock_keep_through_edits_take_letters_and_omit() {
+    let d = tmpdir("scenenumbers");
+    let work = d.join("w.db");
+    let pkg = d.join("script.cirth");
+    let doc = fixtures::page_boundaries().to_document().unwrap();
+    let scenes: Vec<String> = doc.blocks.iter().filter_map(|b| b.scene_id.clone()).collect();
+    assert!(scenes.len() >= 3);
+    {
+        let mut s = Store::open(&work).unwrap();
+        s.seed(&doc).unwrap();
+        let main = s.default_document().unwrap();
+        assert!(!s.scene_numbers_locked(&main).unwrap() && s.scene_numbers(&main).unwrap().is_empty(), "no numbers until locked");
+        assert_eq!(s.number_new_scenes(&main).unwrap(), 0, "unlocked: nothing is numbered");
+        assert_eq!(s.lock_scene_numbers(&main).unwrap(), scenes.len());
+        let n = s.scene_numbers(&main).unwrap();
+        assert_eq!(scenes.iter().map(|id| n[id].number.as_str()).collect::<Vec<_>>(), (1..=scenes.len()).map(|i| i.to_string()).collect::<Vec<_>>().iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        // Add a scene after the first one and one before everything: 1A and A1.
+        let first_heading = doc.blocks.iter().position(|b| b.scene_id.as_deref() == Some(&scenes[0])).unwrap();
+        let after = doc.blocks[first_heading].id.clone();
+        let new_mid = Block::new(BlockKind::Heading, "INT. NEW ROOM - DAY");
+        let new_top = Block::new(BlockKind::Heading, "EXT. NEW OPENING - DAWN");
+        let (mid_id, top_id) = (new_mid.scene_id.clone().unwrap(), new_top.scene_id.clone().unwrap());
+        s.apply(&batch(1, vec![Op::Put { block: new_mid, after: Some(after) }, Op::Put { block: new_top, after: None }])).unwrap();
+        assert_eq!(s.number_new_scenes(&main).unwrap(), 2);
+        let n = s.scene_numbers(&main).unwrap();
+        assert_eq!((n[&mid_id].number.as_str(), n[&top_id].number.as_str()), ("1A", "A1"));
+        assert_eq!(n[&scenes[1]].number, "2", "existing numbers never change");
+        // Omit scene 2, then restore it; unknown scenes cannot be omitted.
+        s.set_scene_omitted(&main, &scenes[1], true).unwrap();
+        assert!(s.scene_numbers(&main).unwrap()[&scenes[1]].omitted);
+        assert!(s.set_scene_omitted(&main, "no-such-scene", true).is_err());
+        s.save_package(&pkg).unwrap();
+    }
+    cirth_core::store::remove_store_files(&work).unwrap();
+    let s = Store::open_package(&pkg, &work, None).unwrap().store;
+    let main = s.default_document().unwrap();
+    assert!(s.scene_numbers_locked(&main).unwrap());
+    let n = s.scene_numbers(&main).unwrap();
+    assert!(n[&scenes[1]].omitted && n[&scenes[1]].number == "2", "kept in the project file");
+    s.set_scene_omitted(&main, &scenes[1], false).unwrap();
+    s.unlock_scene_numbers(&main).unwrap();
+    assert!(!s.scene_numbers_locked(&main).unwrap() && s.scene_numbers(&main).unwrap().is_empty(), "unlock removes the numbers");
+}

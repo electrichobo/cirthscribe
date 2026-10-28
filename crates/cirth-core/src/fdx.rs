@@ -12,8 +12,9 @@
 //! Import maps those types back, reads `Style` (Bold, Italic, Underline),
 //! `StartsNewPage`, `DualDialogue`, and the title page by position (centred
 //! lines: title, credit, authors; left: contact; right: notes). Unknown
-//! paragraph types become action with their text kept; scene numbers, script
-//! notes and other elements Kolbítar cannot use yet are listed in the report.
+//! paragraph types become action with their text kept; scene numbers come
+//! back locked; script notes and other elements Kolbítar cannot use yet are
+//! listed in the report.
 
 use crate::model::{Block, BlockKind, Document, Run};
 use crate::title::TitlePage;
@@ -27,6 +28,8 @@ pub use crate::fountain::Exported;
 pub struct Imported {
     pub document: Document,
     pub title_page: TitlePage,
+    /// Scene numbers that came with the file (scene id, number).
+    pub scene_numbers: Vec<(String, String)>,
     pub notes: Vec<String>,
 }
 
@@ -68,9 +71,10 @@ fn text_runs(runs: &[Run], markup: &mut usize) -> String {
     out
 }
 
-fn paragraph(b: &Block, markup: &mut usize) -> String {
+fn paragraph(b: &Block, markup: &mut usize, numbers: &crate::numbering::Numbers) -> String {
     let page = if b.break_before { " StartsNewPage=\"Yes\"" } else { "" };
-    format!("    <Paragraph Type=\"{}\"{page}>{}</Paragraph>\n", fdx_type(b.kind), text_runs(&b.runs, markup))
+    let number = b.scene_id.as_ref().filter(|_| b.kind == BlockKind::Heading).and_then(|id| numbers.get(id)).map(|n| format!(" Number=\"{}\"", esc(&n.number))).unwrap_or_default();
+    format!("    <Paragraph{number} Type=\"{}\"{page}>{}</Paragraph>\n", fdx_type(b.kind), text_runs(&b.runs, markup))
 }
 
 fn title_page_xml(tp: &TitlePage) -> String {
@@ -109,7 +113,7 @@ fn title_page_xml(tp: &TitlePage) -> String {
     out
 }
 
-pub fn export(blocks: &[Block], title_page: &TitlePage) -> Exported {
+pub fn export(blocks: &[Block], title_page: &TitlePage, numbers: &crate::numbering::Numbers) -> Exported {
     let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\" ?>\n<FinalDraft DocumentType=\"Script\" Template=\"No\" Version=\"5\">\n  <Content>\n");
     let (mut markup, mut sections, mut lyrics) = (0usize, 0usize, 0usize);
     let mut i = 0;
@@ -130,14 +134,14 @@ pub fn export(blocks: &[Block], title_page: &TitlePage) -> Exported {
                     out.push_str("    ");
                     let mut plain = inner.clone();
                     plain.break_before = false;
-                    out.push_str(&paragraph(&plain, &mut markup));
+                    out.push_str(&paragraph(&plain, &mut markup, numbers));
                 }
                 out.push_str("      </DualDialogue>\n    </Paragraph>\n");
                 i = right_end;
                 continue;
             }
         }
-        out.push_str(&paragraph(b, &mut markup));
+        out.push_str(&paragraph(b, &mut markup, numbers));
         i += 1;
     }
     out.push_str("  </Content>\n");
@@ -155,6 +159,10 @@ pub fn export(blocks: &[Block], title_page: &TitlePage) -> Exported {
     }
     if markup > 0 {
         notes.push(format!("Text colour and highlight left out ({markup} marked run{}): they are on-screen markup only.", plural(markup)));
+    }
+    let omitted = numbers.values().filter(|n| n.omitted).count();
+    if omitted > 0 {
+        notes.push(format!("{omitted} omitted scene{} written with their text and number (not marked omitted in the file).", plural(omitted)));
     }
     notes.push("Final Draft lays out its own pages; page breaks you forced are kept. Not yet checked against Final Draft itself.".into());
     Exported { text: out, notes }
@@ -328,12 +336,10 @@ pub fn import(source: &str, fallback_title: &str) -> Result<Imported, String> {
                 }
             },
         };
-        if let Some(n) = &p.number {
-            if kind == BlockKind::Heading {
-                numbers.push(n.clone());
-            }
-        }
         let mut b = Block::new(kind, "");
+        if let (Some(n), Some(id)) = (&p.number, b.scene_id.clone()) {
+            numbers.push((id, n.clone()));
+        }
         // Merge neighbouring runs with the same marks.
         let mut runs: Vec<Run> = Vec::new();
         for r in p.runs.into_iter().filter(|r| !r.text.is_empty()) {
@@ -383,7 +389,7 @@ pub fn import(source: &str, fallback_title: &str) -> Result<Imported, String> {
         notes.push(format!("Paragraph types Kolbítar does not have were imported as action with their text kept: {}.", list.join(", ")));
     }
     if !numbers.is_empty() {
-        notes.push(format!("{} scene number{} not kept (scene numbering comes in a later step): {}.", numbers.len(), plural(numbers.len()), numbers.join(", ")));
+        notes.push(format!("{} scene number{} kept and locked ({}); scenes without one were given A/B numbers.", numbers.len(), plural(numbers.len()), numbers.iter().map(|(_, n)| n.as_str()).collect::<Vec<_>>().join(", ")));
     }
     if script_notes > 0 {
         notes.push(format!("{script_notes} script note{} not imported (comments come in a later milestone).", plural(script_notes)));
@@ -393,7 +399,7 @@ pub fn import(source: &str, fallback_title: &str) -> Result<Imported, String> {
         notes.push(format!("Final Draft settings Kolbítar does not use were left out: {}.", ignored.join(", ")));
     }
     let title = if tp.title.is_empty() { fallback_title.to_string() } else { tp.title.clone() };
-    Ok(Imported { document: Document { title, version: 0, blocks }, title_page: tp, notes })
+    Ok(Imported { document: Document { title, version: 0, blocks }, title_page: tp, scene_numbers: numbers, notes })
 }
 
 #[cfg(test)]
@@ -426,7 +432,7 @@ mod tests {
         for f in [crate::fixtures::unicode_marks(), crate::fixtures::page_boundaries(), crate::fixtures::long_script(20)] {
             let doc = f.to_document().unwrap();
             let tp = TitlePage { title: "ROUND TRIP".into(), credit: "Written by".into(), authors: "Jared Hoy".into(), contact: "jared@example.invalid\n555 0100".into(), ..Default::default() };
-            let out = export(&doc.blocks, &tp);
+            let out = export(&doc.blocks, &tp, &Default::default());
             let back = import(&out.text, "fallback").unwrap();
             assert_eq!(shape(&back.document.blocks), shape(&doc.blocks), "{}", doc.title);
             assert_eq!((back.title_page.title.as_str(), back.title_page.credit.as_str(), back.title_page.authors.as_str(), back.title_page.contact.as_str()), ("ROUND TRIP", "Written by", "Jared Hoy", "jared@example.invalid\n555 0100"));
@@ -476,7 +482,8 @@ mod tests {
         assert_eq!((r.title_page.title.as_str(), r.title_page.credit.as_str(), r.title_page.authors.as_str()), ("SALT AND IRON", "Written by", "Jared Hoy"));
         assert_eq!((r.title_page.contact.as_str(), r.title_page.notes.as_str()), ("jared@example.invalid", "First Draft"));
         let all = r.notes.join(" ");
-        for expected in ["Cast List", "7A", "script note", "ElementSettings", "SmartType", "title page"] {
+        assert_eq!(r.scene_numbers.iter().map(|(_, n)| n.as_str()).collect::<Vec<_>>(), ["7A"], "scene number kept");
+        for expected in ["Cast List", "kept and locked", "script note", "ElementSettings", "SmartType", "title page"] {
             assert!(all.contains(expected), "report mentions {expected}: {all}");
         }
         assert!(import("<html></html>", "x").is_err(), "not an fdx");
@@ -488,12 +495,33 @@ mod tests {
         let mut lyric = Block::new(BlockKind::Lyric, "La <la> & \"la\"");
         lyric.runs[0].highlight = Some("yellow".into());
         let blocks = vec![Block::new(BlockKind::Section, "Act two"), Block::new(BlockKind::Character, "MARA"), lyric];
-        let out = export(&blocks, &TitlePage::default());
+        let out = export(&blocks, &TitlePage::default(), &Default::default());
         assert!(out.text.contains("<Paragraph Type=\"General\"><Text>Act two</Text></Paragraph>"));
         assert!(out.text.contains("La &lt;la&gt; &amp; &quot;la&quot;"), "{}", out.text);
         let all = out.notes.join(" ");
         assert!(all.contains("section") && all.contains("lyric") && all.contains("colour"), "{all}");
         assert!(!out.text.contains("<TitlePage>"), "no title page without a title");
         assert_eq!(import(&out.text, "x").unwrap().document.blocks[2].text(), "La <la> & \"la\"");
+    }
+
+    #[test]
+    fn scene_numbers_round_trip() {
+        use crate::numbering::{Numbers, SceneNumber};
+        let doc = crate::fixtures::page_boundaries().to_document().unwrap();
+        let mut numbers = Numbers::new();
+        let ids: Vec<String> = doc.blocks.iter().filter_map(|b| b.scene_id.clone()).collect();
+        for (i, id) in ids.iter().enumerate() {
+            numbers.insert(id.clone(), SceneNumber { scene_id: id.clone(), number: if i == 1 { "1A".into() } else { (i + 1).to_string() }, omitted: i == 2 });
+        }
+        let out = export(&doc.blocks, &TitlePage::default(), &numbers);
+        assert!(out.notes.iter().any(|n| n.contains("omitted")), "omitted scenes reported: {:?}", out.notes);
+        let back = import(&out.text, "x").unwrap();
+        let got: Vec<String> = back.scene_numbers.iter().map(|(_, n)| n.clone()).collect();
+        let want: Vec<String> = ids.iter().map(|id| numbers[id].number.clone()).collect();
+        assert_eq!(got, want);
+        // Numbers belong to the imported headings, in order.
+        let heading_ids: Vec<String> = back.document.blocks.iter().filter_map(|b| b.scene_id.clone()).collect();
+        assert_eq!(back.scene_numbers.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>(), heading_ids);
+        assert_eq!(back.document.blocks.len(), doc.blocks.len(), "omitted scenes keep their text in interchange");
     }
 }

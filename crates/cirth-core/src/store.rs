@@ -21,7 +21,7 @@ use crate::ops::{Ack, Batch, Op};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -171,10 +171,25 @@ fn migrate_v3(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v3 -> v4: locked scene numbers, by document and stable scene id (see
+/// numbering.rs). Existing projects start unlocked, with no numbers.
+fn migrate_v4(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE scene_numbers (
+          document_id TEXT NOT NULL,
+          scene_id TEXT NOT NULL,
+          number TEXT NOT NULL,
+          omitted INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (document_id, scene_id)
+        );",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -274,6 +289,86 @@ impl Store {
         let mut stmt = self.conn.prepare("SELECT id, title FROM documents ORDER BY pos")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    // --- Scene numbers (numbering.rs) ---------------------------------------
+
+    pub fn scene_numbers_locked(&self, document_id: &str) -> Result<bool> {
+        Ok(self.setting(&format!("document:{document_id}"), "scene_numbers_locked")?.as_deref() == Some("1"))
+    }
+
+    pub fn scene_numbers(&self, document_id: &str) -> Result<crate::numbering::Numbers> {
+        let mut stmt = self.conn.prepare("SELECT scene_id, number, omitted FROM scene_numbers WHERE document_id = ?1")?;
+        let rows = stmt.query_map([document_id], |r| Ok(crate::numbering::SceneNumber { scene_id: r.get(0)?, number: r.get(1)?, omitted: r.get::<_, i64>(2)? != 0 }))?;
+        let mut out = crate::numbering::Numbers::new();
+        for n in rows {
+            let n = n?;
+            out.insert(n.scene_id.clone(), n);
+        }
+        Ok(out)
+    }
+
+    /// Scene ids of the default document's headings, in script order.
+    fn scene_order(&self) -> Result<Vec<String>> {
+        Ok(self.load()?.blocks.iter().filter_map(|b| b.scene_id.clone()).collect())
+    }
+
+    /// Number every scene 1..N in script order and lock the numbers.
+    pub fn lock_scene_numbers(&self, document_id: &str) -> Result<usize> {
+        let order = self.scene_order()?;
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM scene_numbers WHERE document_id = ?1", [document_id])?;
+        for (i, id) in order.iter().enumerate() {
+            tx.execute("INSERT INTO scene_numbers(document_id, scene_id, number, omitted) VALUES (?1, ?2, ?3, 0)", params![document_id, id, (i + 1).to_string()])?;
+        }
+        tx.execute("INSERT OR REPLACE INTO settings(scope, key, value) VALUES (?1, 'scene_numbers_locked', '1')", [format!("document:{document_id}")])?;
+        tx.commit()?;
+        Ok(order.len())
+    }
+
+    /// Remove all scene numbers (and omissions) and unlock.
+    pub fn unlock_scene_numbers(&self, document_id: &str) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM scene_numbers WHERE document_id = ?1", [document_id])?;
+        tx.execute("INSERT OR REPLACE INTO settings(scope, key, value) VALUES (?1, 'scene_numbers_locked', '0')", [format!("document:{document_id}")])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// While locked, give scenes added since locking their A/B numbers
+    /// (idempotent; run after edits). Returns how many were numbered.
+    pub fn number_new_scenes(&self, document_id: &str) -> Result<usize> {
+        if !self.scene_numbers_locked(document_id)? {
+            return Ok(0);
+        }
+        let new = crate::numbering::assign_missing(&self.scene_order()?, &self.scene_numbers(document_id)?);
+        for (id, n) in &new {
+            self.conn.execute("INSERT INTO scene_numbers(document_id, scene_id, number, omitted) VALUES (?1, ?2, ?3, 0)", params![document_id, id, n])?;
+        }
+        Ok(new.len())
+    }
+
+    /// Lock with numbers that came with an import (FDX, Fountain); scenes
+    /// without one get A/B numbers from their neighbours.
+    pub fn lock_scene_numbers_with(&self, document_id: &str, given: &[(String, String)]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM scene_numbers WHERE document_id = ?1", [document_id])?;
+        for (id, n) in given {
+            tx.execute("INSERT OR IGNORE INTO scene_numbers(document_id, scene_id, number, omitted) VALUES (?1, ?2, ?3, 0)", params![document_id, id, n])?;
+        }
+        tx.execute("INSERT OR REPLACE INTO settings(scope, key, value) VALUES (?1, 'scene_numbers_locked', '1')", [format!("document:{document_id}")])?;
+        tx.commit()?;
+        self.number_new_scenes(document_id)?;
+        Ok(())
+    }
+
+    /// Omit or restore a numbered scene. Its number and text are kept.
+    pub fn set_scene_omitted(&self, document_id: &str, scene_id: &str, omitted: bool) -> Result<()> {
+        let n = self.conn.execute("UPDATE scene_numbers SET omitted = ?3 WHERE document_id = ?1 AND scene_id = ?2", params![document_id, scene_id, omitted as i64])?;
+        if n == 0 {
+            return Err(StoreError::Invalid("only scenes with a locked number can be omitted".into()));
+        }
+        Ok(())
     }
 
     /// A document's title page (empty if never set).

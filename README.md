@@ -73,7 +73,8 @@ Done:
 - [x] Title page (PDF and text export)
 - [x] Fountain import and export, with a report of anything that changed
 - [ ] Final production-quality PDF
-- [ ] Scene numbers, revision colours, locked pages (A/B pages)
+- [x] Scene numbers: lock, A/B numbers for new scenes, omit and restore
+- [ ] Revision colours, locked pages (A/B pages)
 - [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
 - [ ] Word (DOCX), RTF and HTML export, each with a report of what carried over
 

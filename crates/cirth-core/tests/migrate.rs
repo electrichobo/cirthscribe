@@ -293,3 +293,24 @@ fn opening_a_v2_project_adds_loglines_and_keeps_everything_else() {
         assert_eq!(again.store.beats().unwrap()[0].logline, "The deal goes wrong");
     }
 }
+
+#[test]
+fn opening_a_v3_project_adds_scene_numbers_unlocked() {
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v3-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v3-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 3, "fixture must be schema v3");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(3));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v3 copy kept");
+        let s = o.store;
+        let main = s.default_document().unwrap();
+        assert!(!s.scene_numbers_locked(&main).unwrap() && s.scene_numbers(&main).unwrap().is_empty(), "upgraded projects start unlocked");
+        assert!(s.lock_scene_numbers(&main).unwrap() > 0, "and can be locked");
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}

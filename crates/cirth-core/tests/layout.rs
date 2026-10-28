@@ -161,3 +161,37 @@ fn colour_and_highlight_never_reach_pages_or_exports() {
     // so an identical map means identical PDF content. Its bytes are not
     // compared: the writer embeds per-render metadata.
 }
+
+#[test]
+fn locked_numbers_print_in_both_margins_and_omitted_scenes_collapse() {
+    use cirth_core::numbering::{Numbers, SceneNumber};
+    let doc = fixtures::page_boundaries().to_document().unwrap();
+    let p = Profile::us_letter();
+    let scenes: Vec<String> = doc.blocks.iter().filter_map(|b| b.scene_id.clone()).collect();
+    let mut numbers = Numbers::new();
+    for (i, id) in scenes.iter().enumerate() {
+        numbers.insert(id.clone(), SceneNumber { scene_id: id.clone(), number: if i == 1 { "2A".into() } else { (i + 1).to_string() }, omitted: i == 2 });
+    }
+    let map = cirth_core::layout::paginate_numbered(&doc.blocks, &p, 1, &numbers);
+    let lines: Vec<_> = map.pages.iter().flat_map(|pg| pg.lines.iter().map(move |l| (pg.number, l))).collect();
+    let nums: Vec<_> = lines.iter().filter(|(_, l)| l.kind == "scene-number").map(|(pg, l)| (*pg, l.row, l.segs[0].text.clone(), l.x_in)).collect();
+    // Two per heading (left, right), on the heading's row.
+    assert_eq!(nums.len(), scenes.len() * 2);
+    assert!(nums.iter().any(|n| n.2 == "2A"));
+    for (pg, row, _, _) in &nums {
+        assert!(lines.iter().any(|(p2, l)| p2 == pg && l.row == *row && l.kind == "heading"));
+    }
+    assert!(nums.iter().all(|n| n.3 < p.action.left_in || n.3 > 7.0), "numbers stay in the margins");
+    // The omitted scene: one OMITTED heading, none of its other text.
+    let omitted_heading = doc.blocks.iter().position(|b| b.scene_id.as_deref() == Some(&scenes[2])).unwrap();
+    let next_heading = doc.blocks[omitted_heading + 1..].iter().position(|b| b.scene_id.is_some()).map(|i| i + omitted_heading + 1).unwrap_or(doc.blocks.len());
+    let hidden: Vec<&str> = doc.blocks[omitted_heading + 1..next_heading].iter().map(|b| b.id.as_str()).collect();
+    assert!(lines.iter().any(|(_, l)| l.block_id.as_deref() == Some(doc.blocks[omitted_heading].id.as_str()) && l.segs.iter().map(|s| s.text.as_str()).collect::<String>() == "OMITTED"));
+    assert!(!lines.iter().any(|(_, l)| l.block_id.as_deref().is_some_and(|id| hidden.contains(&id))), "omitted scene body not printed");
+    // Text export: numbers sit in a left gutter, the rest keeps its columns.
+    let t = cirth_core::txt::render(&map, &p);
+    let first = t.text.lines().find(|l| l.contains("1 ") && l.trim_start().starts_with('1')).unwrap();
+    assert!(first.trim_start().starts_with("1 ") && first.trim_end().ends_with(" 1"), "{first:?}");
+    // No numbers: identical to plain pagination.
+    assert_eq!(serde_json::to_string(&cirth_core::layout::paginate_numbered(&doc.blocks, &p, 1, &Numbers::new())).unwrap(), serde_json::to_string(&map_of(&doc)).unwrap().replace("\"doc_version\":0", "\"doc_version\":1"));
+}

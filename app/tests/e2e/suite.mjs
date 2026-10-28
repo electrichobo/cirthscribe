@@ -2161,6 +2161,69 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(/not an \.fdx script/.test(await app.evaluate("document.getElementById('banner').textContent")), "says why");
   });
 
+  await test("Scene numbers: none until locked; lock numbers 1..N; a new scene gets 1A; omit and restore; numbers in text and Fountain exports; unlock asks first", async () => {
+    await openFixture("page-boundaries");
+    const navNums = () => app.evaluate("[...document.querySelectorAll('#navigator .nav-go .num')].map(n => n.textContent)");
+    const marginNums = () => app.evaluate("document.querySelectorAll('.ProseMirror .scene-num').length");
+    assert((await navNums()).length === 0 && (await marginNums()) === 0, "no numbers while unlocked");
+    const scenes0 = await app.evaluate("__cirth.scenes().length");
+    await app.evaluate("__cirth.menu('scenes_lock')");
+    await waitFor(app, `document.querySelectorAll('#navigator .nav-go .num').length === ${scenes0}`, "numbers in the scene list after locking");
+    assert(JSON.stringify(await navNums()) === JSON.stringify(Array.from({ length: scenes0 }, (_, i) => String(i + 1))), `1..N: ${await navNums()}`);
+    assert((await marginNums()) === scenes0 * 2, "a number in both margins of each heading");
+    await waitAnnounced("Scene numbers locked", "announced");
+    // Add a scene after scene 1: it becomes 1A, and scene 2 keeps 2.
+    const b0 = await blocks();
+    const second = b0.findIndex((b, i) => i > 0 && b.kind === "heading");
+    await caretAtEndOf(second - 1);
+    await press("Enter");
+    await press("1", [MOD_KEY]);
+    await typeText("INT. NEW ROOM - DAY");
+    await waitSynced();
+    await app.evaluate("__cirth.repaginate ? __cirth.repaginate() : null");
+    await waitFor(app, `JSON.stringify([...document.querySelectorAll('#navigator .nav-go .num')].map(n => n.textContent).slice(0, 3)) === '["1","1A","2"]'`, "new scene numbered 1A, the rest unchanged");
+    await screenshot(app, "scene-numbers");
+    // Text export: numbers on both sides of the heading line.
+    const out = join(dataDir, "numbered.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out)})`), "exported");
+    assert(/^\s*1A\s+INT\. NEW ROOM - DAY\s+1A$/m.test(readFileSync(out, "utf8")), "1A on both sides in the text export");
+    // Omit scene 2: OMITTED in the list and the export; its text is kept in the script.
+    const sceneTwo = (await blocks()).findIndex((b) => b.kind === "heading" && text(b) === text(b0[second]));
+    const hiddenText = text((await blocks())[sceneTwo + 1]);
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out.replace(".txt", "-before.txt"))})`), "exported before omitting");
+    await caretAtEndOf(sceneTwo);
+    await app.evaluate("__cirth.menu('scene_omit')");
+    await waitFor(app, "[...document.querySelectorAll('#navigator .nav-go')].some(b => /^\\s*2\\s+OMITTED$/.test(b.textContent))", "scene 2 shown as OMITTED");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out)})`), "exported again");
+    const omittedTxt = readFileSync(out, "utf8");
+    const omittedLine = omittedTxt.split("\n").find((l) => l.includes("OMITTED"));
+    assert(/^\s*2\s+OMITTED\s+2$/.test(omittedLine ?? ""), `printed as OMITTED with its number: ${JSON.stringify(omittedLine)}`);
+    // The scene's own first line of text is not printed (it may repeat elsewhere, so compare counts).
+    const count = (t) => t.split(hiddenText.slice(0, 40)).length - 1;
+    assert(count(omittedTxt) < count(readFileSync(out.replace(".txt", "-before.txt"), "utf8")), "body left out of the pages");
+    assert(text((await blocks())[sceneTwo + 1]) === hiddenText, "the scene's text is still in the script");
+    await app.evaluate("__cirth.menu('scene_restore')");
+    await waitFor(app, "![...document.querySelectorAll('#navigator .nav-go')].some(b => b.textContent.includes('OMITTED'))", "restored");
+    // Kept after reopening; Fountain carries the numbers.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `document.querySelectorAll('#navigator .nav-go .num').length === ${scenes0 + 1}`, "numbers kept after reopening");
+    const fountain = join(dataDir, "numbered.fountain");
+    assert(await app.evaluate(`__cirth.exportFountain(${JSON.stringify(fountain)})`), "Fountain exported");
+    assert(readFileSync(fountain, "utf8").includes("INT. NEW ROOM - DAY #1A#"), "Fountain has #1A#");
+    // Unlock asks first; Cancel keeps them, Unlock removes them.
+    void app.evaluate("__cirth.menu('scenes_unlock')");
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "unlock asks for confirmation");
+    await app.evaluate("(() => { document.getElementById('confirm-cancel').click(); return true; })()");
+    await sleep(300);
+    assert((await navNums()).length === scenes0 + 1, "Cancel keeps the numbers");
+    void app.evaluate("__cirth.menu('scenes_unlock')");
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "asked again");
+    await app.evaluate("(() => { document.getElementById('confirm-ok').click(); return true; })()");
+    await waitFor(app, "document.querySelectorAll('#navigator .nav-go .num').length === 0 && document.querySelectorAll('.ProseMirror .scene-num').length === 0", "numbers removed after unlocking");
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

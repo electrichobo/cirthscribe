@@ -329,10 +329,15 @@ async fn import_fountain(app: State<'_, App>, path: String) -> Result<Opened, St
     let r = cirth_core::fountain::import(&text, &stem);
     let name = unused_library_name(&app, &r.document.title);
     let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
-    if !r.title_page.is_empty() {
+    if !r.title_page.is_empty() || !r.scene_numbers.is_empty() {
         with_session(&app, |s| {
             let doc = s.store.default_document().map_err(err)?;
-            s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            if !r.title_page.is_empty() {
+                s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            }
+            if !r.scene_numbers.is_empty() {
+                s.store.lock_scene_numbers_with(&doc, &r.scene_numbers).map_err(err)?;
+            }
             s.store.save_package(&s.package).map_err(err)?;
             Ok(())
         })?;
@@ -352,10 +357,15 @@ async fn import_fdx(app: State<'_, App>, path: String) -> Result<Opened, String>
     let r = cirth_core::fdx::import(&text, &stem)?;
     let name = unused_library_name(&app, &r.document.title);
     let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
-    if !r.title_page.is_empty() {
+    if !r.title_page.is_empty() || !r.scene_numbers.is_empty() {
         with_session(&app, |s| {
             let doc = s.store.default_document().map_err(err)?;
-            s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            if !r.title_page.is_empty() {
+                s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            }
+            if !r.scene_numbers.is_empty() {
+                s.store.lock_scene_numbers_with(&doc, &r.scene_numbers).map_err(err)?;
+            }
             s.store.save_package(&s.package).map_err(err)?;
             Ok(())
         })?;
@@ -368,7 +378,8 @@ async fn import_fdx(app: State<'_, App>, path: String) -> Result<Opened, String>
 #[tauri::command]
 async fn export_fdx(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
     let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
-    let out = cirth_core::fdx::export(&doc.blocks, &tp);
+    let numbers = with_session(&app, |s| s.store.scene_numbers(&s.store.default_document().map_err(err)?).map_err(err))?;
+    let out = cirth_core::fdx::export(&doc.blocks, &tp, &numbers);
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("fdx.tmp");
     std::fs::write(&tmp, &out.text).map_err(io_err)?;
@@ -387,7 +398,8 @@ struct FountainExported {
 #[tauri::command]
 async fn export_fountain(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
     let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
-    let out = cirth_core::fountain::export(&doc.blocks, &tp);
+    let numbers = with_session(&app, |s| s.store.scene_numbers(&s.store.default_document().map_err(err)?).map_err(err))?;
+    let out = cirth_core::fountain::export(&doc.blocks, &tp, &numbers);
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("fountain.tmp");
     std::fs::write(&tmp, &out.text).map_err(io_err)?;
@@ -517,7 +529,30 @@ fn with_session<T>(app: &App, f: impl FnOnce(&mut Session) -> Result<T, String>)
 
 #[tauri::command]
 async fn apply_batch(app: State<'_, App>, batch: Batch) -> Result<Ack, String> {
-    with_session(&app, |s| s.store.apply(&batch).map_err(err))
+    with_session(&app, |s| {
+        let ack = s.store.apply(&batch).map_err(err)?;
+        // While scene numbers are locked, scenes added by this edit get A/B numbers.
+        let main = s.store.default_document().map_err(err)?;
+        s.store.number_new_scenes(&main).map_err(err)?;
+        Ok(ack)
+    })
+}
+
+/// Format > Scene Numbers: lock (number 1..N), unlock, omit or restore.
+#[tauri::command]
+async fn scene_numbers_command(app: State<'_, App>, action: String, scene_id: Option<String>) -> Result<usize, String> {
+    with_session(&app, |s| {
+        let main = s.store.default_document().map_err(err)?;
+        match action.as_str() {
+            "lock" => s.store.lock_scene_numbers(&main).map_err(err),
+            "unlock" => s.store.unlock_scene_numbers(&main).map(|_| 0).map_err(err),
+            "omit" | "restore" => {
+                let id = scene_id.ok_or("no scene")?;
+                s.store.set_scene_omitted(&main, &id, action == "omit").map(|_| 0).map_err(err)
+            }
+            other => Err(format!("unknown scene number action {other}")),
+        }
+    })
 }
 
 #[tauri::command]
@@ -666,19 +701,26 @@ struct Paginated {
     load_ms: f64,
     layout_ms: f64,
     missing_glyphs: Vec<char>,
+    /// Locked scene numbers (empty when unlocked), for the scene list and margins.
+    scene_numbers: Vec<cirth_core::numbering::SceneNumber>,
+    scene_numbers_locked: bool,
 }
 
 fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Document), String> {
     let t0 = Instant::now();
     // Hold the lock only while reading the canonical document.
-    let doc = with_session(app, |s| s.store.load().map_err(err))?;
+    let (doc, numbers, locked) = with_session(app, |s| {
+        let main = s.store.default_document().map_err(err)?;
+        Ok((s.store.load().map_err(err)?, s.store.scene_numbers(&main).map_err(err)?, s.store.scene_numbers_locked(&main).map_err(err)?))
+    })?;
     let t1 = Instant::now();
-    let map = layout::paginate(&doc.blocks, &profile(profile_name), doc.version);
+    let map = layout::paginate_numbered(&doc.blocks, &profile(profile_name), doc.version, &numbers);
     let t2 = Instant::now();
     let font = fontcheck::FontInfo::parse(pdf::REGULAR).ok_or("bundled font unreadable")?;
     let all: String = doc.blocks.iter().map(|b| b.text()).collect::<Vec<_>>().join(" ");
     let missing_glyphs = fontcheck::missing_chars(&font, &all);
-    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs }, doc))
+    let scene_numbers = numbers.into_values().collect();
+    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked }, doc))
 }
 
 #[tauri::command]
@@ -1443,6 +1485,13 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .item(&check_item(app, "page_letter", "US Letter", true)?)
         .item(&check_item(app, "page_a4", "A4", false)?)
         .build()?;
+    let numbers = SubmenuBuilder::new(app, "Scene Numbers")
+        .text("scenes_lock", "Lock Scene Numbers")
+        .text("scenes_unlock", "Unlock Scene Numbers…")
+        .separator()
+        .text("scene_omit", "Omit This Scene")
+        .text("scene_restore", "Restore This Scene")
+        .build()?;
     SubmenuBuilder::new(app, "Format")
         .text("bold", keyed("Bold", "B"))
         .text("italic", keyed("Italic", "I"))
@@ -1453,6 +1502,8 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .item(&block.build()?)
         .text("dual", keyed("Dual Dialogue", "D"))
         .text("page_break", keyed("Page Break Before", "Enter"))
+        .separator()
+        .item(&numbers)
         .separator()
         .item(&page)
         .build()
@@ -1599,6 +1650,7 @@ fn main() {
             set_menu_checks,
             title_page,
             set_title_page,
+            scene_numbers_command,
             import_fountain,
             export_fountain,
             import_fdx,
