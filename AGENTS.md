@@ -2,15 +2,31 @@
 
 Kolbítar is a free, open-source, offline-first desktop writing and production application for Windows, macOS, and Linux. It combines screenplay editing, story planning, a shared project bible, and script-derived production tools. The project file extension stays `.cirth`; internal crate names (cirth-core) and the app identifier keep the older working name.
 
-This repository currently contains a planning pack, not an implemented application. Never present a planned feature as working.
+## Current stage (2026-10-27)
+
+This is a working application, not yet released, plus its product brief. Milestones M0 (feasibility), M1 and M1b (the writing foundation) are closed by the owner. **M2 (layout, interchange and production) is in progress;** docs/M2_PLAN.md has the plan and step order. Steps 1–6 are built:
+- title page;
+- Fountain import and export;
+- Final Draft (.fdx) import and export;
+- scene numbers and scene-number locking;
+- production PDF with headers and footers;
+- revision sets.
+
+Remaining M2 steps:
+- 7: locked pages with A/B pages;
+- 8: DOCX, RTF and HTML exports with capability reports;
+- 9: compatibility matrix with real external apps.
+
+Later milestones (ROADMAP.md) are still only planned. Never present a planned feature as working. Carried open items: Linux typing latency, named reference machines, the rare End/Enter stress miss (STATUS.md defect 3), and the open manual checks in docs/testing/MANUAL_CHECKS.md.
 
 ## Read before making changes
 
-1. Read this file and docs/PRODUCT_SPEC.md.
-2. Read docs/ARCHITECTURE.md and docs/ROADMAP.md.
-3. For the task at hand, read docs/ACCEPTANCE.md and docs/INTEROPERABILITY.md.
-4. Read existing code, applicable repository instructions, and current status before choosing an implementation.
-5. Work on the earliest incomplete milestone unless the owner gives a different priority.
+1. Read this file and `HANDOFF.md` (the latest working state; see the Session Handoff Protocol below).
+2. Read docs/PRODUCT_SPEC.md, docs/ARCHITECTURE.md and docs/ROADMAP.md.
+3. For the current milestone, read its plan (docs/M2_PLAN.md), STATUS.md and docs/DECISIONS.md. Read the ADRs in docs/adr/ when touching what they decide.
+4. For the task at hand, read docs/ACCEPTANCE.md and docs/INTEROPERABILITY.md.
+5. Read the existing code and its tests before choosing an implementation.
+6. Work on the next unfinished step of the current milestone unless the owner gives a different priority.
 
 The owner's latest explicit instructions override this pack. Keep documentation aligned with the final implementation. Record accepted technical decisions in architecture decision records. Label proposals, measured results, and unresolved decisions separately.
 
@@ -27,15 +43,40 @@ The owner's latest explicit instructions override this pack. Keep documentation 
 - All reports must be independently selectable and exportable.
 - Label timing estimates as estimates. Character dialogue, presence in scenes, and actual time on screen are distinct metrics.
 - AI is optional, user-configured, and secondary to writing. Never apply AI changes without a preview and acceptance.
-- Do not promise lossless export to formats that cannot express CirthScribe features.
+- Do not promise lossless export to formats that cannot express Kolbítar features.
 
-## Stack policy
+## Stack (decided)
 
-Provisional preference: Rust with Tauri 2, a TypeScript web UI, and a structured rich-text editor evaluated during milestone 0. Tauri is a desktop shell, not a screenplay editor or pagination engine.
+Rust with Tauri 2, a TypeScript web UI, ProseMirror as the editor, and SQLite for the project file. Accepted in ADR 0001 (docs/adr/0001-desktop-stack.md) on milestone-0 evidence. Tauri is only the desktop shell. The screenplay model, pagination and every export live in Rust, and the WebView never measures pages. Avalonia was considered and not built; do not build a second app, switch frameworks, or add another runtime without a documented reason and the owner's agreement.
 
-C# with Avalonia remains an allowed alternative if the editor/layout spike demonstrates a material advantage. The framework decision is made once at milestone 0 and recorded with evidence. Do not build two complete apps, switch frameworks opportunistically, or add a second runtime speculatively. A later switch requires a documented reason and owner agreement.
+- License: GPL-3.0-only with an attribution term (`NOTICE`), chosen by the owner.
+- Fonts: pages and exports always use the bundled Courier Prime 12 pt (OFL); the editor's screen font is a display preference only.
+- Dependencies: ask the owner before adding any. Audit each one's license and keep `app/scripts/third-party-notices.mjs --check` passing. No paid or proprietary components.
 
-The free Avalonia framework and premium Avalonia controls have different licensing. Do not assume its current rich-text editor or export components are freely redistributable/buildable. Audit any selected dependency and bundled font. Do not buy licenses or select the project's final open-source license on the owner's behalf.
+## Repository map and commands
+
+- `crates/cirth-core`: the domain model, the store, migrations, layout, numbering, revisions and every import and export (PDF, TXT, Fountain, FDX). Tests: `crates/cirth-core/tests`.
+- `app/src-tauri`: the desktop shell. It holds Tauri commands and native menus, and it builds the `cirthscribe` binary.
+- `app/src`: the TypeScript UI. The ProseMirror schema and plugins send versioned batches to Rust.
+- `app/tests`: `contract.mjs` checks that the TypeScript and Rust data models agree; `e2e/suite.mjs` drives the real app through two drivers, Chrome DevTools (CDP) and WebDriver.
+- `fixtures/`: sample scripts, plus `fixtures/golden/` reference page layouts.
+- `docs/`: product brief, plans, decisions and ADRs, and manual checks (`docs/testing/MANUAL_CHECKS.md`).
+
+On Windows, dot-source `scripts/dev-env.ps1` first; it puts the portable toolchain on PATH. Then:
+- `cargo test -p cirth-core`: core tests.
+  - `UPDATE_GOLDEN=1 cargo test -p cirth-core --test golden` regenerates the reference pages. Review the diff before committing.
+- `cd app && npm run build`, then `cargo build -p cirthscribe --release`. The binary embeds the built UI, so always rebuild both, in this order, before e2e.
+- `cd app && npm run test:contract`.
+- `cd app && npm run e2e:cdp` and `npm run e2e:webdriver`. Set `E2E_ONLY=<test name prefix>` to run some tests only.
+  - Under WebDriver, page scripts run one at a time. Never leave the page awaiting a dialog: start the action with `(__cirth.menu('x'), true)`.
+- `node app/scripts/third-party-notices.mjs --check`.
+
+Conventions:
+- **Schema migrations** are append-only. Never edit a shipped migration. Each schema change freezes real project files of the previous version in `crates/cirth-core/tests/data`, with a test that upgrades them.
+- **Keep the old working name internally:** the `.cirth` extension, crate names, the binary `cirthscribe` and the app identifier stay as they are. Only public-facing text says Kolbítar.
+- **Writing:** match the surrounding code's comment density and idiom. Use plain, direct English in docs and UI.
+- **File edits on Windows:** edit with tools that keep UTF-8 without a BOM. Windows PowerShell 5.1's `Get-Content`/`Set-Content` corrupts non-ASCII text.
+- **Git:** commit or push only when the owner asks. Never put personal details (hostnames, IPs, usernames, personal paths) or credentials in committed files.
 
 ## Engineering rules
 
@@ -66,17 +107,7 @@ For each change:
 
 Do not suppress errors, bypass tests, or silently reduce requirements. If a platform or external integration could not be tested, say so.
 
-## First task
-
-Start with milestone 0, not the full feature list. Produce:
-- a domain/schema sketch and dependency/license inventory;
-- a runnable editing/layout risk prototype in the preferred stack;
-- representative synthetic fixtures and measured findings;
-- an architecture decision recommending Tauri or Avalonia;
-- the next milestone's implementation plan.
-
-Do not implement the complete product during the feasibility spike.
-
+Each finished step updates its milestone plan's "Built" notes, README's progress list and, where a person must check something by hand, docs/testing/MANUAL_CHECKS.md. It is tested on both e2e drivers.
 
 ## Session Handoff Protocol
 

@@ -8,6 +8,7 @@ Milestone 2, production screenplay output (plan and step order: docs/M2_PLAN.md)
 
 ## Completed & Verified
 
+- Agent setup: AGENTS.md holds the instructions and describes the current stage, stack, repository map, commands and conventions. CLAUDE.md and GEMINI.md import it. HANDOFF.md exists. A local pre-push hook warns about a stale HANDOFF.md; tested with simulated push input.
 - Step 6 revision sets (commit feb80da):
   - `cirth_core::revisions`; schema v5 table `revision_sets`; `Run::revision` tags text.
   - The editor tags changes in revision mode, and undo removes the tag.
@@ -33,7 +34,7 @@ Milestone 2, production screenplay output (plan and step order: docs/M2_PLAN.md)
 
 ## Next Immediate Step
 
-Push main (feb80da plus the handoff setup commit). Then build M2 step 7, locked pages:
+Build M2 step 7, locked pages:
 - lock a pagination baseline;
 - later edits make A/B pages instead of reflowing (acceptance D3, D4, D8);
 - a layout-engine upgrade or a missing font never reflows a locked baseline.
