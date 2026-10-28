@@ -2,7 +2,7 @@
 
 Updated 2026-10-27.
 
-**M2 closed by the owner on 2026-10-27 (`docs/m2/EXIT_REVIEW.md`). Next milestone: M3, connected story development; plan proposed in `docs/M3_PLAN.md`, awaiting the owner.** M1 and M1b closed by the owner on 2026-10-27, with Linux latency, reference machines, defect 3 and macOS check N20 carried forward (`docs/m1/EXIT_REVIEW.md`). M0 complete.
+**M2 closed by the owner on 2026-10-27 (`docs/m2/EXIT_REVIEW.md`). Next milestone: M3, connected story development; plan accepted by the owner 2026-10-27 (`docs/M3_PLAN.md`); step 1 not started.** Revision colours corrected to the owner's order (… Cherry, Tan, then Second Blue). M1 and M1b closed by the owner on 2026-10-27, with Linux latency, reference machines, defect 3 and macOS check N20 carried forward (`docs/m1/EXIT_REVIEW.md`). M0 complete.
 
 M2 progress: steps 1–8 built (title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports; details under each step in `docs/M2_PLAN.md`). Step 9, the compatibility matrix, has its baseline: the test pack and the record (`docs/COMPATIBILITY.md`), with the first Mac round logged and its defects fixed. Linux e2e, red in CI since M2 step 3 (Tab traps on WebKitGTK), is green again from 92a2cf9: all three CI jobs pass. **Carried into M3:** external app tests (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print), the Mac recheck of pack v2, manual checks N20–N28, and the M1 carry-overs (Linux latency, reference machines, defect 3). Non-Latin PDF text (CJK, Hebrew, Arabic, emoji) prints blank and is reported by the export; a fallback font comes in a later milestone. The working state between sessions is in `HANDOFF.md`.
 

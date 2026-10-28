@@ -27,8 +27,16 @@ pub struct RevisionSet {
     pub author: String,
 }
 
-/// The common order of revision page colours in US production.
-pub const COLOURS: [&str; 9] = ["blue", "pink", "yellow", "green", "goldenrod", "buff", "salmon", "cherry", "white"];
+/// The usual order of revision page colours in US production (white is the
+/// unrevised draft, so it is not a revision colour). After tan the order
+/// starts again: "Second Blue", "Second Pink" and so on.
+pub const COLOURS: [&str; 9] = ["blue", "pink", "yellow", "green", "goldenrod", "buff", "salmon", "cherry", "tan"];
+
+/// Colours a stored set may have: `COLOURS`, plus "white" from projects made
+/// before tan replaced it (2026-10-27).
+pub fn known_colour(c: &str) -> bool {
+    COLOURS.contains(&c) || c == "white"
+}
 
 /// Left edge of the margin mark: right of the right scene numbers.
 pub const MARK_IN: f32 = 7.9;
@@ -42,11 +50,12 @@ pub fn next_set(sets: &[RevisionSet]) -> (String, String) {
     let colour = COLOURS[next];
     let mut name = colour.to_string();
     name[..1].make_ascii_uppercase();
-    // A second round through the colours is "Double Blue" and so on.
+    // Later rounds through the colours: "Second Blue", "Third Blue", ...
     let round = sets.iter().filter(|s| s.colour == colour).count();
+    const ORDINALS: [&str; 9] = ["Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
     let label = match round {
         0 => format!("{name} Revision"),
-        1 => format!("Double {name} Revision"),
+        n if n <= ORDINALS.len() => format!("{} {name} Revision", ORDINALS[n - 1]),
         n => format!("{name} Revision {}", n + 1),
     };
     (colour.to_string(), label)
@@ -142,7 +151,17 @@ mod tests {
         for c in &COLOURS[1..] {
             sets.push(RevisionSet { colour: c.to_string(), ..set("x") });
         }
-        assert_eq!(next_set(&sets), ("blue".into(), "Double Blue Revision".into()));
+        assert_eq!(COLOURS[8], "tan");
+        assert_eq!(next_set(&sets), ("blue".into(), "Second Blue Revision".into()));
+        sets.push(RevisionSet { colour: "blue".into(), ..set("y") });
+        assert_eq!(next_set(&sets), ("pink".into(), "Second Pink Revision".into()));
+        for c in &COLOURS[1..] {
+            sets.push(RevisionSet { colour: c.to_string(), ..set("z") });
+        }
+        assert_eq!(next_set(&sets), ("blue".into(), "Third Blue Revision".into()));
+        // An older project's white set is still accepted and is followed by blue.
+        assert!(known_colour("white") && !known_colour("mauve"));
+        assert_eq!(next_set(&[RevisionSet { colour: "white".into(), ..set("w") }]).0, "blue");
         assert_eq!(header(&set("a")), "Blue Revision (2026-10-27)");
     }
 

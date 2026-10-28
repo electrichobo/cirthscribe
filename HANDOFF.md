@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md is drafted (proposed, 2026-10-27) and awaits the owner's review**: nine steps, decisions A–E.
+**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started.
 
 ## Completed & Verified
 
@@ -12,6 +12,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - Linux e2e, red in CI from d2d7bdc (M2 step 3), is green again: the More popover and floating-panel Tab traps now run in the capture phase on the document (c49ae5a, 92a2cf9). **CI on 92a2cf9: Linux, macOS and Windows all green.**
 - Checks run on Windows 11 for 92a2cf9: `npm run e2e:cdp` (50/50), `npm run e2e:webdriver` (49/49, 1 skipped: IME).
 - Closure recorded in STATUS, ROADMAP, M2_PLAN, the exit review, COMPATIBILITY, AGENTS, START_HERE; README brought up to date (Stage 2 done, known limits, carried items, docs table).
+- Revision colour order corrected to the owner's: ... Cherry, **Tan** (was White), then "Second Blue" (was "Double Blue"); old white sets still load. `cargo test -p cirth-core` passes; e2e "Revision sets" passes on both drivers (CDP and WebDriver).
 - M3 plan drafted from ROADMAP M3, PRODUCT_SPEC 3–4, ACCEPTANCE B and C, and the current code (one document in the UI; structural permission not stored; planning edits not undoable).
 - Not verified (carried into M3):
   - external app results (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print);
@@ -22,9 +23,9 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-None once the M3 plan commit is made.
+None once the plan-acceptance commit is made.
 
 ## Next Immediate Step
 
-1. Owner reviews docs/M3_PLAN.md and answers decisions A–E. No M3 code before acceptance. Then step 1: store the structural permission per document and add planning commands with undo (ADR 0003 for decision A).
+1. M3 step 1: write ADR 0003 (focus-routed undo), store the structural permission in `document:<id>` settings (store.rs, main.ts `structural`), then planning commands with a core-side undo history.
 2. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.

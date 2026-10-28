@@ -408,7 +408,7 @@ impl Store {
         if set.id.trim().is_empty() || set.label.trim().is_empty() {
             return Err(StoreError::Invalid("a revision set needs an id and a label".into()));
         }
-        if !crate::revisions::COLOURS.contains(&set.colour.as_str()) {
+        if !crate::revisions::known_colour(&set.colour) {
             return Err(StoreError::Invalid(format!("unknown revision colour {}", set.colour)));
         }
         let n = self.conn.execute(

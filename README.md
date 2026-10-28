@@ -75,7 +75,7 @@ Done:
 - [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
 - [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
 - [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
-- [x] Revision sets (label, colour, date, mark), revision mode that marks changed lines, and a changed-pages PDF
+- [x] Revision sets (label, colour, date, mark) in the usual colour order (Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, Tan, then Second Blue and so on), revision mode that marks changed lines, and a changed-pages PDF
 - [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
 - [x] Word (DOCX), RTF and HTML export, each with a report of what carried over
 - [x] A compatibility test pack and record ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)); first results from Preview, TextEdit and Safari on macOS
@@ -89,7 +89,7 @@ Carried forward:
 - [ ] Check the page measurements against an industry-standard PDF
 - [ ] Tested exchange with other screenwriting apps
 
-### 🔜 Stage 3: Story planning (next)
+### 🔜 Stage 3: Story planning (next; plan accepted)
 
 - [ ] Episodes and series sharing one story bible
 - [ ] Tabbed navigator: scenes (length, summary, characters), characters, notes, outline
@@ -163,7 +163,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | - | - |
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
-| [docs/M3_PLAN.md](docs/M3_PLAN.md) | Stage 3 plan (proposed, awaiting the owner) |
+| [docs/M3_PLAN.md](docs/M3_PLAN.md) | Stage 3 plan (accepted) and what each step builds |
 | [docs/M2_PLAN.md](docs/M2_PLAN.md) and [docs/m2/EXIT_REVIEW.md](docs/m2/EXIT_REVIEW.md) | Stage 2 plan, what each step built, and its exit review |
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Which formats have been tested in which other apps, and how to test |
 | [docs/M1_PLAN.md](docs/M1_PLAN.md) and [docs/m1/EXIT_REVIEW.md](docs/m1/EXIT_REVIEW.md) | Stage 1 plan and its exit review |
