@@ -1393,9 +1393,17 @@ struct UiPrefs {
     /// Size of the script text on screen only, in points: 10 to 20.
     #[serde(default = "default_editor_size")]
     editor_size: f64,
+    /// Colour theme, one of THEMES; "system" follows the OS's light or dark.
+    #[serde(default = "default_theme")]
+    theme: String,
 }
 
 const SCREEN_FONTS: [&str; 4] = ["courier-prime", "mono", "serif", "sans"];
+const THEMES: [&str; 5] = ["system", "day", "night", "midnight", "oled"];
+
+fn default_theme() -> String {
+    "system".into()
+}
 
 fn default_editor_font() -> String {
     "courier-prime".into()
@@ -1425,7 +1433,7 @@ impl Default for Panels {
 
 impl Default for UiPrefs {
     fn default() -> Self {
-        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false, editor_font: default_editor_font(), editor_size: default_editor_size() }
+        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false, editor_font: default_editor_font(), editor_size: default_editor_size(), theme: default_theme() }
     }
 }
 
@@ -1437,6 +1445,9 @@ fn sync_view_checks(app: &tauri::AppHandle, prefs: &UiPrefs) {
     let mut map: std::collections::HashMap<String, bool> = checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
     for f in SCREEN_FONTS {
         map.insert(format!("font_{f}"), prefs.editor_font == f);
+    }
+    for t in THEMES {
+        map.insert(format!("theme_{t}"), prefs.theme == t);
     }
     set_menu_checks(app.clone(), map);
 }
@@ -1464,6 +1475,7 @@ async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tau
         typewriter: prefs.typewriter,
         editor_font: if SCREEN_FONTS.contains(&prefs.editor_font.as_str()) { prefs.editor_font } else { default_editor_font() },
         editor_size: if prefs.editor_size.is_finite() { prefs.editor_size.round().clamp(10.0, 20.0) } else { default_editor_size() },
+        theme: if THEMES.contains(&prefs.theme.as_str()) { prefs.theme } else { default_theme() },
     };
     let path = prefs_path(&app);
     let tmp = path.with_extension("json.tmp");
@@ -1765,7 +1777,17 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("popout_board", "Board in Its Own Window")
         .text("popout_notes", "Notes in Their Own Window")
         .build()?;
+    let theme = SubmenuBuilder::new(app, "Theme")
+        .item(&check_item(app, "theme_system", "Match System", true)?)
+        .separator()
+        .item(&check_item(app, "theme_day", "Day", false)?)
+        .item(&check_item(app, "theme_night", "Night", false)?)
+        .item(&check_item(app, "theme_midnight", "Midnight", false)?)
+        .item(&check_item(app, "theme_oled", "OLED (true black)", false)?)
+        .build()?;
     let appearance = SubmenuBuilder::new(app, "Appearance")
+        .item(&theme)
+        .separator()
         .text("ui_larger", keyed("Larger Interface", "="))
         .text("ui_smaller", keyed("Smaller Interface", "-"))
         .text("ui_reset", keyed("Actual Size", "0"))

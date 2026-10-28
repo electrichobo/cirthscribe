@@ -42,6 +42,7 @@ import { createGoToDialog } from "./goto";
 import { createShortcutsDialog } from "./shortcuts";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
+import { setTheme, type Theme } from "./a11y";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -1094,6 +1095,13 @@ async function runMenu(id: string): Promise<void> {
     case "view_typewriter":
       await toggleTypewriter();
       centreTypingLine();
+      break;
+    case "theme_system":
+    case "theme_day":
+    case "theme_night":
+    case "theme_midnight":
+    case "theme_oled":
+      await setTheme(id.slice(6) as Theme);
       break;
     case "popout_nav":
     case "popout_board":

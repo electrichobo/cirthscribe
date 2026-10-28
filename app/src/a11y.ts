@@ -59,6 +59,22 @@ export interface UiPrefs {
   /** Script font and size on screen only; pages and exports keep Courier Prime 12 pt. */
   editor_font: ScreenFont;
   editor_size: number;
+  /** Colour theme; "system" follows the OS's light or dark setting. */
+  theme: Theme;
+}
+
+export type Theme = "system" | "day" | "night" | "midnight" | "oled";
+export const THEME_LABEL: Record<Theme, string> = { system: "Match System", day: "Day", night: "Night", midnight: "Midnight", oled: "OLED" };
+
+/** The theme on the page: no attribute follows the system. */
+export function applyTheme(theme: Theme) {
+  if (theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+}
+
+export async function setTheme(theme: Theme) {
+  const next = await setPrefs({ theme });
+  announce(`Theme: ${THEME_LABEL[next.theme]}`);
 }
 
 export type ScreenFont = "courier-prime" | "mono" | "serif" | "sans";
@@ -69,12 +85,13 @@ export const SCREEN_FONTS: Record<ScreenFont, { label: string; stack: string }> 
   sans: { label: "Sans serif", stack: 'system-ui, "Segoe UI", Helvetica, Arial, "DejaVu Sans", sans-serif' },
 };
 
-let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false }, typewriter: false, editor_font: "courier-prime", editor_size: 12 };
+let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false }, typewriter: false, editor_font: "courier-prime", editor_size: 12, theme: "system" };
 const panelListeners: (() => void)[] = [];
 
 function applyPrefs() {
   if (prefs.contrast === "high") document.documentElement.dataset.contrast = "high";
   else delete document.documentElement.dataset.contrast;
+  applyTheme(prefs.theme ?? "system");
   for (const [k, on] of Object.entries(prefs.panels)) document.body.toggleAttribute(`data-hide-${k}`, !on);
   document.body.toggleAttribute("data-typewriter", prefs.typewriter);
   const root = document.documentElement.style;

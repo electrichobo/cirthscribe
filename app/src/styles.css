@@ -8,9 +8,19 @@
   --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1f; --muted: #5d5d66; --line: #d6d3cc; --accent: #2b5fb3; --warn: #8a4b00; --bad: #a3141c; --on-accent: #ffffff;
   color-scheme: light dark;
 }
+/* Themes (View > Appearance > Theme, stored per user): Match System (no
+   data-theme: light or dark as the OS says), Day, Night, Midnight, OLED.
+   High contrast is a separate switch on top of any of them. Every pair of
+   text and background colours is checked by the "Themes" e2e test. */
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1b1c1f; --panel: #26272b; --ink: #ececef; --muted: #a8a8b3; --line: #3a3b41; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; --on-accent: #10131a; }
+  :root:not([data-theme]) { --bg: #1b1c1f; --panel: #26272b; --ink: #ececef; --muted: #a8a8b3; --line: #3a3b41; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; --on-accent: #10131a; }
 }
+:root[data-theme="day"] { color-scheme: light; }
+:root[data-theme="night"] { --bg: #1b1c1f; --panel: #26272b; --ink: #ececef; --muted: #a8a8b3; --line: #3a3b41; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; --on-accent: #10131a; color-scheme: dark; }
+/* Midnight: deep blue-black, softer than pure black. */
+:root[data-theme="midnight"] { --bg: #0d1322; --panel: #141c30; --ink: #e4e9f4; --muted: #9eabc6; --line: #27314a; --accent: #86b4ff; --warn: #f2b860; --bad: #ff8f95; --on-accent: #0d1322; color-scheme: dark; }
+/* OLED: true black, so dark pixels are off on OLED screens. */
+:root[data-theme="oled"] { --bg: #000000; --panel: #000000; --ink: #e6e6e6; --muted: #a3a3a3; --line: #2a2a2a; --accent: #8fb3ff; --warn: #f0b35a; --bad: #ff8a8f; --on-accent: #000000; color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
 body { display: grid; grid-template-rows: auto 1fr auto; }
@@ -180,8 +190,9 @@ footer #info { margin-left: auto; }
 :root { --tc-red: #b3261e; --tc-orange: #a14f00; --tc-green: #1f7a33; --tc-blue: #1d5fbf; --tc-purple: #7b3fb0;
   --hl-yellow: rgba(255, 214, 0, .45); --hl-green: rgba(76, 200, 90, .35); --hl-blue: rgba(80, 150, 255, .35); --hl-pink: rgba(255, 105, 180, .35); --hl-orange: rgba(255, 150, 40, .4); }
 @media (prefers-color-scheme: dark) {
-  :root { --tc-red: #ff8a80; --tc-orange: #ffb366; --tc-green: #7dd88a; --tc-blue: #8fb3ff; --tc-purple: #d0a8ff; }
+  :root:not([data-theme]) { --tc-red: #ff8a80; --tc-orange: #ffb366; --tc-green: #7dd88a; --tc-blue: #8fb3ff; --tc-purple: #d0a8ff; }
 }
+:root:is([data-theme="night"], [data-theme="midnight"], [data-theme="oled"]) { --tc-red: #ff8a80; --tc-orange: #ffb366; --tc-green: #7dd88a; --tc-blue: #8fb3ff; --tc-purple: #d0a8ff; }
 .tc-red { color: var(--tc-red); } .tc-orange { color: var(--tc-orange); } .tc-green { color: var(--tc-green); } .tc-blue { color: var(--tc-blue); } .tc-purple { color: var(--tc-purple); }
 mark.hl { color: inherit; border-radius: 2px; }
 .hl-yellow { background: var(--hl-yellow); } .hl-green { background: var(--hl-green); } .hl-blue { background: var(--hl-blue); } .hl-pink { background: var(--hl-pink); } .hl-orange { background: var(--hl-orange); }
@@ -392,13 +403,14 @@ button.link { background: none; border: none; padding: 4px 0; color: var(--accen
   --bg: #ffffff; --panel: #ffffff; --ink: #000000; --muted: #1f1f1f; --line: #000000; --accent: #0030a8; --warn: #6b3200; --bad: #8c0000; --on-accent: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
-  :root[data-contrast="high"] { --bg: #000000; --panel: #000000; --ink: #ffffff; --muted: #e6e6e6; --line: #ffffff; --accent: #ffe14d; --warn: #ffc266; --bad: #ff9c9c; --on-accent: #000000; }
+  :root[data-contrast="high"]:not([data-theme]) { --bg: #000000; --panel: #000000; --ink: #ffffff; --muted: #e6e6e6; --line: #ffffff; --accent: #ffe14d; --warn: #ffc266; --bad: #ff9c9c; --on-accent: #000000; }
 }
+:root[data-contrast="high"]:is([data-theme="night"], [data-theme="midnight"], [data-theme="oled"]) { --bg: #000000; --panel: #000000; --ink: #ffffff; --muted: #e6e6e6; --line: #ffffff; --accent: #ffe14d; --warn: #ffc266; --bad: #ff9c9c; --on-accent: #000000; }
 @media (prefers-contrast: more) {
-  :root { --bg: #ffffff; --panel: #ffffff; --ink: #000000; --muted: #1f1f1f; --line: #000000; --accent: #0030a8; --warn: #6b3200; --bad: #8c0000; --on-accent: #ffffff; }
+  :root:not([data-theme]) { --bg: #ffffff; --panel: #ffffff; --ink: #000000; --muted: #1f1f1f; --line: #000000; --accent: #0030a8; --warn: #6b3200; --bad: #8c0000; --on-accent: #ffffff; }
 }
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
-  :root { --bg: #000000; --panel: #000000; --ink: #ffffff; --muted: #e6e6e6; --line: #ffffff; --accent: #ffe14d; --warn: #ffc266; --bad: #ff9c9c; --on-accent: #000000; }
+  :root:not([data-theme]) { --bg: #000000; --panel: #000000; --ink: #ffffff; --muted: #e6e6e6; --line: #ffffff; --accent: #ffe14d; --warn: #ffc266; --bad: #ff9c9c; --on-accent: #000000; }
 }
 :root[data-contrast="high"] button, :root[data-contrast="high"] select, :root[data-contrast="high"] input, :root[data-contrast="high"] textarea { border: 2px solid var(--line); }
 :root[data-contrast="high"] :focus-visible { outline: 3px solid var(--accent) !important; outline-offset: 2px; }

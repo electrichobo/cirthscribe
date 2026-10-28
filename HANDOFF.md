@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). **W1 (menus), W2 (notes panel) and W3 (pop-out panels, ADR 0004) are built**; next W4 (themes).
+**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). **W1 (menus), W2 (notes panel), W3 (pop-out panels, ADR 0004) and W4 (themes) are built**; next W5 (shortcut remapping), the last workspace step before M3 step 1.
 
 ## Completed & Verified
 
@@ -17,6 +17,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - W1 menus built (main.rs menu builder, window_command, open_releases_page, peek_file; main.ts runMenu; new exportdlg.ts, goto.ts, shortcuts.ts). Checks: `npm run build`, contract (4), e2e CDP 50/50, WebDriver 49/49 (1 skipped: IME). Manual N29 open (minimise, zoom, full screen, browser, real imports).
 - W2 notes panel built (notes.ts; store project_notes; Tools > Notes). Store fix: settings changes now count as unsaved work, so a crash no longer loses notes, title page or header changes made after the last save. Checks: `cargo test -p cirth-core` (all pass), e2e CDP 51/51, WebDriver 50/50 (1 skipped: IME), contract 4.
 - W3 pop-out panels built: panels.ts (main side), panelwin.ts + panel.html (window side), ScriptView in views.ts, Rust pop_out_panel / close_panel_window (async: building a window in a sync command deadlocks on Windows) / window_labels, capability panel-*. Checks: e2e CDP 52/52, WebDriver 51/51 (1 skipped: IME), contract 4. Manual N30 open.
+- W4 themes built: data-theme tokens in styles.css (Day, Night, Midnight, OLED; none = Match System), UiPrefs.theme, View > Appearance > Theme. Checks: e2e CDP 53/53, WebDriver 52/52 (1 skipped: IME), contract 4.
 - M3 plan drafted from ROADMAP M3, PRODUCT_SPEC 3–4, ACCEPTANCE B and C, and the current code (one document in the UI; structural permission not stored; planning edits not undoable).
 - Not verified (carried into M3):
   - external app results (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print);
@@ -27,10 +28,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-None once the W3 commit is made.
+None once the W4 commit is made.
 
 ## Next Immediate Step
 
-1. W4: themes Day, Night, Midnight, OLED, Match System (View > Appearance > Theme; tokens in styles.css; stored in UiPrefs; contrast checks like the Display e2e test). Then W5 shortcut remapping.
+1. W5: keyboard shortcut remapping: a command list with keys (start from shortcuts.ts and the key handlers in main.ts), conflict warnings, reset to defaults, stored per user in UiPrefs. Then M3 step 1 (ADR 0003, structural permission per document, planning undo).
 2. Then M3 step 1: write ADR 0003 (focus-routed undo), store the structural permission in `document:<id>` settings (store.rs, main.ts `structural`), then planning commands with a core-side undo history.
 3. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.

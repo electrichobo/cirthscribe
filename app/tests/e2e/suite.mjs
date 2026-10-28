@@ -1508,6 +1508,43 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(saved.scale === 1 && saved.contrast === "system", `stored ${JSON.stringify(saved)}`);
   });
 
+  await test("Themes: Day, Night, Midnight, OLED and Match System from View > Appearance > Theme; every one meets contrast minimums, with high contrast too; stored per user", async () => {
+    await openFixture("unicode-marks");
+    const ratios = `(() => {
+      const css = getComputedStyle(document.documentElement);
+      const rgb = (v) => { let h = css.getPropertyValue(v).trim().replace('#', ''); if (h.length === 3) h = [...h].map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); };
+      const lum = (v) => { const [r, g, b] = rgb(v); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+      const out = {};
+      for (const fg of ['--ink', '--muted', '--accent', '--warn', '--bad']) for (const bg of ['--bg', '--panel']) out[fg + ' on ' + bg] = Math.round(cr(fg, bg) * 100) / 100;
+      return { bg: css.getPropertyValue('--bg').trim(), scheme: css.colorScheme, out };
+    })()`;
+    const seen = {};
+    for (const t of ["day", "night", "midnight", "oled", "system"]) {
+      await app.evaluate(`__cirth.menu('theme_${t}')`);
+      await waitFor(app, `__cirth.prefs().theme === '${t}' && (document.documentElement.dataset.theme ?? 'system') === '${t}'`, `theme ${t} applied`);
+      await waitFor(app, `window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.filter(i => i.id.startsWith('theme_') && i.checked).map(i => i.id).join() === 'theme_${t}')`, `only ${t} checked`);
+      const r = await app.evaluate(ratios);
+      const low = Object.entries(r.out).filter(([, v]) => !(v >= 4.5));
+      assert(!low.length, `${t}: below 4.5:1: ${JSON.stringify(low)}`);
+      seen[t] = r.bg;
+      if (t !== "system") assert(r.scheme === (t === "day" ? "light" : "dark"), `${t}: native controls follow the theme (${r.scheme})`);
+    }
+    const black = (c) => ["#000", "#000000"].includes(c);
+    assert(black(seen.oled) && new Set([seen.day, seen.night, seen.midnight, seen.oled]).size === 4, `four distinct themes, OLED true black: ${JSON.stringify(seen)}`);
+    // High contrast on top of a dark theme stays dark and reaches 7:1.
+    await app.evaluate("__cirth.menu('theme_oled')");
+    await app.evaluate("__cirth.menu('ui_contrast')");
+    await waitFor(app, "document.documentElement.dataset.contrast === 'high'", "high contrast on");
+    const hc = await app.evaluate(ratios);
+    assert(black(hc.bg) && Object.values(hc.out).every((v) => v >= 7), `OLED + high contrast: ${JSON.stringify(hc)}`);
+    await app.evaluate("__cirth.menu('ui_contrast')");
+    const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
+    assert(saved.theme === "oled", `stored per user: ${saved.theme}`);
+    await app.evaluate("__cirth.menu('theme_system')");
+    await waitFor(app, "!document.documentElement.dataset.theme && __cirth.prefs().theme === 'system'", "back to Match System");
+  });
+
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {
     await openFixture("unicode-marks");
     const n0 = (await blocks()).length;

@@ -95,7 +95,7 @@ First, from the owner's notes on the current build:
 - [x] Reorganised menus: one Import (it recognises Fountain, Final Draft and plain text) and one Export dialog; View > Mode, Tools, Appearance, Go To (page or scene) and Window; elements, screen font, title page and spelling under Format; a keyboard shortcut list
 - [x] A notes scratchpad saved with the project (View > Tools > Notes)
 - [x] Panels that pop out into their own windows (scene list, board, notes)
-- [ ] Themes: Day, Night, Midnight, OLED, Match System
+- [x] Themes: Day, Night, Midnight, OLED (true black) and Match System, with high contrast on top of any of them
 - [ ] Remappable keyboard shortcuts
 
 

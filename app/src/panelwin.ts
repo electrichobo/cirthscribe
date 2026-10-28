@@ -6,7 +6,7 @@ import "./styles.css";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { renderBoard, renderNavigator, setSceneNumbers, type BoardState, type ScriptView } from "./views";
-import { installLiveRegions, focusKey, restoreFocus, type UiPrefs } from "./a11y";
+import { installLiveRegions, focusKey, restoreFocus, applyTheme, type UiPrefs } from "./a11y";
 import type { PanelCommand, PanelState, PopPanel } from "./panels";
 import type { SceneInfo } from "./scenes";
 
@@ -18,10 +18,11 @@ installLiveRegions();
 type Cmd = PanelCommand extends infer C ? (C extends PanelCommand ? Omit<C, "panel"> : never) : never;
 const send = (c: Cmd) => void emitTo("main", "panel-command", { panel, ...c } as PanelCommand);
 
-// Contrast follows the app preference (read once, when the window opens).
+// Theme and contrast follow the app preference (read when the window opens).
 void invoke<UiPrefs>("ui_prefs")
   .then((p) => {
     if (p.contrast === "high") document.documentElement.dataset.contrast = "high";
+    applyTheme(p.theme ?? "system");
   })
   .catch(() => undefined);
 

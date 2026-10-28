@@ -84,9 +84,15 @@ The owner's notes after using the current build. Proposed as steps W1–W5, done
   - The main window stays the only authority: a panel window draws a snapshot sent from it and sends every change back as a command (go to a scene, move a scene, edit or move a card, the board's permission switch, notes text, undo and redo). The panel code is shared through a small `ScriptView` interface in `views.ts`.
   - A scene move from a panel window is one transaction in the script's history; Ctrl/Cmd+Z in the panel window (outside a text field) undoes it there.
   - The Dock button or the window's own close button puts the panel back; going Home or closing the main window closes every panel window. The main window gives the space to the script while a panel is out.
-  - Not yet: which panels are out is not remembered between sessions; a panel window takes high contrast from the preference when it opens, not later changes, and not the interface size.
+  - Not yet: which panels are out is not remembered between sessions; a panel window takes theme, high contrast and interface size from the preferences when it opens, not later changes.
   - Tests: e2e "Pop-out panels" on both drivers (windows open and close, each draws from the main window's snapshot, a move from the window reaches the script and redraws, undo from the window, a card edit stored once, notes kept, Dock, close button, Home). Manual check N30: moving windows, focus and front-most window by hand on each OS.
-- **W4. Themes:** Day, Night, Midnight, OLED (true black) and Match System, each checked for contrast like the current two.
+- **W4. Themes:** Day, Night, Midnight, OLED (true black) and Match System, each checked for contrast like the current two. **Built 2026-10-28:**
+  - View > Appearance > Theme, with a check mark on the current one; stored per user in the preferences file (old files get Match System).
+  - Day and Night are the former light and dark colours; Midnight is a deep blue-black; OLED is true black. Match System follows the OS's light or dark setting as before.
+  - Native controls (dropdown lists, scrollbars) follow the theme. Screen-only text colours switch to their light-on-dark versions in the dark themes.
+  - High contrast stays a separate switch on top of any theme: white with Day, black with the dark ones. The OS's own high-contrast request applies while the theme is Match System.
+  - Pop-out panel windows take the theme, contrast and interface size when they open.
+  - Tests: e2e "Themes" on both drivers: every theme's text and background pairs at least 4.5:1, OLED plus high contrast at least 7:1 and still black, one check mark, stored.
 - **W5. Keyboard shortcut remapping:** a list of commands with their keys, conflict warnings, reset to defaults; stored per user.
 
 **W1 built 2026-10-28:**
