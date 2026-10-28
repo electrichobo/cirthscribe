@@ -4,32 +4,32 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-M2, production screenplay output (docs/M2_PLAN.md). Steps 1–8 are built and pushed (through ce5c517). **Step 9, the compatibility matrix, is in progress:** collect external results for every export format, each labelled with an actual test and its date, in docs/COMPATIBILITY.md. The M2 exit review comes after it.
+M2, production screenplay output (docs/M2_PLAN.md). Steps 1–8 are built and pushed. **Step 9, the compatibility matrix, is in progress:** collect external results for every export format in docs/COMPATIBILITY.md, each labelled with an actual test and its date. The M2 exit review comes after it.
 
 ## Completed & Verified
 
-- Step 9 groundwork:
-  - `cirth_core::compat` and `cirth-cli compat-pack` write the three samples in all seven formats to `out/compat-pack-v1/`, with MANIFEST.md hashes.
-  - docs/COMPATIBILITY.md holds per-format status, a results log and how to test.
-- Logged so far:
-  - the owner's informal HTML look (2026-10-27; browser not recorded);
-  - Kolbítar's automated Fountain and FDX round trips of the whole pack (internal, not external).
-- Checks on Windows 11: `cargo test -p cirth-core` (all pass, including the repeatable-pack and round-trip test); `cirth-cli compat-pack` ran (21 files).
-  - The app (UI and Tauri) did not change in this step, so the e2e suites were not rerun. They last passed on ce5c517: CDP 50/50, WebDriver 49/49.
+- Step 9 groundwork (a07198a, pushed): `cirth-cli compat-pack` and docs/COMPATIBILITY.md.
+- First external round, owner's Mac, pack v1: Preview, TextEdit and Safari. Results are logged; Pages was not installed.
+- Fixes from that round, now pack v2:
+  - DOCX: the same bytes on every OS (zip entries Unix 0644), plus direct paragraph and run formatting;
+  - PDF: Info strings as UTF-16BE, with cross-reference offsets shifted and validated by a test; MediaBox exactly 612 × 792;
+  - RTF: a page break after the title page that TextEdit honours.
+- Checks on Windows 11: `cargo test -p cirth-core` (all pass, including new tests for the zip headers, PDF Info and offsets, and the RTF page break); `cirth-cli compat-pack` (v2, 21 files).
+  - Full suites: notices check, `npm run test:contract` (4), `npm run e2e:cdp` (50/50), `npm run e2e:webdriver` (49/49, 1 skipped: IME).
 - Not verified:
-  - No external app results yet for PDF, TXT, Fountain, FDX, DOCX or RTF, and HTML only informally.
-  - Manual checks N20–N28 are open. macOS and Linux run only in CI.
-  - Known limits as before: locked-boundary split offsets; board moves not marked revised; FDX has no revisions or locked pages.
-  - Carried from M1: Linux latency, reference machines, defect 3.
+  - The v2 fixes on the Mac. Is the DOCX now byte-identical across OSes?
+  - Word, Google Docs, LibreOffice, Final Draft, a Fountain app, and Safari print preview.
+  - PDF fonts are named F0–F3 (printpdf).
+  - No fallback font for non-Latin text in the PDF.
+  - Manual checks N20–N28.
+  - Known limits as before; carried M1 items.
 
 ## In-Progress / Uncommitted State
 
-None once the step 9 groundwork commit is made.
+None once the step 9 fixes are committed.
 
 ## Next Immediate Step
 
-The owner chooses which external tests to run, and where:
-- Final Draft, Word, Google Docs, LibreOffice and Fountain apps on the owner's machines;
-- TextEdit, Pages, Preview and Safari on the Mac test machine via its Remote Control session, only with the owner's go-ahead.
-
-Each result becomes a row in docs/COMPATIBILITY.md, with the format's status updated. Fix any defects found, then start the M2 exit review (template: docs/m1/EXIT_REVIEW.md).
+1. Ask the owner whether to push.
+2. Send the Mac session a recheck on pack v2 (the commit after a07198a): compare all 21 hashes with Windows; recheck the PDF Producer and page size in Preview, the DOCX formatting in TextEdit, and the RTF title page in TextEdit.
+3. Log the results. Then the owner's own app tests (Word, Google Docs, LibreOffice, Final Draft, a Fountain app).

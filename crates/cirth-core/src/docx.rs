@@ -42,7 +42,7 @@ fn style_id(name: &str) -> String {
 }
 
 fn run(text: &str, bold: bool, italic: bool, underline: bool) -> String {
-    let mut props = String::new();
+    let mut props = String::from(RUN_FONT);
     if bold {
         props.push_str("<w:b/>");
     }
@@ -52,7 +52,7 @@ fn run(text: &str, bold: bool, italic: bool, underline: bool) -> String {
     if underline {
         props.push_str("<w:u w:val=\"single\"/>");
     }
-    let rpr = if props.is_empty() { String::new() } else { format!("<w:rPr>{props}</w:rPr>") };
+    let rpr = format!("<w:rPr>{props}</w:rPr>");
     // Line breaks inside a block become <w:br/>; tabs become <w:tab/>.
     let mut body = String::new();
     for (i, line) in text.split('\n').enumerate() {
@@ -71,20 +71,41 @@ fn run(text: &str, bold: bool, italic: bool, underline: bool) -> String {
     format!("<w:r>{rpr}{body}</w:r>")
 }
 
-fn para_xml(p: &Para) -> String {
-    let mut ppr = format!("<w:pStyle w:val=\"{}\"/>", style_id(printdoc::style_name(p.kind)));
-    if p.break_before {
+/// Font and size on every run as well as in the styles: readers such as
+/// macOS TextEdit ignore styles.xml and keep only direct formatting.
+const RUN_FONT: &str = "<w:rFonts w:ascii=\"Courier Prime\" w:hAnsi=\"Courier Prime\" w:eastAsia=\"Courier Prime\" w:cs=\"Courier Prime\"/><w:sz w:val=\"24\"/><w:szCs w:val=\"24\"/>";
+
+fn para_xml(p: &Profile, para: &Para) -> String {
+    let g = printdoc::geom(p, para.kind);
+    // Element order inside pPr follows the schema: pStyle, keepNext,
+    // pageBreakBefore, tabs, spacing, ind, jc.
+    let mut ppr = format!("<w:pStyle w:val=\"{}\"/>", style_id(printdoc::style_name(para.kind)));
+    if g.keep_with_next {
+        ppr.push_str("<w:keepNext/>");
+    }
+    if para.break_before {
         ppr.push_str("<w:pageBreakBefore/>");
     }
-    let mut body = String::new();
-    if let Some(n) = &p.number {
-        // The number hangs in the left margin, then a tab to the text.
-        ppr.push_str("<w:tabs><w:tab w:val=\"left\" w:pos=\"0\"/></w:tabs><w:ind w:left=\"0\" w:hanging=\"1080\"/>");
-        body.push_str(&run(n, false, false, false));
-        body.push_str("<w:r><w:tab/></w:r>");
+    if para.number.is_some() {
+        ppr.push_str("<w:tabs><w:tab w:val=\"left\" w:pos=\"0\"/></w:tabs>");
     }
-    for r in &p.runs {
-        body.push_str(&run(&r.text, r.bold, r.italic, r.underline));
+    ppr.push_str(&format!("<w:spacing w:before=\"{}\" w:after=\"0\" w:line=\"240\" w:lineRule=\"exact\"/>", g.space_before * 240));
+    if para.number.is_some() {
+        // The number hangs in the left margin, then a tab to the text.
+        ppr.push_str(&format!("<w:ind w:left=\"{}\" w:right=\"{}\" w:hanging=\"1080\"/>", tw(g.left_in), tw(g.right_in)));
+    } else {
+        ppr.push_str(&format!("<w:ind w:left=\"{}\" w:right=\"{}\"/>", tw(g.left_in), tw(g.right_in)));
+    }
+    if g.right_aligned {
+        ppr.push_str("<w:jc w:val=\"right\"/>");
+    }
+    let mut body = String::new();
+    if let Some(n) = &para.number {
+        body.push_str(&run(n, false, false, false));
+        body.push_str(&format!("<w:r><w:rPr>{RUN_FONT}</w:rPr><w:tab/></w:r>"));
+    }
+    for r in &para.runs {
+        body.push_str(&run(&r.text, r.bold, r.italic || g.italic, r.underline));
     }
     format!("<w:p><w:pPr>{ppr}</w:pPr>{body}</w:p>")
 }
@@ -159,7 +180,7 @@ fn document_xml(paras: &[Para], title: Option<&TitlePage>, p: &Profile) -> Strin
                 TitleAlign::Right => "right",
             };
             body.push_str(&format!(
-                "<w:p><w:pPr><w:pStyle w:val=\"TitlePage\"/><w:spacing w:before=\"{}\"/><w:jc w:val=\"{jc}\"/></w:pPr>{}</w:p>",
+                "<w:p><w:pPr><w:pStyle w:val=\"TitlePage\"/><w:spacing w:before=\"{}\" w:after=\"0\" w:line=\"240\" w:lineRule=\"exact\"/><w:jc w:val=\"{jc}\"/></w:pPr>{}</w:p>",
                 t.space_before * 240,
                 run(&t.text, false, false, false)
             ));
@@ -168,7 +189,7 @@ fn document_xml(paras: &[Para], title: Option<&TitlePage>, p: &Profile) -> Strin
         body.push_str(&format!("<w:p><w:pPr><w:sectPr>{}</w:sectPr></w:pPr></w:p>", page_setup(p, false, false)));
     }
     for para in paras {
-        body.push_str(&para_xml(para));
+        body.push_str(&para_xml(p, para));
     }
     if paras.is_empty() {
         body.push_str("<w:p/>");
@@ -228,7 +249,13 @@ pub fn export(blocks: &[Block], p: &Profile, numbers: &Numbers, title_page: Opti
     ];
     let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let fixed = zip::DateTime::from_date_and_time(2000, 1, 1, 0, 0, 0).map_err(|e| e.to_string())?;
-    let o = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated).last_modified_time(fixed);
+    // The host OS and file mode go into every entry; fix them (Unix, a plain
+    // 0644 file) so every OS writes the same bytes.
+    let o = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .last_modified_time(fixed)
+        .system(zip::System::Unix)
+        .external_attributes(0o100644 << 16);
     for (name, xml) in parts.iter().map(|(n, x)| (*n, x.as_str())).chain(std::iter::once(("docProps/app.xml", APP_XML))) {
         zip.start_file(name, o).map_err(|e| e.to_string())?;
         zip.write_all(xml.as_bytes()).map_err(|e| e.to_string())?;
@@ -278,6 +305,9 @@ mod tests {
         assert!(doc.contains("A &amp; B &lt;tag&gt; "), "escaped");
         assert!(doc.contains("<w:pStyle w:val=\"SceneHeading\"/>") && doc.contains("INT. LAB - NIGHT"), "upper-case heading with its style");
         assert!(doc.contains("<w:b/>"), "bold kept");
+        // Formatting is also direct on each paragraph and run (TextEdit ignores styles.xml).
+        assert!(doc.contains("<w:pStyle w:val=\"Dialogue\"/><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\" w:lineRule=\"exact\"/><w:ind w:left=\"1440\" w:right=\"2160\"/>"), "dialogue indents on the paragraph");
+        assert!(doc.contains("<w:rPr><w:rFonts w:ascii=\"Courier Prime\""), "font on the runs");
         assert!(doc.contains("w:w=\"12240\" w:h=\"15840\""), "US Letter");
         assert_eq!(doc.matches("<w:sectPr>").count(), 2, "title page section and script section");
         let styles = part(&out.bytes, "word/styles.xml");
@@ -291,6 +321,18 @@ mod tests {
         let a = export(&sample(), &p, &Numbers::new(), None, &DocOptions::default()).unwrap();
         let b = export(&sample(), &p, &Numbers::new(), None, &DocOptions::default()).unwrap();
         assert_eq!(a.bytes, b.bytes);
+        // Every entry says Unix, mode 0644, whatever OS wrote it (version made by,
+        // offset 4 of each central directory header; external attributes, offset 38).
+        let mut at = 0;
+        let mut entries = 0;
+        while let Some(i) = a.bytes[at..].windows(4).position(|w| w == [0x50, 0x4b, 0x01, 0x02]) {
+            let h = at + i;
+            assert_eq!(a.bytes[h + 5], 3, "made by Unix");
+            assert_eq!(u32::from_le_bytes(a.bytes[h + 38..h + 42].try_into().unwrap()), 0o100644 << 16);
+            entries += 1;
+            at = h + 4;
+        }
+        assert_eq!(entries, 9);
         assert!(part(&a.bytes, "word/document.xml").contains("w:w=\"11909\""), "A4 width");
     }
 }

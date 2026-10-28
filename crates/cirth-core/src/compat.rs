@@ -14,7 +14,7 @@ use crate::title::TitlePage;
 use std::path::{Path, PathBuf};
 
 /// Pack format version: bump when the pack's contents or options change.
-pub const PACK_VERSION: u32 = 1;
+pub const PACK_VERSION: u32 = 2;
 
 /// Fixed date in the PDFs (2026-01-01 UTC) so the pack is repeatable.
 const PACK_DATE: i64 = 1_767_225_600;

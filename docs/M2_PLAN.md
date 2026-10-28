@@ -146,7 +146,14 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - `cirth-cli compat-pack` writes the test pack (`cirth_core::compat`): the three samples in all seven export formats, with a title page, locked scene numbers and a header. Output is byte-for-byte repeatable, with a `MANIFEST.md` of sizes and FNV-1a hashes. It is in `out/`, not committed: regenerate it from the commit being tested.
    - docs/COMPATIBILITY.md holds the status of each format, the results log, and how to test and record.
      - Recorded so far: the owner's informal HTML check, and Kolbítar's automated Fountain and FDX round trips of the whole pack (internal, not external).
-   - Open: external results for every format. These need the apps (Final Draft, Word, Google Docs, LibreOffice, TextEdit, a Fountain app, browsers) and the manual checks N22, N23, N25 and N28.
+   - **First external round, 2026-10-27, on the owner's Mac with pack v1:** Preview, TextEdit and Safari; Pages was not installed. Defects found and fixed in pack v2:
+     - DOCX files differed between Windows and macOS (zip host OS and mode): every entry is now Unix 0644;
+     - DOCX formatting was lost in TextEdit, which ignores styles: indents, spacing, alignment, font and size are now also written on each paragraph and run;
+     - PDF metadata showed "KolbÃ­tar": non-ASCII Info strings are rewritten as UTF-16BE after saving, and cross-reference offsets are shifted and checked by a test;
+     - PDF page size was 612.00006 pt: now exactly 612 × 792;
+     - the RTF title page was not on its own page in TextEdit: the first script paragraph now also has a page break.
+     Results and the remaining losses are in docs/COMPATIBILITY.md. A recheck on v2 is pending.
+   - Open: external results for every format. These need the apps (Final Draft, Word, Google Docs, LibreOffice, a Fountain app, browser print) and the manual checks N22, N23, N25 and N28.
 
 The exit review comes after 7–9. Steps 2 and 3 can swap if the owner wants FDX first.
 

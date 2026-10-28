@@ -120,6 +120,7 @@ pub fn export(blocks: &[Block], p: &Profile, numbers: &Numbers, title_page: Opti
         esc(opts.header.trim()),
         esc(opts.footer.trim())
     );
+    let has_title = title_page.is_some_and(|t| !t.is_empty());
     if let Some(tp) = title_page.filter(|t| !t.is_empty()) {
         s.push_str("\\sectd\\sbknone\n");
         for t in printdoc::title_paras(tp, p) {
@@ -133,8 +134,16 @@ pub fn export(blocks: &[Block], p: &Profile, numbers: &Numbers, title_page: Opti
         s.push_str("\\sect\n");
     }
     s.push_str(&script_section);
-    for para in &paras {
-        s.push_str(&para_rtf(p, para));
+    for (i, para) in paras.iter().enumerate() {
+        // Readers that ignore section breaks (macOS TextEdit) still start
+        // the script on a new page after the title page; Word, already on a
+        // new page, adds nothing.
+        if i == 0 && has_title && !para.break_before {
+            let forced = Para { break_before: true, ..para.clone() };
+            s.push_str(&para_rtf(p, &forced));
+        } else {
+            s.push_str(&para_rtf(p, para));
+        }
     }
     s.push('}');
     let mut notes = printdoc::notes(&counts, "RTF");
@@ -170,5 +179,8 @@ mod tests {
         assert!(s.contains("\\paperw12240\\paperh15840\\margl2160"), "US Letter, 1.5 in left margin");
         assert!(s.contains("\\li1440\\ri2160"), "dialogue indents");
         assert!(s.contains("\\sect\n") && s.contains("\\pgnrestart"), "title page section, then numbering from 1");
+        let first_script = s.find("INT. LAB - NIGHT").unwrap();
+        let para_start = s[..first_script].rfind("\\pard").unwrap();
+        assert!(s[para_start..first_script].contains("\\pagebb"), "the script also starts with a page break, for readers that ignore sections");
     }
 }
