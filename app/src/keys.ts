@@ -16,7 +16,7 @@
 
 import { TextSelection, type Command, type EditorState } from "prosemirror-state";
 import { keymap } from "prosemirror-keymap";
-import { KINDS, type Kind } from "./schema";
+import { type Kind } from "./schema";
 
 export interface KeyConfig {
   tab: Partial<Record<Kind, Kind>>;
@@ -132,6 +132,6 @@ export function screenplayKeymap(onEscape: () => void) {
       return true;
     },
   };
-  KINDS.forEach((k, i) => (bindings[`Mod-${i + 1}`] = setKind(k)));
+  // Ctrl/Cmd+1 to 9 are rebindable shortcuts (bindings.ts), run by the app's dispatcher.
   return keymap(bindings);
 }

@@ -375,6 +375,9 @@ dialog.about h3 { font-size: 13px; margin: 14px 0 6px; }
 .shortcut-table { border-collapse: collapse; width: 100%; }
 .shortcut-table td { padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .shortcut-table .keys { white-space: nowrap; font-family: ui-monospace, Consolas, monospace; color: var(--muted); text-align: right; }
+.shortcut-table .shortcut-actions { white-space: nowrap; text-align: right; width: 1%; }
+.shortcut-table .shortcut-actions button { font-size: 12px; padding: 1px 8px; margin-left: 4px; }
+#shortcuts-status { min-height: 1.4em; color: var(--ink); }
 /* A button for a feature not built yet (comments, M5): visibly inactive. */
 .tool.placeholder { opacity: .45; }
 .form-note { margin: 0 0 10px; color: var(--muted); }

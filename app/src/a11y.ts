@@ -61,6 +61,8 @@ export interface UiPrefs {
   editor_size: number;
   /** Colour theme; "system" follows the OS's light or dark setting. */
   theme: Theme;
+  /** Rebound shortcuts: command id -> keys ("" = none); only what differs from the defaults (bindings.ts). */
+  keys: Record<string, string>;
 }
 
 export type Theme = "system" | "day" | "night" | "midnight" | "oled";
@@ -85,7 +87,7 @@ export const SCREEN_FONTS: Record<ScreenFont, { label: string; stack: string }> 
   sans: { label: "Sans serif", stack: 'system-ui, "Segoe UI", Helvetica, Arial, "DejaVu Sans", sans-serif' },
 };
 
-let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false }, typewriter: false, editor_font: "courier-prime", editor_size: 12, theme: "system" };
+let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false }, typewriter: false, editor_font: "courier-prime", editor_size: 12, theme: "system", keys: {} };
 const panelListeners: (() => void)[] = [];
 
 function applyPrefs() {

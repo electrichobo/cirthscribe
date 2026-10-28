@@ -1545,6 +1545,70 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.documentElement.dataset.theme && __cirth.prefs().theme === 'system'", "back to Match System");
   });
 
+  await test("Shortcuts: Help > Keyboard Shortcuts rebinds a command; the menu shows the new keys; a taken key moves; fixed and plain keys are refused; stored; Reset all", async () => {
+    await openFixture("unicode-marks");
+    const prefsKeys = () => app.evaluate("__cirth.prefs().keys");
+    const exportOpen = () => app.evaluate("document.getElementById('export-dialog').open");
+    const closeExport = () => app.evaluate("(document.getElementById('export-cancel').click(), true)");
+    const status = () => app.evaluate("document.getElementById('shortcuts-status').textContent");
+    const change = (id) => app.evaluate(`(document.querySelector('#shortcuts-dialog tr[data-command="${id}"] .shortcut-change').click(), true)`);
+    // The default keys work.
+    await app.evaluate("__cirth.view.focus()");
+    await press("e", [MOD_KEY]);
+    await waitFor(app, "document.getElementById('export-dialog').open", "Ctrl/Cmd+E opens Export by default");
+    await closeExport();
+    // Rebind Export to Ctrl/Cmd+Shift+E.
+    await app.evaluate("(__cirth.menu('shortcuts'), true)");
+    await waitFor(app, "document.getElementById('shortcuts-dialog').open", "dialog open");
+    await change("export");
+    assert(/Press the new keys/.test(await status()), "waiting for keys");
+    await press("e", [MOD_KEY, "shift"]);
+    await waitFor(app, "__cirth.prefs().keys.export === 'Mod+Shift+E'", "Export rebound");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => /\\((Ctrl|Cmd)\\+Shift\\+E\\)$/.test(m.find(i => i.id === 'export').path))", "the File menu shows the new keys");
+    // A taken key moves: Italic gets Ctrl/Cmd+B, Bold has none.
+    await change("italic");
+    await press("b", [MOD_KEY]);
+    await waitFor(app, "__cirth.prefs().keys.italic === 'Mod+B' && __cirth.prefs().keys.bold === ''", "Ctrl/Cmd+B moved to Italic");
+    assert(/Bold/.test(await status()), `the writer is told Bold lost it: ${await status()}`);
+    // Fixed keys and plain letters are refused; Escape leaves it unchanged.
+    await change("underline");
+    await press("z", [MOD_KEY]);
+    assert(/fixed/.test(await status()), `Ctrl/Cmd+Z refused: ${await status()}`);
+    await press("k");
+    assert(/would type/.test(await status()), `a plain letter refused: ${await status()}`);
+    await press("Escape");
+    assert((await app.evaluate("document.getElementById('shortcuts-dialog').open")) && !("underline" in (await prefsKeys())), "Escape cancels without closing the dialog or changing anything");
+    await app.evaluate("(document.getElementById('shortcuts-close').click(), true)");
+    // In force at once: the old keys do nothing, the new ones work.
+    await app.evaluate("__cirth.view.focus()");
+    await press("e", [MOD_KEY]);
+    await sleep(300);
+    assert(!(await exportOpen()), "Ctrl/Cmd+E no longer opens Export");
+    await press("e", [MOD_KEY, "shift"]);
+    await waitFor(app, "document.getElementById('export-dialog').open", "Ctrl/Cmd+Shift+E opens Export");
+    await closeExport();
+    const b0 = await blocks();
+    const ai = b0.findIndex((b) => b.kind === "action");
+    await setCaret(`[ps[${ai}][0] + 1, ps[${ai}][0] + 5]`);
+    await press("b", [MOD_KEY]);
+    await waitFor(app, `__cirth.view.state.doc.child(${ai}).firstChild?.marks.some(m => m.type.name === 'em')`, "Ctrl/Cmd+B now makes italic in the script");
+    assert(!(await app.evaluate(`__cirth.view.state.doc.child(${ai}).firstChild?.marks.some(m => m.type.name === 'strong')`)), "and not bold");
+    await press("z", [MOD_KEY]);
+    // Stored per user.
+    const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
+    assert(saved.keys.export === "Mod+Shift+E" && saved.keys.italic === "Mod+B" && saved.keys.bold === "", `stored: ${JSON.stringify(saved.keys)}`);
+    // Reset all: the defaults again, menus too.
+    await app.evaluate("(__cirth.menu('shortcuts'), true)");
+    await app.evaluate("(document.getElementById('shortcuts-reset-all').click(), true)");
+    await waitFor(app, "Object.keys(__cirth.prefs().keys).length === 0", "every override removed");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => /\\((Ctrl|Cmd)\\+E\\)$/.test(m.find(i => i.id === 'export').path))", "menu back to the default keys");
+    await app.evaluate("(document.getElementById('shortcuts-close').click(), true)");
+    await app.evaluate("__cirth.view.focus()");
+    await press("e", [MOD_KEY]);
+    await waitFor(app, "document.getElementById('export-dialog').open", "Ctrl/Cmd+E opens Export again");
+    await closeExport();
+  });
+
   await test("Crash after acknowledged commit: reopen recovers it; unacknowledged keystrokes are not claimed", async () => {
     await openFixture("unicode-marks");
     const n0 = (await blocks()).length;

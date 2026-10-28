@@ -40,6 +40,7 @@ import { createFurnitureDialog } from "./furniture";
 import { createExportDialog, type ExportFormat } from "./exportdlg";
 import { createGoToDialog } from "./goto";
 import { createShortcutsDialog } from "./shortcuts";
+import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
 import { setTheme, type Theme } from "./a11y";
@@ -277,8 +278,9 @@ function makeState(blocks: Block[]) {
       completePlugin(),
       // Escape: leave focus mode, else go to the scene list (or the board if the list is hidden).
       screenplayKeymap(() => void (focusMode.on ? focusMode.leave() : focusRegion(navEl) || focusRegion(boardEl))),
-      keymap({ "Mod-d": toggleDual(showBanner), "Mod-Enter": togglePageBreak }),
-      keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo, "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em), "Mod-u": toggleMark(schema.marks.underline) }),
+      // Bold, elements, dual dialogue and the rest are rebindable: the
+      // shortcut dispatcher runs them (bindings.ts). Undo and redo are fixed.
+      keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo }),
       keymap(baseKeymap),
       pageMarksPlugin(),
       sceneNumbersPlugin(),
@@ -616,6 +618,14 @@ const furniture = createFurnitureDialog(() => saveFile(false));
 const exportDialog = createExportDialog({ hasActiveRevision: () => !!revisions.state.active, run: (f) => exportAs(f) });
 const goTo = createGoToDialog({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], numbers: () => sceneNumbers });
 const shortcuts = createShortcutsDialog();
+// Menu items show the keys in force (after a change, and at startup).
+let shownKeys = "";
+onPanelsChanged(() => {
+  const keys = JSON.stringify(currentPrefs().keys ?? {});
+  if (keys === shownKeys) return;
+  shownKeys = keys;
+  void invoke("set_menu_texts", { texts: menuTexts(currentPrefs().keys ?? {}) }).catch(() => undefined);
+});
 const panelHost = createPanelHost({
   open: () => !!lastOpen,
   scenes: () => (view ? scenesOf(view.state.doc) : []),
@@ -838,10 +848,24 @@ window.addEventListener(
     if (e.key === "F6" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing && !document.querySelector("dialog[open]")) {
       e.preventDefault();
       cycleRegions(regions(), e.shiftKey);
-    } else if (e.key === "F11" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-      e.preventDefault();
-      void toggleFullScreen();
     }
+  },
+  true,
+);
+// Every rebindable shortcut (bindings.ts): the keys in force come from the
+// user's preferences; the command runs exactly as its menu item does.
+// Formatting keys act only in the script.
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.isComposing || document.body.hasAttribute("data-capturing-keys")) return;
+    const combo = comboOf(e);
+    const b = combo ? commandFor(currentPrefs().keys ?? {}, combo) : undefined;
+    if (!b) return;
+    if (b.scope === "script" && !(view && lastOpen && view.dom.contains(e.target as Node))) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void runMenu(b.id);
   },
   true,
 );
@@ -851,34 +875,7 @@ window.addEventListener(
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (!mod || e.altKey || e.isComposing) return;
     const k = e.key.toLowerCase();
-    if (k === "s") {
-      e.preventDefault();
-      if (lastOpen) void (e.shiftKey ? saveAs() : saveNow());
-    } else if (k === "." && !e.shiftKey) {
-      e.preventDefault();
-      if (lastOpen) spell.menuAtCaret();
-    } else if (k === "f" && !e.shiftKey) {
-      e.preventDefault();
-      if (lastOpen) findBar.open();
-    } else if (k === "f" && e.shiftKey) {
-      e.preventDefault();
-      if (lastOpen) void focusMode.toggle();
-    } else if (k === "t" && e.shiftKey) {
-      e.preventDefault();
-      void toggleTypewriter().then(centreTypingLine);
-    } else if (k === "o" && !e.shiftKey) {
-      e.preventDefault();
-      void openViaDialog();
-    } else if (k === "e" && !e.shiftKey) {
-      e.preventDefault();
-      if (lastOpen) exportDialog.open();
-    } else if (k === "g") {
-      e.preventDefault();
-      if (lastOpen) goTo.open(e.shiftKey ? "scene" : "page");
-    } else if (k === "=" || k === "+" || k === "-" || k === "0") {
-      e.preventDefault();
-      void stepScale(k === "0" ? 0 : k === "-" ? -1 : 1);
-    } else if ((k === "z" || (k === "y" && !isMac)) && view && lastOpen && inPanelNotField(e.target)) {
+    if ((k === "z" || (k === "y" && !isMac)) && view && lastOpen && inPanelNotField(e.target)) {
       // Undo/redo from the scene list or the board: the script's one undo
       // history (structural moves are script changes). Text fields such as a
       // beat summary keep their own undo. Planning-only card moves are not

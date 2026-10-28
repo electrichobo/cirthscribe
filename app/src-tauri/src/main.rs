@@ -1396,6 +1396,10 @@ struct UiPrefs {
     /// Colour theme, one of THEMES; "system" follows the OS's light or dark.
     #[serde(default = "default_theme")]
     theme: String,
+    /// Rebound keyboard shortcuts: command id -> keys ("" = none). Only what
+    /// differs from the defaults in app/src/bindings.ts.
+    #[serde(default)]
+    keys: std::collections::BTreeMap<String, String>,
 }
 
 const SCREEN_FONTS: [&str; 4] = ["courier-prime", "mono", "serif", "sans"];
@@ -1433,7 +1437,7 @@ impl Default for Panels {
 
 impl Default for UiPrefs {
     fn default() -> Self {
-        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false, editor_font: default_editor_font(), editor_size: default_editor_size(), theme: default_theme() }
+        UiPrefs { scale: 1.0, contrast: "system".into(), panels: Panels::default(), typewriter: false, editor_font: default_editor_font(), editor_size: default_editor_size(), theme: default_theme(), keys: Default::default() }
     }
 }
 
@@ -1476,6 +1480,13 @@ async fn set_ui_prefs(app: State<'_, App>, handle: tauri::AppHandle, window: tau
         editor_font: if SCREEN_FONTS.contains(&prefs.editor_font.as_str()) { prefs.editor_font } else { default_editor_font() },
         editor_size: if prefs.editor_size.is_finite() { prefs.editor_size.round().clamp(10.0, 20.0) } else { default_editor_size() },
         theme: if THEMES.contains(&prefs.theme.as_str()) { prefs.theme } else { default_theme() },
+        // Plain ids and short key names only; the UI checks what a key may be.
+        keys: prefs
+            .keys
+            .into_iter()
+            .filter(|(id, k)| id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') && k.len() <= 40 && !k.chars().any(char::is_control))
+            .take(200)
+            .collect(),
     };
     let path = prefs_path(&app);
     let tmp = path.with_extension("json.tmp");
@@ -1994,6 +2005,29 @@ fn menu_items(app: tauri::AppHandle) -> Vec<MenuEntry> {
 }
 
 /// Find a check item anywhere in the menu, including nested submenus.
+/// Menu item texts with the keyboard shortcuts in force (after the writer
+/// rebinds one in Help > Keyboard Shortcuts…). Unknown ids are ignored.
+#[tauri::command]
+fn set_menu_texts(app: tauri::AppHandle, texts: std::collections::HashMap<String, String>) {
+    fn walk(items: Vec<tauri::menu::MenuItemKind<tauri::Wry>>, texts: &std::collections::HashMap<String, String>) {
+        for item in items {
+            if let Some(t) = texts.get(item.id().as_ref()) {
+                if let Some(m) = item.as_menuitem() {
+                    let _ = m.set_text(t);
+                } else if let Some(c) = item.as_check_menuitem() {
+                    let _ = c.set_text(t);
+                }
+            }
+            if let Some(sub) = item.as_submenu() {
+                walk(sub.items().unwrap_or_default(), texts);
+            }
+        }
+    }
+    if let Some(menu) = app.menu() {
+        walk(menu.items().unwrap_or_default(), &texts);
+    }
+}
+
 fn find_check(items: Vec<tauri::menu::MenuItemKind<tauri::Wry>>, id: &str) -> Option<tauri::menu::CheckMenuItem<tauri::Wry>> {
     for item in items {
         if let Some(c) = item.as_check_menuitem() {
@@ -2072,6 +2106,7 @@ fn main() {
             close_panel_window,
             window_labels,
             set_menu_checks,
+            set_menu_texts,
             title_page,
             set_title_page,
             project_notes,

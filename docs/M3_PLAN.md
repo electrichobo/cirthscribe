@@ -93,7 +93,16 @@ The owner's notes after using the current build. Proposed as steps W1–W5, done
   - High contrast stays a separate switch on top of any theme: white with Day, black with the dark ones. The OS's own high-contrast request applies while the theme is Match System.
   - Pop-out panel windows take the theme, contrast and interface size when they open.
   - Tests: e2e "Themes" on both drivers: every theme's text and background pairs at least 4.5:1, OLED plus high contrast at least 7:1 and still black, one check mark, stored.
-- **W5. Keyboard shortcut remapping:** a list of commands with their keys, conflict warnings, reset to defaults; stored per user.
+- **W5. Keyboard shortcut remapping:** a list of commands with their keys, conflict warnings, reset to defaults; stored per user. **Built 2026-10-28:**
+  - Help > Keyboard Shortcuts… lists every shortcut by group. Change waits for the next key combination (Escape cancels, Backspace removes the shortcut); Reset puts one back; Reset all puts every one back.
+  - Rebindable: open, save, save as, export, find, spelling suggestions, bold, italic, underline, dual dialogue, page break, the nine elements, go to page and scene, focus mode, typewriter mode, full screen, interface size.
+  - Fixed, listed but not changeable: undo and redo, cut, copy, paste, select all, Tab and Shift+Tab, Enter, Escape, F6, Alt+arrows. A shortcut needs Ctrl/Cmd or Alt (or is an F key), so it never stops a letter from typing.
+  - Keys that belong to another command move to the new one, and the dialog says which command lost them.
+  - One registry (`bindings.ts`) and one dispatcher replace the separate key handlers; each shortcut runs its menu item's action. Formatting keys act only in the script. The native menus show the keys in force.
+  - Stored per user in the preferences file (`keys`, only what differs from the defaults).
+  - Tests: e2e "Shortcuts: Help > Keyboard Shortcuts…" on both drivers (rebind, menu label, a taken key moves, fixed and plain keys refused, Escape, the new keys work and the old do not, stored, Reset all); every earlier e2e test still drives the default keys.
+
+**Workspace steps W1–W5 are done (2026-10-28).** Next: M3 step 1.
 
 **W1 built 2026-10-28:**
 - **File:** New, Open, **Import…** (Final Draft by content or extension; Fountain, .spmd and .txt read as Fountain; anything else is refused with the formats named), Save, Save As, **Export…** (Ctrl/Cmd+E: a dialog listing PDF, changed-pages PDF (only with an active revision set), plain text, Fountain, Final Draft, Word, RTF and HTML, each with what it keeps; each then runs its own export and report), Close Project, Quit. Free Writing left File; it stays in the island's More menu and on Home.

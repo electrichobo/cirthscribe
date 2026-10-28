@@ -96,7 +96,7 @@ First, from the owner's notes on the current build:
 - [x] A notes scratchpad saved with the project (View > Tools > Notes)
 - [x] Panels that pop out into their own windows (scene list, board, notes)
 - [x] Themes: Day, Night, Midnight, OLED (true black) and Match System, with high contrast on top of any of them
-- [ ] Remappable keyboard shortcuts
+- [x] Remappable keyboard shortcuts (Help > Keyboard Shortcuts…), with conflicts handled and Reset all
 
 
 - [ ] Episodes and series sharing one story bible
