@@ -77,7 +77,7 @@ interface Paginated {
   pages_locked: boolean;
   missing_glyphs: string[];
   /** Each scene's page, length in eighths and speakers (the navigator). */
-  scene_stats: { scene_id: string; page: string; eighths: number; characters: string[] }[];
+  scene_stats: { scene_id: string; page: string; eighths: number; position: number; characters: string[] }[];
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -309,7 +309,8 @@ async function refreshNav() {
   if (!lastOpen) return;
   try {
     navData = await invoke<NavigatorInfo>("navigator_info", { project: navUi.project });
-    renderNav();
+    // The board's pacing reads the same stats.
+    rerenderSide();
   } catch {
     // The scene list still works from the script alone.
   }

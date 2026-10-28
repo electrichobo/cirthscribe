@@ -72,6 +72,15 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
 5. **Beat and pacing board** (item 12).
    - The writer divides beats into any number of acts. Optional starting structures with generic names (three-act, five-act), never a trademarked method.
    - Pacing: each beat's position against estimated page and estimated minutes, labelled as estimates.
+   - **Built 2026-10-28:**
+     - The board is divided into the outline's acts, any number of them: a heading per act with its beat count and an estimated length in pages; cards not in an act come first under "Not in an act". In a pop-out board window the acts sit side by side as columns.
+     - "Add acts…" adds three or five acts (Act One, Act Two …) or one more act; generic names only. Each act is an outline item, so it can be renamed, moved or deleted in the Outline tab.
+     - Cards move into an act by dragging onto the act, by the card's Act menu (the keyboard way; it appears once the outline has acts), or in the Outline tab. All of these are planning steps; the script never moves.
+     - Pacing strip above the cards: the script's length in pages, each act's span, and a mark per linked beat at the page where its scene starts; the strip and every card say these are estimates (a page is about a minute). Cards show "p. 12 · ≈ 11 min".
+     - Core: each scene's position in pages (`SceneStat::position`) from the page map.
+     - Found by looking at the screen, not by tests: the navigator's filter was squeezed to nothing and its tabs overflowed the panel; fixed (filter on its own line, compact tabs and scope labels "This script" / "Project").
+     - Not yet: moving a whole act reorders the script (step 4's limit stands); beats are placed by their scene's page, so unlinked beats have no pacing mark.
+     - Tests: core (positions); e2e "Beat and pacing board" on both drivers (marks per linked card, estimate wording, three acts, cards into Act Two by menu, the act's length, the pacing span, the script untouched).
 6. **Overview map** (item 11): a read-only, zoomed-out map of the script or the whole series, scenes as blocks sized by length and coloured by label or act, with a text alternative (the same data as a list). Click or Enter jumps.
 7. **Project bible: characters, locations, world** (C1–C3).
    - Entities with authored fields, custom fields and aliases; project-scoped, with optional season or episode scope.

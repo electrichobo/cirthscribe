@@ -759,6 +759,31 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(document.getElementById('nav-tab-scenes').click(), true)");
   });
 
+  await test("Beat and pacing board: a pacing strip and page/minute estimates; three acts from a starting structure; cards move into acts by menu; act lengths; the script is untouched", async () => {
+    await openFixture("page-boundaries");
+    const script0 = JSON.stringify(await blocks());
+    const cards = await app.evaluate("__cirth.board.beats.filter(b => b.kind === 'beat').length");
+    await waitFor(app, `document.querySelectorAll('#board .pacing-beat').length === ${cards}`, "one pacing mark per linked card");
+    assert(/estimate/.test(await app.evaluate("document.querySelector('#board .pacing-track').getAttribute('aria-label')")), "the pacing strip says it is an estimate");
+    assert(/^p\. 1 · ≈ 0 min$/.test(await app.evaluate("document.querySelector('#board .card .card-pace span:last-child').textContent")), "the first card shows its page and minutes");
+    // Three acts from the starting structures: generic names, empty acts ready for cards.
+    await app.evaluate("(() => { const s = document.getElementById('board-structure'); s.value = '3'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "[...document.querySelectorAll('#board .board-act-title')].map(h => h.firstChild.textContent).join() === 'Not in an act,Act One,Act Two,Act Three'", "three acts on the board");
+    assert((await app.evaluate("__cirth.board.beats.filter(b => b.kind === 'act').map(a => a.title).join()")) === "Act One,Act Two,Act Three", "the acts are outline items");
+    // Two cards into Act Two by each card's Act menu.
+    const act2 = await app.evaluate("__cirth.board.beats.find(b => b.title === 'Act Two').id");
+    for (let i = 0; i < 2; i++) {
+      await app.evaluate(`(() => { const s = document.querySelector('#board .no-act .card .card-act'); s.value = ${JSON.stringify(act2)}; s.dispatchEvent(new Event('change')); return true; })()`);
+      await waitFor(app, `document.querySelectorAll('#board .board-act[data-act="${act2}"] .card').length === ${i + 1}`, `card ${i + 1} in Act Two`);
+    }
+    const meta = await app.evaluate(`document.querySelector('#board .board-act[data-act="${act2}"] .board-act-meta').textContent`);
+    assert(/2 beats · ≈ \d+(\.\d)? pages \(estimate\)/.test(meta), `Act Two's length: ${meta}`);
+    assert((await app.evaluate("document.querySelectorAll('#board .pacing-act').length")) === 1, "Act Two shows on the pacing strip");
+    await screenshot(app, "pacing-board");
+    // The script never moved.
+    assert(JSON.stringify(await blocks()) === script0, "the script is unchanged");
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

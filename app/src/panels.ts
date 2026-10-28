@@ -12,7 +12,7 @@ import type { NavInfo } from "./views";
 
 /** NavInfo as JSON (maps as entry lists). */
 export interface NavWire {
-  stats: [string, { page: string; eighths: number; characters: string[] }][];
+  stats: [string, { page: string; eighths: number; position: number; characters: string[] }][];
   labels: [string, string][];
   labelNames: [string, string][];
   characters: NavInfo["characters"];
@@ -91,7 +91,7 @@ export function createPanelHost(hooks: {
       numbers: [...hooks.numbers()].map(([id, n]) => [id, { number: n.number, omitted: n.omitted }]),
       beats: hooks.beats(),
       structural: hooks.structural(),
-      ...(panel === "nav" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
+      ...(panel !== "notes" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
       ...(withNotes ? { notes: hooks.notesText() } : {}),
     };
   }

@@ -106,7 +106,7 @@ First, from the owner's notes on the current build:
 - [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
 - [ ] An overview map of the whole script
 - [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
-- [ ] Beat and pacing board, split into acts wherever you choose
+- [x] Beat and pacing board: cards divided into any number of acts (start from three or five), with a pacing strip and page and minute estimates
 - [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo
 - [x] Reordering scenes from the board (only with your permission, which is remembered per script, and undoable)
 - [ ] Story timeline, kept separate from script order

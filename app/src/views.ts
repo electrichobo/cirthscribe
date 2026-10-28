@@ -135,7 +135,7 @@ export interface CharacterStat {
 /** What the navigator shows besides the script's own scenes. */
 export interface NavInfo {
   /** Page, length in eighths and speakers per scene of the open document. */
-  stats: Map<string, { page: string; eighths: number; characters: string[] }>;
+  stats: Map<string, { page: string; eighths: number; position: number; characters: string[] }>;
   /** Scene id -> label key. */
   labels: Map<string, string>;
   /** Label keys in palette order with the project's names for them. */
@@ -187,8 +187,8 @@ function navShell(root: HTMLElement, script: ScriptView) {
   });
   tablist.append(...tabs);
   head.append(tablist);
+  // The pop-out (or dock) button sits with the scope, so the three tabs fit one line.
   const pop = script.panelButton?.("nav") ?? null;
-  if (pop) head.append(pop);
   const filter = el("input", { type: "search", className: "nav-filter", id: "nav-filter", placeholder: "Filter" });
   filter.setAttribute("aria-label", "Filter scenes or characters");
   filter.addEventListener("input", () => {
@@ -197,7 +197,8 @@ function navShell(root: HTMLElement, script: ScriptView) {
   });
   const scope = el("select", { className: "nav-scope", id: "nav-scope" });
   scope.setAttribute("aria-label", "Scope");
-  scope.append(new Option("This document", "doc"), new Option("Whole project", "project"));
+  scope.append(new Option("This script", "doc"), new Option("Project", "project"));
+  scope.title = "This script, or every script in the project";
   scope.addEventListener("change", () => {
     navUi.project = scope.value === "project";
     script.setScope?.(navUi.project);
@@ -206,6 +207,7 @@ function navShell(root: HTMLElement, script: ScriptView) {
   names.addEventListener("click", () => script.renameLabels?.());
   const tools = el("div", { className: "nav-tools" }, filter, scope);
   if (script.renameLabels) tools.append(names);
+  if (pop) tools.append(pop);
   const body = el("div", { className: "nav-body" });
   root.replaceChildren(head, tools, el("p", { className: "sr-only", id: "nav-hint" }, NAV_HINT), body);
   sh = { tabs, filter, scope, names, body, pop };
@@ -290,7 +292,7 @@ export function renderNavigator(root: HTMLElement, script: ScriptView, focusScen
   });
   const parts: HTMLElement[] = [];
   const multi = navUi.project && (info?.projectScenes.length ?? 0) > 0;
-  if (multi) parts.push(el("h3", { className: "nav-doc" }, "This document"));
+  if (multi) parts.push(el("h3", { className: "nav-doc" }, "This script"));
   parts.push(list);
   // Whole project: the other documents' scenes; choosing one opens its document.
   if (multi && info) {
@@ -662,15 +664,86 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
     rerender();
     announce("New beat added at the end of the board");
   });
-  header.append(badge, add);
+  // Starting structures: generic act names only (never a trademarked method).
+  const structure = el("select", { className: "board-structure", id: "board-structure", title: "Add acts to the outline to divide the board" });
+  structure.setAttribute("aria-label", "Add acts from a starting structure");
+  structure.append(new Option("Add acts…", ""), new Option("Three acts", "3"), new Option("Five acts", "5"), new Option("One more act", "1"));
+  structure.addEventListener("change", async () => {
+    const n = Number(structure.value);
+    structure.value = "";
+    if (!n) return;
+    const acts = st.beats.filter((b) => b.kind === "act");
+    const top = Math.max(0, ...st.beats.filter((b) => !b.parent).map((b) => b.pos));
+    const words = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+    for (let i = 0; i < n; i++) {
+      const k = acts.length + i;
+      await script.putBeat({ id: newId(), kind: "act", title: `Act ${words[k] ?? k + 1}`, logline: "", summary: "", scene_id: null, parent: null, pos: top + i + 1 });
+    }
+    rerender();
+    announce(`${n === 1 ? "An act" : `${n} acts`} added. Move cards into them by dragging, Alt+arrows, or the outline.`);
+  });
+  header.append(badge, add, structure);
   const pb = script.panelButton?.("board");
   if (pb) header.append(pb);
-  const grid = el("div", { className: "cards", role: "list" });
-  grid.setAttribute("aria-label", "Beat cards");
-  grid.setAttribute("aria-describedby", "board-hint");
+
+  // Acts: each card's act is its outermost act (sequences show on the card).
+  const byId = new Map(st.beats.map((b) => [b.id, b]));
+  const actOf = (b: Beat): Beat | undefined => {
+    let p = b.parent ? byId.get(b.parent) : undefined;
+    while (p && p.kind !== "act") p = p.parent ? byId.get(p.parent) : undefined;
+    return p;
+  };
+  const seqOf = (b: Beat): Beat | undefined => (b.parent ? byId.get(b.parent) : undefined)?.kind === "sequence" ? byId.get(b.parent!) : undefined;
+  const info = script.nav?.();
+  const stat = (b: Beat) => (b.scene_id ? info?.stats.get(b.scene_id) : undefined);
+  const pages = (beats: Beat[]) => {
+    const seen = new Set<string>();
+    let e = 0;
+    for (const b of beats) if (b.scene_id && !seen.has(b.scene_id) && stat(b)) (seen.add(b.scene_id), (e += stat(b)!.eighths));
+    return e / 8;
+  };
+  const acts = outlineOrder(st.beats).map((x) => x.it).filter((b) => b.kind === "act");
+  // Groups of consecutive cards in the same act, in board order.
+  const groups: { act: Beat | undefined; beats: Beat[] }[] = [];
+  for (const b of order) {
+    const a = actOf(b);
+    if (groups.at(-1)?.act?.id !== a?.id || !groups.length) groups.push({ act: a, beats: [] });
+    groups.at(-1)!.beats.push(b);
+  }
+  // Acts with no cards yet still show, so cards can be dropped into them.
+  if (!st.structural) for (const a of acts) if (!groups.some((g) => g.act?.id === a.id)) groups.push({ act: a, beats: [] });
+
+  // Pacing (an estimate): where each linked beat falls in the script, by page; a page is about a minute.
+  const linked = order.filter((b) => stat(b));
+  const total = Math.max(1, ...[...(info?.stats.values() ?? [])].map((x) => x.position + x.eighths / 8));
+  const pacing = el("div", { className: "pacing", id: "board-pacing" });
+  if (linked.length) {
+    const track = el("div", { className: "pacing-track" });
+    track.setAttribute("role", "img");
+    for (const g of groups.filter((g) => g.act && g.beats.some((b) => stat(b)))) {
+      const ps = g.beats.filter((b) => stat(b)).map((b) => stat(b)!);
+      const from = Math.min(...ps.map((x) => x.position));
+      const to = Math.max(...ps.map((x) => x.position + x.eighths / 8));
+      const seg = el("span", { className: "pacing-act", title: `${g.act!.title}: pages ${Math.floor(from) + 1} to ${Math.ceil(to)} (estimate)` });
+      seg.style.left = `${(from / total) * 100}%`;
+      seg.style.width = `${Math.max(0.5, ((to - from) / total) * 100)}%`;
+      track.append(seg);
+    }
+    for (const b of linked) {
+      const x = stat(b)!;
+      const tick = el("span", { className: "pacing-beat", title: `${b.logline || b.summary || "Beat"}: page ${x.page}, about ${Math.round(x.position)} min (estimate)` });
+      tick.style.left = `${(x.position / total) * 100}%`;
+      track.append(tick);
+    }
+    track.setAttribute("aria-label", `Pacing, an estimate: ${linked.length} linked beats over about ${Math.ceil(total)} pages, roughly a minute a page. ${linked.map((b) => `${b.logline || "a beat"} at page ${stat(b)!.page}`).join("; ")}.`);
+    pacing.append(el("div", { className: "pacing-label" }, `Pacing (estimate): about ${Math.ceil(total)} pages ≈ ${Math.ceil(total)} min`), track);
+  }
+
+  const actsEl = el("div", { className: "board-acts" });
   const cards: HTMLElement[] = [];
+  const cardEls = new Map<string, HTMLElement>();
   // Only the chosen card's own controls are in the Tab order.
-  const inner = (card: HTMLElement, on: boolean) => card.querySelectorAll<HTMLElement>("button, textarea, input").forEach((c) => (c.tabIndex = on ? 0 : -1));
+  const inner = (card: HTMLElement, on: boolean) => card.querySelectorAll<HTMLElement>("button, textarea, input, select").forEach((c) => (c.tabIndex = on ? 0 : -1));
   const move = async (id: string, dir: -1 | 1) => {
     const i = order.findIndex((b) => b.id === id);
     const j = i + dir;
@@ -755,10 +828,66 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
       const from = e.dataTransfer?.getData("text/x-beat");
       if (from && from !== b.id) void moveCard(script, st, from, b.id, rerender);
     });
-    card.append(link, logline, summary, el("div", { className: "card-moves" }, left, right));
-    grid.append(card);
+    const where = stat(b);
+    const seq = seqOf(b);
+    const meta = el("div", { className: "card-pace" }, ...(seq ? [el("span", { className: "card-seq" }, seq.title || "Sequence")] : []), ...(where ? [el("span", { title: "Page and minutes are estimates (a page is about a minute)" }, `p. ${where.page} · ≈ ${Math.round(where.position)} min`)] : []));
+    card.append(link, logline, summary, meta);
+    // The keyboard way into an act (dragging onto an act is the mouse way).
+    if (acts.length && !st.structural) {
+      const pick = el("select", { className: "card-act" });
+      pick.dataset.part = "act";
+      pick.setAttribute("aria-label", "Act this card is in");
+      pick.append(new Option("Not in an act", ""), ...acts.map((a) => new Option(a.title || "(untitled act)", a.id)));
+      pick.value = actOf(b)?.id ?? "";
+      pick.addEventListener("change", () => {
+        const to = pick.value || null;
+        const kids = st.beats.filter((x) => (x.parent ?? null) === to && x.id !== b.id);
+        void script.putBeat({ ...b, parent: to, pos: Math.max(0, ...kids.map((x) => x.pos)) + 1 }).then(() => {
+          rerender();
+          announce(to ? `Card moved into ${byId.get(to)?.title}. The script is unchanged.` : "Card moved out of its act. The script is unchanged.");
+        });
+      });
+      card.append(pick);
+    }
+    card.append(el("div", { className: "card-moves" }, left, right));
     cards.push(card);
+    cardEls.set(b.id, card);
   });
+  // Lay the cards out under their acts.
+  for (const g of groups) {
+    const section = el("section", { className: `board-act${g.act ? "" : " no-act"}` });
+    const title = g.act ? g.act.title || "(untitled act)" : acts.length ? "Not in an act" : "";
+    const grid = el("div", { className: "cards", role: "list" });
+    grid.setAttribute("aria-label", g.act ? `Beat cards in ${title}` : "Beat cards");
+    grid.setAttribute("aria-describedby", "board-hint");
+    for (const b of g.beats) grid.append(cardEls.get(b.id)!);
+    if (title) {
+      const p = pages(g.beats);
+      const h = el("h3", { className: "board-act-title" }, title, el("span", { className: "board-act-meta" }, ` ${g.beats.length} beat${g.beats.length === 1 ? "" : "s"}${p ? ` · ≈ ${p.toFixed(1)} pages (estimate)` : ""}`));
+      section.append(h);
+    }
+    section.append(grid);
+    if (!g.beats.length) grid.append(el("p", { className: "form-note" }, "Drop cards here."));
+    // Dropping a card on an act (not on a card) puts it at the end of that act.
+    if (!st.structural && g.act) {
+      const act = g.act;
+      section.dataset.act = act.id;
+      section.addEventListener("dragover", (e) => e.preventDefault());
+      section.addEventListener("drop", (e) => {
+        if ((e.target as HTMLElement).closest(".card")) return;
+        e.preventDefault();
+        const from = e.dataTransfer?.getData("text/x-beat");
+        const b = from ? byId.get(from) : undefined;
+        if (!b) return;
+        const kids = st.beats.filter((x) => x.parent === act.id);
+        void script.putBeat({ ...b, parent: act.id, pos: Math.max(0, ...kids.map((x) => x.pos)) + 1 }).then(() => {
+          rerender();
+          announce(`Card moved into ${act.title}. The script is unchanged.`);
+        });
+      });
+    }
+    actsEl.append(section);
+  }
   setRoving(cards, cards.find((c) => c.dataset.item === focusBeat) ?? cards[0], inner);
-  root.replaceChildren(header, el("p", { className: "sr-only", id: "board-hint" }, BOARD_HINT), grid);
+  root.replaceChildren(header, pacing, el("p", { className: "sr-only", id: "board-hint" }, BOARD_HINT), actsEl);
 }

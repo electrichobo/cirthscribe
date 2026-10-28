@@ -139,12 +139,14 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 .nav-list { list-style: none; margin: 0; padding: 0; }
 .nav-list li { display: flex; flex-wrap: wrap; gap: 2px; align-items: stretch; padding-bottom: 3px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
 /* Tabbed navigator (M3 step 3): Scenes and Characters, a filter and a scope. */
-.nav-tabs { display: flex; gap: 2px; flex: 1; }
-.nav-tab { border: 0; border-bottom: 2px solid transparent; background: none; padding: 4px 8px; font-weight: 600; color: var(--muted); }
+.nav-tabs { display: flex; flex-wrap: wrap; gap: 0; flex: 1; min-width: 0; }
+.nav-tab { border: 0; border-bottom: 2px solid transparent; background: none; padding: 4px 5px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .nav-tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-.nav-tools { display: flex; gap: 4px; margin: 4px 0 6px; }
-.nav-filter { flex: 1; min-width: 0; padding: 3px 6px; }
-.nav-scope, .nav-label-names { font-size: 12px; }
+.nav-tools { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+/* The filter gets its own line; scope and Labels share the next. */
+.nav-filter { flex: 1 1 100%; min-width: 0; padding: 3px 6px; }
+.nav-scope, .nav-label-names, .nav-tools .panel-pop { font-size: 12px; padding: 2px 6px; }
+.nav-scope { flex: 1 1 0; min-width: 0; }
 .nav-body h2 { margin: 2px 0 4px; }
 .nav-doc { font-size: 12px; margin: 10px 0 2px; color: var(--muted); }
 .nav-details { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; padding: 0 4px 0 calc(2.6em + 4px); font-size: 11px; color: var(--muted); }
@@ -158,6 +160,24 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 .nav-list li[data-label="blue"] { --label-color: var(--label-blue); } .nav-list li[data-label="purple"] { --label-color: var(--label-purple); }
 .nav-list li[data-label="pink"] { --label-color: var(--label-pink); } .nav-list li[data-label="grey"] { --label-color: var(--label-grey); }
 :root { --label-red: #d64545; --label-orange: #e07b21; --label-yellow: #d4b106; --label-green: #3a9a4a; --label-blue: #3b73d6; --label-purple: #8a55c8; --label-pink: #d65a9f; --label-grey: #8a8a8a; }
+/* Beat and pacing board (M3 step 5): cards under their acts; a pacing strip on top. */
+.board-acts { display: flex; flex-direction: column; gap: 10px; }
+.board-act-title { font-size: 12px; margin: 4px 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; border-bottom: 2px solid var(--accent); padding-bottom: 2px; }
+.board-act.no-act .board-act-title { border-bottom-color: var(--line); color: var(--muted); }
+.board-act-meta { font-weight: normal; color: var(--muted); font-size: 11px; }
+.board-act[data-act] .cards { min-height: 36px; }
+.board-structure { font-size: 12px; }
+.card-pace { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: var(--muted); }
+.card-seq { font-weight: 600; }
+.card-act { font-size: 11px; justify-self: start; max-width: 100%; }
+.pacing { margin: 2px 0 8px; }
+.pacing-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.pacing-track { position: relative; height: 18px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); overflow: hidden; }
+.pacing-act { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 16%, transparent); border-left: 1px solid var(--accent); }
+.pacing-beat { position: absolute; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; background: var(--ink); }
+/* A pop-out board window is wide enough for acts side by side. */
+body[data-panel="board"] .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; }
+body[data-panel="board"] .board-act { flex: 0 0 260px; }
 /* Outline tab (M3 step 4): acts, sequences and beats as one tree. */
 .outline-tools { display: flex; gap: 4px; margin: 0 0 6px; }
 .outline-tools button { font-size: 12px; padding: 2px 8px; }

@@ -22,6 +22,10 @@ pub struct SceneStat {
     pub page: String,
     /// Length in eighths of a page (at least 1).
     pub eighths: u32,
+    /// Where the scene starts, in pages from the top of the script (page 1
+    /// starts at 0.0; halfway down page 3 is about 2.5). The pacing board
+    /// reads it, with one page taken as about a minute (an estimate).
+    pub position: f64,
     /// Speaking characters, in order of first speech.
     pub characters: Vec<String>,
 }
@@ -77,7 +81,9 @@ pub fn scene_stats(blocks: &[Block], map: &PageMap) -> Vec<SceneStat> {
     // Rows each scene covers on each page (first to last of its lines).
     let mut rows = vec![0usize; scenes.len()];
     let mut page = vec![String::new(); scenes.len()];
-    for p in &map.pages {
+    let mut position = vec![f64::NAN; scenes.len()];
+    let body = map.body_lines.max(1) as f64;
+    for (pi, p) in map.pages.iter().enumerate() {
         let mut span: HashMap<usize, (usize, usize)> = HashMap::new();
         for l in &p.lines {
             let Some(i) = l.block_id.as_deref().and_then(|id| scene_of.get(id)) else { continue };
@@ -86,17 +92,23 @@ pub fn scene_stats(blocks: &[Block], map: &PageMap) -> Vec<SceneStat> {
             e.1 = e.1.max(l.row);
             if page[*i].is_empty() {
                 page[*i] = p.label.clone();
+                position[*i] = pi as f64 + l.row as f64 / body;
             }
         }
         for (i, (a, b)) in span {
             rows[i] += b - a + 1;
         }
     }
-    let body = map.body_lines.max(1) as f64;
     scenes
         .iter()
         .enumerate()
-        .map(|(i, (sid, bs))| SceneStat { scene_id: sid.clone(), page: page[i].clone(), eighths: ((rows[i] as f64 / body * 8.0).round() as u32).max(1), characters: speakers(bs) })
+        .map(|(i, (sid, bs))| SceneStat {
+            scene_id: sid.clone(),
+            page: page[i].clone(),
+            eighths: ((rows[i] as f64 / body * 8.0).round() as u32).max(1),
+            position: if position[i].is_nan() { 0.0 } else { (position[i] * 100.0).round() / 100.0 },
+            characters: speakers(bs),
+        })
         .collect()
 }
 
@@ -197,6 +209,8 @@ mod tests {
         assert!(st[0].eighths >= 1 && st[0].eighths <= 2, "a short scene: {}", st[0].eighths);
         assert!(st[1].eighths > 8, "a scene longer than a page: {}", st[1].eighths);
         assert!(st[1].characters.is_empty());
+        assert_eq!(st[0].position, 0.0, "the first scene starts the script");
+        assert!(st[1].position > 0.0 && st[1].position < 1.0, "the second starts on page 1: {}", st[1].position);
 
         let two = vec![b(BlockKind::Heading, "INT. BOAT - DAY"), b(BlockKind::Character, "PELL"), b(BlockKind::Dialogue, "Seven eight nine ten.")];
         let cs = characters(&[("ep1".into(), one.clone()), ("ep2".into(), two.clone())]);
