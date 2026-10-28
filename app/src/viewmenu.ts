@@ -60,7 +60,9 @@ export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => voi
       return b;
     });
     list.replaceChildren(focusItem, typewriter, sep, ...checks);
-    menu.replaceChildren(list, settings);
+    // Insert the settings once: moving a focused control would drop focus
+    // to the page (re-renders happen while open, e.g. on a resize).
+    if (list.parentElement !== menu || settings.parentElement !== menu) menu.replaceChildren(list, settings);
     for (const b of items()) b.tabIndex = -1;
     if (keep && !menu.hidden) items().find((b) => b.dataset.panel === keep)?.focus();
   }
@@ -105,9 +107,14 @@ export function createViewMenu(button: HTMLButtonElement, toggleFocus: () => voi
       // setting. Leaving by Tab would drop focus into the script, where Tab
       // changes the block type (macOS check N18). Escape is the way out.
       e.preventDefault();
-      const ring: HTMLElement[] = [all[Math.max(at, 0)], ...settings.querySelectorAll<HTMLElement>("select, input, button")];
-      const i = at >= 0 ? 0 : ring.indexOf(document.activeElement as HTMLElement);
+      e.stopPropagation();
+      const controls = [...settings.querySelectorAll<HTMLElement>("select, input, button")].filter((el) => !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0);
+      const ring: HTMLElement[] = [all[Math.max(at, 0)], ...controls];
+      const i = at >= 0 ? 0 : Math.max(ring.indexOf(document.activeElement as HTMLElement), 0);
       ring[(i + (e.shiftKey ? ring.length - 1 : 1)) % ring.length]?.focus();
+      // Never let focus leave the popover (some engines refuse focus on a
+      // control mid-keystroke): fall back to the first item.
+      if (!menu.contains(document.activeElement)) all[0]?.focus();
     } else if (at < 0) {
       // In the settings: their own keys.
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {

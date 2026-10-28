@@ -1813,12 +1813,15 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Tab cycles inside More and never leaves into the script (macOS check N18).
     const kinds0 = (await blocks()).map((b) => b.kind).join();
     const inMore = () => app.evaluate("document.getElementById('view-menu').contains(document.activeElement)");
+    // Where focus is, for failure messages: "select#view-mode", "body" …
+    const focusAt = () => app.evaluate("(() => { const a = document.activeElement; return a ? a.tagName.toLowerCase() + (a.id ? '#' + a.id : '') + (a.dataset.panel ? '[' + a.dataset.panel + ']' : '') : 'none'; })()");
     for (let i = 0; i < 9; i++) {
       await press("Tab");
-      assert(await inMore(), `Tab ${i + 1} stays inside More`);
+      assert(await inMore(), `Tab ${i + 1} stays inside More (focus on ${await focusAt()})`);
     }
+    const before = await focusAt();
     await press("Tab", ["shift"]);
-    assert(await inMore(), "Shift+Tab stays inside More");
+    assert(await inMore(), `Shift+Tab stays inside More (from ${before}, focus now on ${await focusAt()})`);
     assert((await blocks()).map((b) => b.kind).join() === kinds0, "no block type changed while tabbing");
     await press("Escape");
     assert(await app.evaluate("document.getElementById('view-menu').hidden && document.activeElement?.id === 'view-menu-btn'"), "Escape closes More and returns to ⋮");

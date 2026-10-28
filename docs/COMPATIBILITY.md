@@ -33,6 +33,16 @@ Statuses: not implemented · implemented, unverified · verified within profile 
 | .html | Verified within profile on screen (Safari); print unverified | Any current browser, screen and print | Safari (macOS) 2026-10-27, and the owner's informal check. Print preview not yet run |
 | .xlsx / .csv | Not implemented | Reports and stripboards (later milestones) | — |
 
+## Deferred
+
+- **Mac recheck of pack v2: deferred (owner, 2026-10-27).** The test Mac is busy with other work. When it is free, revisit:
+  - cross-OS hashes, especially the DOCX;
+  - the PDF Producer and page size in Preview;
+  - DOCX formatting in TextEdit;
+  - the RTF title page in TextEdit.
+
+  Until then, every "fixed in v2" below is tested only by Kolbítar's own automated tests, not on the Mac.
+
 ## Results log
 
 Mac rows: tested on the owner's Mac (macOS 26.2 (25C56), Apple M4 Pro) by a Claude Code session working for the owner. Evidence: screenshots kept on that Mac. Courier Prime is not installed system-wide there.

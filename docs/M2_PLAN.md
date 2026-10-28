@@ -155,7 +155,7 @@ Each step is a working, tested slice. Every export gets a capability/loss report
      Results and the remaining losses are in docs/COMPATIBILITY.md. A recheck on v2 is pending.
    - Open: external results for every format. These need the apps (Final Draft, Word, Google Docs, LibreOffice, a Fountain app, browser print) and the manual checks N22, N23, N25 and N28.
 
-The exit review comes after 7–9. Steps 2 and 3 can swap if the owner wants FDX first.
+The exit review comes after 7–9. **Exit review drafted 2026-10-27: docs/m2/EXIT_REVIEW.md. Verdict: not done yet.** Linux e2e is red in CI (fix attempt pending); external app results are missing; the Mac recheck is deferred; owner decisions A (non-Latin PDF font) and B (how to close) are open. Steps 2 and 3 can swap if the owner wants FDX first.
 
 ## Carried from M1 (not blockers for starting M2)
 

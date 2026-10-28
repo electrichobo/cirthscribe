@@ -6,7 +6,7 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 A working application, not yet released, plus its product brief. M0, M1 and M1b are closed by the owner. **M2 is in progress** (docs/M2_PLAN.md).
 - Built, steps 1–8: title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports.
-- In progress: step 9, the compatibility matrix from real external tests (docs/COMPATIBILITY.md). Then the M2 exit review.
+- In progress: step 9 (external tests, docs/COMPATIBILITY.md). The exit review is drafted (docs/m2/EXIT_REVIEW.md: not done yet).
 
 Later milestones (ROADMAP.md) are only planned. Never present a planned feature as working. Open items are listed in STATUS.md and docs/testing/MANUAL_CHECKS.md.
 
