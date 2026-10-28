@@ -19,6 +19,8 @@ pub enum PlanningOp {
     /// Create a card or replace it (text, link, planning position).
     PutBeat(Beat),
     DeleteBeat(String),
+    /// A scene's colour label ("" for none).
+    SetSceneLabel { scene_id: String, label: String },
 }
 
 #[derive(Clone, Debug)]

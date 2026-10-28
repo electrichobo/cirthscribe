@@ -46,6 +46,15 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
    - Scenes tab: number, heading, page, length in eighths (from the core page map), logline/summary from the linked item, colour label (decision C), characters in the scene. Filter and search; jump to the scene; scroll sync kept. Scope: this episode or the whole project.
    - Characters tab: from cues until step 7 links them to bible entries: lines and words of dialogue, scenes, first appearance, jump to each, across episodes. Dual dialogue counts both speakers once each.
    - Schema: a per-scene colour label.
+   - **Built 2026-10-28:**
+     - The scene list became a tabbed navigator: **Scenes** and **Characters** tabs, a filter, and a scope (this document or the whole project). The scene list itself is still one Tab stop; L on a scene reaches its label.
+     - Scenes tab: locked number, heading, page, length in eighths (labelled an estimate), colour label, speaking characters and the linked card's logline (summary on hover). The filter matches headings, numbers, labels, speakers and card text. Whole-project scope lists the other documents' scenes under their titles; choosing one opens that document at the scene.
+     - Characters tab: speeches, words of dialogue, scenes and first appearance, from cues (extensions such as (V.O.) and the dual mark are not part of a name); Enter goes to the first appearance, in another episode if need be. Presence without lines and screen time are stated as not counted.
+     - Labels (decision C): eight colours with renamable names per project (Scenes > Labels…); a label is always shown with its name. Setting one is a planning step (ADR 0003): Ctrl/Cmd+Z in the scene list undoes it when it was the list's last action.
+     - Core: `cirth_core::navigator` (scene stats from the page map, character counts across documents), schema v6 (`scene_labels`), `Store::all_documents`; pagination returns each scene's stats; `navigator_info` gives labels, names, characters and the project's scenes. Frozen v5 files (`tests/data/schema-v5-*.cirth`) are upgraded by a test.
+     - The pop-out scene list window has the same tabs, labels and scope.
+     - Not yet: the Characters tab reads cues, not bible entries (step 7 links them); colour labels in the board and outline (steps 4–5).
+     - Tests: core (cue names; page, eighths and speakers; counts across episodes; v5 upgrade with label undo and names); e2e "Navigator tabs" on both drivers (stats, speakers, estimate label, filter keeping focus, label and its undo/redo, label names, Characters counts and first appearance, whole-project scope opening another episode); the keyboard test checks the scene list and the tabs are one Tab stop each.
 4. **Outline editor** (item 11; decision B).
    - Beats become outline items: the migration keeps their ids, text, links and planning order.
    - An editable tree: acts, sequences, scene items and beats, each with title, logline and summary. Scene items link to a scene by stable id; a beat can exist before its scene and be linked later, or create the scene explicitly.

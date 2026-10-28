@@ -338,3 +338,37 @@ fn opening_a_v4_project_adds_revision_sets_with_none_active() {
         assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
     }
 }
+
+#[test]
+fn opening_a_v5_project_adds_scene_labels_with_none_set() {
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v5-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v5-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 5, "fixture must be schema v5");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(5));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v5 copy kept");
+        let s = o.store;
+        let before = s.load().unwrap();
+        assert!(s.scene_labels().unwrap().is_empty(), "no scene has a label yet");
+        assert_eq!(s.label_names().unwrap()[0], ("red".to_string(), "Red".to_string()));
+        // A label is a planning step: undone exactly; unknown labels refused.
+        let scene = before.scenes()[0].scene_id.clone();
+        let mut h = PlanningHistory::default();
+        let v = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::SetSceneLabel { scene_id: scene.clone(), label: "blue".into() }, v).unwrap();
+        assert_eq!(s.scene_label(&scene).unwrap(), "blue");
+        h.undo(&s).unwrap();
+        assert_eq!(s.scene_label(&scene).unwrap(), "");
+        assert!(s.set_scene_label(&scene, "mauve").is_err());
+        s.set_label_name("blue", "Act Two").unwrap();
+        assert_eq!(s.label_names().unwrap()[4], ("blue".to_string(), "Act Two".to_string()));
+        assert_eq!(serde_json::to_string(&s.load().unwrap().blocks).unwrap(), serde_json::to_string(&before.blocks).unwrap(), "the script is untouched");
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}

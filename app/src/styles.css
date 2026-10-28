@@ -137,7 +137,32 @@ nav, aside { overflow: auto; padding: 8px 10px; background: var(--panel); border
 aside { border-right: 0; border-left: 1px solid var(--line); }
 h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 0 8px; }
 .nav-list { list-style: none; margin: 0; padding: 0; }
-.nav-list li { display: flex; gap: 2px; align-items: stretch; }
+.nav-list li { display: flex; flex-wrap: wrap; gap: 2px; align-items: stretch; padding-bottom: 3px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+/* Tabbed navigator (M3 step 3): Scenes and Characters, a filter and a scope. */
+.nav-tabs { display: flex; gap: 2px; flex: 1; }
+.nav-tab { border: 0; border-bottom: 2px solid transparent; background: none; padding: 4px 8px; font-weight: 600; color: var(--muted); }
+.nav-tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.nav-tools { display: flex; gap: 4px; margin: 4px 0 6px; }
+.nav-filter { flex: 1; min-width: 0; padding: 3px 6px; }
+.nav-scope, .nav-label-names { font-size: 12px; }
+.nav-body h2 { margin: 2px 0 4px; }
+.nav-doc { font-size: 12px; margin: 10px 0 2px; color: var(--muted); }
+.nav-details { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; padding: 0 4px 0 calc(2.6em + 4px); font-size: 11px; color: var(--muted); }
+.nav-chars { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.nav-card { flex-basis: 100%; padding: 0 4px 0 calc(2.6em + 4px); font-size: 11px; color: var(--ink); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A label is a colour and its name: the select shows the name, the swatch the colour. */
+.nav-label { font-size: 11px; padding: 0 4px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(var(--swatch), var(--swatch)) 4px 50% / 7px 7px no-repeat, var(--panel); color: var(--muted); max-width: 11em; }
+.nav-list li[data-label] .nav-go { box-shadow: inset 3px 0 0 var(--label-color, transparent); }
+.nav-list li[data-label="red"] { --label-color: var(--label-red); } .nav-list li[data-label="orange"] { --label-color: var(--label-orange); }
+.nav-list li[data-label="yellow"] { --label-color: var(--label-yellow); } .nav-list li[data-label="green"] { --label-color: var(--label-green); }
+.nav-list li[data-label="blue"] { --label-color: var(--label-blue); } .nav-list li[data-label="purple"] { --label-color: var(--label-purple); }
+.nav-list li[data-label="pink"] { --label-color: var(--label-pink); } .nav-list li[data-label="grey"] { --label-color: var(--label-grey); }
+:root { --label-red: #d64545; --label-orange: #e07b21; --label-yellow: #d4b106; --label-green: #3a9a4a; --label-blue: #3b73d6; --label-purple: #8a55c8; --label-pink: #d65a9f; --label-grey: #8a8a8a; }
+.char-list { list-style: none; margin: 0; padding: 0; }
+.char-list li { display: grid; gap: 1px; padding: 3px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.char-go { text-align: left; border: 0; background: none; padding: 2px 4px; }
+.char-meta, .char-first { font-size: 11px; color: var(--muted); padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label-key { padding-left: 16px; background: linear-gradient(var(--swatch), var(--swatch)) 2px 50% / 9px 9px no-repeat; }
 .nav-list li.current .nav-go { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .nav-go { flex: 1; text-align: left; border: 0; background: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 3px 4px; }
 .nav-move { padding: 0 5px; }

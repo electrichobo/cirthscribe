@@ -643,6 +643,61 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(tree.length === 3 && tree.some((i) => i.title === "Season 1" && i.kind === "folder"), `tree kept: ${JSON.stringify(tree.map((i) => i.title))}`);
   });
 
+  await test("Navigator tabs: scenes show page, length in eighths, speakers and their card; filter; labels with names and undo; Characters tab; whole-project scope opens another episode", async () => {
+    await openFixture("page-boundaries");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => ({ id: s.sceneId, heading: s.heading }))");
+    await waitFor(app, `document.querySelectorAll('#navigator .nav-list li .nav-page').length === ${scenes.length}`, "every scene shows its page and length");
+    const rows = await app.evaluate("[...document.querySelectorAll('#navigator .nav-list li')].map(li => ({ page: li.querySelector('.nav-page')?.textContent, len: li.querySelector('.nav-len')?.textContent, chars: li.querySelector('.nav-chars')?.textContent ?? '' }))");
+    assert(rows[0].page === "p. 1" && /^(\d+ )?\d\/8$|^\d+$/.test(rows[0].len), `page and eighths: ${JSON.stringify(rows[0])}`);
+    assert(rows.some((r) => /INES/.test(r.chars)) && rows.some((r) => /PELL/.test(r.chars)), `speakers listed: ${JSON.stringify(rows.map((r) => r.chars))}`);
+    assert(/estimate/.test(await app.evaluate("document.querySelector('#navigator .nav-len').title")), "length is labelled as an estimate");
+    // Filter: matches headings, speakers, labels and card text; typing keeps focus.
+    await app.evaluate("(document.getElementById('nav-filter').focus(), true)");
+    await typeText("pell");
+    await waitFor(app, "[...document.querySelectorAll('#navigator .nav-list li')].every(li => /PELL/.test(li.textContent)) && document.activeElement?.id === 'nav-filter'", "filtered to PELL's scenes, focus kept");
+    const kept = await app.evaluate("document.querySelectorAll('#navigator .nav-list li').length");
+    assert(kept > 0 && kept < scenes.length, `some scenes hidden: ${kept} of ${scenes.length}`);
+    await app.evaluate("(() => { const f = document.getElementById('nav-filter'); f.value = ''; f.dispatchEvent(new Event('input')); return true; })()");
+    await waitFor(app, `document.querySelectorAll('#navigator .nav-list li').length === ${scenes.length}`, "filter cleared");
+    // A label: shown by name, undone from the scene list.
+    const pick = (i, v) => app.evaluate(`(() => { const s = document.querySelectorAll('#navigator .nav-list li .nav-label')[${i}]; s.value = '${v}'; s.dispatchEvent(new Event('change')); return true; })()`);
+    await pick(0, "blue");
+    await waitFor(app, `document.querySelector('#navigator .nav-list li[data-scene-id="${scenes[0].id}"]')?.dataset.label === 'blue'`, "the scene is labelled");
+    await app.evaluate("(document.querySelector('#navigator .nav-list .nav-go[tabindex=\"0\"]').focus(), true)");
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `!document.querySelector('#navigator .nav-list li[data-scene-id="${scenes[0].id}"]').dataset.label`, "Ctrl/Cmd+Z in the scene list undoes the label");
+    await press("z", [MOD_KEY, "shift"]);
+    await waitFor(app, `document.querySelector('#navigator .nav-list li[data-scene-id="${scenes[0].id}"]').dataset.label === 'blue'`, "and redoes it");
+    // Label names: renamed for this project; the colour stays.
+    await app.evaluate("(document.getElementById('nav-label-names').click(), true)");
+    await waitFor(app, "document.getElementById('labels-dialog').open", "Labels… opens");
+    await app.evaluate("(() => { const i = document.getElementById('label-name-blue'); i.value = 'Act One'; document.getElementById('labels-save').click(); return true; })()");
+    await waitFor(app, "[...document.querySelector('#navigator .nav-list li .nav-label').options].some(o => o.value === 'blue' && o.textContent === 'Act One')", "the label is called Act One");
+    // Characters tab: counts, and Enter goes to the first appearance.
+    await app.evaluate("(document.getElementById('nav-tab-characters').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#navigator .char-list li').length >= 2", "characters listed");
+    const ines = await app.evaluate("[...document.querySelectorAll('#navigator .char-list li')].find(li => li.querySelector('strong').textContent === 'INES')?.querySelector('.char-meta').textContent");
+    assert(/\d+ speech/.test(ines ?? "") && /\d+ words/.test(ines ?? ""), `INES counted: ${ines}`);
+    await app.evaluate("([...document.querySelectorAll('#navigator .char-go')].find(b => b.textContent === 'PELL').click(), true)");
+    const pellFirst = scenes[rows.findIndex((r) => /PELL/.test(r.chars))].id;
+    await waitFor(app, `(() => { const at = __cirth.view.state.selection.from; const s = __cirth.scenes().find(x => at >= x.from && at < x.to); return s?.sceneId === ${JSON.stringify(pellFirst)}; })()`, "PELL goes to his first appearance");
+    await app.evaluate("(document.getElementById('nav-tab-scenes').click(), true)");
+    // Whole project: another episode's scenes; choosing one opens it there.
+    const pilot = await app.evaluate("(async () => (await window.__TAURI_INTERNALS__.invoke('project_tree'))[0].id)()");
+    const ep = await app.evaluate("window.__TAURI_INTERNALS__.invoke('create_episode', { title: 'Episode 2', folder: null })");
+    await app.evaluate(`__cirth.openDocument(${JSON.stringify(ep)})`);
+    await caretAtEndOf(0);
+    await typeText("INT. BOAT - NIGHT");
+    await sleep(700);
+    await app.evaluate(`__cirth.openDocument(${JSON.stringify(pilot)})`);
+    await waitFor(app, `__cirth.scenes().length === ${scenes.length}`, "back in the pilot");
+    await app.evaluate("(() => { const s = document.getElementById('nav-scope'); s.value = 'project'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "[...document.querySelectorAll('#navigator .nav-doc')].some(h => h.textContent === 'Episode 2') && [...document.querySelectorAll('#navigator .nav-list.other .nav-go')].some(b => b.textContent === 'INT. BOAT - NIGHT')", "the other episode's scenes are listed");
+    await app.evaluate("([...document.querySelectorAll('#navigator .nav-list.other .nav-go')].find(b => b.textContent === 'INT. BOAT - NIGHT').click(), true)");
+    await waitFor(app, "__cirth.scenes().length === 1 && __cirth.scenes()[0].heading === 'INT. BOAT - NIGHT'", "choosing it opens Episode 2 at that scene");
+    await app.evaluate("(() => { const s = document.getElementById('nav-scope'); s.value = 'doc'; s.dispatchEvent(new Event('change')); return true; })()");
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");
@@ -1537,7 +1592,9 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(await activeIn("#navigator"), "Shift+F6: back to the navigator");
     // One Tab stop per list.
     const tabStops = (sel) => app.evaluate(`[...document.querySelectorAll(${JSON.stringify(sel + " button, " + sel + " textarea, " + sel + " [tabindex]")})].filter(e => e.tabIndex >= 0 && !e.disabled && e.getClientRects().length).length`);
-    assert((await tabStops("#navigator")) === 1, `navigator tab stops ${await tabStops("#navigator")}`);
+    // The scene list is one Tab stop; the navigator's tabs, filter and scope are one stop each besides (M3 step 3).
+    assert((await tabStops("#navigator .nav-list")) === 1, `scene list tab stops ${await tabStops("#navigator .nav-list")}`);
+    assert((await tabStops("#navigator .nav-tabs")) === 1, `the tabs are one stop: ${await tabStops("#navigator .nav-tabs")}`);
     // Escape in the editor goes to the navigator's current scene.
     await caretAtEndOf(0);
     await press("Escape");

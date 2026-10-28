@@ -8,6 +8,18 @@ import { emitTo, listen } from "@tauri-apps/api/event";
 import { announce } from "./a11y";
 import type { Beat } from "./schema";
 import type { SceneInfo } from "./scenes";
+import type { NavInfo } from "./views";
+
+/** NavInfo as JSON (maps as entry lists). */
+export interface NavWire {
+  stats: [string, { page: string; eighths: number; characters: string[] }][];
+  labels: [string, string][];
+  labelNames: [string, string][];
+  characters: NavInfo["characters"];
+  projectScenes: NavInfo["projectScenes"];
+  currentDocument: string | null;
+  project: boolean;
+}
 
 export type PopPanel = "nav" | "board" | "notes";
 export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Board", notes: "Notes" };
@@ -20,6 +32,8 @@ export interface PanelState {
   numbers: [string, { number: string; omitted: boolean }][];
   beats: Beat[];
   structural: boolean;
+  /** The navigator's data (scene list window). */
+  nav?: NavWire;
   /** Sent once, when the window opens (it then owns the typing). */
   notes?: string;
 }
@@ -31,8 +45,15 @@ export type PanelCommand =
   | { panel: PopPanel; cmd: "putBeat"; beat: Beat }
   | { panel: PopPanel; cmd: "structural"; on: boolean }
   | { panel: PopPanel; cmd: "notes"; text: string }
+  | { panel: PopPanel; cmd: "label"; sceneId: string; label: string }
+  | { panel: PopPanel; cmd: "scope"; project: boolean }
+  | { panel: PopPanel; cmd: "openElsewhere"; documentId: string; sceneId: string }
   | { panel: PopPanel; cmd: "undo" | "redo" | "dock" }
   | { panel: PopPanel; cmd: "rendered"; items: number; first: string };
+
+function wire(n: NavInfo, project: boolean): NavWire {
+  return { stats: [...n.stats], labels: [...n.labels], labelNames: n.labelNames, characters: n.characters, projectScenes: n.projectScenes, currentDocument: n.currentDocument, project };
+}
 
 export function createPanelHost(hooks: {
   open: () => boolean;
@@ -47,6 +68,11 @@ export function createPanelHost(hooks: {
   putBeat: (beat: Beat) => Promise<void>;
   notesText: () => string;
   setNotes: (text: string) => void;
+  nav: () => NavInfo;
+  project: () => boolean;
+  setLabel: (sceneId: string, label: string) => void;
+  setScope: (project: boolean) => void;
+  openElsewhere: (documentId: string, sceneId: string) => void;
   undo: (redo: boolean, panel: PopPanel) => void;
   /** The main window's layout changed (a panel left or came back). */
   changed: () => void;
@@ -63,6 +89,7 @@ export function createPanelHost(hooks: {
       numbers: [...hooks.numbers()].map(([id, n]) => [id, { number: n.number, omitted: n.omitted }]),
       beats: hooks.beats(),
       structural: hooks.structural(),
+      ...(panel === "nav" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
       ...(withNotes ? { notes: hooks.notesText() } : {}),
     };
   }
@@ -127,6 +154,15 @@ export function createPanelHost(hooks: {
         break;
       case "notes":
         hooks.setNotes(c.text);
+        break;
+      case "label":
+        hooks.setLabel(c.sceneId, c.label);
+        break;
+      case "scope":
+        hooks.setScope(c.project);
+        break;
+      case "openElsewhere":
+        hooks.openElsewhere(c.documentId, c.sceneId);
         break;
       case "undo":
       case "redo":

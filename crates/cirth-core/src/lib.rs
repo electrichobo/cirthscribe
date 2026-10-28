@@ -11,6 +11,7 @@ pub mod html;
 pub mod layout;
 pub mod locked;
 pub mod model;
+pub mod navigator;
 pub mod numbering;
 pub mod ops;
 pub mod pdf;

@@ -5,7 +5,7 @@
 import "./styles.css";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { renderBoard, renderNavigator, setSceneNumbers, type BoardState, type ScriptView } from "./views";
+import { renderBoard, renderNavigator, setSceneNumbers, navUi, type BoardState, type ScriptView } from "./views";
 import { installLiveRegions, focusKey, restoreFocus, applyTheme, type UiPrefs } from "./a11y";
 import type { PanelCommand, PanelState, PopPanel } from "./panels";
 import type { SceneInfo } from "./scenes";
@@ -47,6 +47,22 @@ const script: ScriptView = {
   move: (sceneId, before) => send({ cmd: "move", sceneId, before }),
   putBeat: async (beat) => send({ cmd: "putBeat", beat }),
   panelButton: () => dockButton(),
+  nav: () => {
+    const n = last?.nav;
+    return {
+      stats: new Map(n?.stats ?? []),
+      labels: new Map(n?.labels ?? []),
+      labelNames: n?.labelNames ?? [],
+      characters: n?.characters ?? [],
+      projectScenes: n?.projectScenes ?? [],
+      beats: last?.beats ?? [],
+      currentDocument: n?.currentDocument ?? null,
+    };
+  },
+  redraw: () => draw(),
+  setScope: (project) => send({ cmd: "scope", project }),
+  setLabel: (sceneId, label) => send({ cmd: "label", sceneId, label }),
+  openElsewhere: (documentId, sceneId) => send({ cmd: "openElsewhere", documentId, sceneId }),
 };
 
 function draw() {
@@ -54,6 +70,7 @@ function draw() {
   setSceneNumbers(new Map(last.numbers));
   const key = focusKey(root);
   if (panel === "nav") {
+    navUi.project = last.nav?.project ?? false;
     renderNavigator(root, script, key?.split("|")[0]);
     send({ cmd: "rendered", items: last.scenes.length, first: last.scenes[0]?.heading ?? "" });
   } else if (panel === "board") {

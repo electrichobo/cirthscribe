@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). All workspace steps W1–W5 are built. M3 steps 1 (planning undo, ADR 0003) and **2 (episodes and series)** are built; next step 3, the tabbed navigator.
+**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). All workspace steps W1–W5 are built. M3 steps 1 (planning undo, ADR 0003), 2 (episodes and series) and **3 (tabbed navigator, schema v6)** are built; next step 4, the outline editor.
 
 ## Completed & Verified
 
@@ -21,6 +21,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - W5 shortcut remapping built: bindings.ts (registry, combos, conflicts), one dispatcher in main.ts, Help > Keyboard Shortcuts… (shortcuts.ts), UiPrefs.keys, Rust set_menu_texts. Checks: e2e CDP 54/54, WebDriver 53/53 (1 skipped: IME), contract 4.
 - M3 step 1 built: core planning.rs + Store::apply_planning (versions, inverses), planning edits count as unsaved, board_structural per document; app commands planning_state_now / planning_command / planning_undo / set_board_structural (put_beat command removed); board undo routing in main.ts; planning writes queued so undo waits for them. Checks: `cargo test -p cirth-core` (all pass, new planning test), e2e CDP 55/55, WebDriver 54/54 (1 skipped: IME), contract 4.
 - M3 step 2 built: store current_document (meta), project_tree, create_folder, create_episode, rename_item, move_item (cycle-safe); load/apply/beats follow the current document; app shell uses current_document everywhere; open_document command; projecttree.ts dialog; export names include the episode. Checks: `cargo test -p cirth-core` (all pass, new series test), e2e CDP 56/56, WebDriver 55/55 (1 skipped: IME), contract 4.
+- M3 step 3 built: navigator.rs, schema v6 scene_labels, label names, PlanningOp::SetSceneLabel, paginate returns scene_stats, navigator_info / set_label_name commands; views.ts renderNavigator with tabs, filter, scope; labelnames.ts; pop-out window gets nav data. Checks: `cargo test -p cirth-core` (all pass; new navigator and v5-upgrade tests), e2e CDP 57/57, WebDriver 56/56 (1 skipped: IME), contract 4.
 - M3 plan drafted from ROADMAP M3, PRODUCT_SPEC 3–4, ACCEPTANCE B and C, and the current code (one document in the UI; structural permission not stored; planning edits not undoable).
 - Not verified (carried into M3):
   - external app results (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print);
@@ -31,10 +32,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-None once the step 2 commit is made.
+None once the step 3 commit is made.
 
 ## Next Immediate Step
 
-1. M3 step 3, tabbed navigator: Scenes tab (number, heading, page, length in eighths from the core page map, card logline/summary, colour label, characters in the scene; filter and search; scope this episode or the whole project) and Characters tab (from cues; dialogue lines and words, scenes, first appearance). Needs a per-scene colour label (schema v6, fixed palette with renamable names, decision C) with frozen v5 test files.
+1. M3 step 4, outline editor (decision B: beats become outline items). Schema v7: an outline tree (acts, sequences, scene items, beats; title, logline, summary; scene link by stable id); migrate beats into it keeping ids, text, links and order; freeze v6 files first (`cirth-cli make-package`). The board then shows the same items. Reorder under the structural permission moves the script once (ADR 0003).
 2. Then M3 step 1: write ADR 0003 (focus-routed undo), store the structural permission in `document:<id>` settings (store.rs, main.ts `structural`), then planning commands with a core-side undo history.
 3. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.

@@ -16,7 +16,7 @@ import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
 import { sceneNumbersPlugin, sceneNumbersKey, buildSceneNumberDecorations, type SceneNumber } from "./scenenums";
 import { confirmDialog } from "./confirm";
-import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, type BoardState, type ScriptView, setSceneNumbers, sceneAtCursor } from "./views";
+import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, navUi, type BoardState, type ScriptView, type NavInfo, type CharacterStat, setSceneNumbers, sceneAtCursor } from "./views";
 import { createPanelHost, POP_LABEL, type PopPanel } from "./panels";
 import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
@@ -41,6 +41,7 @@ import { createExportDialog, type ExportFormat } from "./exportdlg";
 import { createGoToDialog } from "./goto";
 import { createShortcutsDialog } from "./shortcuts";
 import { createProjectTree } from "./projecttree";
+import { createLabelNamesDialog } from "./labelnames";
 import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
@@ -75,6 +76,8 @@ interface Paginated {
   /** Laid out against a locked page baseline (labels such as 12A, 11-12). */
   pages_locked: boolean;
   missing_glyphs: string[];
+  /** Each scene's page, length in eighths and speakers (the navigator). */
+  scene_stats: { scene_id: string; page: string; eighths: number; characters: string[] }[];
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -287,7 +290,83 @@ function popButton(panel: "nav" | "board"): HTMLElement {
   return b;
 }
 
-const script = (): ScriptView => editorScript(view, putBeat, popButton);
+// The navigator's data besides the script (M3 step 3): labels, characters and
+// the whole project's scenes, fetched after each pagination and on change.
+interface NavigatorInfo {
+  labels: Record<string, string>;
+  label_names: [string, string][];
+  characters: CharacterStat[];
+  project_scenes: NavInfo["projectScenes"];
+}
+let navData: NavigatorInfo = { labels: {}, label_names: [], characters: [], project_scenes: [] };
+async function refreshNav() {
+  if (!lastOpen) return;
+  try {
+    navData = await invoke<NavigatorInfo>("navigator_info", { project: navUi.project });
+    renderNav();
+  } catch {
+    // The scene list still works from the script alone.
+  }
+}
+function navInfo(): NavInfo {
+  return {
+    stats: new Map((lastPagination?.scene_stats ?? []).map((x) => [x.scene_id, x])),
+    labels: new Map(Object.entries(navData.labels)),
+    labelNames: navData.label_names,
+    characters: navData.characters,
+    projectScenes: navData.project_scenes,
+    beats: board.beats,
+    currentDocument: lastOpen?.document_id ?? null,
+  };
+}
+/** Steps taken in the scene list that are not script edits (labels), for its undo. */
+let navSteps: "planning"[] = [];
+let navRedo: "planning"[] = [];
+async function setLabel(sceneId: string, label: string) {
+  await queued(async () => {
+    try {
+      takePlanning(await invoke<PlanningState>("planning_command", { op: { SetSceneLabel: { scene_id: sceneId, label } }, base: planningVersion }));
+      navSteps.push("planning");
+      navRedo = [];
+      const name = navData.label_names.find(([k]) => k === label)?.[1];
+      announce(name ? `Label: ${name}` : "Label removed");
+    } catch (e) {
+      showBanner(`Label not set: ${e}`);
+    }
+  });
+  await refreshNav();
+}
+/** Ctrl/Cmd+Z in the scene list: a label change if that was its last step, otherwise the script's history (its moves are script edits). */
+async function navUndo(again: boolean): Promise<boolean> {
+  const from = again ? navRedo : navSteps;
+  if (!from.length) return false;
+  await queued(async () => {
+    const st = await invoke<PlanningState>("planning_undo", { redo: again });
+    takePlanning(st);
+    if (st.done) (again ? navSteps : navRedo).push(from.pop()!);
+    else from.length = 0;
+  });
+  await refreshNav();
+  announce(again ? "Label change redone" : "Label change undone");
+  return true;
+}
+const labelNames = createLabelNamesDialog(() => navData.label_names, async (changes) => {
+  for (const [key, name] of changes) await invoke("set_label_name", { key, name });
+  await refreshNav();
+});
+async function openElsewhere(documentId: string, sceneId: string) {
+  if (await openWith("open_document", { id: documentId })) revealScene(view, sceneId);
+}
+
+const script = (): ScriptView => ({
+  ...editorScript(view, putBeat, popButton),
+  nav: navInfo,
+  redraw: () => renderNav(),
+  setScope: () => void refreshNav(),
+  setLabel: (id, label) => void setLabel(id, label),
+  renameLabels: () => labelNames.open(),
+  openElsewhere: (d, sc) => void openElsewhere(d, sc),
+});
 
 function rerenderSide() {
   renderNav();
@@ -328,6 +407,7 @@ async function repaginate() {
         .setMeta("addToHistory", false),
     );
     if (changed) rerenderSide();
+    void refreshNav();
     if (p.map.warnings.length) showBanner(`Layout warnings: ${p.map.warnings.join("; ")}`);
     if (stale && target !== syncer.currentVersion) schedulePaginate();
     updateInfo();
@@ -421,6 +501,8 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   $("project-title").textContent = o.is_default ? o.doc.title || o.name : `${o.project_title || o.name} › ${o.doc.title}`;
   board.beats = o.beats;
   await refreshPlanning();
+  navSteps = [];
+  navRedo = [];
   const state = makeState(o.doc.blocks);
   if (view) view.updateState(state);
   else
@@ -754,6 +836,14 @@ const panelHost = createPanelHost({
     rerenderSide();
   },
   notesText: () => notesPanel.value,
+  nav: () => navInfo(),
+  project: () => navUi.project,
+  setLabel: (id, label) => void setLabel(id, label),
+  setScope: (project) => {
+    navUi.project = project;
+    void refreshNav();
+  },
+  openElsewhere: (d, sc) => void openElsewhere(d, sc),
   setNotes: (text) => notesPanel.set(text),
   undo: (again, panel) => {
     if (!view || !lastOpen) return;
@@ -1000,6 +1090,7 @@ window.addEventListener(
       e.preventDefault();
       const again = k === "y" || e.shiftKey;
       if (boardEl.contains(e.target as Node)) return void boardUndo(again);
+      if (navEl.contains(e.target as Node) && (again ? navRedo : navSteps).length) return void navUndo(again);
       const done = (again ? redo : undo)(view.state, view.dispatch);
       announce(done ? (again ? "Redone" : "Undone") : again ? "Nothing to redo" : "Nothing to undo");
     }

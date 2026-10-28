@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 5;
+pub const SCHEMA_VERSION: i64 = 6;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -85,6 +85,9 @@ impl From<std::io::Error> for StoreError {
 }
 
 pub type Result<T> = std::result::Result<T, StoreError>;
+
+/// Scene label colours, in palette order (names are the project's, see `label_names`).
+pub const LABELS: [&str; 8] = ["red", "orange", "yellow", "green", "blue", "purple", "pink", "grey"];
 
 /// One folder or document in a project's tree (`Store::project_tree`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -219,10 +222,17 @@ fn migrate_v5(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v5 -> v6: a colour label per scene (the navigator, M3 step 3). Keyed by
+/// stable scene id; no row means no label. Existing scenes start without one.
+fn migrate_v6(tx: &Transaction) -> Result<()> {
+    tx.execute_batch("CREATE TABLE scene_labels (scene_id TEXT PRIMARY KEY, label TEXT NOT NULL);")?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -656,6 +666,72 @@ impl Store {
         self.set_setting(&format!("document:{document_id}"), "board_structural", if on { "1" } else { "0" })
     }
 
+    // --- Scene labels (navigator, M3 step 3) ---------------------------------
+
+    /// Every labelled scene: scene id -> palette key (`LABELS`).
+    pub fn scene_labels(&self) -> Result<std::collections::HashMap<Id, String>> {
+        let mut stmt = self.conn.prepare("SELECT scene_id, label FROM scene_labels")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<_, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn scene_label(&self, scene_id: &str) -> Result<String> {
+        Ok(self.conn.query_row("SELECT label FROM scene_labels WHERE scene_id = ?1", [scene_id], |r| r.get(0)).optional()?.unwrap_or_default())
+    }
+
+    /// Give a scene a label ("" removes it). Planning data: use the planning
+    /// command (`PlanningOp::SetSceneLabel`) so it can be undone.
+    pub fn set_scene_label(&self, scene_id: &str, label: &str) -> Result<()> {
+        if label.is_empty() {
+            self.conn.execute("DELETE FROM scene_labels WHERE scene_id = ?1", [scene_id])?;
+        } else if LABELS.contains(&label) {
+            self.conn.execute("INSERT OR REPLACE INTO scene_labels(scene_id, label) VALUES (?1, ?2)", [scene_id, label])?;
+        } else {
+            return Err(StoreError::Invalid(format!("unknown label {label}")));
+        }
+        self.mark_unsaved()
+    }
+
+    /// The label palette with the project's names for it (renamable; the
+    /// colour stays, so a label is always shown with its name).
+    pub fn label_names(&self) -> Result<Vec<(String, String)>> {
+        let custom: std::collections::HashMap<String, String> = self.setting("project", "label_names")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        Ok(LABELS.iter().map(|k| (k.to_string(), custom.get(*k).cloned().unwrap_or_else(|| { let mut n = k.to_string(); n[..1].make_ascii_uppercase(); n }))).collect())
+    }
+
+    pub fn set_label_name(&self, key: &str, name: &str) -> Result<()> {
+        if !LABELS.contains(&key) {
+            return Err(StoreError::Invalid(format!("unknown label {key}")));
+        }
+        let mut custom: std::collections::HashMap<String, String> = self.setting("project", "label_names")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        let name = name.trim();
+        if name.is_empty() {
+            custom.remove(key);
+        } else {
+            custom.insert(key.to_string(), name.chars().take(40).collect());
+        }
+        self.set_setting("project", "label_names", &serde_json::to_string(&custom).unwrap_or_default())
+    }
+
+    /// Every document's blocks, in tree order (folders first-come), for project-wide views.
+    pub fn all_documents(&self) -> Result<Vec<(Id, String, Vec<Block>)>> {
+        let tree = self.project_tree()?;
+        let mut order: Vec<&TreeItem> = Vec::new();
+        fn walk<'a>(tree: &'a [TreeItem], parent: Option<&str>, out: &mut Vec<&'a TreeItem>) {
+            let mut kids: Vec<&TreeItem> = tree.iter().filter(|i| i.parent.as_deref() == parent).collect();
+            kids.sort_by(|a, b| a.pos.total_cmp(&b.pos));
+            for k in kids {
+                if k.kind == "folder" {
+                    walk(tree, Some(&k.id), out);
+                } else {
+                    out.push(k);
+                }
+            }
+        }
+        walk(&tree, None, &mut order);
+        order.into_iter().map(|d| Ok((d.id.clone(), d.title.clone(), self.load_document(&d.id)?.blocks))).collect()
+    }
+
     /// The project's notes panel: free text saved with the project and tied
     /// to no document, scene or block (owner, 2026-10-28). Empty if never written.
     pub fn project_notes(&self) -> Result<String> {
@@ -863,6 +939,11 @@ impl Store {
                     Some(old) => PlanningOp::PutBeat(old),
                     None => PlanningOp::DeleteBeat(b.id.clone()),
                 }
+            }
+            PlanningOp::SetSceneLabel { scene_id, label } => {
+                let before = self.scene_label(scene_id)?;
+                self.set_scene_label(scene_id, label)?;
+                PlanningOp::SetSceneLabel { scene_id: scene_id.clone(), label: before }
             }
             PlanningOp::DeleteBeat(id) => {
                 let Some(old) = self.beat(id)? else {

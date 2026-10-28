@@ -227,6 +227,56 @@ fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migratio
     })
 }
 
+// --- Navigator (M3 step 3) --------------------------------------------------------
+
+#[derive(Serialize)]
+struct ProjectScene {
+    document_id: String,
+    document_title: String,
+    scene_id: String,
+    heading: String,
+}
+
+/// What the navigator needs besides the open script: scene labels and their
+/// names, the speaking characters (this document or the whole project) and,
+/// for the whole project, every document's scenes.
+#[derive(Serialize)]
+struct NavigatorInfo {
+    labels: std::collections::HashMap<String, String>,
+    label_names: Vec<(String, String)>,
+    characters: Vec<cirth_core::navigator::CharacterStat>,
+    project_scenes: Vec<ProjectScene>,
+}
+
+#[tauri::command]
+async fn navigator_info(app: State<'_, App>, project: bool) -> Result<NavigatorInfo, String> {
+    with_session(&app, |s| {
+        let docs: Vec<(String, String, Vec<cirth_core::model::Block>)> = if project {
+            s.store.all_documents().map_err(err)?
+        } else {
+            let id = s.store.current_document().map_err(err)?;
+            let d = s.store.load().map_err(err)?;
+            vec![(id, d.title, d.blocks)]
+        };
+        let characters = cirth_core::navigator::characters(&docs.iter().map(|(id, _, b)| (id.clone(), b.clone())).collect::<Vec<_>>());
+        let project_scenes = if project {
+            docs.iter()
+                .flat_map(|(id, title, blocks)| {
+                    blocks.iter().filter(|b| b.kind == cirth_core::model::BlockKind::Heading && b.scene_id.is_some()).map(move |b| ProjectScene { document_id: id.clone(), document_title: title.clone(), scene_id: b.scene_id.clone().unwrap(), heading: b.text() })
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Ok(NavigatorInfo { labels: s.store.scene_labels().map_err(err)?, label_names: s.store.label_names().map_err(err)?, characters, project_scenes })
+    })
+}
+
+#[tauri::command]
+async fn set_label_name(app: State<'_, App>, key: String, name: String) -> Result<(), String> {
+    with_session(&app, |s| s.store.set_label_name(&key, &name).map_err(err))
+}
+
 // --- Episodes and series (M3 step 2) -------------------------------------------
 
 /// The project's folders and documents, in order (cirth_core::store::TreeItem).
@@ -923,6 +973,8 @@ struct Paginated {
     revised_pages: usize,
     /// Pages are laid out against a locked baseline (labels like 12A).
     pages_locked: bool,
+    /// Each scene's page, length in eighths and speakers (the navigator).
+    scene_stats: Vec<cirth_core::navigator::SceneStat>,
 }
 
 fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Document), String> {
@@ -946,7 +998,8 @@ fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Documen
     let all: String = doc.blocks.iter().map(|b| b.text()).collect::<Vec<_>>().join(" ");
     let missing_glyphs = fontcheck::missing_chars(&font, &all);
     let scene_numbers = numbers.into_values().collect();
-    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked, revision, revised_pages, pages_locked: page_lock.is_some() }, doc))
+    let scene_stats = cirth_core::navigator::scene_stats(&doc.blocks, &map);
+    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked, revision, revised_pages, pages_locked: page_lock.is_some(), scene_stats }, doc))
 }
 
 #[tauri::command]
@@ -2195,6 +2248,8 @@ fn main() {
             load_document,
             planning_state_now,
             project_tree,
+            navigator_info,
+            set_label_name,
             open_document,
             create_folder,
             create_episode,
