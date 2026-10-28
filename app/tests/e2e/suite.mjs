@@ -581,6 +581,68 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!(await app.evaluate("document.getElementById('structural').checked")), "another document starts with it off");
   });
 
+  await test("Episodes and series: File > Episodes and Documents adds a season folder and an episode; each document has its own script, scene list and cards; rename and move; the open episode is kept", async () => {
+    await openFixture("page-boundaries");
+    const pilotBlocks = JSON.stringify(await blocks());
+    const pilotScenes = (await app.evaluate("__cirth.scenes()")).length;
+    const pilotCards = await app.evaluate("__cirth.board.beats.length");
+    const treeRows = () => app.evaluate("[...document.querySelectorAll('#tree-list li')].map(li => li.querySelector('.tree-name').textContent + '|' + li.style.paddingLeft + '|' + li.querySelector('.tree-meta').textContent)");
+    const click = (id) => app.evaluate(`(document.getElementById('${id}').click(), true)`);
+    const choose = (title) => app.evaluate(`(() => { const li = [...document.querySelectorAll('#tree-list li')].find(l => l.querySelector('.tree-name').textContent.replace('▸ ', '') === ${JSON.stringify(title)}); li.click(); return !!li; })()`);
+    const submitTitle = (t) => app.evaluate(`(() => { const i = document.getElementById('tree-rename-input'); i.value = ${JSON.stringify(t)}; i.form.requestSubmit(); return true; })()`);
+    await app.evaluate("(__cirth.menu('project_tree'), true)");
+    await waitFor(app, "document.getElementById('tree-dialog').open && document.querySelectorAll('#tree-list li').length === 1", "the tree lists the project's one script");
+    assert(/open/.test((await treeRows())[0]), `the open document is marked: ${await treeRows()}`);
+    // A season folder, then an episode inside it.
+    await click("tree-new-folder");
+    await submitTitle("Season 1");
+    await waitFor(app, "[...document.querySelectorAll('#tree-list .tree-name')].some(n => n.textContent === '▸ Season 1')", "folder added");
+    await choose("Season 1");
+    await click("tree-new-episode");
+    await submitTitle("Episode 1: Low Water");
+    await waitFor(app, "document.querySelectorAll('#tree-list li').length === 3", "episode added");
+    const rows = await treeRows();
+    assert(rows[2].startsWith("Episode 1: Low Water|26px"), `the episode sits inside the season: ${rows}`);
+    // Open it: an empty script with one scene, no cards; the status bar names both.
+    await choose("Episode 1: Low Water");
+    await click("tree-open");
+    await waitFor(app, "!document.getElementById('tree-dialog').open && __cirth.scenes().length === 1 && __cirth.board.beats.length === 0", "the episode opens with one empty scene and no cards");
+    assert(/›\s*Episode 1: Low Water$/.test(await app.evaluate("document.getElementById('project-title').textContent")), "the status bar shows project › episode");
+    await caretAtEndOf(0);
+    await typeText("INT. HARBOUR - DAWN");
+    await app.evaluate("(document.querySelector('#board .board-head button:not(.panel-pop)').click(), true)");
+    await waitFor(app, "__cirth.board.beats.length === 1", "a card in the episode");
+    assert(await storedMatchesEditor(), "the episode's edits are stored");
+    // Back to the pilot: its script and cards as they were.
+    await app.evaluate("(__cirth.menu('project_tree'), true)");
+    await waitFor(app, "document.getElementById('tree-dialog').open", "tree again");
+    await choose((await app.evaluate("[...document.querySelectorAll('#tree-list .tree-name')].map(n => n.textContent)"))[0]);
+    await click("tree-open");
+    await waitFor(app, `__cirth.scenes().length === ${pilotScenes} && __cirth.board.beats.length === ${pilotCards}`, "the pilot opens with its own scenes and cards");
+    assert(JSON.stringify(await blocks()) === pilotBlocks, "the pilot's script is unchanged");
+    // Rename and move: the episode up to the top level, renamed; a folder is never offered as its own target.
+    await app.evaluate("(__cirth.menu('project_tree'), true)");
+    await waitFor(app, "document.getElementById('tree-dialog').open", "tree again");
+    await choose("Season 1");
+    assert(!(await app.evaluate("[...document.getElementById('tree-into').options].some(o => o.textContent.trim() === 'Season 1')")), "a folder cannot be moved into itself");
+    await choose("Episode 1: Low Water");
+    await click("tree-rename");
+    await submitTitle("Episode 1: Neap Tide");
+    await waitFor(app, "[...document.querySelectorAll('#tree-list .tree-name')].some(n => n.textContent === 'Episode 1: Neap Tide')", "renamed");
+    await app.evaluate("(() => { const s = document.getElementById('tree-into'); s.value = '__top'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "(() => { const li = [...document.querySelectorAll('#tree-list li')].find(l => l.querySelector('.tree-name').textContent === 'Episode 1: Neap Tide'); return li && li.style.paddingLeft === '8px'; })()", "moved to the top level");
+    await click("tree-close");
+    // Kept with the project: reopening shows the same tree, on the last open document.
+    await app.evaluate("__cirth.openDocument(" + JSON.stringify(await app.evaluate("(async () => (await window.__TAURI_INTERNALS__.invoke('project_tree')).find(i => i.title === 'Episode 1: Neap Tide').id)()")) + ")");
+    await waitFor(app, "__cirth.scenes().length === 1 && __cirth.scenes()[0].heading === 'INT. HARBOUR - DAWN'", "the episode again");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, "__cirth.scenes().length === 1 && /Neap Tide$/.test(document.getElementById('project-title').textContent)", "reopening lands on the episode that was open");
+    const tree = await app.evaluate("window.__TAURI_INTERNALS__.invoke('project_tree')");
+    assert(tree.length === 3 && tree.some((i) => i.title === "Season 1" && i.kind === "folder"), `tree kept: ${JSON.stringify(tree.map((i) => i.title))}`);
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

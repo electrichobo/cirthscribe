@@ -52,6 +52,12 @@ struct App {
 struct Opened {
     /// Key of the project (library projects: the file name without extension).
     name: String,
+    /// The project's title (Home shows it); `doc.title` is the open document's.
+    project_title: String,
+    /// The open document (an episode, or the project's first script).
+    document_id: String,
+    /// True for the project's first script (exports keep the project's file name).
+    is_default: bool,
     doc: Document,
     beats: Vec<Beat>,
     recovered: bool,
@@ -202,8 +208,12 @@ async fn forget_recent(app: State<'_, App>, path: String) -> Result<(), String> 
 // --- Opening --------------------------------------------------------------------
 
 fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migration_backup: Option<PathBuf>, t0: Instant) -> Result<Opened, String> {
+    let document_id = s.store.current_document().map_err(err)?;
     Ok(Opened {
         name: s.key.clone(),
+        project_title: s.store.load_document(&s.store.default_document().map_err(err)?).map_err(err)?.title,
+        is_default: document_id == s.store.default_document().map_err(err)?,
+        document_id,
         doc: s.store.load().map_err(err)?,
         beats: s.store.beats().map_err(err)?,
         recovered,
@@ -215,6 +225,47 @@ fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migratio
         package_path: s.package.display().to_string(),
         open_ms: t0.elapsed().as_secs_f64() * 1e3,
     })
+}
+
+// --- Episodes and series (M3 step 2) -------------------------------------------
+
+/// The project's folders and documents, in order (cirth_core::store::TreeItem).
+#[tauri::command]
+async fn project_tree(app: State<'_, App>) -> Result<Vec<cirth_core::store::TreeItem>, String> {
+    with_session(&app, |s| s.store.project_tree().map_err(err))
+}
+
+/// Open another document of the open project: the editor, scene list,
+/// board, numbering, revisions and exports follow it. The UI saves first.
+/// The planning history belongs to the document it was made in.
+#[tauri::command]
+async fn open_document(app: State<'_, App>, id: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    with_session(&app, |s| {
+        s.store.set_current_document(&id).map_err(err)?;
+        s.planning = Default::default();
+        opened(s, false, None, None, t0)
+    })
+}
+
+#[tauri::command]
+async fn create_folder(app: State<'_, App>, title: String, parent: Option<String>) -> Result<String, String> {
+    with_session(&app, |s| s.store.create_folder(&title, parent.as_deref()).map_err(err))
+}
+
+#[tauri::command]
+async fn create_episode(app: State<'_, App>, title: String, folder: Option<String>) -> Result<String, String> {
+    with_session(&app, |s| s.store.create_episode(&title, folder.as_deref()).map_err(err))
+}
+
+#[tauri::command]
+async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
+    with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
+}
+
+#[tauri::command]
+async fn move_item(app: State<'_, App>, id: String, parent: Option<String>, index: usize) -> Result<(), String> {
+    with_session(&app, |s| s.store.move_item(&id, parent.as_deref(), index).map_err(err))
 }
 
 /// Open an existing project file, recovering unsaved working-store commits
@@ -334,7 +385,7 @@ async fn import_fountain(app: State<'_, App>, path: String) -> Result<Opened, St
     let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
     if !r.title_page.is_empty() || !r.scene_numbers.is_empty() {
         with_session(&app, |s| {
-            let doc = s.store.default_document().map_err(err)?;
+            let doc = s.store.current_document().map_err(err)?;
             if !r.title_page.is_empty() {
                 s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
             }
@@ -362,7 +413,7 @@ async fn import_fdx(app: State<'_, App>, path: String) -> Result<Opened, String>
     let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
     if !r.title_page.is_empty() || !r.scene_numbers.is_empty() {
         with_session(&app, |s| {
-            let doc = s.store.default_document().map_err(err)?;
+            let doc = s.store.current_document().map_err(err)?;
             if !r.title_page.is_empty() {
                 s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
             }
@@ -380,8 +431,8 @@ async fn import_fdx(app: State<'_, App>, path: String) -> Result<Opened, String>
 /// File > Export > Final Draft…: the current document and its title page.
 #[tauri::command]
 async fn export_fdx(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
-    let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
-    let numbers = with_session(&app, |s| s.store.scene_numbers(&s.store.default_document().map_err(err)?).map_err(err))?;
+    let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err)?)))?;
+    let numbers = with_session(&app, |s| s.store.scene_numbers(&s.store.current_document().map_err(err)?).map_err(err))?;
     let out = cirth_core::fdx::export(&doc.blocks, &tp, &numbers);
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("fdx.tmp");
@@ -397,7 +448,7 @@ async fn export_fdx(app: State<'_, App>, path: String) -> Result<FountainExporte
 #[tauri::command]
 async fn export_document(app: State<'_, App>, format: String, path: String) -> Result<FountainExported, String> {
     let (doc, tp, numbers, furniture, stored) = with_session(&app, |s| {
-        let main = s.store.default_document().map_err(err)?;
+        let main = s.store.current_document().map_err(err)?;
         Ok((
             s.store.load().map_err(err)?,
             s.store.title_page(&main).map_err(err)?,
@@ -436,8 +487,8 @@ struct FountainExported {
 /// File > Export > Fountain…: the current document and its title page.
 #[tauri::command]
 async fn export_fountain(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
-    let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
-    let numbers = with_session(&app, |s| s.store.scene_numbers(&s.store.default_document().map_err(err)?).map_err(err))?;
+    let (doc, tp) = with_session(&app, |s| Ok((s.store.load().map_err(err)?, s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err)?)))?;
+    let numbers = with_session(&app, |s| s.store.scene_numbers(&s.store.current_document().map_err(err)?).map_err(err))?;
     let out = cirth_core::fountain::export(&doc.blocks, &tp, &numbers);
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("fountain.tmp");
@@ -571,7 +622,7 @@ async fn apply_batch(app: State<'_, App>, batch: Batch) -> Result<Ack, String> {
     with_session(&app, |s| {
         let ack = s.store.apply(&batch).map_err(err)?;
         // While scene numbers are locked, scenes added by this edit get A/B numbers.
-        let main = s.store.default_document().map_err(err)?;
+        let main = s.store.current_document().map_err(err)?;
         s.store.number_new_scenes(&main).map_err(err)?;
         Ok(ack)
     })
@@ -591,7 +642,7 @@ struct RevisionState {
 }
 
 fn revision_state_of(s: &Session) -> Result<RevisionState, String> {
-    let main = s.store.default_document().map_err(err)?;
+    let main = s.store.current_document().map_err(err)?;
     let sets = s.store.revision_sets(&main).map_err(err)?;
     let blocks = s.store.load().map_err(err)?.blocks;
     let (next_colour, next_label) = revisions::next_set(&sets);
@@ -616,7 +667,7 @@ async fn revision_state(app: State<'_, App>) -> Result<RevisionState, String> {
 #[tauri::command]
 async fn revision_command(app: State<'_, App>, action: String, set: Option<RevisionSet>, id: Option<String>, on: Option<bool>) -> Result<RevisionState, String> {
     with_session(&app, |s| {
-        let main = s.store.default_document().map_err(err)?;
+        let main = s.store.current_document().map_err(err)?;
         match action.as_str() {
             "put" => {
                 let set = set.ok_or("no revision set")?;
@@ -643,9 +694,9 @@ async fn page_lock_command(app: State<'_, App>, action: String, profile_name: St
     match action.as_str() {
         "lock" => {
             let (p, _) = paginate_current(&app, &profile_name)?;
-            with_session(&app, |s| s.store.lock_pages(&s.store.default_document().map_err(err)?, &p.map).map_err(err))
+            with_session(&app, |s| s.store.lock_pages(&s.store.current_document().map_err(err)?, &p.map).map_err(err))
         }
-        "unlock" => with_session(&app, |s| s.store.unlock_pages(&s.store.default_document().map_err(err)?).map(|_| 0).map_err(err)),
+        "unlock" => with_session(&app, |s| s.store.unlock_pages(&s.store.current_document().map_err(err)?).map(|_| 0).map_err(err)),
         other => Err(format!("unknown page lock action {other}")),
     }
 }
@@ -654,7 +705,7 @@ async fn page_lock_command(app: State<'_, App>, action: String, profile_name: St
 #[tauri::command]
 async fn scene_numbers_command(app: State<'_, App>, action: String, scene_id: Option<String>) -> Result<usize, String> {
     with_session(&app, |s| {
-        let main = s.store.default_document().map_err(err)?;
+        let main = s.store.current_document().map_err(err)?;
         match action.as_str() {
             "lock" => s.store.lock_scene_numbers(&main).map_err(err),
             "unlock" => s.store.unlock_scene_numbers(&main).map(|_| 0).map_err(err),
@@ -686,7 +737,7 @@ struct PlanningState {
 }
 
 fn planning_state(s: &Session, done: bool) -> Result<PlanningState, String> {
-    let doc = s.store.default_document().map_err(err)?;
+    let doc = s.store.current_document().map_err(err)?;
     Ok(PlanningState {
         version: s.store.planning_version().map_err(err)?,
         beats: s.store.beats().map_err(err)?,
@@ -723,7 +774,7 @@ async fn planning_undo(app: State<'_, App>, redo: bool) -> Result<PlanningState,
 #[tauri::command]
 async fn set_board_structural(app: State<'_, App>, on: bool) -> Result<(), String> {
     with_session(&app, |s| {
-        let doc = s.store.default_document().map_err(err)?;
+        let doc = s.store.current_document().map_err(err)?;
         s.store.set_board_structural(&doc, on).map_err(err)
     })
 }
@@ -878,7 +929,7 @@ fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Documen
     let t0 = Instant::now();
     // Hold the lock only while reading the canonical document.
     let (doc, numbers, locked, revision, page_lock) = with_session(app, |s| {
-        let main = s.store.default_document().map_err(err)?;
+        let main = s.store.current_document().map_err(err)?;
         Ok((
             s.store.load().map_err(err)?,
             s.store.scene_numbers(&main).map_err(err)?,
@@ -926,7 +977,7 @@ struct PageFurniture {
 }
 
 fn page_furniture_of(s: &Session) -> Result<PageFurniture, String> {
-    let scope = format!("document:{}", s.store.default_document().map_err(err)?);
+    let scope = format!("document:{}", s.store.current_document().map_err(err)?);
     Ok(PageFurniture {
         header: s.store.setting(&scope, "header").map_err(err)?.unwrap_or_default(),
         footer: s.store.setting(&scope, "footer").map_err(err)?.unwrap_or_default(),
@@ -942,7 +993,7 @@ async fn page_furniture(app: State<'_, App>) -> Result<PageFurniture, String> {
 #[tauri::command]
 async fn set_page_furniture(app: State<'_, App>, header: String, footer: String) -> Result<(), String> {
     with_session(&app, |s| {
-        let scope = format!("document:{}", s.store.default_document().map_err(err)?);
+        let scope = format!("document:{}", s.store.current_document().map_err(err)?);
         s.store.set_setting(&scope, "header", &header).map_err(err)?;
         s.store.set_setting(&scope, "footer", &footer).map_err(err)
     })
@@ -972,7 +1023,7 @@ async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<Stri
     }
     let prof = profile(&profile_name);
     let t0 = Instant::now();
-    let (tp, furniture, project_id) = with_session(&app, |s| Ok((s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?, s.store.project_id().map_err(err)?)))?;
+    let (tp, furniture, project_id) = with_session(&app, |s| Ok((s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?, s.store.project_id().map_err(err)?)))?;
     let opts = pdf::PdfOptions {
         title: if tp.is_empty() { doc.title.clone() } else { tp.title.lines().next().unwrap_or("").trim().to_string() },
         author: tp.authors.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(", "),
@@ -1010,7 +1061,7 @@ fn ui_profile(stored: &str) -> &'static str {
 
 #[tauri::command]
 async fn document_profile(app: State<'_, App>) -> Result<&'static str, String> {
-    with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.default_document().map_err(err)?).map_err(err)?)))
+    with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.current_document().map_err(err)?).map_err(err)?)))
 }
 
 /// Store the page size for this document. The next save writes it into the
@@ -1023,7 +1074,7 @@ async fn set_document_profile(app: State<'_, App>, profile: String) -> Result<&'
         _ => return Err(format!("unknown page size {profile}")),
     };
     with_session(&app, |s| {
-        let doc = s.store.default_document().map_err(err)?;
+        let doc = s.store.current_document().map_err(err)?;
         s.store.set_document_profile(&doc, stored).map_err(err)?;
         Ok(ui_profile(stored))
     })
@@ -1032,7 +1083,7 @@ async fn set_document_profile(app: State<'_, App>, profile: String) -> Result<&'
 /// The current document's title page (empty fields if none yet).
 #[tauri::command]
 async fn title_page(app: State<'_, App>) -> Result<cirth_core::title::TitlePage, String> {
-    with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))
+    with_session(&app, |s| s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err))
 }
 
 /// The notes panel's text: saved with the project, tied to nothing else.
@@ -1053,7 +1104,7 @@ async fn set_project_notes(app: State<'_, App>, text: String) -> Result<(), Stri
 #[tauri::command]
 async fn set_title_page(app: State<'_, App>, page: cirth_core::title::TitlePage) -> Result<(), String> {
     with_session(&app, |s| {
-        let doc = s.store.default_document().map_err(err)?;
+        let doc = s.store.current_document().map_err(err)?;
         s.store.set_title_page(&doc, &page).map_err(err)
     })
 }
@@ -1071,13 +1122,13 @@ struct TxtExported {
 /// size; `changed_only` as for the PDF.
 #[tauri::command]
 async fn export_txt(app: State<'_, App>, path: String, changed_only: Option<bool>) -> Result<TxtExported, String> {
-    let name = with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
+    let name = with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.current_document().map_err(err)?).map_err(err)?)))?;
     let (mut p, doc) = paginate_current(&app, name)?;
     let changed_only = changed_only.unwrap_or(false);
     if changed_only {
         changed_pages_only(&mut p)?;
     }
-    let (tp, furniture) = with_session(&app, |s| Ok((s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?)))?;
+    let (tp, furniture) = with_session(&app, |s| Ok((s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?)))?;
     let rev = p.revision.as_ref().map(revisions::header).unwrap_or_default();
     let t = cirth_core::txt::render_document(&p.map, &profile(name), if changed_only { None } else { Some(&tp) }, &pdf::expand_tokens(&furniture.header, &tp), &pdf::expand_tokens(&furniture.footer, &tp), &rev);
     let target = normalize(Path::new(&path));
@@ -1791,6 +1842,7 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
         .text("import", "Import…")
+        .text("project_tree", keyed("Episodes and Documents…", "Shift+O"))
         .separator()
         .text("save", keyed("Save", "S"))
         .text("save_as", keyed("Save As…", "Shift+S"))
@@ -2142,6 +2194,12 @@ fn main() {
             apply_batch,
             load_document,
             planning_state_now,
+            project_tree,
+            open_document,
+            create_folder,
+            create_episode,
+            rename_item,
+            move_item,
             planning_command,
             planning_undo,
             set_board_structural,

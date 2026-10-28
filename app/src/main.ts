@@ -40,6 +40,7 @@ import { createFurnitureDialog } from "./furniture";
 import { createExportDialog, type ExportFormat } from "./exportdlg";
 import { createGoToDialog } from "./goto";
 import { createShortcutsDialog } from "./shortcuts";
+import { createProjectTree } from "./projecttree";
 import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
@@ -48,6 +49,11 @@ import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggle
 
 interface Opened {
   name: string;
+  /** The project's title; `doc.title` is the open document's (an episode's). */
+  project_title: string;
+  document_id: string;
+  /** The project's first script: exports keep the project's file name. */
+  is_default: boolean;
   doc: { title: string; version: number; blocks: Block[] };
   beats: Beat[];
   recovered: boolean;
@@ -197,6 +203,15 @@ async function refreshPlanning() {
   takePlanning(await invoke<PlanningState>("planning_state_now"));
   boardSteps = [];
   boardRedo = [];
+}
+
+/** Where an export goes by default: beside the project file, named after it
+ *  (and after the episode, for any document but the project's first). */
+function exportPath(ext: string): string {
+  const base = lastOpen!.package_path.replace(/\.cirth$/i, "");
+  if (lastOpen!.is_default) return base + ext;
+  const episode = lastOpen!.doc.title.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+  return `${base} - ${episode || "episode"}${ext}`;
 }
 
 /** Planning writes run one at a time, and undo waits for any still in flight. */
@@ -403,7 +418,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   const t1 = performance.now();
   setView("editor");
   $("find-bar").hidden = true; // a new editor state has no search
-  $("project-title").textContent = o.doc.title || o.name;
+  $("project-title").textContent = o.is_default ? o.doc.title || o.name : `${o.project_title || o.name} › ${o.doc.title}`;
   board.beats = o.beats;
   await refreshPlanning();
   const state = makeState(o.doc.blocks);
@@ -702,6 +717,20 @@ const furniture = createFurnitureDialog(() => saveFile(false));
 const exportDialog = createExportDialog({ hasActiveRevision: () => !!revisions.state.active, run: (f) => exportAs(f) });
 const goTo = createGoToDialog({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], numbers: () => sceneNumbers });
 const shortcuts = createShortcutsDialog();
+const projectTree = createProjectTree({
+  current: () => lastOpen?.document_id ?? null,
+  openDocument: (id) => openWith("open_document", { id }),
+  changed: () => {
+    // A rename of the open document shows at once in the status bar.
+    void invoke<Opened["doc"]>("load_document")
+      .then((d) => {
+        if (!lastOpen) return;
+        lastOpen.doc.title = d.title;
+        $("project-title").textContent = lastOpen.is_default ? d.title || lastOpen.name : `${lastOpen.project_title || lastOpen.name} › ${d.title}`;
+      })
+      .catch(() => undefined);
+  },
+});
 // Menu items show the keys in force (after a change, and at startup).
 let shownKeys = "";
 onPanelsChanged(() => {
@@ -1025,6 +1054,9 @@ async function runMenu(id: string): Promise<void> {
     case "import":
       await importAny();
       break;
+    case "project_tree":
+      if (lastOpen) await projectTree.open();
+      break;
     case "export":
       if (lastOpen) exportDialog.open();
       break;
@@ -1215,7 +1247,7 @@ $("save").addEventListener("click", () => void saveNow());
 async function exportPdf(path?: string, changedOnly = false): Promise<boolean> {
   if (!lastOpen) return false;
   const suffix = changedOnly ? "-changed-pages.pdf" : ".pdf";
-  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, suffix), filters: [{ name: "PDF", extensions: ["pdf"] }] }));
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(suffix), filters: [{ name: "PDF", extensions: ["pdf"] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
@@ -1361,7 +1393,7 @@ async function importFountain(path?: string): Promise<boolean> {
 /** File > Export > Fountain…: the script and title page as Fountain text. */
 async function exportFountain(path?: string): Promise<boolean> {
   if (!lastOpen) return false;
-  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".fountain"), filters: [{ name: "Fountain screenplay", extensions: ["fountain"] }] }));
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(".fountain"), filters: [{ name: "Fountain screenplay", extensions: ["fountain"] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
@@ -1384,7 +1416,7 @@ const DOCUMENT_FORMATS = {
 async function exportDocument(format: keyof typeof DOCUMENT_FORMATS, path?: string): Promise<boolean> {
   if (!lastOpen) return false;
   const f = DOCUMENT_FORMATS[format];
-  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, `.${format}`), filters: [{ name: f.name, extensions: [format] }] }));
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(`.${format}`), filters: [{ name: f.name, extensions: [format] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
@@ -1407,7 +1439,7 @@ async function importFdx(path?: string): Promise<boolean> {
 /** File > Export > Final Draft…: the script and title page as .fdx XML. */
 async function exportFdx(path?: string): Promise<boolean> {
   if (!lastOpen) return false;
-  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".fdx"), filters: [{ name: "Final Draft", extensions: ["fdx"] }] }));
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(".fdx"), filters: [{ name: "Final Draft", extensions: ["fdx"] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
@@ -1423,7 +1455,7 @@ async function exportFdx(path?: string): Promise<boolean> {
 /** Plain text with the PDF's line breaks and pages (cirth_core::txt). */
 async function exportText(path?: string, changedOnly = false): Promise<boolean> {
   if (!lastOpen) return false;
-  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".txt"), filters: [{ name: "Plain text", extensions: ["txt"] }] }));
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(".txt"), filters: [{ name: "Plain text", extensions: ["txt"] }] }));
   if (!target) return false;
   await syncer.flush();
   try {
@@ -1449,6 +1481,8 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   exportText,
   importFountain,
   importAny,
+  projectTree,
+  openDocument: (id: string) => openWith("open_document", { id }),
   notes: notesPanel,
   importerFor,
   exportDialog,

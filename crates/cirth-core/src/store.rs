@@ -19,6 +19,7 @@
 use crate::model::{Beat, Block, BlockKind, Document, Id, Run};
 use crate::ops::{Ack, Batch, Op};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub const SCHEMA_VERSION: i64 = 5;
@@ -84,6 +85,20 @@ impl From<std::io::Error> for StoreError {
 }
 
 pub type Result<T> = std::result::Result<T, StoreError>;
+
+/// One folder or document in a project's tree (`Store::project_tree`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TreeItem {
+    pub id: Id,
+    /// "folder", or the document's kind ("screenplay").
+    pub kind: String,
+    pub title: String,
+    /// The folder it is in; None at the top level.
+    pub parent: Option<Id>,
+    pub pos: f64,
+    /// Scenes in a document (0 for a folder).
+    pub scenes: u64,
+}
 
 pub struct Store {
     conn: Connection,
@@ -294,6 +309,131 @@ impl Store {
             return Err(StoreError::Invalid(format!("no document {document_id}")));
         }
         Ok(())
+    }
+
+    // --- Episodes and series (M3 step 2) -------------------------------------
+    //
+    // A project is a tree: folders (containers: a series, a season) holding
+    // documents (episodes, a feature) and other folders, each ordered by `pos`
+    // among its siblings. One document is "current": the editor, scene list,
+    // board, numbering, revisions and exports work on it. Ids never change;
+    // titles are labels.
+
+    /// The document the editor shows (the default one until another is opened).
+    pub fn current_document(&self) -> Result<Id> {
+        if let Some(id) = self.meta("current_document")? {
+            if self.conn.query_row("SELECT 1 FROM documents WHERE id = ?1", [&id], |_| Ok(())).optional()?.is_some() {
+                return Ok(id);
+            }
+        }
+        self.default_document()
+    }
+
+    pub fn set_current_document(&self, id: &str) -> Result<()> {
+        if self.conn.query_row("SELECT 1 FROM documents WHERE id = ?1", [id], |_| Ok(())).optional()?.is_none() {
+            return Err(StoreError::Invalid(format!("no document {id}")));
+        }
+        Self::set_meta(&self.conn, "current_document", id)
+    }
+
+    /// Every folder and document, each with its parent folder and position.
+    pub fn project_tree(&self) -> Result<Vec<TreeItem>> {
+        let mut out = Vec::new();
+        let mut stmt = self.conn.prepare("SELECT id, title, parent_id, pos FROM containers ORDER BY pos")?;
+        for r in stmt.query_map([], |r| Ok(TreeItem { id: r.get(0)?, kind: "folder".into(), title: r.get(1)?, parent: r.get(2)?, pos: r.get(3)?, scenes: 0 }))? {
+            out.push(r?);
+        }
+        let mut stmt = self.conn.prepare(
+            "SELECT d.id, d.kind, d.title, d.container_id, d.pos, (SELECT COUNT(*) FROM blocks b WHERE b.document_id = d.id AND b.scene_id IS NOT NULL) FROM documents d ORDER BY d.pos",
+        )?;
+        for r in stmt.query_map([], |r| Ok(TreeItem { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, parent: r.get(3)?, pos: r.get(4)?, scenes: r.get::<_, i64>(5)? as u64 }))? {
+            out.push(r?);
+        }
+        out.sort_by(|a, b| a.pos.total_cmp(&b.pos));
+        Ok(out)
+    }
+
+    fn check_folder(&self, folder: Option<&str>) -> Result<()> {
+        if let Some(f) = folder {
+            if self.conn.query_row("SELECT 1 FROM containers WHERE id = ?1", [f], |_| Ok(())).optional()?.is_none() {
+                return Err(StoreError::Invalid(format!("no folder {f}")));
+            }
+        }
+        Ok(())
+    }
+
+    fn next_pos(&self, folder: Option<&str>) -> Result<f64> {
+        Ok(self.project_tree()?.iter().filter(|i| i.parent.as_deref() == folder).map(|i| i.pos).fold(0.0, f64::max) + 1.0)
+    }
+
+    /// A new folder (a series or a season), last in `parent`.
+    pub fn create_folder(&self, title: &str, parent: Option<&str>) -> Result<Id> {
+        self.check_folder(parent)?;
+        let id = crate::model::new_id();
+        let pos = self.next_pos(parent)?;
+        self.conn.execute("INSERT INTO containers(id, parent_id, title, pos) VALUES (?1, ?2, ?3, ?4)", params![id, parent, title.trim(), pos])?;
+        self.mark_unsaved()?;
+        Ok(id)
+    }
+
+    /// A new screenplay document (an episode), last in `folder`, starting
+    /// with one empty scene heading, like a new project.
+    pub fn create_episode(&mut self, title: &str, folder: Option<&str>) -> Result<Id> {
+        self.check_folder(folder)?;
+        let id = crate::model::new_id();
+        let pos = self.next_pos(folder)?;
+        self.conn.execute("INSERT INTO documents(id, kind, title, profile, container_id, pos) VALUES (?1, 'screenplay', ?2, 'us-letter', ?3, ?4)", params![id, title.trim(), folder, pos])?;
+        let base = self.version()?;
+        self.apply(&Batch { tx_id: crate::model::new_id(), base_version: base, document_id: Some(id.clone()), ops: vec![Op::Put { block: Block::new(BlockKind::Heading, ""), after: None }] })?;
+        Ok(id)
+    }
+
+    /// Rename a folder or a document. The default document's title is also
+    /// the project's title (as on Home).
+    pub fn rename_item(&self, id: &str, title: &str) -> Result<()> {
+        let title = title.trim();
+        if title.is_empty() {
+            return Err(StoreError::Invalid("a title cannot be empty".into()));
+        }
+        if self.default_document()? == id {
+            self.set_title(title)?;
+        } else if self.conn.execute("UPDATE documents SET title = ?2 WHERE id = ?1", [id, title])? == 0 && self.conn.execute("UPDATE containers SET title = ?2 WHERE id = ?1", [id, title])? == 0 {
+            return Err(StoreError::Invalid(format!("nothing called {id} in this project")));
+        }
+        self.mark_unsaved()
+    }
+
+    /// Move a folder or document into `parent` (None: the top level) at
+    /// position `index` among its new siblings. A folder cannot go inside
+    /// itself or one of its own folders.
+    pub fn move_item(&self, id: &str, parent: Option<&str>, index: usize) -> Result<()> {
+        self.check_folder(parent)?;
+        let tree = self.project_tree()?;
+        let Some(item) = tree.iter().find(|i| i.id == id) else {
+            return Err(StoreError::Invalid(format!("nothing called {id} in this project")));
+        };
+        if item.kind == "folder" {
+            let mut at = parent.map(str::to_string);
+            while let Some(p) = at {
+                if p == id {
+                    return Err(StoreError::Invalid("a folder cannot go inside itself".into()));
+                }
+                at = tree.iter().find(|i| i.id == p).and_then(|i| i.parent.clone());
+            }
+        }
+        let mut siblings: Vec<&TreeItem> = tree.iter().filter(|i| i.parent.as_deref() == parent && i.id != id).collect();
+        siblings.insert(index.min(siblings.len()), item);
+        let tx = self.conn.unchecked_transaction()?;
+        for (i, it) in siblings.iter().enumerate() {
+            let pos = (i + 1) as f64;
+            if it.kind == "folder" {
+                tx.execute("UPDATE containers SET pos = ?2, parent_id = ?3 WHERE id = ?1", params![it.id, pos, parent])?;
+            } else {
+                tx.execute("UPDATE documents SET pos = ?2, container_id = ?3 WHERE id = ?1", params![it.id, pos, parent])?;
+            }
+        }
+        tx.commit()?;
+        self.mark_unsaved()
     }
 
     /// Add an empty document (for multi-document projects; no UI yet).
@@ -585,9 +725,9 @@ impl Store {
         Ok(())
     }
 
-    /// The project's default document (the one the editor shows today).
+    /// The current document (the one the editor shows).
     pub fn load(&self) -> Result<Document> {
-        self.load_document(&self.default_document()?)
+        self.load_document(&self.current_document()?)
     }
 
     pub fn load_document(&self, document_id: &str) -> Result<Document> {
@@ -606,7 +746,13 @@ impl Store {
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        Ok(Document { title: self.meta("title")?.unwrap_or_default(), version: self.version()?, blocks })
+        // The document's own title (an episode's); the default document's is the project's.
+        let title: Option<String> = self.conn.query_row("SELECT title FROM documents WHERE id = ?1", [document_id], |r| r.get(0)).optional()?;
+        let title = match title {
+            Some(t) if !t.is_empty() => t,
+            _ => self.meta("title")?.unwrap_or_default(),
+        };
+        Ok(Document { title, version: self.version()?, blocks })
     }
 
     /// Replace the whole document. Used only to seed a new project from an
@@ -629,6 +775,11 @@ impl Store {
     }
 
     pub fn apply(&mut self, batch: &Batch) -> Result<Ack> {
+        // A batch without a document edits the current one.
+        let current_doc = match &batch.document_id {
+            Some(_) => None,
+            None => Some(self.current_document()?),
+        };
         let tx = self.conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         if let Some(v) = tx.query_row("SELECT version FROM oplog WHERE tx_id = ?1", [&batch.tx_id], |r| r.get::<_, i64>(0)).optional()? {
             return Ok(Ack { version: v as u64, duplicate: true });
@@ -639,7 +790,7 @@ impl Store {
         }
         let doc = match &batch.document_id {
             Some(d) => d.clone(),
-            None => tx.query_row("SELECT value FROM meta WHERE key = 'default_document'", [], |r| r.get::<_, String>(0))?,
+            None => current_doc.unwrap_or_default(),
         };
         if tx.query_row("SELECT 1 FROM documents WHERE id = ?1", [&doc], |_| Ok(())).optional()?.is_none() {
             return Err(StoreError::Invalid(format!("unknown document {doc}")));
@@ -657,10 +808,12 @@ impl Store {
         Ok(Ack { version: next, duplicate: false })
     }
 
+    /// The current document's cards.
     pub fn beats(&self) -> Result<Vec<Beat>> {
-        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos FROM beats ORDER BY pos")?;
+        let doc = self.current_document()?;
+        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos FROM beats WHERE document_id = ?1 ORDER BY pos")?;
         let beats = stmt
-            .query_map([], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)? }))?
+            .query_map([&doc], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(beats)
     }
@@ -669,8 +822,8 @@ impl Store {
     /// settings change, they count as unsaved work until the next save.
     pub fn put_beat(&self, beat: &Beat) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, ?5, (SELECT value FROM meta WHERE key = 'default_document'))",
-            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos],
+            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id) VALUES (?1, ?2, ?3, ?4, ?5, COALESCE((SELECT document_id FROM beats WHERE id = ?1), ?6))",
+            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos, self.current_document()?],
         )?;
         self.mark_unsaved()
     }

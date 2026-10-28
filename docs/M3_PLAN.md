@@ -34,6 +34,14 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
    - A project tree of containers and documents (in the schema since v2): create, rename, move and open episodes. The scene list, board and exports follow the open document.
    - One shared bible per project (step 7), with facts scoped to a season or episode.
    - Fixture: a nested multi-episode project with aliases, shared facts and its own chronology (ACCEPTANCE's fixture list), grown as later steps add data.
+   - **Built 2026-10-28:**
+     - File > Episodes and Documents… (Ctrl/Cmd+Shift+O): the project's tree of folders (a series, a season) and documents. Add an episode or a folder, rename (F2), move up or down (Alt+Up/Down), move into a folder or to the top level, open (Enter). A folder is never offered as a place inside itself, and the core refuses it too.
+     - One document is current; the store keeps which one with the project, so reopening lands on the episode that was open. The editor, scene list, board, scene numbers, revisions, locked pages, title page, headers and footers, page size and every export follow it. Opening another document saves first; its planning history starts fresh.
+     - A new episode starts like a new project, with one empty scene heading. Cards belong to the document they were made in.
+     - The status bar shows "Project › Episode" for any document but the project's first; exports are named after the project and the episode.
+     - No schema change: folders and documents have been in the schema since v2.
+     - Not yet: deleting an episode or folder (it needs a safe, undoable design); the bible across episodes (step 7).
+     - Tests: core (a season with two episodes; batches without a document edit the current one; cards and numbers per document; the pilot untouched; moves, the folder cycle refused, renames; kept through a save); e2e "Episodes and series" on both drivers (add a folder and an episode in the dialog, open it, write and add a card, back to the pilot unchanged, rename, move to the top level, reopen on the last open episode).
 3. **Tabbed navigator: Scenes and Characters** (ROADMAP item 10).
    - Scenes tab: number, heading, page, length in eighths (from the core page map), logline/summary from the linked item, colour label (decision C), characters in the scene. Filter and search; jump to the scene; scroll sync kept. Scope: this episode or the whole project.
    - Characters tab: from cues until step 7 links them to bible entries: lines and words of dialogue, scenes, first appearance, jump to each, across episodes. Dual dialogue counts both speakers once each.

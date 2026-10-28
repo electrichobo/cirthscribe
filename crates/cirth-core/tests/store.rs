@@ -494,6 +494,79 @@ fn planning_commands_check_their_base_undo_exactly_and_never_touch_the_script() 
 }
 
 #[test]
+fn series_tree_folders_and_episodes_each_with_their_own_script_cards_and_numbers() {
+    use cirth_core::model::{Beat, Block, BlockKind};
+    use cirth_core::ops::{Batch, Op};
+    let d = tmpdir("series");
+    let work = d.join("w.db");
+    let pkg = d.join("series.cirth");
+    let (pilot, season, ep1, ep2);
+    {
+        let mut s = Store::open(&work).unwrap();
+        s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+        s.set_title("The Tide Ledger").unwrap();
+        pilot = s.default_document().unwrap();
+        assert_eq!(s.current_document().unwrap(), pilot, "the default document is current at first");
+        let pilot_blocks = serde_json::to_string(&s.load().unwrap().blocks).unwrap();
+
+        // A season folder with two episodes.
+        season = s.create_folder("Season 1", None).unwrap();
+        ep1 = s.create_episode("Episode 1: Low Water", Some(&season)).unwrap();
+        ep2 = s.create_episode("Episode 2: Spring Tide", Some(&season)).unwrap();
+        let tree = s.project_tree().unwrap();
+        let titles: Vec<(&str, Option<&str>)> = tree.iter().map(|i| (i.title.as_str(), i.parent.as_deref())).collect();
+        assert_eq!(titles, vec![("The Tide Ledger", None), ("Season 1", None), ("Episode 1: Low Water", Some(season.as_str())), ("Episode 2: Spring Tide", Some(season.as_str()))]);
+
+        // Open episode 1: edits, cards and numbers are its own.
+        s.set_current_document(&ep1).unwrap();
+        let ep1_doc = s.load().unwrap();
+        assert_eq!(ep1_doc.title, "Episode 1: Low Water");
+        assert_eq!(ep1_doc.blocks.len(), 1, "a new episode starts with one empty scene heading");
+        assert_eq!(ep1_doc.blocks[0].kind, BlockKind::Heading);
+        let base = s.version().unwrap();
+        let line = Block::new(BlockKind::Action, "The harbour empties.");
+        s.apply(&Batch { tx_id: cirth_core::model::new_id(), base_version: base, document_id: None, ops: vec![Op::Put { block: line.clone(), after: Some(ep1_doc.blocks[0].id.clone()) }] }).unwrap();
+        assert_eq!(s.load().unwrap().blocks.len(), 2, "a batch without a document edits the current one");
+        let card = Beat { id: "ep1-card".into(), logline: "Low water".into(), summary: String::new(), scene_id: ep1_doc.blocks[0].scene_id.clone(), pos: 1.0 };
+        s.put_beat(&card).unwrap();
+        assert_eq!(s.beats().unwrap(), vec![card.clone()], "the board shows this episode's cards only");
+        s.lock_scene_numbers(&ep1).unwrap();
+        assert_eq!(s.scene_numbers(&ep1).unwrap().len(), 1);
+        assert!(s.scene_numbers(&pilot).unwrap().is_empty(), "numbers are per document");
+
+        // The pilot is untouched.
+        s.set_current_document(&pilot).unwrap();
+        assert_eq!(serde_json::to_string(&s.load().unwrap().blocks).unwrap(), pilot_blocks, "the pilot's script is untouched");
+        assert!(s.beats().unwrap().iter().all(|b| b.id != "ep1-card"), "episode cards stay with the episode");
+
+        // Move episode 2 first in the season, then the pilot into the season; a folder never into itself.
+        s.move_item(&ep2, Some(&season), 0).unwrap();
+        s.move_item(&pilot, Some(&season), 0).unwrap();
+        let order: Vec<String> = s.project_tree().unwrap().into_iter().filter(|i| i.parent.as_deref() == Some(season.as_str())).map(|i| i.title).collect();
+        assert_eq!(order, vec!["The Tide Ledger", "Episode 2: Spring Tide", "Episode 1: Low Water"]);
+        let inner = s.create_folder("Flashbacks", Some(&season)).unwrap();
+        assert!(matches!(s.move_item(&season, Some(&inner), 0), Err(StoreError::Invalid(_))), "no folder inside its own folder");
+        assert!(matches!(s.move_item(&ep1, Some("no-such-folder"), 0), Err(StoreError::Invalid(_))));
+
+        // Renames are labels: ids stay; the default document's title is the project's.
+        s.rename_item(&ep2, "Episode 2: Neap Tide").unwrap();
+        s.rename_item(&season, "Series One").unwrap();
+        s.rename_item(&pilot, "Tide Ledger (Pilot)").unwrap();
+        assert!(matches!(s.rename_item(&ep1, "  "), Err(StoreError::Invalid(_))));
+        s.set_current_document(&ep1).unwrap();
+        s.save_package(&pkg).unwrap();
+    }
+    cirth_core::store::remove_store_files(&work).unwrap();
+    let s = Store::open_package(&pkg, &work, None).unwrap().store;
+    assert_eq!(s.current_document().unwrap(), ep1, "the open episode is kept with the project");
+    assert_eq!(s.load().unwrap().blocks.len(), 2);
+    let titles: Vec<String> = s.project_tree().unwrap().into_iter().map(|i| i.title).collect();
+    assert!(titles.contains(&"Episode 2: Neap Tide".to_string()) && titles.contains(&"Series One".to_string()) && titles.contains(&"Tide Ledger (Pilot)".to_string()), "{titles:?}");
+    assert_eq!(s.load_document(&pilot).unwrap().title, "Tide Ledger (Pilot)");
+    assert_eq!(s.load_document(&ep2).unwrap().title, "Episode 2: Neap Tide");
+}
+
+#[test]
 fn scene_numbers_lock_keep_through_edits_take_letters_and_omit() {
     let d = tmpdir("scenenumbers");
     let work = d.join("w.db");

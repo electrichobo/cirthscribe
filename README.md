@@ -99,7 +99,8 @@ First, from the owner's notes on the current build:
 - [x] Remappable keyboard shortcuts (Help > Keyboard Shortcuts…), with conflicts handled and Reset all
 
 
-- [ ] Episodes and series sharing one story bible
+- [x] Episodes and series: folders for seasons, any number of episodes per project, each with its own script, scene list, cards and exports (File > Episodes and Documents…)
+- [ ] One story bible shared by every episode
 - [ ] Tabbed navigator: scenes (length, summary, characters), characters, notes, outline
 - [ ] Outline editor, and an overview map of the whole script
 - [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
