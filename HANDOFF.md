@@ -14,7 +14,8 @@ M2, production screenplay output. Steps 1–8 are built; step 9 (compatibility m
   - settings are not moved while More is open;
   - the test reports where focus went.
   CI on b94b0de still failed, but with a diagnosis: "from select#view-mode, focus now on button#view-menu-btn" (the browser's default Shift+Tab; the popover's bubbling keydown never cancelled it on WebKitGTK).
-  Second fix: Tab is handled in the capture phase on the document (Tab, ISO_Left_Tab, keyCode 9), plus a focus-in safety net. It passes on Windows under both drivers (50/50, 49/49); Linux needs another CI run.
+  Second fix (c49ae5a): Tab handled in the capture phase on the document (Tab, ISO_Left_Tab, keyCode 9), plus a focus-in safety net. **CI on c49ae5a: the More test passes on Linux**; the run then failed on "Narrow script column: Tab stays in the floating scene list", the same bubbling-handler pattern in layout-mode.ts.
+  Third fix: the floating panels' Tab trap moved to a capture-phase document handler too. Passes on Windows under both drivers; Linux needs another CI run.
 - Mac recheck of pack v2: **deferred by the owner** (recorded in docs/COMPATIBILITY.md).
 - Checks run on Windows 11: `npm run test:contract` (4), `npm run e2e:cdp` (50/50), `npm run e2e:webdriver` (49/49, 1 skipped: IME). CI on 65462b7: macOS and Windows jobs green (including the new PDF, DOCX and RTF tests); Linux failed on the same More Shift+Tab test (before this fix).
 - Not verified:
@@ -30,6 +31,6 @@ None once the review commit is made.
 
 ## Next Immediate Step
 
-1. Ask the owner to push. Then read the CI result through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and the failed job's annotations under `/check-runs/<job id>/annotations`.
+1. Ask the owner to push the floating-panel fix. Then read the CI result through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and the failed job's annotations under `/check-runs/<job id>/annotations`.
 2. If Linux still fails, the new assertion message names where focus went: fix from that.
 3. Ask the owner for decisions A and B (docs/m2/EXIT_REVIEW.md section 5).

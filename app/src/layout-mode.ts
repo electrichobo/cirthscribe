@@ -75,20 +75,33 @@ export function createLayoutMode(opts: { zoom: () => number; panes: HTMLElement;
         e.stopPropagation();
         closeFloats();
         opts.focusScript();
-      } else if (e.key === "Tab") {
-        // Tab cycles inside the floating panel: leaving by Tab would drop
-        // focus into the script, where Tab changes the block type (macOS
-        // check N19). Escape is the way out.
-        e.preventDefault();
-        const stops = [...opts.panels[side].querySelectorAll<HTMLElement>("button, input, textarea, select, [tabindex]")].filter(
-          (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0,
-        );
-        if (!stops.length) return;
-        const at = stops.indexOf(document.activeElement as HTMLElement);
-        stops[(at + (e.shiftKey ? stops.length - 1 : 1) + stops.length) % stops.length].focus();
       }
     });
   }
+  // Tab cycles inside a floating panel: leaving by Tab would drop focus into
+  // the script, where Tab changes the block type (macOS check N19). Escape is
+  // the way out. Handled in the capture phase on the document, as in the More
+  // popover: on Linux (WebKitGTK) a bubbling listener on the panel does not
+  // reliably cancel the browser's own Tab, and GTK may name the key ISO_Left_Tab.
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (mode !== "overlay" || e.defaultPrevented) return;
+      if (!(e.key === "Tab" || e.key === "ISO_Left_Tab" || e.keyCode === 9)) return;
+      const side = (["nav", "board"] as Side[]).find((s) => floating[s] && opts.panels[s].contains(document.activeElement));
+      if (!side) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const stops = [...opts.panels[side].querySelectorAll<HTMLElement>("button, input, textarea, select, [tabindex]")].filter(
+        (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0,
+      );
+      if (!stops.length) return;
+      const back = e.shiftKey || e.key === "ISO_Left_Tab";
+      const at = stops.indexOf(document.activeElement as HTMLElement);
+      stops[(at + (back ? stops.length - 1 : 1) + stops.length) % stops.length].focus();
+    },
+    true,
+  );
   opts.panes.addEventListener("focusin", (e) => {
     if (mode === "overlay" && !opts.panels.nav.contains(e.target as Node) && !opts.panels.board.contains(e.target as Node)) closeFloats();
   });
