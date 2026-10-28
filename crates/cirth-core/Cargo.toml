@@ -17,6 +17,9 @@ unicode-segmentation = "1"
 printpdf = "0.7"
 spellbook = "=0.4.2"
 quick-xml = "0.42.0"
+# DOCX packages (owner-approved, decision B). Deflate only, through the
+# flate2 already in the tree; no other compression or encryption code.
+zip = { version = "9.1.3", default-features = false, features = ["deflate-flate2"] }
 
 [[bin]]
 name = "cirth-cli"

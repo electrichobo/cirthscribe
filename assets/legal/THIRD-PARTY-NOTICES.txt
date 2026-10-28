@@ -348,8 +348,10 @@ declared license; the standard text of that license applies.
     text: [T118] [T60] [T63]
 - new_debug_unreachable 1.0.6: MIT (https://github.com/mbrubeck/rust-debug-unreachable)
     text: [T119]
+- nix 0.31.3: MIT (https://github.com/nix-rust/nix)
+    text: [T120]
 - num-conv 0.2.2: MIT OR Apache-2.0 (https://github.com/jhpratt/num-conv)
-    text: [T4] [T120]
+    text: [T4] [T121]
 - num-traits 0.2.19: MIT OR Apache-2.0 (https://github.com/rust-num/num-traits)
     text: [T18] [T23]
 - objc2 0.6.5: MIT (https://github.com/madsmtm/objc2)
@@ -368,9 +370,9 @@ declared license; the standard text of that license applies.
 - once_cell 1.21.4: MIT OR Apache-2.0 (https://github.com/matklad/once_cell)
     text: [T18] [T10]
 - option-ext 0.2.0: MPL-2.0 (https://github.com/soc/option-ext.git)
-    text: [T121]
-- orderedmap 2.1.1: MIT (https://github.com/marijnh/orderedmap.git)
     text: [T122]
+- orderedmap 2.1.1: MIT (https://github.com/marijnh/orderedmap.git)
+    text: [T123]
 - owned_ttf_parser 0.19.0: Apache-2.0 (https://github.com/alexheretic/owned-ttf-parser)
     text: [T4]
 - pango 0.18.3: MIT (https://github.com/gtk-rs/gtk-rs-core)
@@ -384,59 +386,59 @@ declared license; the standard text of that license applies.
 - percent-encoding 2.3.2: MIT OR Apache-2.0 (https://github.com/servo/rust-url/)
     text: [T18] [T93]
 - phf 0.13.1: MIT (https://github.com/rust-phf/rust-phf)
-    text: [T123]
+    text: [T124]
 - phf_generator 0.13.1: MIT (https://github.com/rust-phf/rust-phf)
-    text: [T123]
+    text: [T124]
 - phf_macros 0.13.1: MIT (https://github.com/rust-phf/rust-phf)
-    text: [T123]
+    text: [T124]
 - phf_shared 0.13.1: MIT (https://github.com/rust-phf/rust-phf)
-    text: [T123]
+    text: [T124]
 - pin-project-lite 0.2.17: Apache-2.0 OR MIT (https://github.com/taiki-e/pin-project-lite)
     text: [T4] [T10]
 - plist 1.10.3: MIT (https://github.com/ebarnard/rust-plist/)
-    text: [T124]
+    text: [T125]
 - png 0.18.1: MIT OR Apache-2.0 (https://github.com/image-rs/image-png)
-    text: [T18] [T125]
+    text: [T18] [T126]
 - pom 3.4.0: MIT (https://github.com/J-F-Liu/pom.git)
     text: [T108]
 - potential_utf 0.1.6: Unicode-3.0 (https://github.com/unicode-org/icu4x)
     text: [T91]
 - powerfmt 0.2.1: MIT OR Apache-2.0 (https://github.com/jhpratt/powerfmt)
-    text: [T126] [T127]
+    text: [T127] [T128]
 - precomputed-hash 0.1.1: MIT (https://github.com/emilio/precomputed-hash)
-    text: [T128]
-- printpdf 0.7.0: MIT (https://github.com/fschutt/printpdf)
     text: [T129]
+- printpdf 0.7.0: MIT (https://github.com/fschutt/printpdf)
+    text: [T130]
 - proc-macro-crate 1.3.1: MIT OR Apache-2.0 (https://github.com/bkchr/proc-macro-crate)
     text: [T9] [T10]
 - proc-macro-crate 2.0.2: MIT OR Apache-2.0 (https://github.com/bkchr/proc-macro-crate)
     text: [T9] [T10]
 - proc-macro-error 1.0.4: MIT OR Apache-2.0 (https://gitlab.com/CreepySkeleton/proc-macro-error)
-    text: [T130] [T131]
+    text: [T131] [T132]
 - proc-macro-error-attr 1.0.4: MIT OR Apache-2.0 (https://gitlab.com/CreepySkeleton/proc-macro-error)
-    text: [T130] [T131]
+    text: [T131] [T132]
 - proc-macro2 1.0.107: MIT OR Apache-2.0 (https://github.com/dtolnay/proc-macro2)
     text: [T15] [T10]
 - prosemirror-commands 1.7.2: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-commands.git)
-    text: [T132]
-- prosemirror-history 1.5.1: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-history.git)
-    text: [T132]
-- prosemirror-keymap 1.2.3: MIT (git://github.com/prosemirror/prosemirror-keymap.git)
-    text: [T132]
-- prosemirror-model 1.25.12: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-model.git)
-    text: [T132]
-- prosemirror-state 1.4.4: MIT (git://github.com/prosemirror/prosemirror-state.git)
-    text: [T132]
-- prosemirror-transform 1.12.4: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-transform.git)
-    text: [T132]
-- prosemirror-view 1.42.8: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-view.git)
-    text: [T132]
-- quick-xml 0.42.0: MIT (https://github.com/tafia/quick-xml)
     text: [T133]
+- prosemirror-history 1.5.1: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-history.git)
+    text: [T133]
+- prosemirror-keymap 1.2.3: MIT (git://github.com/prosemirror/prosemirror-keymap.git)
+    text: [T133]
+- prosemirror-model 1.25.12: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-model.git)
+    text: [T133]
+- prosemirror-state 1.4.4: MIT (git://github.com/prosemirror/prosemirror-state.git)
+    text: [T133]
+- prosemirror-transform 1.12.4: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-transform.git)
+    text: [T133]
+- prosemirror-view 1.42.8: MIT (https://code.haverbeke.berlin/prosemirror/prosemirror-view.git)
+    text: [T133]
+- quick-xml 0.42.0: MIT (https://github.com/tafia/quick-xml)
+    text: [T134]
 - quote 1.0.47: MIT OR Apache-2.0 (https://github.com/dtolnay/quote)
     text: [T15] [T10]
 - raw-window-handle 0.6.2: MIT OR Apache-2.0 OR Zlib (https://github.com/rust-windowing/raw-window-handle)
-    text: [T4] [T134] [T135]
+    text: [T4] [T135] [T136]
 - ref-cast 1.0.27: MIT OR Apache-2.0 (https://github.com/dtolnay/ref-cast)
     text: [T15] [T10]
 - ref-cast-impl 1.0.27: MIT OR Apache-2.0 (https://github.com/dtolnay/ref-cast)
@@ -448,25 +450,25 @@ declared license; the standard text of that license applies.
 - regex-syntax 0.8.11: MIT OR Apache-2.0 (https://github.com/rust-lang/regex)
     text: [T18] [T23]
 - rfd 0.16.1: MIT (https://github.com/PolyMeilex/rfd)
-    text: [T136]
-- rope-sequence 1.3.4: MIT (https://github.com/marijnh/rope-sequence.git)
     text: [T137]
+- rope-sequence 1.3.4: MIT (https://github.com/marijnh/rope-sequence.git)
+    text: [T138]
 - rusqlite 0.41.0: MIT (https://github.com/rusqlite/rusqlite)
     text: [T106]
 - rustc-hash 2.1.3: Apache-2.0 OR MIT (https://github.com/rust-lang/rustc-hash)
     text: [T15] [T10]
 - same-file 1.0.6: Unlicense/MIT (https://github.com/BurntSushi/same-file)
-    text: [T11] [T138] [T13]
+    text: [T11] [T139] [T13]
 - schemars 0.8.22: MIT (https://github.com/GREsau/schemars)
-    text: [T139]
+    text: [T140]
 - schemars 0.9.0: MIT (https://github.com/GREsau/schemars)
-    text: [T139]
+    text: [T140]
 - schemars 1.2.3: MIT (https://github.com/GREsau/schemars)
-    text: [T139]
+    text: [T140]
 - schemars_derive 0.8.22: MIT (https://github.com/GREsau/schemars)
-    text: [T139]
+    text: [T140]
 - scopeguard 1.2.0: MIT OR Apache-2.0 (https://github.com/bluss/scopeguard)
-    text: [T18] [T140]
+    text: [T18] [T141]
 - selectors 0.38.0: MPL-2.0 (https://github.com/servo/stylo)
     copyright: The Servo Project Developers
 - semver 1.0.28: MIT OR Apache-2.0 (https://github.com/dtolnay/semver)
@@ -484,37 +486,37 @@ declared license; the standard text of that license applies.
 - serde_repr 0.1.21: MIT OR Apache-2.0 (https://github.com/dtolnay/serde-repr)
     text: [T15] [T10]
 - serde_spanned 0.6.9: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T40] [T141]
+    text: [T40] [T142]
 - serde_spanned 1.1.2: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T142] [T141]
+    text: [T143] [T142]
 - serde_with 3.24.0: MIT OR Apache-2.0 (https://github.com/jonasbb/serde_with/)
-    text: [T18] [T143]
+    text: [T18] [T144]
 - serde_with_macros 3.24.0: MIT OR Apache-2.0 (https://github.com/jonasbb/serde_with/)
-    text: [T18] [T143]
+    text: [T18] [T144]
 - serde-untagged 0.1.9: MIT OR Apache-2.0 (https://github.com/dtolnay/serde-untagged)
     text: [T15] [T10]
 - serialize-to-javascript 0.1.2: MIT OR Apache-2.0 (https://github.com/chippers/serialize-to-javascript)
-    text: [T60] [T144]
+    text: [T60] [T145]
 - serialize-to-javascript-impl 0.1.2: MIT OR Apache-2.0 (https://github.com/chippers/serialize-to-javascript)
-    text: [T60] [T144]
+    text: [T60] [T145]
 - servo_arc 0.4.3: MIT OR Apache-2.0 (https://github.com/servo/stylo)
     text: [T18] [T10]
 - sha2 0.10.9: MIT OR Apache-2.0 (https://github.com/RustCrypto/hashes)
-    text: [T24] [T145]
+    text: [T24] [T146]
 - simd-adler32 0.3.10: MIT (https://github.com/mcountryman/simd-adler32)
-    text: [T146]
+    text: [T147]
 - simdutf8 0.1.5: MIT OR Apache-2.0 (https://github.com/rusticstuff/simdutf8)
     text: [T4] [T92]
 - siphasher 1.0.4: MIT OR Apache-2.0 (https://github.com/jedisct1/rust-siphash)
-    text: [T147] [T60] [T17]
+    text: [T148] [T60] [T17]
 - slab 0.4.12: MIT (https://github.com/tokio-rs/slab)
-    text: [T148]
+    text: [T149]
 - smallvec 1.16.4: MIT OR Apache-2.0 (https://github.com/servo/rust-smallvec)
-    text: [T18] [T149]
+    text: [T18] [T150]
 - socket2 0.6.5: MIT OR Apache-2.0 (https://github.com/rust-lang/socket2)
     text: [T18] [T32]
 - softbuffer 0.4.8: MIT OR Apache-2.0 (https://github.com/rust-windowing/softbuffer)
-    text: [T150] [T151]
+    text: [T151] [T152]
 - soup3 0.5.0: MIT (https://gitlab.gnome.org/World/Rust/soup3-rs)
     text: [T98]
 - soup3-sys 0.5.0: MIT (https://gitlab.gnome.org/World/Rust/soup3-rs)
@@ -522,13 +524,13 @@ declared license; the standard text of that license applies.
 - spellbook 0.4.2: MPL-2.0 (https://github.com/helix-editor/spellbook)
     text: [T45]
 - stable_deref_trait 1.2.1: MIT OR Apache-2.0 (https://github.com/storyyeller/stable_deref_trait)
-    text: [T18] [T152]
+    text: [T18] [T153]
 - string_cache 0.9.0: MIT OR Apache-2.0 (https://github.com/servo/string-cache)
     text: [T18] [T37]
 - strsim 0.11.1: MIT (https://github.com/rapidfuzz/strsim-rs)
-    text: [T153]
+    text: [T154]
 - swift-rs 1.0.9: MIT OR Apache-2.0 (https://github.com/Brendonovich/swift-rs)
-    text: [T154] [T155]
+    text: [T155] [T156]
 - syn 1.0.109: MIT OR Apache-2.0 (https://github.com/dtolnay/syn)
     text: [T18] [T10]
 - syn 2.0.119: MIT OR Apache-2.0 (https://github.com/dtolnay/syn)
@@ -536,9 +538,9 @@ declared license; the standard text of that license applies.
 - syn 3.0.9: MIT OR Apache-2.0 (https://github.com/dtolnay/syn)
     text: [T15] [T10]
 - synstructure 0.14.0: MIT (https://github.com/mystor/synstructure)
-    text: [T156]
+    text: [T157]
 - tao 0.37.2: Apache-2.0 (https://github.com/tauri-apps/tao)
-    text: [T40] [T157]
+    text: [T40] [T158]
 - tauri 2.12.5: Apache-2.0 OR MIT (https://github.com/tauri-apps/tauri)
     text: [T4] [T5]
 - tauri-codegen 2.7.4: Apache-2.0 OR MIT (https://github.com/tauri-apps/tauri)
@@ -556,7 +558,7 @@ declared license; the standard text of that license applies.
 - tauri-utils 2.10.2: Apache-2.0 OR MIT (https://github.com/tauri-apps/tauri)
     text: [T4] [T5]
 - tendril 0.5.1: MIT OR Apache-2.0 (https://github.com/servo/html5ever)
-    text: [T18] [T158]
+    text: [T18] [T159]
 - thiserror 1.0.69: MIT OR Apache-2.0 (https://github.com/dtolnay/thiserror)
     text: [T15] [T10]
 - thiserror 2.0.21: MIT OR Apache-2.0 (https://github.com/dtolnay/thiserror)
@@ -566,118 +568,120 @@ declared license; the standard text of that license applies.
 - thiserror-impl 2.0.21: MIT OR Apache-2.0 (https://github.com/dtolnay/thiserror)
     text: [T15] [T10]
 - time 0.3.55: MIT OR Apache-2.0 (https://github.com/time-rs/time)
-    text: [T4] [T159]
+    text: [T4] [T160]
 - time-core 0.1.9: MIT OR Apache-2.0 (https://github.com/time-rs/time)
-    text: [T4] [T159]
+    text: [T4] [T160]
 - time-macros 0.2.32: MIT OR Apache-2.0 (https://github.com/time-rs/time)
-    text: [T4] [T159]
+    text: [T4] [T160]
 - tinystr 0.8.5: Unicode-3.0 (https://github.com/unicode-org/icu4x)
     text: [T91]
 - tinyvec 1.13.3: Zlib OR Apache-2.0 OR MIT (https://github.com/Lokathor/tinyvec)
-    text: [T60] [T46] [T160]
+    text: [T60] [T46] [T161]
 - tokio 1.54.1: MIT (https://github.com/tokio-rs/tokio)
-    text: [T161]
+    text: [T162]
 - toml 1.1.8+spec-1.1.0: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T142] [T141]
+    text: [T143] [T142]
 - toml_datetime 0.6.3: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
     text: [T18] [T32]
 - toml_datetime 1.1.2+spec-1.1.0: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T142] [T141]
+    text: [T143] [T142]
 - toml_edit 0.19.15: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T40] [T141]
+    text: [T40] [T142]
 - toml_edit 0.20.2: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T40] [T141]
+    text: [T40] [T142]
 - toml_parser 1.1.5+spec-1.1.0: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T142] [T141]
+    text: [T143] [T142]
 - toml_writer 1.1.3+spec-1.1.0: MIT OR Apache-2.0 (https://github.com/toml-rs/toml)
-    text: [T142] [T141]
+    text: [T143] [T142]
 - tracing 0.1.44: MIT (https://github.com/tokio-rs/tracing)
-    text: [T162]
+    text: [T163]
 - tracing-core 0.1.36: MIT (https://github.com/tokio-rs/tracing)
-    text: [T162]
+    text: [T163]
 - tray-icon 0.25.1: MIT OR Apache-2.0 (https://github.com/tauri-apps/tray-icon)
-    text: [T18] [T116] [T163]
+    text: [T18] [T116] [T164]
 - ttf-parser 0.19.2: MIT OR Apache-2.0 (https://github.com/RazrFalcon/ttf-parser)
-    text: [T18] [T164]
+    text: [T18] [T165]
+- typed-path 0.13.0: MIT OR Apache-2.0 (https://github.com/chipsenkbeil/typed-path)
+    text: [T15] [T10]
 - typeid 1.0.3: MIT OR Apache-2.0 (https://github.com/dtolnay/typeid)
     text: [T15] [T10]
 - typenum 1.20.1: MIT OR Apache-2.0 (https://github.com/paholg/typenum)
-    text: [T165] [T166] [T167]
+    text: [T166] [T167] [T168]
 - unicode-ident 1.0.27: (MIT OR Apache-2.0) AND Unicode-3.0 (https://github.com/dtolnay/unicode-ident)
-    text: [T15] [T10] [T168]
+    text: [T15] [T10] [T169]
 - unicode-segmentation 1.13.3: MIT OR Apache-2.0 (https://github.com/unicode-rs/unicode-segmentation)
-    text: [T169] [T18] [T83]
+    text: [T170] [T18] [T83]
 - unicode-width 0.2.2: MIT OR Apache-2.0 (https://github.com/unicode-rs/unicode-width)
-    text: [T169] [T18] [T83]
+    text: [T170] [T18] [T83]
 - url 2.5.8: MIT OR Apache-2.0 (https://github.com/servo/rust-url)
     text: [T18] [T93]
 - urlpattern 0.6.0: MIT (https://github.com/denoland/rust-urlpattern)
-    text: [T170]
+    text: [T171]
 - utf8_iter 1.0.4: Apache-2.0 OR MIT (https://github.com/hsivonen/utf8_iter)
-    text: [T171] [T60] [T63]
+    text: [T172] [T60] [T63]
 - uuid 1.29.0: Apache-2.0 OR MIT (https://github.com/uuid-rs/uuid)
-    text: [T18] [T172]
+    text: [T18] [T173]
 - w3c-keyname 2.2.8: MIT (https://github.com/marijnh/w3c-keyname.git)
-    text: [T122]
+    text: [T123]
 - walkdir 2.5.0: Unlicense/MIT (https://github.com/BurntSushi/walkdir)
     text: [T11] [T12] [T13]
 - web_atoms 0.2.6: MIT OR Apache-2.0 (https://github.com/servo/html5ever)
     text: [T18] [T85]
 - web-time 1.1.0: MIT OR Apache-2.0 (https://github.com/daxpedda/web-time)
-    text: [T173] [T174]
+    text: [T174] [T175]
 - webkit2gtk 2.0.2: MIT (https://github.com/tauri-apps/webkit2gtk-rs)
-    text: [T175]
-- webkit2gtk-sys 2.0.2: MIT (https://github.com/tauri-apps/webkit2gtk-rs)
     text: [T176]
+- webkit2gtk-sys 2.0.2: MIT (https://github.com/tauri-apps/webkit2gtk-rs)
+    text: [T177]
 - webview2-com 0.39.1: MIT (https://github.com/wravery/webview2-rs)
 - webview2-com-macros 0.8.1: MIT (https://github.com/wravery/webview2-rs)
 - webview2-com-sys 0.39.1: MIT (https://github.com/wravery/webview2-rs)
 - weezl 0.1.12: MIT OR Apache-2.0 (https://github.com/image-rs/weezl)
-    text: [T18] [T177]
+    text: [T18] [T178]
 - winapi-util 0.1.11: Unlicense OR MIT (https://github.com/BurntSushi/winapi-util)
-    text: [T11] [T138] [T13]
+    text: [T11] [T139] [T13]
 - window-vibrancy 0.8.1: Apache-2.0 OR MIT (https://github.com/tauri-apps/tauri-plugin-vibrancy)
-    text: [T18] [T178] [T179]
+    text: [T18] [T179] [T180]
 - windows 0.62.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows_x86_64_msvc 0.53.1: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-collections 0.3.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-core 0.62.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-future 0.3.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-implement 0.60.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-interface 0.59.3: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-link 0.2.1: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-numerics 0.3.1: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-result 0.4.1: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-strings 0.5.1: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-sys 0.60.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-sys 0.61.2: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-targets 0.53.5: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-threading 0.2.1: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - windows-version 0.1.7: MIT OR Apache-2.0 (https://github.com/microsoft/windows-rs)
-    text: [T180] [T181]
+    text: [T181] [T182]
 - winnow 0.5.40: MIT (https://github.com/winnow-rs/winnow)
-    text: [T182]
+    text: [T183]
 - winnow 1.0.4: MIT (https://github.com/winnow-rs/winnow)
-    text: [T182]
+    text: [T183]
 - writeable 0.6.4: Unicode-3.0 (https://github.com/unicode-org/icu4x)
     text: [T91]
 - wry 0.57.1: Apache-2.0 OR MIT (https://github.com/tauri-apps/wry)
-    text: [T18] [T183] [T184]
+    text: [T18] [T184] [T185]
 - x11 2.21.0: MIT (https://github.com/AltF02/x11-rs.git)
     text: [T10]
 - x11-dl 2.21.0: MIT (https://github.com/AltF02/x11-rs.git)
@@ -696,8 +700,10 @@ declared license; the standard text of that license applies.
     text: [T91]
 - zerovec-derive 0.11.7: Unicode-3.0 (https://github.com/unicode-org/icu4x)
     text: [T91]
+- zip 9.1.3: MIT (https://github.com/zip-rs/zip2)
+    text: [T186]
 - zlib-rs 0.6.8: Zlib (https://github.com/trifectatechfoundation/zlib-rs)
-    text: [T185]
+    text: [T187]
 - zmij 1.0.23: MIT (https://github.com/dtolnay/zmij)
     text: [T10]
 
@@ -8462,7 +8468,33 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T120] from num-conv 0.2.2: LICENSE-MIT
+[T120] from nix 0.31.3: LICENSE
+========================================================================
+
+The MIT License (MIT)
+
+Copyright (c) 2015 Carl Lerche + nix-rust Authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+========================================================================
+[T121] from num-conv 0.2.2: LICENSE-MIT
 ========================================================================
 
 Copyright (c) Jacob Pratt
@@ -8486,7 +8518,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T121] from option-ext 0.2.0: LICENSE.txt
+[T122] from option-ext 0.2.0: LICENSE.txt
 ========================================================================
 
 Mozilla Public License Version 2.0
@@ -8864,7 +8896,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
   defined by the Mozilla Public License, v. 2.0.
 
 ========================================================================
-[T122] from orderedmap 2.1.1: LICENSE
+[T123] from orderedmap 2.1.1: LICENSE
 ========================================================================
 
 Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
@@ -8888,7 +8920,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-[T123] from phf 0.13.1: LICENSE
+[T124] from phf 0.13.1: LICENSE
 ========================================================================
 
 The MIT License (MIT)
@@ -8913,7 +8945,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T124] from plist 1.10.3: LICENCE
+[T125] from plist 1.10.3: LICENCE
 ========================================================================
 
 Copyright (c) 2015 Edward Barnard
@@ -8937,7 +8969,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T125] from png 0.18.1: LICENSE-MIT
+[T126] from png 0.18.1: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2015 nwin
@@ -8967,7 +8999,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T126] from powerfmt 0.2.1: LICENSE-Apache
+[T127] from powerfmt 0.2.1: LICENSE-Apache
 ========================================================================
 
 Apache License
@@ -9173,7 +9205,7 @@ Apache License
    limitations under the License.
 
 ========================================================================
-[T127] from powerfmt 0.2.1: LICENSE-MIT
+[T128] from powerfmt 0.2.1: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2023 Jacob Pratt et al.
@@ -9197,7 +9229,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T128] from precomputed-hash 0.1.1: LICENSE
+[T129] from precomputed-hash 0.1.1: LICENSE
 ========================================================================
 
 MIT License
@@ -9223,7 +9255,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T129] from printpdf 0.7.0: LICENSE
+[T130] from printpdf 0.7.0: LICENSE
 ========================================================================
 
 MIT License
@@ -9249,7 +9281,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T130] from proc-macro-error 1.0.4: LICENSE-APACHE
+[T131] from proc-macro-error 1.0.4: LICENSE-APACHE
 ========================================================================
 
 Apache License
@@ -9455,7 +9487,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ========================================================================
-[T131] from proc-macro-error 1.0.4: LICENSE-MIT
+[T132] from proc-macro-error 1.0.4: LICENSE-MIT
 ========================================================================
 
 MIT License
@@ -9481,7 +9513,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T132] from prosemirror-commands 1.7.2: LICENSE
+[T133] from prosemirror-commands 1.7.2: LICENSE
 ========================================================================
 
 Copyright (C) 2015-2017 by Marijn Haverbeke <marijn@haverbeke.berlin> and others
@@ -9505,7 +9537,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-[T133] from quick-xml 0.42.0: LICENSE-MIT.md
+[T134] from quick-xml 0.42.0: LICENSE-MIT.md
 ========================================================================
 
 The MIT License (MIT)
@@ -9533,7 +9565,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-[T134] from raw-window-handle 0.6.2: LICENSE-MIT.md
+[T135] from raw-window-handle 0.6.2: LICENSE-MIT.md
 ========================================================================
 
 MIT License
@@ -9559,7 +9591,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T135] from raw-window-handle 0.6.2: LICENSE-ZLIB.md
+[T136] from raw-window-handle 0.6.2: LICENSE-ZLIB.md
 ========================================================================
 
 Copyright (c) 2020 Osspial
@@ -9575,7 +9607,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 
 ========================================================================
-[T136] from rfd 0.16.1: LICENSE
+[T137] from rfd 0.16.1: LICENSE
 ========================================================================
 
 MIT License
@@ -9601,7 +9633,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T137] from rope-sequence 1.3.4: LICENSE
+[T138] from rope-sequence 1.3.4: LICENSE
 ========================================================================
 
 Copyright (C) 2016 by Marijn Haverbeke <marijn@haverbeke.berlin>
@@ -9625,7 +9657,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-[T138] from same-file 1.0.6: LICENSE-MIT
+[T139] from same-file 1.0.6: LICENSE-MIT
 ========================================================================
 
 The MIT License (MIT)
@@ -9651,7 +9683,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-[T139] from schemars 0.8.22: LICENSE
+[T140] from schemars 0.8.22: LICENSE
 ========================================================================
 
 MIT License
@@ -9677,7 +9709,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T140] from scopeguard 1.2.0: LICENSE-MIT
+[T141] from scopeguard 1.2.0: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2016-2019 Ulrik Sverdrup "bluss" and scopeguard developers
@@ -9707,7 +9739,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T141] from serde_spanned 0.6.9: LICENSE-MIT
+[T142] from serde_spanned 0.6.9: LICENSE-MIT
 ========================================================================
 
 Copyright (c) Individual contributors
@@ -9731,7 +9763,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T142] from serde_spanned 1.1.2: LICENSE-APACHE
+[T143] from serde_spanned 1.1.2: LICENSE-APACHE
 ========================================================================
 
 Apache License
@@ -9937,7 +9969,7 @@ Apache License
    limitations under the License.
 
 ========================================================================
-[T143] from serde_with 3.24.0: LICENSE-MIT
+[T144] from serde_with 3.24.0: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2015
@@ -9967,7 +9999,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T144] from serialize-to-javascript 0.1.2: LICENSE-MIT
+[T145] from serialize-to-javascript 0.1.2: LICENSE-MIT
 ========================================================================
 
 MIT License
@@ -9993,7 +10025,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T145] from sha2 0.10.9: LICENSE-MIT
+[T146] from sha2 0.10.9: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2006-2009 Graydon Hoare
@@ -10025,7 +10057,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T146] from simd-adler32 0.3.10: LICENSE.md
+[T147] from simd-adler32 0.3.10: LICENSE.md
 ========================================================================
 
 MIT License
@@ -10051,7 +10083,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T147] from siphasher 1.0.4: COPYING
+[T148] from siphasher 1.0.4: COPYING
 ========================================================================
 
 Copyright 2012-2016 The Rust Project Developers.
@@ -10063,7 +10095,7 @@ http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 option.
 
 ========================================================================
-[T148] from slab 0.4.12: LICENSE
+[T149] from slab 0.4.12: LICENSE
 ========================================================================
 
 Copyright (c) 2019 Carl Lerche
@@ -10093,7 +10125,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T149] from smallvec 1.16.4: LICENSE-MIT
+[T150] from smallvec 1.16.4: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2018 The Servo Project Developers
@@ -10123,7 +10155,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T150] from softbuffer 0.4.8: LICENSE-APACHE
+[T151] from softbuffer 0.4.8: LICENSE-APACHE
 ========================================================================
 
 Apache License
@@ -10329,7 +10361,7 @@ Apache License
    limitations under the License.
 
 ========================================================================
-[T151] from softbuffer 0.4.8: LICENSE-MIT
+[T152] from softbuffer 0.4.8: LICENSE-MIT
 ========================================================================
 
 Copyright 2022 Kirill Chibisov
@@ -10353,7 +10385,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T152] from stable_deref_trait 1.2.1: LICENSE-MIT
+[T153] from stable_deref_trait 1.2.1: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2017 Robert Grosse
@@ -10383,7 +10415,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T153] from strsim 0.11.1: LICENSE
+[T154] from strsim 0.11.1: LICENSE
 ========================================================================
 
 The MIT License (MIT)
@@ -10411,7 +10443,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T154] from swift-rs 1.0.9: LICENSE-APACHE
+[T155] from swift-rs 1.0.9: LICENSE-APACHE
 ========================================================================
 
 Apache License
@@ -10617,7 +10649,7 @@ Apache License
    limitations under the License.
 
 ========================================================================
-[T155] from swift-rs 1.0.9: LICENSE-MIT
+[T156] from swift-rs 1.0.9: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2023 The swift-rs Developers
@@ -10641,7 +10673,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T156] from synstructure 0.14.0: LICENSE
+[T157] from synstructure 0.14.0: LICENSE
 ========================================================================
 
 Copyright 2016 Nika Layzell
@@ -10653,7 +10685,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T157] from tao 0.37.2: LICENSE.spdx
+[T158] from tao 0.37.2: LICENSE.spdx
 ========================================================================
 
 SPDXVersion: SPDX-2.1
@@ -10676,7 +10708,7 @@ PackageDownloadLocation: git+ssh://github.com/tauri-apps/tao.git
 Creator: Person: Daniel Thompson-Yvetot
 
 ========================================================================
-[T158] from tendril 0.5.1: LICENSE-MIT
+[T159] from tendril 0.5.1: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2015 Keegan McAllister
@@ -10706,7 +10738,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T159] from time 0.3.55: LICENSE-MIT
+[T160] from time 0.3.55: LICENSE-MIT
 ========================================================================
 
 Copyright (c) Jacob Pratt et al.
@@ -10730,7 +10762,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T160] from tinyvec 1.13.3: LICENSE-ZLIB.md
+[T161] from tinyvec 1.13.3: LICENSE-ZLIB.md
 ========================================================================
 
 Copyright (c) 2019 Daniel "Lokathor" Gee.
@@ -10746,7 +10778,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 
 ========================================================================
-[T161] from tokio 1.54.1: LICENSE
+[T162] from tokio 1.54.1: LICENSE
 ========================================================================
 
 MIT License
@@ -10772,7 +10804,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T162] from tracing 0.1.44: LICENSE
+[T163] from tracing 0.1.44: LICENSE
 ========================================================================
 
 Copyright (c) 2019 Tokio Contributors
@@ -10802,7 +10834,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T163] from tray-icon 0.25.1: LICENSE.spdx
+[T164] from tray-icon 0.25.1: LICENSE.spdx
 ========================================================================
 
 SPDXVersion: SPDX-2.1
@@ -10826,7 +10858,7 @@ PackageDownloadLocation: git+ssh://github.com/tauri-apps/tray-icon.git
 Creator: Person: Daniel Thompson-Yvetot
 
 ========================================================================
-[T164] from ttf-parser 0.19.2: LICENSE-MIT
+[T165] from ttf-parser 0.19.2: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2018 Yevhenii Reizner
@@ -10850,13 +10882,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-[T165] from typenum 1.20.1: LICENSE
+[T166] from typenum 1.20.1: LICENSE
 ========================================================================
 
 MIT OR Apache-2.0
 
 ========================================================================
-[T166] from typenum 1.20.1: LICENSE-APACHE
+[T167] from typenum 1.20.1: LICENSE-APACHE
 ========================================================================
 
 Apache License
@@ -11062,7 +11094,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ========================================================================
-[T167] from typenum 1.20.1: LICENSE-MIT
+[T168] from typenum 1.20.1: LICENSE-MIT
 ========================================================================
 
 The MIT License (MIT)
@@ -11088,7 +11120,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T168] from unicode-ident 1.0.27: LICENSE-UNICODE
+[T169] from unicode-ident 1.0.27: LICENSE-UNICODE
 ========================================================================
 
 UNICODE LICENSE V3
@@ -11132,7 +11164,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 
 ========================================================================
-[T169] from unicode-segmentation 1.13.3: COPYRIGHT
+[T170] from unicode-segmentation 1.13.3: COPYRIGHT
 ========================================================================
 
 Licensed under the Apache License, Version 2.0
@@ -11144,7 +11176,7 @@ notice may not be copied, modified, or distributed except
 according to those terms.
 
 ========================================================================
-[T170] from urlpattern 0.6.0: LICENSE
+[T171] from urlpattern 0.6.0: LICENSE
 ========================================================================
 
 MIT License
@@ -11170,7 +11202,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T171] from utf8_iter 1.0.4: COPYRIGHT
+[T172] from utf8_iter 1.0.4: COPYRIGHT
 ========================================================================
 
 Copyright Mozilla Foundation
@@ -11217,7 +11249,7 @@ licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
 
 ========================================================================
-[T172] from uuid 1.29.0: LICENSE-MIT
+[T173] from uuid 1.29.0: LICENSE-MIT
 ========================================================================
 
 Copyright (c) 2014 The Rust Project Developers
@@ -11248,7 +11280,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T173] from web-time 1.1.0: LICENSE-APACHE
+[T174] from web-time 1.1.0: LICENSE-APACHE
 ========================================================================
 
 Apache License
@@ -11454,7 +11486,7 @@ Apache License
    limitations under the License.
 
 ========================================================================
-[T174] from web-time 1.1.0: LICENSE-MIT
+[T175] from web-time 1.1.0: LICENSE-MIT
 ========================================================================
 
 MIT License
@@ -11480,7 +11512,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T175] from webkit2gtk 2.0.2: LICENSE
+[T176] from webkit2gtk 2.0.2: LICENSE
 ========================================================================
 
 Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
@@ -11505,7 +11537,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T176] from webkit2gtk-sys 2.0.2: LICENSE
+[T177] from webkit2gtk-sys 2.0.2: LICENSE
 ========================================================================
 
 Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
@@ -11528,7 +11560,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T177] from weezl 0.1.12: LICENSE-MIT
+[T178] from weezl 0.1.12: LICENSE-MIT
 ========================================================================
 
 The MIT License (MIT)
@@ -11554,7 +11586,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T178] from window-vibrancy 0.8.1: LICENSE-MIT
+[T179] from window-vibrancy 0.8.1: LICENSE-MIT
 ========================================================================
 
 MIT License
@@ -11580,7 +11612,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T179] from window-vibrancy 0.8.1: LICENSE.spdx
+[T180] from window-vibrancy 0.8.1: LICENSE.spdx
 ========================================================================
 
 SPDXVersion: SPDX-2.1
@@ -11604,7 +11636,7 @@ PackageDownloadLocation: git+ssh://github.com/tauri-apps/window-vibrancy.git
 Creator: Person: Daniel Thompson-Yvetot
 
 ========================================================================
-[T180] from windows 0.62.2: license-apache-2.0
+[T181] from windows 0.62.2: license-apache-2.0
 ========================================================================
 
 Apache License
@@ -11810,7 +11842,7 @@ Apache License
    limitations under the License.
 
 ========================================================================
-[T181] from windows 0.62.2: license-mit
+[T182] from windows 0.62.2: license-mit
 ========================================================================
 
 MIT License
@@ -11836,7 +11868,7 @@ MIT License
     SOFTWARE
 
 ========================================================================
-[T182] from winnow 0.5.40: LICENSE-MIT
+[T183] from winnow 0.5.40: LICENSE-MIT
 ========================================================================
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -11859,7 +11891,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-[T183] from wry 0.57.1: LICENSE-MIT
+[T184] from wry 0.57.1: LICENSE-MIT
 ========================================================================
 
 MIT License
@@ -11885,7 +11917,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-[T184] from wry 0.57.1: LICENSE.spdx
+[T185] from wry 0.57.1: LICENSE.spdx
 ========================================================================
 
 SPDXVersion: SPDX-2.1
@@ -11910,7 +11942,33 @@ PackageDownloadLocation: git+ssh://github.com/tauri-apps/wry.git
 Creator: Person: Daniel Thompson-Yvetot
 
 ========================================================================
-[T185] from zlib-rs 0.6.8: LICENSE
+[T186] from zip 9.1.3: LICENSE
+========================================================================
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Mathijs van de Nes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+========================================================================
+[T187] from zlib-rs 0.6.8: LICENSE
 ========================================================================
 
 (C) 2024 Trifecta Tech Foundation

@@ -67,6 +67,19 @@ fn wrap(text: &str, width: usize) -> Vec<String> {
     out
 }
 
+/// The bottom-right items: draft label, date, WGA registration (labelled
+/// unless the writer already wrote "WGA") and notes.
+pub fn corner_text(tp: &TitlePage) -> [String; 4] {
+    let wga = tp.wga.trim();
+    let wga = if wga.is_empty() || wga.to_uppercase().contains("WGA") { wga.to_string() } else { format!("WGA Registration No. {wga}") };
+    [tp.draft_label.clone(), tp.draft_date.clone(), wga, tp.notes.clone()]
+}
+
+/// Rows on a title page (the same as on a script page).
+pub fn rows(p: &Profile) -> usize {
+    ((p.page_h_in - p.top_in - p.bottom_in) * p.lines_per_inch).floor() as usize
+}
+
 pub fn layout(tp: &TitlePage, p: &Profile) -> Vec<TitleLine> {
     let char_in = 1.0 / p.chars_per_inch;
     let rows = ((p.page_h_in - p.top_in - p.bottom_in) * p.lines_per_inch).floor() as usize;
@@ -102,9 +115,7 @@ pub fn layout(tp: &TitlePage, p: &Profile) -> Vec<TitleLine> {
     for (i, l) in contact.iter().enumerate() {
         out.push(TitleLine { row: rows - contact.len() + i, x_in: left, text: l.clone() });
     }
-    let wga = tp.wga.trim();
-    let wga = if wga.is_empty() || wga.to_uppercase().contains("WGA") { wga.to_string() } else { format!("WGA Registration No. {wga}") };
-    let corner: Vec<String> = [tp.draft_label.as_str(), tp.draft_date.as_str(), wga.as_str(), tp.notes.as_str()].iter().flat_map(|t| wrap(t, half)).collect();
+    let corner: Vec<String> = corner_text(tp).iter().flat_map(|t| wrap(t, half)).collect();
     for (i, l) in corner.iter().enumerate() {
         out.push(TitleLine { row: rows - corner.len() + i, x_in: right - w(l), text: l.clone() });
     }

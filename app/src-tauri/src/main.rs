@@ -389,6 +389,42 @@ async fn export_fdx(app: State<'_, App>, path: String) -> Result<FountainExporte
     Ok(FountainExported { path: target.display().to_string(), notes: out.notes })
 }
 
+/// File > Export > Word (.docx)… / Rich Text (.rtf)… / Web Page (.html)…:
+/// the current document as printed (scene numbers, omitted scenes), its
+/// title page, header and footer, in this document's page size.
+#[tauri::command]
+async fn export_document(app: State<'_, App>, format: String, path: String) -> Result<FountainExported, String> {
+    let (doc, tp, numbers, furniture, stored) = with_session(&app, |s| {
+        let main = s.store.default_document().map_err(err)?;
+        Ok((
+            s.store.load().map_err(err)?,
+            s.store.title_page(&main).map_err(err)?,
+            s.store.scene_numbers(&main).map_err(err)?,
+            page_furniture_of(s)?,
+            s.store.document_profile(&main).map_err(err)?,
+        ))
+    })?;
+    let prof = profile(ui_profile(&stored));
+    let opts = cirth_core::printdoc::DocOptions {
+        title: if tp.is_empty() { doc.title.clone() } else { tp.title.lines().next().unwrap_or("").trim().to_string() },
+        author: tp.authors.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(", "),
+        header: pdf::expand_tokens(&furniture.header, &tp),
+        footer: pdf::expand_tokens(&furniture.footer, &tp),
+    };
+    let out = match format.as_str() {
+        "docx" => cirth_core::docx::export(&doc.blocks, &prof, &numbers, Some(&tp), &opts)?,
+        "rtf" => cirth_core::rtf::export(&doc.blocks, &prof, &numbers, Some(&tp), &opts),
+        "html" => cirth_core::html::export(&doc.blocks, &prof, &numbers, Some(&tp), &opts),
+        other => return Err(format!("unknown document format {other}")),
+    };
+    let target = normalize(Path::new(&path));
+    let tmp = target.with_extension(format!("{format}.tmp"));
+    std::fs::write(&tmp, &out.bytes).map_err(io_err)?;
+    cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
+    Ok(FountainExported { path: target.display().to_string(), notes: out.notes })
+}
+
 #[derive(Serialize)]
 struct FountainExported {
     path: String,
@@ -1538,7 +1574,7 @@ fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Resul
 
 fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF…").text("export_changed_pdf", "Changed Pages (PDF)…").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").build()?;
+    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF…").text("export_changed_pdf", "Changed Pages (PDF)…").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").text("export_docx", "Word (.docx)…").text("export_rtf", "Rich Text (.rtf)…").text("export_html", "Web Page (.html)…").build()?;
     let file = SubmenuBuilder::new(app, "File")
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
@@ -1836,6 +1872,7 @@ fn main() {
             export_fountain,
             import_fdx,
             export_fdx,
+            export_document,
             menu_items,
             document_profile,
             set_document_profile,

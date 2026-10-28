@@ -7,6 +7,7 @@
 import { writeFileSync, mkdirSync, copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateRawSync } from "node:zlib";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 import { MOD_KEY, Skip, clipboardTool, sleep } from "./platform.mjs";
@@ -2358,6 +2359,55 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitAnnounced("Pages unlocked", "unlock announced");
     const free = await pag();
     assert(!free.locked && free.labels.every((l, i) => l === String(i + 1)), `unlocked: plain numbers again: ${free.labels}`);
+  });
+
+  await test("Word, RTF and HTML export: chosen path, title page, element styles, scene numbers and a report of what each format cannot keep", async () => {
+    await openFixture("page-boundaries");
+    // A title page, locked scene numbers and some emphasis to carry through.
+    await app.evaluate("__cirth.menu('title_page')");
+    await waitFor(app, "document.getElementById('title-dialog')?.open === true", "title page dialog");
+    await app.evaluate("(() => { document.getElementById('tp-title').value = 'THE TIDE LEDGER'; document.getElementById('tp-authors').value = 'A. Writer'; document.getElementById('tp-save').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('title-dialog').open", "title page saved");
+    await app.evaluate("__cirth.menu('scenes_lock')");
+    await waitAnnounced("Scene numbers locked", "numbers locked");
+    const heading = text((await blocks()).find((x) => x.kind === "heading")).toUpperCase();
+    // Word: a real zip package; read word/document.xml out of it.
+    const docxPath = join(dataDir, "export test.docx");
+    assert(await app.evaluate(`__cirth.exportDocument('docx', ${JSON.stringify(docxPath)})`), "DOCX exported");
+    const zip = readFileSync(docxPath);
+    assert(zip.subarray(0, 2).toString() === "PK", "a zip package");
+    const part = (name) => {
+      for (let at = 0; at + 30 < zip.length; ) {
+        if (zip.readUInt32LE(at) !== 0x04034b50) break;
+        const [method, size, nameLen, extraLen] = [zip.readUInt16LE(at + 8), zip.readUInt32LE(at + 18), zip.readUInt16LE(at + 26), zip.readUInt16LE(at + 28)];
+        const n = zip.subarray(at + 30, at + 30 + nameLen).toString();
+        const data = zip.subarray(at + 30 + nameLen + extraLen, at + 30 + nameLen + extraLen + size);
+        if (n === name) return (method === 8 ? inflateRawSync(data) : data).toString("utf8");
+        at += 30 + nameLen + extraLen + size;
+      }
+      throw new Error(`${name} not in the package`);
+    };
+    const doc = part("word/document.xml");
+    assert(doc.includes("THE TIDE LEDGER") && doc.includes(heading.replace(/&/g, "&amp;")), "title page and script text");
+    assert(doc.includes('<w:pStyle w:val="SceneHeading"/>') && doc.includes('<w:pStyle w:val="Dialogue"/>'), "one style per element");
+    assert(/<w:t xml:space="preserve">1<\/w:t>/.test(doc), "scene number 1 written");
+    assert(part("word/styles.xml").includes("Courier Prime"), "Courier Prime named");
+    assert(/Word document written: .*export test\.docx\..*lays out its own pages/.test(await app.evaluate("document.getElementById('banner').textContent")), "report shown");
+    // RTF.
+    const rtfPath = join(dataDir, "export test.rtf");
+    assert(await app.evaluate(`__cirth.exportDocument('rtf', ${JSON.stringify(rtfPath)})`), "RTF exported");
+    const rtf = readFileSync(rtfPath, "latin1");
+    assert(rtf.startsWith("{\\rtf1") && rtf.includes("THE TIDE LEDGER") && rtf.includes("Scene Heading;"), "RTF with styles and title page");
+    assert(rtf.includes("\\paperw12240\\paperh15840"), "US Letter");
+    // HTML.
+    const htmlPath = join(dataDir, "export test.html");
+    assert(await app.evaluate(`__cirth.exportDocument('html', ${JSON.stringify(htmlPath)})`), "HTML exported");
+    const html = readFileSync(htmlPath, "utf8");
+    assert(html.startsWith("<!DOCTYPE html>") && html.includes("<title>THE TIDE LEDGER</title>") && html.includes('<p class="scene-heading"><span class="num left">1 </span>'), "HTML with numbered headings");
+    assert(!/<script|https?:\/\//.test(html), "nothing to run or fetch");
+    // Menus.
+    const items = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
+    for (const label of ["Word (.docx)…", "Rich Text (.rtf)…", "Web Page (.html)…"]) assert(items.some((i) => i.path === `File > Export > ${label}`), `File > Export > ${label}`);
   });
 
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {

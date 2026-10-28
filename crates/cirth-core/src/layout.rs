@@ -97,7 +97,7 @@ impl Profile {
         ((self.page_h_in - self.top_in - self.bottom_in) * self.lines_per_inch).floor() as usize
     }
 
-    fn geom(&self, kind: BlockKind) -> Geometry {
+    pub fn geom(&self, kind: BlockKind) -> Geometry {
         match kind {
             BlockKind::Heading | BlockKind::Shot | BlockKind::Section => self.heading,
             BlockKind::Action => self.action,

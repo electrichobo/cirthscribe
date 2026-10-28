@@ -114,7 +114,31 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - lock a baseline;
    - later edits create A/B pages instead of reflowing (D3, D4, D8);
    - a layout-engine upgrade or a missing font never reflows a locked baseline.
-8. **Further exports with capability reports:**
+8. **Further exports with capability reports.** **Built 2026-10-27:**
+   - File > Export > Word (.docx)…, Rich Text (.rtf)… and Web Page (.html)…, each followed by a report of what the format could not keep.
+   - **Shared production view** (`cirth_core::printdoc`):
+     - locked scene numbers, omitted scenes printed as OMITTED, upper case where the page shows it;
+     - indents and spacing taken from the layout profile;
+     - the title page as editable paragraphs: centre block a third of the way down, then contact and draft items stacked at the foot;
+     - headers and footers as set for the PDF.
+   - **DOCX** (`docx.rs`), a real WordprocessingML package written with `zip`:
+     - Google Docs profile: one paragraph style per element, explicit paper size and margins, Courier Prime 12 pt named, exact 12 pt lines;
+     - the title page is its own section; the script section numbers pages from 1 with a PAGE field and shows no number on page 1;
+     - scene numbers hang in the left margin;
+     - same input gives the same bytes.
+   - **RTF** (`rtf.rs`): the same styles, also applied directly on each paragraph; Unicode as \uN escapes; the same section, header and page-number arrangement.
+   - **HTML** (`html.rs`): a standalone page, escaped, with inline CSS and nothing to fetch; scene numbers in both margins; CSS page breaks.
+   - **Reports** say what each format cannot keep:
+     - the opening app lays out its own pages, so page breaks and locked labels such as 12A are not kept;
+     - dual dialogue is written one speech after the other;
+     - revision marks and on-screen colour are left out;
+     - HTML has no page headers.
+   - Not yet checked in Word, Google Docs, LibreOffice, TextEdit or a browser's print view: that is step 9 (compatibility matrix) and manual check N28.
+   - Tests:
+     - core: well-formed XML parts, escaping, styles and indents, repeatable bytes, RTF escapes and balanced groups, HTML escaping;
+     - e2e on both drivers: the DOCX is unzipped and its document part checked.
+   - Dependency: `zip` 9.1.3 (MIT; deflate through the existing `flate2` only), owner-approved. It brings `typed-path` (MIT or Apache-2.0) and, on Linux and macOS, `nix` (MIT).
+   Original plan:
    - DOCX (Google Docs profile; needs a zip writer, decision B);
    - RTF;
    - HTML.

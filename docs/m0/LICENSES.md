@@ -2,6 +2,8 @@
 
 Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dictionaries) by `node app/scripts/license-inventory.mjs` from `Cargo.lock` / `cargo metadata` and `app/package-lock.json`. License fields are as declared by each package; they have not been audited file by file. Re-run on every dependency change.
 
+**2026-10-27, M2 step 8:** `zip` 9.1.3 (MIT) added as a direct dependency of cirth-core for DOCX export, with the owner's approval (decision B). Default features are off: only `deflate-flate2`, which uses the `flate2`/`miniz_oxide` already shipped. New in the shipped tree: `zip`, `typed-path` 0.13.0 (MIT OR Apache-2.0) and, on Linux and macOS only, `nix` 0.31.3 (MIT); `cfg_aliases` 0.2.2 (MIT) is a build-time helper. `assets/legal/THIRD-PARTY-NOTICES.txt` regenerated (355 components).
+
 **2026-10-27, M2:** `quick-xml` 0.42.0 (MIT) added as a direct dependency of cirth-core for FDX import and export, with the owner's approval. It was already in the shipped tree through Tauri, so the bundled notices file did not change; its default features add only `memchr` (MIT OR Unlicense), which was also already present.
 
 ## Not from package managers

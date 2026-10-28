@@ -852,6 +852,11 @@ async function runMenu(id: string): Promise<void> {
     case "export_fdx":
       await exportFdx();
       break;
+    case "export_docx":
+    case "export_rtf":
+    case "export_html":
+      await exportDocument(id.slice(7) as "docx" | "rtf" | "html");
+      break;
     case "export_txt":
       await exportText();
       break;
@@ -1076,6 +1081,29 @@ async function exportFountain(path?: string): Promise<boolean> {
   }
 }
 
+const DOCUMENT_FORMATS = {
+  docx: { name: "Word document", label: "Word document" },
+  rtf: { name: "Rich Text", label: "Rich Text file" },
+  html: { name: "Web page", label: "Web page" },
+} as const;
+
+/** File > Export > Word / Rich Text / Web Page: document formats with a report of what they cannot keep. */
+async function exportDocument(format: keyof typeof DOCUMENT_FORMATS, path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const f = DOCUMENT_FORMATS[format];
+  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, `.${format}`), filters: [{ name: f.name, extensions: [format] }] }));
+  if (!target) return false;
+  await syncer.flush();
+  try {
+    const r = await invoke<{ path: string; notes: string[] }>("export_document", { format, path: target });
+    showBanner(`${f.label} written: ${r.path}. ${r.notes.join(" ")}`);
+    return true;
+  } catch (e) {
+    showBanner(`${f.label} export failed: ${e}`);
+    return false;
+  }
+}
+
 /** File > Import Final Draft…: a new project from a .fdx file. */
 async function importFdx(path?: string): Promise<boolean> {
   const source = path ?? (await openDialog({ multiple: false, directory: false, filters: [{ name: "Final Draft", extensions: ["fdx"] }] }));
@@ -1133,6 +1161,7 @@ $("structural").addEventListener("change", (e) => {
   exportFountain,
   importFdx,
   exportFdx,
+  exportDocument,
   exportPdf,
   get view() {
     return view;

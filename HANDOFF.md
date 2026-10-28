@@ -4,37 +4,31 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-M2, production screenplay output (docs/M2_PLAN.md). Steps 1–7 are built and pushed: title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages. The goal now is **step 8: DOCX, RTF and HTML exports, each with a capability report** (what the format cannot carry). Then step 9 (compatibility matrix) and the M2 exit review.
+M2, production screenplay output (docs/M2_PLAN.md). Steps 1–8 are built. Step 8, DOCX/RTF/HTML exports, is committed and not yet pushed. The goal now is **step 9: the compatibility matrix**, meaning fixtures exchanged with real external apps, each result labelled with the actual test and its date. Then the M2 exit review.
 
 ## Completed & Verified
 
-- Step 7 locked pages (adef267, pushed):
-  - `cirth_core::locked`; the baseline is JSON in the document settings.
-  - Overflow goes onto 12A, 12B; emptied pages fold into "11-12".
-- Step 6 revision sets (feb80da, pushed).
-- Agent protocol: AGENTS.md has the takeover protocol. CLAUDE.md, GEMINI.md and QWEN.md point to it. START_HERE.md and STATUS.md describe the current stage.
-- Checks run on Windows 11 for adef267, all passing:
-  - `cargo test -p cirth-core`;
+- Step 8: `printdoc.rs` (shared production view), `docx.rs`, `rtf.rs` and `html.rs`, plus File > Export > Word / Rich Text / Web Page, each with a report.
+  - The `zip` 9.1.3 dependency was added (owner-approved), the license inventory updated and the notices regenerated.
+- Steps 1–7 pushed (adef267), and the agent protocol (65e86c7).
+- Checks run on Windows 11 for step 8:
+  - `cargo test -p cirth-core` (core tests for all three writers);
   - `npm run build`;
-  - `npm run test:contract` (4);
-  - `npm run e2e:cdp` (49/49);
-  - `npm run e2e:webdriver` (48/48, 1 skipped: IME);
-  - the third-party notices check.
+  - the "Word, RTF and HTML export" e2e test on CDP and WebDriver;
+  - full suites: notices check (355 components), `npm run test:contract` (4), `npm run e2e:cdp` (50/50), `npm run e2e:webdriver` (49/49, 1 skipped: IME).
 - Not verified:
-  - macOS and Linux run only in CI after a push.
-  - Manual checks N20–N27 are open (docs/testing/MANUAL_CHECKS.md).
-  - Known limit: editing inside a block that crosses a locked boundary can shift that split point.
-  - Moving scenes from the board does not mark them revised.
-  - FDX carries neither revision sets nor locked pages.
+  - DOCX/RTF/HTML have not been opened in Word, Google Docs, LibreOffice, TextEdit or a browser (manual check N28; step 9). The HTML page's look is unchecked: the browser pane cannot run tools on local files.
+  - macOS and Linux run only in CI. Manual checks N20–N28 are open.
+  - Known limits: an edit inside a block that crosses a locked boundary can shift that split point; board moves are not marked revised; FDX carries no revisions or locked pages.
   - Carried from M1: Linux latency, reference machines, defect 3.
 
 ## In-Progress / Uncommitted State
 
-None after the agent-protocol commit. The working tree is clean.
+None once the step 8 commit is made.
 
 ## Next Immediate Step
 
-Step 8, starting with DOCX:
-1. Add `crates/cirth-core/src/docx.rs`, a Word document written with the approved `zip` crate. It is not yet a dependency: add it to `crates/cirth-core/Cargo.toml` (approved for this step) and record it in docs/m0/LICENSES.md.
-2. Map each block kind to a paragraph style with screenplay indents. Return an `Exported { notes }` capability report, like `fountain.rs` and `fdx.rs`.
-3. Then RTF (`rtf.rs`, no dependency needed) and HTML (`html.rs`), with File > Export menu items and an e2e test.
+Ask the owner whether to push. Then plan step 9:
+1. Pick the fixtures: page-boundaries, unicode-marks and long-120, each with a title page and locked numbers.
+2. Decide which external apps the owner can test, and on which machines: Word, Google Docs, LibreOffice, Final Draft, Fountain apps, browsers.
+3. Create `docs/COMPATIBILITY.md`, a matrix of format × app × result × date, filled only from real tests (N22, N23 and N28 feed it).

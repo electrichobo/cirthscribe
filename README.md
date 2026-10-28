@@ -80,7 +80,7 @@ Still to do:
 - [ ] Check the page measurements against an industry-standard PDF
 - [x] Revision sets (label, colour, date, mark), revision mode that marks changed lines, and a changed-pages PDF
 - [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
-- [ ] Word (DOCX), RTF and HTML export, each with a report of what carried over
+- [x] Word (DOCX), RTF and HTML export, each with a report of what carried over (not yet tried in Word, Google Docs or LibreOffice)
 - [ ] Tested exchange with other screenwriting apps
 
 ### Stage 3: Story planning

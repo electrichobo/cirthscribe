@@ -4,7 +4,7 @@ Updated 2026-10-27.
 
 **Current milestone: M2 (plan: `docs/M2_PLAN.md`), started 2026-10-27.** M1 and M1b closed by the owner on 2026-10-27, with Linux latency, reference machines, defect 3 and macOS check N20 carried forward (`docs/m1/EXIT_REVIEW.md`). M0 complete.
 
-M2 progress: steps 1–7 built and pushed (title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages; details under each step in `docs/M2_PLAN.md`). Next: step 8, DOCX, RTF and HTML exports with capability reports. Then step 9, the compatibility matrix, and the M2 exit review. The working state between sessions is in `HANDOFF.md`.
+M2 progress: steps 1–8 built (title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports; details under each step in `docs/M2_PLAN.md`). Next: step 9, the compatibility matrix with real external apps, then the M2 exit review. The working state between sessions is in `HANDOFF.md`.
 
 M1 progress:
 - 1.1 done: End-key selection defect fixed; regression and stress tests.
