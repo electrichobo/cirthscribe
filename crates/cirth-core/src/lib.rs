@@ -6,6 +6,7 @@ pub mod fontcheck;
 pub mod fountain;
 pub mod freewrite;
 pub mod layout;
+pub mod locked;
 pub mod model;
 pub mod numbering;
 pub mod ops;

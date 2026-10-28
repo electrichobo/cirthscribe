@@ -134,7 +134,11 @@ pub struct PLine {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Page {
+    /// Physical page count from 1 (page 1 prints no number).
     pub number: usize,
+    /// Printed page number: the same as `number`, or a locked label such as
+    /// "12A" or "11-12" (locked.rs).
+    pub label: String,
     pub lines: Vec<PLine>,
     /// Holds text of the revision set being printed (revisions.rs).
     pub revised: bool,
@@ -144,6 +148,7 @@ pub struct Page {
 #[derive(Clone, Debug, Serialize)]
 pub struct PageStart {
     pub page: usize,
+    pub label: String,
     pub block_id: Id,
     pub offset: usize,
 }
@@ -347,7 +352,7 @@ impl<'p> Pager<'p> {
     }
     fn new_page(&mut self) {
         let n = self.pages.len() + 1;
-        self.pages.push(Page { number: n, lines: Vec::new(), revised: false });
+        self.pages.push(Page { number: n, label: n.to_string(), lines: Vec::new(), revised: false });
         self.row = 0;
     }
     fn avail(&self) -> usize {
@@ -491,8 +496,18 @@ pub const SCENE_NUMBER_RIGHT_IN: f32 = 7.4;
 /// their other blocks are left out of the pages, not the project. Numbered
 /// headings get their number in both margins on their first line.
 pub fn paginate_numbered(blocks: &[Block], p: &Profile, doc_version: u64, numbers: &crate::numbering::Numbers) -> PageMap {
+    paginate_production(blocks, p, doc_version, numbers, None)
+}
+
+/// Pages with locked scene numbers (as `paginate_numbered`) and, when given,
+/// against a locked page baseline (locked.rs).
+pub fn paginate_production(blocks: &[Block], p: &Profile, doc_version: u64, numbers: &crate::numbering::Numbers, lock: Option<&crate::locked::PageLock>) -> PageMap {
+    let lay = |bs: &[Block]| match lock {
+        Some(l) => crate::locked::paginate_locked(bs, p, doc_version, l),
+        None => paginate(bs, p, doc_version),
+    };
     if numbers.is_empty() {
-        return paginate(blocks, p, doc_version);
+        return lay(blocks);
     }
     let mut shown: Vec<Block> = Vec::with_capacity(blocks.len());
     let mut skipping = false;
@@ -511,7 +526,7 @@ pub fn paginate_numbered(blocks: &[Block], p: &Profile, doc_version: u64, number
             shown.push(b.clone());
         }
     }
-    let mut map = paginate(&shown, p, doc_version);
+    let mut map = lay(&shown);
     let number_of: std::collections::HashMap<&str, &str> = shown
         .iter()
         .filter(|b| b.kind == BlockKind::Heading)
@@ -550,7 +565,7 @@ pub fn paginate(blocks: &[Block], p: &Profile, doc_version: u64) -> PageMap {
     let mut page_starts = Vec::new();
     for page in &pg.pages {
         if let Some(l) = page.lines.iter().find(|l| !l.synthetic && l.block_id.is_some()) {
-            page_starts.push(PageStart { page: page.number, block_id: l.block_id.clone().unwrap(), offset: l.start });
+            page_starts.push(PageStart { page: page.number, label: page.label.clone(), block_id: l.block_id.clone().unwrap(), offset: l.start });
         }
     }
     PageMap {

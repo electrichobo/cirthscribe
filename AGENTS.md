@@ -4,16 +4,16 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 ## Current stage (2026-10-27)
 
-This is a working application, not yet released, plus its product brief. Milestones M0 (feasibility), M1 and M1b (the writing foundation) are closed by the owner. **M2 (layout, interchange and production) is in progress;** docs/M2_PLAN.md has the plan and step order. Steps 1–6 are built:
+This is a working application, not yet released, plus its product brief. Milestones M0 (feasibility), M1 and M1b (the writing foundation) are closed by the owner. **M2 (layout, interchange and production) is in progress;** docs/M2_PLAN.md has the plan and step order. Steps 1–7 are built:
 - title page;
 - Fountain import and export;
 - Final Draft (.fdx) import and export;
 - scene numbers and scene-number locking;
 - production PDF with headers and footers;
-- revision sets.
+- revision sets;
+- locked pages with A/B pages.
 
 Remaining M2 steps:
-- 7: locked pages with A/B pages;
 - 8: DOCX, RTF and HTML exports with capability reports;
 - 9: compatibility matrix with real external apps.
 
@@ -55,7 +55,7 @@ Rust with Tauri 2, a TypeScript web UI, ProseMirror as the editor, and SQLite fo
 
 ## Repository map and commands
 
-- `crates/cirth-core`: the domain model, the store, migrations, layout, numbering, revisions and every import and export (PDF, TXT, Fountain, FDX). Tests: `crates/cirth-core/tests`.
+- `crates/cirth-core`: the domain model, the store, migrations, layout, numbering, revisions, locked pages and every import and export (PDF, TXT, Fountain, FDX). Tests: `crates/cirth-core/tests`.
 - `app/src-tauri`: the desktop shell. It holds Tauri commands and native menus, and it builds the `cirthscribe` binary.
 - `app/src`: the TypeScript UI. The ProseMirror schema and plugins send versioned batches to Rust.
 - `app/tests`: `contract.mjs` checks that the TypeScript and Rust data models agree; `e2e/suite.mjs` drives the real app through two drivers, Chrome DevTools (CDP) and WebDriver.

@@ -8,6 +8,8 @@ import type { Node as PMNode } from "prosemirror-model";
 
 export interface PageStart {
   page: number;
+  /** Printed page number: "12", or "12A" / "11-12" when pages are locked. */
+  label?: string;
   block_id: string;
   offset: number; // Unicode scalar values
 }
@@ -26,7 +28,7 @@ export function scalarToUtf16(text: string, scalars: number): number {
   return u;
 }
 
-function marker(page: number, inline: boolean, stale: boolean): HTMLElement {
+function marker(page: string, inline: boolean, stale: boolean): HTMLElement {
   const el = document.createElement(inline ? "span" : "div");
   el.className = `page-mark${inline ? " inline" : ""}${stale ? " stale" : ""}`;
   el.contentEditable = "false";
@@ -44,10 +46,10 @@ export function buildDecorations(doc: PMNode, starts: PageStart[], stale: boolea
     const hit = byId.get(s.block_id);
     if (!hit) continue;
     if (s.offset === 0) {
-      decos.push(Decoration.widget(hit.pos, () => marker(s.page, false, stale), { side: -1, key: `p${s.page}-${stale}` }));
+      decos.push(Decoration.widget(hit.pos, () => marker(s.label ?? String(s.page), false, stale), { side: -1, key: `p${s.page}-${stale}` }));
     } else {
       const off = scalarToUtf16(hit.node.textContent, s.offset);
-      decos.push(Decoration.widget(hit.pos + 1 + off, () => marker(s.page, true, stale), { side: -1, key: `pi${s.page}-${stale}` }));
+      decos.push(Decoration.widget(hit.pos + 1 + off, () => marker(s.label ?? String(s.page), true, stale), { side: -1, key: `pi${s.page}-${stale}` }));
     }
   }
   return DecorationSet.create(doc, decos);

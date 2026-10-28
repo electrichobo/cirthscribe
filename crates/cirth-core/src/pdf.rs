@@ -102,12 +102,12 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
         let rev = opts.revision_header.trim();
         if page.revised && !rev.is_empty() {
             // Ends four characters before the page number (or at its place on page 1).
-            let number_w = if page.number > 1 { (format!("{}.", page.number).chars().count() + 4) as f32 * char_in } else { 0.0 };
+            let number_w = if page.number > 1 { (format!("{}.", page.label).chars().count() + 4) as f32 * char_in } else { 0.0 };
             let w = unicode_width::UnicodeWidthStr::width(rev) as f32 * char_in;
             layer.use_text(rev, p.font_pt, mm(p.page_w_in - 1.0 - number_w - w), top, &fonts[0]);
         }
         if page.number > 1 {
-            let label = format!("{}.", page.number);
+            let label = format!("{}.", page.label);
             let x = p.page_w_in - 1.0 - label.chars().count() as f32 * char_in;
             layer.use_text(label, p.font_pt, mm(x), top, &fonts[0]);
             if !opts.header.trim().is_empty() {

@@ -473,3 +473,30 @@ fn revision_sets_are_kept_and_a_used_set_cannot_be_deleted() {
     assert!(s.revision_sets(&main).unwrap().is_empty());
     assert!(s.active_revision(&main).unwrap().is_none() && !s.revision_mode(&main).unwrap(), "deleting the active set ends revision mode");
 }
+
+#[test]
+fn page_lock_is_kept_refuses_a_second_lock_and_a_page_size_change() {
+    let d = tmpdir("page-lock");
+    let pkg = d.join("locked.cirth");
+    let doc = fixtures::page_boundaries().to_document().unwrap();
+    let p = cirth_core::layout::Profile::us_letter();
+    {
+        let mut s = Store::open(&d.join("w.db")).unwrap();
+        s.seed(&doc).unwrap();
+        let main = s.default_document().unwrap();
+        assert!(s.page_lock(&main).unwrap().is_none());
+        let map = cirth_core::layout::paginate(&s.load().unwrap().blocks, &p, 1);
+        assert_eq!(s.lock_pages(&main, &map).unwrap(), map.pages.len());
+        assert!(s.lock_pages(&main, &map).is_err(), "already locked");
+        assert!(s.set_document_profile(&main, "a4").is_err(), "page size fixed while locked");
+        s.set_document_profile(&main, "us-letter").unwrap();
+        s.save_package(&pkg).unwrap();
+    }
+    let o = Store::open_package(&pkg, &d.join("w2.db"), None).unwrap();
+    let main = o.store.default_document().unwrap();
+    let lock = o.store.page_lock(&main).unwrap().expect("kept in the file");
+    assert_eq!(lock.labels.first().map(String::as_str), Some("1"));
+    o.store.unlock_pages(&main).unwrap();
+    assert!(o.store.page_lock(&main).unwrap().is_none());
+    o.store.set_document_profile(&main, "a4").unwrap();
+}

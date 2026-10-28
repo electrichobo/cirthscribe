@@ -4,37 +4,38 @@ Working state for whichever agent works next (see "Session Handoff Protocol" in 
 
 ## Current Goal
 
-Milestone 2, production screenplay output (plan and step order: docs/M2_PLAN.md). Steps 1–6 are built: title page, Fountain, FDX, scene numbers, production PDF, revision sets. Step 7, locked pages, is next. After it come step 8 (DOCX, RTF and HTML exports with capability reports) and step 9 (compatibility matrix).
+Milestone 2, production screenplay output (plan and step order: docs/M2_PLAN.md). Steps 1–7 are built: title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages. Two steps remain: step 8 (DOCX, RTF and HTML exports with capability reports) and step 9 (compatibility matrix). After them comes the M2 exit review.
 
 ## Completed & Verified
 
-- Agent setup: AGENTS.md holds the instructions and describes the current stage, stack, repository map, commands and conventions. CLAUDE.md and GEMINI.md import it. HANDOFF.md exists. A local pre-push hook warns about a stale HANDOFF.md; tested with simulated push input.
-- Step 6 revision sets (commit feb80da):
-  - `cirth_core::revisions`; schema v5 table `revision_sets`; `Run::revision` tags text.
-  - The editor tags changes in revision mode, and undo removes the tag.
-  - Margin marks and a revision header on changed pages; File > Export > Changed Pages (PDF)….
-- Step 5 production PDF (commit 3726521, pushed): output is byte-for-byte repeatable; headers and footers; golden page files in `fixtures/golden/`, checked in CI on three OSes.
-- Checks run on Windows 11 for feb80da, all passing:
-  - `cargo test -p cirth-core`;
-  - `npm run test:contract`;
-  - `npm run e2e:cdp` (48/48);
-  - `npm run e2e:webdriver` (47/47, 1 skipped: IME cannot be simulated);
-  - `node app/scripts/third-party-notices.mjs --check`.
+- Step 7, locked pages (`cirth_core::locked`; the baseline is JSON in the document's settings, so no schema change):
+  - Format > Locked Pages > Lock Pages / Unlock Pages….
+  - Overflow goes onto 12A, 12B…; emptied pages fold into "11-12"; (MORE)/(CONT'D) across locked boundaries.
+  - Labels appear in the editor markers, PDF, TXT and revision headers. The page size is fixed while locked.
+- Step 6, revision sets (feb80da, pushed): revision mode tags text; changed-pages export.
+- Agent setup (76e07ca, f4124df, pushed): AGENTS.md, HANDOFF.md, CLAUDE.md and GEMINI.md import AGENTS.md, and a local pre-push hook.
+- Step 7 checks run on Windows 11, all passing:
+  - `cargo test -p cirth-core`, including the locked tests, the golden tests (both samples locked and unchanged match the unlocked pages byte for byte; an edited page runs onto A pages) and a store test;
+  - the "Locked pages" e2e test on CDP and WebDriver;
+  - full suites: third-party notices check, `npm run test:contract` (4), `npm run e2e:cdp` (49/49), `npm run e2e:webdriver` (48/48, 1 skipped: IME).
 
 ## Assumed / Untested
 
-- macOS and Linux runs of the new golden tests happen only in CI after a push.
+- An edit before a split point inside a block that crosses a locked boundary moves that split point by the edited amount (offsets count characters).
+- Moving scenes from the board or scene list does not mark them as revised. FDX does not carry revision sets or locked pages.
+- macOS and Linux run the golden tests only in CI after a push.
 - Manual checks still open (docs/testing/MANUAL_CHECKS.md):
   - N25: PDF margins against an industry PDF;
-  - N26: printed changed pages on Letter and A4. The mark is about 0.27 in from the A4 edge.
+  - N26: printed changed pages;
+  - N27: locked-page labels compared with a production tool;
   - N20–N24 on Mac;
   - N23: FDX opened in Final Draft.
-- Moving scenes from the board or scene list does not mark them as revised. FDX does not carry revision sets.
-- Carried from M1: Linux typing latency, reference machines, defect 3 (a rare End/Enter miss in the stress test).
+- Carried from M1: Linux typing latency, reference machines, defect 3.
 
 ## Next Immediate Step
 
-Build M2 step 7, locked pages:
-- lock a pagination baseline;
-- later edits make A/B pages instead of reflowing (acceptance D3, D4, D8);
-- a layout-engine upgrade or a missing font never reflows a locked baseline.
+Commit step 7 and ask the owner whether to push. Then build M2 step 8, further exports with capability reports:
+- DOCX (Google Docs profile; uses the approved `zip` crate);
+- RTF;
+- HTML.
+Each gets an export report of what the format cannot carry.

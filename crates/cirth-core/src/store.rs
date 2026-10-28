@@ -286,6 +286,9 @@ impl Store {
         if !matches!(profile, "us-letter" | "a4") {
             return Err(StoreError::Invalid(format!("unknown page profile {profile}")));
         }
+        if self.page_lock(document_id)?.is_some() && self.document_profile(document_id)? != profile {
+            return Err(StoreError::Invalid("pages are locked for the current page size; unlock pages before changing it".into()));
+        }
         let n = self.conn.execute("UPDATE documents SET profile = ?2 WHERE id = ?1", [document_id, profile])?;
         if n == 0 {
             return Err(StoreError::Invalid(format!("no document {document_id}")));
@@ -463,6 +466,30 @@ impl Store {
             return Err(StoreError::Invalid("choose or add a revision set first".into()));
         }
         self.set_setting(&format!("document:{document_id}"), "revision_mode", if on { "1" } else { "0" })
+    }
+
+    // --- Locked pages (locked.rs) ------------------------------------------
+
+    /// The document's locked page baseline, if its pages are locked.
+    pub fn page_lock(&self, document_id: &str) -> Result<Option<crate::locked::PageLock>> {
+        let json = self.setting(&format!("document:{document_id}"), "page_lock")?.filter(|j| !j.is_empty());
+        json.map(|j| serde_json::from_str(&j).map_err(|e| StoreError::Invalid(format!("unreadable page lock: {e}")))).transpose()
+    }
+
+    /// Lock pages as laid out in `map` (the current production layout).
+    pub fn lock_pages(&self, document_id: &str, map: &crate::layout::PageMap) -> Result<usize> {
+        if self.page_lock(document_id)?.is_some() {
+            return Err(StoreError::Invalid("pages are already locked; unlock them first to lock a new baseline".into()));
+        }
+        let lock = crate::locked::PageLock::from_map(map);
+        let json = serde_json::to_string(&lock).map_err(|e| StoreError::Invalid(e.to_string()))?;
+        self.set_setting(&format!("document:{document_id}"), "page_lock", &json)?;
+        Ok(lock.labels.len())
+    }
+
+    /// Unlock: pages flow freely again and A pages are renumbered.
+    pub fn unlock_pages(&self, document_id: &str) -> Result<()> {
+        self.set_setting(&format!("document:{document_id}"), "page_lock", "")
     }
 
     /// A document's title page (empty if never set).

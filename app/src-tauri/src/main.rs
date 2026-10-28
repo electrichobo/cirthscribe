@@ -597,6 +597,21 @@ async fn revision_command(app: State<'_, App>, action: String, set: Option<Revis
     })
 }
 
+/// Format > Locked Pages: "lock" records the pages as laid out now (with
+/// scene numbers and omitted scenes) as the baseline; "unlock" drops it.
+/// Returns the number of locked pages.
+#[tauri::command]
+async fn page_lock_command(app: State<'_, App>, action: String, profile_name: String) -> Result<usize, String> {
+    match action.as_str() {
+        "lock" => {
+            let (p, _) = paginate_current(&app, &profile_name)?;
+            with_session(&app, |s| s.store.lock_pages(&s.store.default_document().map_err(err)?, &p.map).map_err(err))
+        }
+        "unlock" => with_session(&app, |s| s.store.unlock_pages(&s.store.default_document().map_err(err)?).map(|_| 0).map_err(err)),
+        other => Err(format!("unknown page lock action {other}")),
+    }
+}
+
 /// Format > Scene Numbers: lock (number 1..N), unlock, omit or restore.
 #[tauri::command]
 async fn scene_numbers_command(app: State<'_, App>, action: String, scene_id: Option<String>) -> Result<usize, String> {
@@ -766,24 +781,32 @@ struct Paginated {
     /// The active revision set: its text is marked and its pages flagged `revised`.
     revision: Option<RevisionSet>,
     revised_pages: usize,
+    /// Pages are laid out against a locked baseline (labels like 12A).
+    pages_locked: bool,
 }
 
 fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Document), String> {
     let t0 = Instant::now();
     // Hold the lock only while reading the canonical document.
-    let (doc, numbers, locked, revision) = with_session(app, |s| {
+    let (doc, numbers, locked, revision, page_lock) = with_session(app, |s| {
         let main = s.store.default_document().map_err(err)?;
-        Ok((s.store.load().map_err(err)?, s.store.scene_numbers(&main).map_err(err)?, s.store.scene_numbers_locked(&main).map_err(err)?, s.store.active_revision(&main).map_err(err)?))
+        Ok((
+            s.store.load().map_err(err)?,
+            s.store.scene_numbers(&main).map_err(err)?,
+            s.store.scene_numbers_locked(&main).map_err(err)?,
+            s.store.active_revision(&main).map_err(err)?,
+            s.store.page_lock(&main).map_err(err)?,
+        ))
     })?;
     let t1 = Instant::now();
-    let mut map = layout::paginate_numbered(&doc.blocks, &profile(profile_name), doc.version, &numbers);
+    let mut map = layout::paginate_production(&doc.blocks, &profile(profile_name), doc.version, &numbers, page_lock.as_ref());
     let revised_pages = revision.as_ref().map_or(0, |set| revisions::mark_pages(&mut map, &doc.blocks, set));
     let t2 = Instant::now();
     let font = fontcheck::FontInfo::parse(pdf::REGULAR).ok_or("bundled font unreadable")?;
     let all: String = doc.blocks.iter().map(|b| b.text()).collect::<Vec<_>>().join(" ");
     let missing_glyphs = fontcheck::missing_chars(&font, &all);
     let scene_numbers = numbers.into_values().collect();
-    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked, revision, revised_pages }, doc))
+    Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked, revision, revised_pages, pages_locked: page_lock.is_some() }, doc))
 }
 
 #[tauri::command]
@@ -1633,6 +1656,10 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .text("scene_omit", "Omit This Scene")
         .text("scene_restore", "Restore This Scene")
         .build()?;
+    let page_lock = SubmenuBuilder::new(app, "Locked Pages")
+        .text("pages_lock", "Lock Pages")
+        .text("pages_unlock", "Unlock Pages…")
+        .build()?;
     let revisions = SubmenuBuilder::new(app, "Revisions")
         .item(&check_item(app, "revision_mode", "Revision Mode", false)?)
         .text("revision_sets", "Revision Sets…")
@@ -1651,6 +1678,7 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .text("page_break", keyed("Page Break Before", "Enter"))
         .separator()
         .item(&numbers)
+        .item(&page_lock)
         .item(&revisions)
         .separator()
         .item(&page)
@@ -1803,6 +1831,7 @@ fn main() {
             scene_numbers_command,
             revision_state,
             revision_command,
+            page_lock_command,
             import_fountain,
             export_fountain,
             import_fdx,

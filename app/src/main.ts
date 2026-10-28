@@ -59,6 +59,8 @@ interface Paginated {
   layout_ms: number;
   scene_numbers: SceneNumber[];
   scene_numbers_locked: boolean;
+  /** Laid out against a locked page baseline (labels such as 12A, 11-12). */
+  pages_locked: boolean;
   missing_glyphs: string[];
 }
 
@@ -148,7 +150,8 @@ function updateInfo() {
     const k = docCounts.by_kind;
     counts.push(`script ${n(docCounts.total)} (dialogue ${n(k.dialogue ?? 0)}, action ${n(k.action ?? 0)})`);
   }
-  const pages = lastPagination ? `${lastPagination.map.pages.length} pages (layout of v${lastPagination.map.doc_version}, ${lastPagination.layout_ms.toFixed(1)} ms)` : "not paginated";
+  const locked = lastPagination?.pages_locked ? ", pages locked" : "";
+  const pages = lastPagination ? `${lastPagination.map.pages.length} pages (layout of v${lastPagination.map.doc_version}, ${lastPagination.layout_ms.toFixed(1)} ms${locked})` : "not paginated";
   const missing = lastPagination?.missing_glyphs.length ? ` · Font lacks: ${lastPagination.missing_glyphs.join(" ")} (these break fixed pitch in PDF)` : "";
   infoEl.textContent = `${blockKindAtCursor()} · ${counts.join(" · ")} · ${pages}${missing}`;
 }
@@ -894,6 +897,10 @@ async function runMenu(id: string): Promise<void> {
     case "focus_next":
       cycleRegions(regions(), false);
       break;
+    case "pages_lock":
+    case "pages_unlock":
+      if (lastOpen) await pageLockAction(id);
+      break;
     case "scenes_lock":
     case "scenes_unlock":
     case "scene_omit":
@@ -988,6 +995,30 @@ async function exportPdf(path?: string, changedOnly = false): Promise<boolean> {
   }
 }
 /** Format > Scene Numbers. Numbers live in Rust; this asks, then repaints. */
+/** Format > Locked Pages. The baseline lives in Rust (cirth_core::locked). */
+async function pageLockAction(id: string) {
+  const locked = !!lastPagination?.pages_locked;
+  if (id === "pages_lock" && locked) return showBanner("Pages are already locked. Unlock them first to lock a new baseline.");
+  if (id === "pages_unlock") {
+    if (!locked) return showBanner("Pages are not locked.");
+    const ok = await confirmDialog(
+      "Unlock pages?",
+      "Pages flow freely again: added pages such as 12A disappear and page numbers can change. Locking again takes the pages as they are then as the new baseline.",
+      "Unlock",
+    );
+    if (!ok) return;
+  }
+  try {
+    await syncer.flush();
+    const n = await invoke<number>("page_lock_command", { action: id === "pages_lock" ? "lock" : "unlock", profileName: ($("profile") as HTMLSelectElement).value });
+    await saveFile(false);
+    await repaginate();
+    announce(id === "pages_lock" ? `Pages locked: ${n} pages. Added text now goes onto A pages; later pages keep their numbers` : "Pages unlocked");
+  } catch (e) {
+    showBanner(`Locked pages: ${e}`);
+  }
+}
+
 async function sceneNumbersAction(id: string) {
   const locked = !!lastPagination?.scene_numbers_locked;
   const scene = sceneAtCursor(view);

@@ -89,3 +89,36 @@ fn revised_dialogue_marks_its_lines_and_the_changed_pages_print_alone() {
     map.pages.retain(|pg| pg.revised);
     check("page-boundaries-revised-changed-pages-letter", &txt::render_document(&map, &p, None, "", "", &header).text);
 }
+
+#[test]
+fn locked_pages_unchanged_match_the_unlocked_pages_and_edits_add_a_pages() {
+    use cirth_core::locked::{PageLock, paginate_locked};
+    for (file, name) in [("page-boundaries.json", "page-boundaries"), ("long-120.json", "long-120")] {
+        let doc = fixture(file);
+        let p = Profile::us_letter();
+        let map = paginate(&doc.blocks, &p, 0);
+        let lock = PageLock::from_map(&map);
+        assert!(lock.starts.iter().any(|(_, off)| *off > 0), "{name}: the fixture splits a block across pages");
+        let same = paginate_locked(&doc.blocks, &p, 0, &lock);
+        assert_eq!(txt::render(&same, &p).text, txt::render(&map, &p).text, "{name}: locked and unchanged");
+    }
+    // Lengthen the first speech that starts after page 1: its page runs onto
+    // an added "A" page; the following pages keep their text.
+    let mut doc = fixture("page-boundaries.json");
+    let p = Profile::us_letter();
+    let map = paginate(&doc.blocks, &p, 0);
+    let lock = PageLock::from_map(&map);
+    let page_of: std::collections::HashMap<String, usize> = lock.members.iter().cloned().collect();
+    let i = doc.blocks.iter().position(|b| b.kind == cirth_core::model::BlockKind::Dialogue && page_of.get(&b.id).is_some_and(|k| *k >= 1)).expect("a speech after page 1");
+    let k = page_of[&doc.blocks[i].id];
+    let extra = " And another thing, while we are standing here with the tide coming in.".repeat(40);
+    doc.blocks[i].runs.push(cirth_core::model::Run::plain(extra));
+    let m = paginate_locked(&doc.blocks, &p, 1, &lock);
+    let labels: Vec<&str> = m.pages.iter().map(|pg| pg.label.as_str()).collect();
+    assert!(labels.contains(&format!("{}A", k + 1).as_str()), "{labels:?}");
+    let base: Vec<String> = txt::render(&map, &p).text.split('\u{c}').map(String::from).collect();
+    let now: Vec<String> = txt::render(&m, &p).text.split('\u{c}').map(String::from).collect();
+    let next = labels.iter().position(|l| *l == (k + 2).to_string()).unwrap();
+    assert_eq!(now[next..], base[k + 1..], "pages from {} on are unchanged", k + 2);
+    check("page-boundaries-locked-edited-letter", &txt::render(&m, &p).text);
+}

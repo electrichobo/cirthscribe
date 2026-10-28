@@ -67,7 +67,7 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
         }
         let rev = if page.revised { revision } else { "" };
         if page.number > 1 || !rev.is_empty() {
-            let number = if page.number > 1 { format!("{}.", page.number) } else { String::new() };
+            let number = if page.number > 1 { format!("{}.", page.label) } else { String::new() };
             let label = [rev, number.as_str()].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join("    ");
             let label_w = UnicodeWidthStr::width(label.as_str());
             let header = if page.number > 1 { header } else { "" };

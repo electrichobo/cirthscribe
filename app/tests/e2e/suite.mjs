@@ -2305,6 +2305,61 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(() => { document.getElementById('rev-close').click(); return true; })()");
   });
 
+  await test("Locked pages: lock the pages; added text goes onto A pages and later pages keep their numbers; kept after reopening; page size fixed; unlock asks first", async () => {
+    await openFixture("page-boundaries");
+    const pag = () => app.evaluate("window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => ({ locked: p.pages_locked, labels: p.map.pages.map(pg => pg.label), starts: p.map.page_starts }))");
+    const before = await pag();
+    assert(!before.locked && before.labels.join() === before.labels.map((_, i) => i + 1).join(), `unlocked pages are 1..N: ${before.labels}`);
+    await app.evaluate("__cirth.menu('pages_lock')");
+    await waitAnnounced("Pages locked", "lock announced");
+    assert((await pag()).locked, "locked");
+    assert(/pages locked/.test(await app.evaluate("document.getElementById('info').textContent")), "the status bar says so");
+    // Add text on the first page after page 1 that has an action block starting on it.
+    const b = await blocks();
+    const startOf = (k) => b.findIndex((x) => x.id === before.starts[k].block_id);
+    let k = 1;
+    let action = -1;
+    for (; k < before.starts.length - 1 && action < 0; k++) action = b.findIndex((x, i) => i > startOf(k) && i < startOf(k + 1) && x.kind === "action");
+    k -= 1;
+    assert(action >= 0, "an action block on a page after page 1");
+    const [page, next, added] = [String(k + 1), String(k + 2), `${k + 1}A`];
+    await caretAtEndOf(action);
+    for (let i = 0; i < 30; i++) {
+      await press("Enter");
+      await typeText(`Added ${i}.`);
+    }
+    await waitSynced();
+    await app.evaluate("__cirth.repaginate ? __cirth.repaginate() : null");
+    const after = await pag();
+    assert(after.labels.includes(added), `page ${page} runs onto ${added}: ${after.labels}`);
+    assert(after.labels[after.labels.length - 1] === before.labels[before.labels.length - 1], `the last page keeps its number: ${after.labels}`);
+    const between = after.labels.slice(after.labels.indexOf(page) + 1, after.labels.indexOf(next));
+    assert(between.length > 0 && between.every((l) => l.startsWith(page) && /[A-Z]$/.test(l)), `only added pages between ${page} and ${next}: ${after.labels}`);
+    assert(after.labels.slice(0, after.labels.indexOf(page) + 1).join() === before.labels.slice(0, k + 1).join(), "earlier pages unchanged");
+    // The page markers in the editor show the labels.
+    await waitFor(app, `[...document.querySelectorAll('.page-mark')].some(m => m.textContent.trim() === 'page ${added}')`, `editor marker for ${added}`);
+    // Text export prints the labels.
+    const out = join(dataDir, "locked.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(out)})`), "exported");
+    assert(new RegExp(`^ +${added}\\.$`, "m").test(readFileSync(out, "utf8")), `${added}. printed as the page number`);
+    // Page size cannot change while locked.
+    await app.evaluate("__cirth.menu('page_a4')");
+    await waitFor(app, "/unlock pages/.test(document.getElementById('banner').textContent)", "page size change refused");
+    assert((await app.evaluate("document.getElementById('profile').value")) === "letter", "still US Letter");
+    // Kept after reopening.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => p.pages_locked &&p.map.pages.some(pg => pg.label === '${added}'))`, "lock kept after reopening");
+    // Unlock asks first; then pages flow freely again.
+    await app.evaluate("(__cirth.menu('pages_unlock'), true)"); // not awaited in the page: WebDriver runs one script at a time
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "unlock asks first");
+    await app.evaluate("(() => { document.getElementById('confirm-ok').click(); return true; })()");
+    await waitAnnounced("Pages unlocked", "unlock announced");
+    const free = await pag();
+    assert(!free.locked && free.labels.every((l, i) => l === String(i + 1)), `unlocked: plain numbers again: ${free.labels}`);
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

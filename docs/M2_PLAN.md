@@ -97,7 +97,20 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - named sets with date and colour (colour never the only identifier);
    - a revision mode that marks changed lines (asterisk in the margin);
    - a changed-pages export (D6).
-7. **Locked pages:**
+7. **Locked pages.** **Built 2026-10-27** (`cirth_core::locked`; the baseline is stored as JSON in the document's settings, so no schema change):
+   - Format > Locked Pages > Lock Pages records the pages as laid out at that moment, with scene numbers and omitted scenes. It records where each page starts (block id and offset) and which page each block starts on. Unlock Pages… asks first.
+   - Afterwards each block keeps its baseline page. A new block joins the page of the block before it. A block never moves to an earlier page than the one before it, so a scene moved earlier flows in like new text.
+   - Each locked page is laid out on its own. Overflow goes onto added pages (12A, 12B … 12Z, 12AA) and later pages keep their numbers (D3). A page that loses text gets shorter. A page that loses all its text folds into the page before it, which prints as "11-12" (D4). A speech cut at a locked boundary keeps its (MORE) and (CONT'D) cue.
+   - Boundaries come from the stored baseline, never from a new layout. A different layout-engine version or paper size is reported as a warning and moves no boundary (D8). Pages always use the bundled font, so a missing system font changes nothing. The page size cannot be changed while pages are locked.
+   - The labels appear in the editor's page markers, the PDF and the text export, the revision header, and the changed-pages export.
+   - Known limits:
+     - An edit before a split point inside a block that runs across a locked boundary can move that split point by the edited amount, because the stored offset counts characters.
+     - Re-locking after A pages (an "A pages become real pages" renumbering) is just Unlock, then Lock.
+   - Tests:
+     - core: unchanged pages match exactly, A pages, shortened pages and folded pages, engine change, labels;
+     - golden: both samples locked and unchanged match the unlocked reference byte for byte, and an edited page runs onto A pages;
+     - store, and an e2e flow on both drivers.
+   Original plan:
    - lock a baseline;
    - later edits create A/B pages instead of reflowing (D3, D4, D8);
    - a layout-engine upgrade or a missing font never reflows a locked baseline.
