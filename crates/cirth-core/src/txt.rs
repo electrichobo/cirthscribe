@@ -25,6 +25,13 @@ pub fn render(map: &PageMap, p: &Profile) -> Exported {
 /// Like `render`, with a title page first (then a form feed) when one is
 /// given and not empty. Page numbers are unchanged: the title page is unnumbered.
 pub fn render_with_title(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>) -> Exported {
+    render_document(map, p, title_page, "", "")
+}
+
+/// Like `render_with_title`, with a header (left of the page number) and a
+/// footer (centred after the page) from page 2, as in the PDF.
+pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::title::TitlePage>, header: &str, footer: &str) -> Exported {
+    let (header, footer) = (header.trim(), footer.trim());
     // Columns count from the action margin, or from the left scene numbers
     // when the script has them (they sit in the left margin).
     let origin = map.pages.iter().flat_map(|pg| pg.lines.iter().map(|l| l.x_in)).fold(p.action.left_in, f32::min);
@@ -58,7 +65,10 @@ pub fn render_with_title(map: &PageMap, p: &Profile, title_page: Option<&crate::
         }
         if page.number > 1 {
             let label = format!("{}.", page.number);
-            out.push_str(&" ".repeat(right.saturating_sub(label.len())));
+            let left = format!("{}{header}", " ".repeat(col(p.action.left_in)));
+            let gap = right.saturating_sub(label.len()).saturating_sub(UnicodeWidthStr::width(left.as_str())).max(if header.is_empty() { 0 } else { 2 });
+            out.push_str(if header.is_empty() { "" } else { &left });
+            out.push_str(&" ".repeat(if header.is_empty() { right.saturating_sub(label.len()) } else { gap }));
             out.push_str(&label);
             out.push_str("\n\n");
         }
@@ -83,6 +93,13 @@ pub fn render_with_title(map: &PageMap, p: &Profile, title_page: Option<&crate::
         }
         for r in grid {
             out.push_str(r.trim_end());
+            out.push('\n');
+        }
+        if page.number > 1 && !footer.is_empty() {
+            let centre = (col(p.action.left_in) + right) / 2;
+            out.push('\n');
+            out.push_str(&" ".repeat(centre.saturating_sub(UnicodeWidthStr::width(footer) / 2)));
+            out.push_str(footer);
             out.push('\n');
         }
     }

@@ -5,3 +5,4 @@
 *.pdf binary
 *.ps1 text eol=crlf
 *.cirth binary
+fixtures/golden/*.txt -text

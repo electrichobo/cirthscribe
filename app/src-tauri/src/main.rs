@@ -739,19 +739,68 @@ struct Exported {
     missing_glyphs: Vec<char>,
 }
 
+/// Header and footer text for this document (settings; tokens unexpanded).
+#[derive(Serialize, Deserialize, Default)]
+struct PageFurniture {
+    header: String,
+    footer: String,
+}
+
+fn page_furniture_of(s: &Session) -> Result<PageFurniture, String> {
+    let scope = format!("document:{}", s.store.default_document().map_err(err)?);
+    Ok(PageFurniture {
+        header: s.store.setting(&scope, "header").map_err(err)?.unwrap_or_default(),
+        footer: s.store.setting(&scope, "footer").map_err(err)?.unwrap_or_default(),
+    })
+}
+
 #[tauri::command]
-async fn export_pdf(app: State<'_, App>, profile_name: String) -> Result<Exported, String> {
+async fn page_furniture(app: State<'_, App>) -> Result<PageFurniture, String> {
+    with_session(&app, |s| page_furniture_of(s))
+}
+
+/// Store header and footer. The next save writes them into the project file.
+#[tauri::command]
+async fn set_page_furniture(app: State<'_, App>, header: String, footer: String) -> Result<(), String> {
+    with_session(&app, |s| {
+        let scope = format!("document:{}", s.store.default_document().map_err(err)?);
+        s.store.set_setting(&scope, "header", &header).map_err(err)?;
+        s.store.set_setting(&scope, "footer", &footer).map_err(err)
+    })
+}
+
+/// File > Export > PDF…: the page map with title page, scene numbers,
+/// header and footer. Without `path` (tests) it goes to the app's exports folder.
+#[tauri::command]
+async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<String>) -> Result<Exported, String> {
     let (p, doc) = paginate_current(&app, &profile_name)?;
     let prof = profile(&profile_name);
     let t0 = Instant::now();
-    let tp = with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))?;
-    let bytes = pdf::render_with_title(&p.map, &prof, &doc.title, Some(&tp))?;
+    let (tp, furniture, project_id) = with_session(&app, |s| Ok((s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?, s.store.project_id().map_err(err)?)))?;
+    let opts = pdf::PdfOptions {
+        title: if tp.is_empty() { doc.title.clone() } else { tp.title.lines().next().unwrap_or("").trim().to_string() },
+        author: tp.authors.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(", "),
+        subject: tp.draft_label.trim().to_string(),
+        date_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0),
+        document_id: project_id,
+        header: pdf::expand_tokens(&furniture.header, &tp),
+        footer: pdf::expand_tokens(&furniture.footer, &tp),
+    };
+    let bytes = pdf::render_document(&p.map, &prof, Some(&tp), &opts)?;
     let pdf_ms = t0.elapsed().as_secs_f64() * 1e3;
-    let name = with_session(&app, |s| Ok(s.key.clone()))?;
-    let dir = data_dir(&app).join("exports");
-    std::fs::create_dir_all(&dir).map_err(io_err)?;
-    let path = dir.join(format!("{name}-v{}-{}.pdf", doc.version, prof.name));
-    std::fs::write(&path, &bytes).map_err(io_err)?;
+    let path = match path {
+        Some(target) => normalize(Path::new(&target)),
+        None => {
+            let name = with_session(&app, |s| Ok(s.key.clone()))?;
+            let dir = data_dir(&app).join("exports");
+            std::fs::create_dir_all(&dir).map_err(io_err)?;
+            dir.join(format!("{name}-v{}-{}.pdf", doc.version, prof.name))
+        }
+    };
+    let tmp = path.with_extension("pdf.tmp");
+    std::fs::write(&tmp, &bytes).map_err(io_err)?;
+    cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)?;
     Ok(Exported { path: path.display().to_string(), pages: p.map.pages.len(), doc_version: doc.version, layout_ms: p.layout_ms, pdf_ms, bytes: bytes.len(), missing_glyphs: p.missing_glyphs })
 }
 
@@ -813,8 +862,8 @@ struct TxtExported {
 async fn export_txt(app: State<'_, App>, path: String) -> Result<TxtExported, String> {
     let name = with_session(&app, |s| Ok(ui_profile(&s.store.document_profile(&s.store.default_document().map_err(err)?).map_err(err)?)))?;
     let (p, doc) = paginate_current(&app, name)?;
-    let tp = with_session(&app, |s| s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err))?;
-    let t = cirth_core::txt::render_with_title(&p.map, &profile(name), Some(&tp));
+    let (tp, furniture) = with_session(&app, |s| Ok((s.store.title_page(&s.store.default_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?)))?;
+    let t = cirth_core::txt::render_document(&p.map, &profile(name), Some(&tp), &pdf::expand_tokens(&furniture.header, &tp), &pdf::expand_tokens(&furniture.footer, &tp));
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("txt.tmp");
     std::fs::write(&tmp, &t.text).map_err(io_err)?;
@@ -1375,7 +1424,7 @@ fn check_item(app: &tauri::App, id: &str, label: &str, on: bool) -> tauri::Resul
 
 fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::SubmenuBuilder;
-    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF (proof)").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").build()?;
+    let export = SubmenuBuilder::new(app, "Export").text("export_pdf", "PDF…").text("export_txt", "Plain Text…").text("export_fountain", "Fountain…").text("export_fdx", "Final Draft (.fdx)…").build()?;
     let file = SubmenuBuilder::new(app, "File")
         .text("new", "New Project…")
         .text("open", keyed("Open…", "O"))
@@ -1387,6 +1436,7 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&export)
         .separator()
         .text("title_page", "Title Page…")
+        .text("page_furniture", "Headers and Footers…")
         .separator()
         .text("free_writing", "Free Writing")
         .separator()
@@ -1650,6 +1700,8 @@ fn main() {
             set_menu_checks,
             title_page,
             set_title_page,
+            page_furniture,
+            set_page_furniture,
             scene_numbers_command,
             import_fountain,
             export_fountain,

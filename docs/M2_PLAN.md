@@ -73,7 +73,14 @@ Each step is a working, tested slice. Every export gets a capability/loss report
    - OMITTED scenes keep their number;
    - unlocking renumbers after a confirmation.
    - Numbers appear in the scene list, the PDF margins and FDX.
-5. **Production PDF:**
+5. **Production PDF.** **Built 2026-10-27:**
+   - File > Export > PDF… asks where to save. Title, author and draft come from the title page into the PDF's properties.
+   - Repeatable output: the same script and options give the same bytes; printpdf's random trailer ids are replaced by a stable project id, and the date is set explicitly. Tested.
+   - Headers and footers (File > Headers and Footers…, tokens {title} {draft} {date}) from page 2 in PDF and text exports.
+   - Scene numbers in both margins (step 4).
+   - **Cross-platform reference pages (acceptance D7):** `crates/cirth-core/tests/golden.rs` compares the text layout of the three sample scripts (Letter and A4) and a numbered variant with committed files in `fixtures/golden/`. CI runs it on Windows, macOS and Linux.
+   - The "proof" label is gone. The export still says that page measurements follow published guidance and have not been compared with an industry PDF; manual check N25 does that.
+   Original plan:
    - headers and footers;
    - scene numbers in both margins;
    - the "draft proof" label dropped once acceptance D1, D2 and D7 pass on all three OSes;

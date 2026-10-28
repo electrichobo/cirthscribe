@@ -35,6 +35,7 @@ import { createFormatBar } from "./formatbar";
 import { icon, iconButton, iconSelect } from "./icons";
 import { createLayoutMode } from "./layout-mode";
 import { createTitlePageDialog } from "./titlepage";
+import { createFurnitureDialog } from "./furniture";
 import { usedPointer, announce, installLiveRegions, loadPrefs, stepScale, toggleContrast, togglePanel, toggleTypewriter, setScreenFont, setScreenSize, stepScreenSize, onPanelsChanged, SCREEN_FONTS, type ScreenFont, cycleRegions, focusRegion, focusKey, restoreFocus, currentPrefs } from "./a11y";
 
 interface Opened {
@@ -559,6 +560,7 @@ const about = createAbout();
 // Title page fields are settings, not versioned edits, so write the file now
 // (as a page-size change does) instead of waiting for autosave.
 const titlePage = createTitlePageDialog(() => saveFile(false));
+const furniture = createFurnitureDialog(() => saveFile(false));
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
 // Screen font and size: on screen only (pages and exports keep Courier Prime 12 pt).
 {
@@ -812,7 +814,7 @@ async function runMenu(id: string): Promise<void> {
       if (lastOpen) await saveAs();
       break;
     case "export_pdf":
-      if (lastOpen) await exportPdf();
+      await exportPdf();
       break;
     case "import_fountain":
       await importFountain();
@@ -880,6 +882,9 @@ async function runMenu(id: string): Promise<void> {
     case "title_page":
       if (lastOpen) await titlePage.open();
       break;
+    case "page_furniture":
+      if (lastOpen) await furniture.open();
+      break;
     case "free_writing":
       await openFreeWriting();
       break;
@@ -941,13 +946,21 @@ void loadPrefs();
 
 $("save").addEventListener("click", () => void saveNow());
 /** PDF proof from the canonical store (File > Export > PDF). */
-async function exportPdf() {
+/** File > Export > PDF…: asks where to save (a path skips the dialog). */
+async function exportPdf(path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target = path ?? (await saveDialog({ defaultPath: lastOpen.package_path.replace(/\.cirth$/i, ".pdf"), filters: [{ name: "PDF", extensions: ["pdf"] }] }));
+  if (!target) return false;
   await syncer.flush();
   try {
-    const r = await invoke<{ path: string; pages: number; doc_version: number; layout_ms: number; pdf_ms: number; missing_glyphs: string[] }>("export_pdf", { profileName: ($("profile") as HTMLSelectElement).value });
-    showBanner(`PDF proof (not production-ready) written: ${r.path} · ${r.pages} pages from v${r.doc_version} · layout ${r.layout_ms.toFixed(1)} ms, PDF ${r.pdf_ms.toFixed(1)} ms${r.missing_glyphs.length ? ` · missing glyphs: ${r.missing_glyphs.join(" ")}` : ""}`);
+    const r = await invoke<{ path: string; pages: number; doc_version: number; layout_ms: number; pdf_ms: number; missing_glyphs: string[] }>("export_pdf", { profileName: ($("profile") as HTMLSelectElement).value, path: target });
+    const glyphs = r.missing_glyphs.length ? ` The font has no ${r.missing_glyphs.join(" ")}, so those characters may not print.` : "";
+    // Honest until MANUAL_CHECKS N25 compares the margins with an industry reference.
+    showBanner(`PDF written: ${r.path} · ${r.pages} pages from v${r.doc_version}.${glyphs} Page measurements follow published guidance and have not yet been checked against an industry PDF.`);
+    return true;
   } catch (e) {
     showBanner(`PDF export failed: ${e}`);
+    return false;
   }
 }
 /** Format > Scene Numbers. Numbers live in Rust; this asks, then repaints. */
@@ -1084,6 +1097,7 @@ $("structural").addEventListener("change", (e) => {
   focusMode,
   layoutMode,
   titlePage,
+  furniture,
   selSync,
   blocks: () => {
     const out: Block[] = [];

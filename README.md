@@ -76,7 +76,8 @@ Done:
 - [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
 
 Still to do:
-- [ ] Production-quality PDF (headers and footers, scene numbers, no more "draft proof" label)
+- [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
+- [ ] Check the page measurements against an industry-standard PDF
 - [ ] Revision colours and revision marks
 - [ ] Locked pages: later changes create A/B pages instead of moving everything
 - [ ] Word (DOCX), RTF and HTML export, each with a report of what carried over

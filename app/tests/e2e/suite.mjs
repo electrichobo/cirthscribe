@@ -1590,8 +1590,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitOpen(app);
     assert((await blocks()).some((b) => text(b).startsWith("No signal.")), "text back after reopening");
     assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(join(dataDir, "offline.txt"))})`), "text export");
-    await app.evaluate("__cirth.menu('export_pdf')");
-    await waitFor(app, "/PDF proof/.test(document.getElementById('banner').textContent)", "PDF export");
+    assert(await app.evaluate(`__cirth.exportPdf(${JSON.stringify(join(dataDir, "offline.pdf"))})`), "PDF export");
     await fwOpen();
     await app.evaluate("(() => { document.getElementById('fw-new').click(); return true; })()");
     await fwFocusBody();
@@ -1749,7 +1748,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!missing.length, `missing menu items: ${missing}`);
     const editNative = items.filter((i) => i.path.startsWith("Edit > ") && !want.includes(i.id));
     assert(editNative.length >= 4, `Edit has the OS's Cut, Copy, Paste and Select All: ${editNative.map((i) => i.path)}`);
-    assert(items.some((i) => i.path === "File > Export > PDF (proof)") && items.some((i) => i.path.startsWith("Format > Block Type > Dialogue (")), "nested Export and Block Type menus");
+    assert(items.some((i) => i.path === "File > Export > PDF…") && items.some((i) => i.path.startsWith("Format > Block Type > Dialogue (")), "nested Export and Block Type menus");
     const checked = (id) => items.find((i) => i.id === id)?.checked;
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'page_letter').checked && !m.find(i => i.id === 'page_a4').checked && m.find(i => i.id === 'spell_en_US').checked)", "check marks match this document on open");
 
@@ -2213,12 +2212,12 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(await app.evaluate(`__cirth.exportFountain(${JSON.stringify(fountain)})`), "Fountain exported");
     assert(readFileSync(fountain, "utf8").includes("INT. NEW ROOM - DAY #1A#"), "Fountain has #1A#");
     // Unlock asks first; Cancel keeps them, Unlock removes them.
-    void app.evaluate("__cirth.menu('scenes_unlock')");
+    await app.evaluate("(__cirth.menu('scenes_unlock'), true)"); // not awaited in the page: WebDriver runs one script at a time
     await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "unlock asks for confirmation");
     await app.evaluate("(() => { document.getElementById('confirm-cancel').click(); return true; })()");
     await sleep(300);
     assert((await navNums()).length === scenes0 + 1, "Cancel keeps the numbers");
-    void app.evaluate("__cirth.menu('scenes_unlock')");
+    await app.evaluate("(__cirth.menu('scenes_unlock'), true)"); // not awaited in the page: WebDriver runs one script at a time
     await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "asked again");
     await app.evaluate("(() => { document.getElementById('confirm-ok').click(); return true; })()");
     await waitFor(app, "document.querySelectorAll('#navigator .nav-go .num').length === 0 && document.querySelectorAll('.ProseMirror .scene-num').length === 0", "numbers removed after unlocking");
@@ -2252,15 +2251,33 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!(await app.evaluate("document.getElementById('latency-dialog').open")), "closed");
   });
 
-  await test("PDF proof export from the canonical store", async () => {
-    await openFixture("page-boundaries", false);
-    await app.evaluate("__cirth.menu('export_pdf')");
-    let banner = "";
-    for (let i = 0; i < 50 && !/PDF proof/.test(banner); i++) {
-      await sleep(100);
-      banner = await app.evaluate("document.getElementById('banner').textContent");
-    }
-    assert(/PDF proof \(not production-ready\) written/.test(banner), banner);
+  await test("PDF export: saved where chosen, with title page, headers and footers (from page 2) and the title page's metadata", async () => {
+    await openFixture("page-boundaries");
+    // Title page and headers/footers through their dialogs.
+    await app.evaluate("__cirth.menu('title_page')");
+    await waitFor(app, "document.getElementById('title-dialog')?.open === true", "title page dialog");
+    await app.evaluate("(() => { document.getElementById('tp-title').value = 'PAGE BOUNDARIES'; document.getElementById('tp-authors').value = 'Jared Hoy'; document.getElementById('tp-draft_label').value = 'Blue Revision'; document.getElementById('tp-save').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('title-dialog').open", "title page saved");
+    await app.evaluate("__cirth.menu('page_furniture')");
+    await waitFor(app, "document.getElementById('furniture-dialog')?.open === true", "headers and footers dialog");
+    await audit("headers and footers dialog");
+    await app.evaluate("(() => { document.getElementById('pf-header').value = '{title} - {draft}'; document.getElementById('pf-footer').value = 'Confidential'; document.getElementById('pf-save').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('furniture-dialog').open", "saved");
+    // Text export shows exactly what the PDF prints around the pages.
+    const txtPath = join(dataDir, "furniture.txt");
+    assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(txtPath)})`), "text exported");
+    const pages = readFileSync(txtPath, "utf8").split("\f");
+    assert(!pages[1].includes("PAGE BOUNDARIES - Blue Revision") && !pages[1].includes("Confidential"), "nothing on page 1 of the script");
+    assert(/^ *PAGE BOUNDARIES - Blue Revision +2\.$/m.test(pages[2]) && /^ +Confidential$/m.test(pages[2]), `header and footer on page 2: ${pages[2].slice(0, 200)}`);
+    // PDF: saved at the chosen path, metadata from the title page, title page + script pages.
+    const pdfPath = join(dataDir, "chosen name.pdf");
+    assert(await app.evaluate(`__cirth.exportPdf(${JSON.stringify(pdfPath)})`), "PDF exported");
+    const banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(banner.includes("PDF written") && !/proof/i.test(banner), `banner: ${banner}`);
+    const bytes = readFileSync(pdfPath, "latin1");
+    const scriptPages = await app.evaluate("window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => p.map.pages.length)");
+    assert((bytes.match(/\/Type\s*\/Page(?!s)/g) ?? []).length === scriptPages + 1, "title page plus script pages");
+    assert(bytes.includes("(PAGE BOUNDARIES)") && bytes.includes("(Jared Hoy)") && bytes.includes("(Blue Revision)"), "title, author and draft in the PDF's properties");
     return { banner };
   });
 
