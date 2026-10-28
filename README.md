@@ -91,6 +91,9 @@ Carried forward:
 
 ### 🔜 Stage 3: Story planning (next; plan accepted)
 
+First, from the owner's notes on the current build: reorganised menus, a notes scratchpad, panels that pop out into their own windows, more themes and remappable shortcuts.
+
+
 - [ ] Episodes and series sharing one story bible
 - [ ] Tabbed navigator: scenes (length, summary, characters), characters, notes, outline
 - [ ] Outline editor, and an overview map of the whole script

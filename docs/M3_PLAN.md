@@ -58,6 +58,32 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
 
 The exit review comes after 9. Steps 5 and 6 can swap.
 
+## Workspace and menus (owner notes, 2026-10-28)
+
+The owner's notes after using the current build. Proposed as steps W1–W5, done **before step 1**: every M3 panel built afterwards then lands in the new menus and can pop out from the start. A menu item appears only once its feature works: never a placeholder for M4–M5 features.
+
+- **W0. Fixed at once (2026-10-28):**
+  - The block-type dropdown's open list was unreadable except under the mouse (system list background, theme text colour). Options now use the theme's panel and ink colours.
+  - Home: Free Writing sits directly under "Open a project file…", the same size.
+  - Already true, checked in the code: Free Writing belongs to no project, saves half a second after typing, on leaving a field and on closing the app.
+- **W1. Menus and naming.**
+  - "Elements" instead of "blocks" everywhere the writer sees it (the code keeps `block`).
+  - **File:** one Import… that detects the format from the file (Fountain and FDX now; TXT, RTF and DOCX need new importers, see question 3). One Export… dialog listing every export with its options and capability report; reports, sides and stripboards join it when M4 builds them. Free Writing leaves File for the island's More menu. Title Page… and Headers and Footers move to Format.
+  - **View:** a Mode submenu (Normal, Page, Typewriter, Focus, Full Screen); a Tools submenu with every panel's toggle and pop-out (scene navigator, board now; outline, beat board, overview, bible, timeline, evidence board and notes as each is built); Appearance (themes Day, Night, Midnight, OLED and Match System; interface size; high contrast); Window (minimise, zoom, bring all to front; split, document list once episodes exist); Go To (page, scene; act once acts exist); Reports (the StoryScry dashboard and every report: M4).
+  - **Format:** Element submenu (the block types); Page (size; margins and spacing, see question 4); Spelling moves here from Edit; Title Page, Headers and Footers; Revisions, Scene Numbers, Locked Pages as now; Rename Globally (characters and locations: the bible's previewed rename, step 7); Tags (M4); Keyboard Shortcuts (W5).
+  - **Help:** About, Keyboard Shortcuts, Licences, Check for Updates (see question 5), Typing Latency.
+- **W2. Notes panel:** a scratchpad saved with the project and tied to nothing else. A Tools panel that can pop out.
+- **W3. Pop-out panels:** any panel can leave the main window as its own window, move freely, and come back. Clicking or focusing a window brings it to the front as the active one. Panels stay views of the core's data, so two windows never hold separate copies; keyboard focus and undo follow the active window (decision A). Tauri 2 opens extra windows itself: no new dependency. An ADR records how windows share state.
+- **W4. Themes:** Day, Night, Midnight, OLED (true black) and Match System, each checked for contrast like the current two.
+- **W5. Keyboard shortcut remapping:** a list of commands with their keys, conflict warnings, reset to defaults; stored per user.
+
+Questions for the owner (they change what gets built):
+1. **Comment icon on the island.** On 2026-10-27 comments went wholly to M5 (decision C, option 2: no button before then). Bring a basic anchored comment forward into M3 so the icon works, or add the icon when M5 builds comments?
+2. **Name of the reports dashboard:** the README says StoryScry; your notes say ScriptScry. Which one?
+3. **Import formats:** Fountain and FDX import exist. TXT can be read as Fountain. RTF and DOCX import are new work (no dependency for RTF; DOCX can reuse the approved `zip` crate). In M3, or later?
+4. **Margins, line spacing and fonts for screenplays:** pages use the fixed industry format so a page stays about a minute (decision A1, 2026-10-26). Proposed: page size stays the only page setting for screenplays; margins, spacing and fonts apply to other document kinds (M6). Or do you want them for screenplays too, knowing page counts stop matching the standard?
+5. **Check for Updates:** the app makes no network request without opt-in. Proposed: the menu item opens the project's releases page in your browser only when clicked; no background checks. Nothing to point at until there is a first release.
+
 ## Carried from M2 (not blockers for starting M3)
 
 - External app tests: Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print (docs/COMPATIBILITY.md);

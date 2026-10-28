@@ -116,7 +116,7 @@ export function createHome(root: HTMLElement, actions: Actions) {
   freeBtn.addEventListener("click", () => actions.openFreeWriting());
   const aboutBtn = el("button", { type: "button", id: "open-about", className: "link" }, "About Kolbítar and licences");
   aboutBtn.addEventListener("click", () => actions.openAbout());
-  const side = el("aside", { className: "home-side", ariaLabel: "New, open and samples" }, form, el("h2", {}, "Open"), openBtn, el("h2", {}, "Free Writing"), freeBtn, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
+  const side = el("aside", { className: "home-side", ariaLabel: "New, open and samples" }, form, el("h2", {}, "Open"), openBtn, freeBtn, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
   const main = el("section", { className: "home-main", ariaLabel: "Projects" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, "Kolbítar"), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 

@@ -55,6 +55,10 @@ body[data-view="editor"] > .toolbar > .island { grid-column: 2; justify-self: ce
 .fmt[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .board-option { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; }
 button, select, input, textarea { font: inherit; color: inherit; }
+/* The open list of a dropdown is drawn by the system on its own background:
+   give its options the theme's colours, or light text lands on a light list
+   (only the hovered option was readable). */
+select option, select optgroup { background: var(--panel); color: var(--ink); }
 button { padding: 3px 9px; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer; }
 button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, .card:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #status { font-variant-numeric: tabular-nums; }
@@ -304,7 +308,9 @@ dialog.backups h2 { text-transform: none; letter-spacing: 0; font-size: 15px; co
 .spell-menu .suggestion { font-weight: 600; }
 .spell-menu .none { padding: 4px 10px; color: var(--muted); }
 .spell-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
-#open-file { width: 100%; padding: 7px 12px; margin-bottom: 18px; }
+#open-file, #open-free { width: 100%; padding: 7px 12px; }
+#open-file { margin-bottom: 8px; }
+#open-free { margin-bottom: 18px; }
 .project-item { display: grid; gap: 4px; }
 .forget { justify-self: start; font-size: 12px; }
 .project .meta .file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
