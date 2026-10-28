@@ -4,7 +4,7 @@ Updated 2026-10-27.
 
 **Current milestone: M2 (plan: `docs/M2_PLAN.md`), started 2026-10-27.** M1 and M1b closed by the owner on 2026-10-27, with Linux latency, reference machines, defect 3 and macOS check N20 carried forward (`docs/m1/EXIT_REVIEW.md`). M0 complete.
 
-M2 progress: steps 1–8 built (title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports; details under each step in `docs/M2_PLAN.md`). Step 9, the compatibility matrix, is in progress: the test pack and the record (`docs/COMPATIBILITY.md`) exist; the first Mac round is logged and its defects are fixed; the Mac recheck is deferred by the owner. **M2 exit review drafted (`docs/m2/EXIT_REVIEW.md`): not done yet.** Linux e2e has been red in CI since M2 step 3, and a fix attempt is pending a CI run. External app results are missing, and owner decisions A and B are open. The working state between sessions is in `HANDOFF.md`.
+M2 progress: steps 1–8 built (title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports; details under each step in `docs/M2_PLAN.md`). Step 9, the compatibility matrix, is in progress: the test pack and the record (`docs/COMPATIBILITY.md`) exist; the first Mac round is logged and its defects are fixed; the Mac recheck is deferred by the owner. **M2 exit review drafted (`docs/m2/EXIT_REVIEW.md`): not done yet.** Linux e2e, red in CI since M2 step 3 (Tab traps on WebKitGTK), is green again from 92a2cf9: all three CI jobs pass. External app results are missing, and owner decisions A and B are open. The working state between sessions is in `HANDOFF.md`.
 
 M1 progress:
 - 1.1 done: End-key selection defect fixed; regression and stress tests.

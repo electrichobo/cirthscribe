@@ -6,8 +6,8 @@ Gate sources: ROADMAP.md (M2 and its exit line), ACCEPTANCE.md section D, docs/M
 
 **Verdict: M2 is not done.**
 - Everything M2 promised is built, with tests on Windows.
-- The exit gate needs external results that do not exist yet, and one platform check is failing:
-  - Linux end-to-end has been red in CI since M2 step 3;
+- The exit gate needs external results that do not exist yet:
+  - (resolved after the review: Linux end-to-end, red in CI since M2 step 3, is green again from 92a2cf9);
   - Word, Google Docs, LibreOffice and Final Draft results are missing;
   - the Mac recheck is deferred by the owner.
 - One acceptance item needs an owner decision: non-Latin text in PDFs.
@@ -45,14 +45,14 @@ Gate sources: ROADMAP.md (M2 and its exit line), ACCEPTANCE.md section D, docs/M
 
 ## 4. Blockers and open items
 
-1. **Linux end-to-end in CI: failing since d2d7bdc (M2 step 3).** Core tests, macOS and Windows pass.
+1. **Linux end-to-end in CI: failed from d2d7bdc (M2 step 3); fixed, green from 92a2cf9 (2026-10-27).** Core tests, macOS and Windows pass.
    - The failing test: Tab and Shift+Tab inside the island's More popover.
    - Likely cause: step 1 added a Title Page button to More, so Shift+Tab is now pressed from a `<select>`, which WebKitGTK handles differently. This is an inference: it cannot be run on this machine.
    - Fix attempt in the commit that adds this review: the trap never lets focus leave, settings are no longer moved while More is open, and the test reports where focus went.
    - Confirmed only when CI runs it.
    - **CI on b94b0de, 2026-10-27: still failing**, now with a diagnosis: "from select#view-mode, focus now on button#view-menu-btn". That is the browser's own Shift+Tab, so the popover's keydown handler never cancelled it: on WebKitGTK a focused `<select>` keeps the event from the popover's bubbling listener.
    - Second fix (c49ae5a): Tab is handled in the capture phase on the document, which accepts GTK's `ISO_Left_Tab` and keyCode 9, with a focus-in safety net.
-   - **CI on c49ae5a: the More popover test passes on Linux.** The run then failed on "Narrow script column: Tab stays in the floating scene list". The floating panels had the same bubbling Tab handler, so they get the same capture-phase handling in the next commit. It passes on Windows under both drivers; it needs another CI run.
+   - **CI on c49ae5a: the More popover test passes on Linux.** The run then failed on "Narrow script column: Tab stays in the floating scene list". The floating panels had the same bubbling Tab handler, so they got the same capture-phase handling (92a2cf9). **CI on 92a2cf9: all three jobs green, Linux end-to-end included.**
    - Earlier, in 24466e0, the Linux run failed once on "Narrow script column"; later runs got past it.
    - The failures went unnoticed because several runs in between were cancelled by newer pushes and no one read the results.
 2. **External compatibility results** (above). Needs the owner's apps.
@@ -72,5 +72,5 @@ Gate sources: ROADMAP.md (M2 and its exit line), ACCEPTANCE.md section D, docs/M
   - (2) Keep it as a reported limitation for M2 (the export already lists missing glyphs) and pick the font in a later milestone.
 - **B. Closing M2.**
   - (1) Wait for the external results and the Mac recheck.
-  - (2) Close M2 as M1 was closed, carrying the external tests, the Mac recheck and the manual checks forward, once Linux CI is green again.
+  - (2) Close M2 as M1 was closed, carrying the external tests, the Mac recheck and the manual checks forward. Linux CI is green again (92a2cf9), so this is now possible.
 - **C. Pages on the Mac:** installs are not allowed there, so Pages stays untested unless you install it yourself.

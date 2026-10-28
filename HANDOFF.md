@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-M2, production screenplay output. Steps 1–8 are built; step 9 (compatibility matrix) is in progress. **The M2 exit review is drafted: docs/m2/EXIT_REVIEW.md. Verdict: not done yet.** The immediate goal is to get Linux end-to-end green in CI again, then the owner's decisions A (non-Latin PDF font) and B (how to close M2).
+M2, production screenplay output. Steps 1–8 are built; step 9 (compatibility matrix) is in progress. **The M2 exit review is drafted: docs/m2/EXIT_REVIEW.md. Verdict: not done yet.** Linux end-to-end is green in CI again (92a2cf9). The immediate goal is the owner's decisions A (non-Latin PDF font) and B (how to close M2).
 
 ## Completed & Verified
 
@@ -15,11 +15,10 @@ M2, production screenplay output. Steps 1–8 are built; step 9 (compatibility m
   - the test reports where focus went.
   CI on b94b0de still failed, but with a diagnosis: "from select#view-mode, focus now on button#view-menu-btn" (the browser's default Shift+Tab; the popover's bubbling keydown never cancelled it on WebKitGTK).
   Second fix (c49ae5a): Tab handled in the capture phase on the document (Tab, ISO_Left_Tab, keyCode 9), plus a focus-in safety net. **CI on c49ae5a: the More test passes on Linux**; the run then failed on "Narrow script column: Tab stays in the floating scene list", the same bubbling-handler pattern in layout-mode.ts.
-  Third fix: the floating panels' Tab trap moved to a capture-phase document handler too. Passes on Windows under both drivers; Linux needs another CI run.
+  Third fix (92a2cf9): the floating panels' Tab trap moved to a capture-phase document handler too. **CI on 92a2cf9: Linux, macOS and Windows all green.**
 - Mac recheck of pack v2: **deferred by the owner** (recorded in docs/COMPATIBILITY.md).
 - Checks run on Windows 11: `npm run test:contract` (4), `npm run e2e:cdp` (50/50), `npm run e2e:webdriver` (49/49, 1 skipped: IME). CI on 65462b7: macOS and Windows jobs green (including the new PDF, DOCX and RTF tests); Linux failed on the same More Shift+Tab test (before this fix).
 - Not verified:
-  - Linux CI;
   - external app results (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print);
   - the Mac v2 recheck (deferred);
   - manual checks N20–N28;
@@ -31,6 +30,5 @@ None once the review commit is made.
 
 ## Next Immediate Step
 
-1. Ask the owner to push the floating-panel fix. Then read the CI result through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and the failed job's annotations under `/check-runs/<job id>/annotations`.
-2. If Linux still fails, the new assertion message names where focus went: fix from that.
-3. Ask the owner for decisions A and B (docs/m2/EXIT_REVIEW.md section 5).
+1. Ask the owner for decisions A and B (docs/m2/EXIT_REVIEW.md section 5).
+2. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.
