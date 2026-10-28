@@ -23,7 +23,9 @@ export function createLayoutMode(opts: { zoom: () => number; panes: HTMLElement;
   const floating: Record<Side, boolean> = { nav: false, board: false };
 
   function compute(): LayoutMode {
-    const p = currentPrefs().panels;
+    // A panel popped out into its own window takes no room here (ADR 0004).
+    const prefs = currentPrefs().panels;
+    const p = { nav: prefs.nav && !document.body.hasAttribute("data-popped-nav"), board: prefs.board && !document.body.hasAttribute("data-popped-board") };
     if (!p.nav && !p.board) return "normal";
     const need = PAGE_PX * opts.zoom() + SLACK;
     const width = opts.panes.clientWidth || window.innerWidth;

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core events, the app's own commands, closing the main window (the close handler saves first), and native Open/Save dialogs (they only return a path; the app's own commands do the file work). No shell, no fs plugin, no http.",
-  "windows": ["main"],
+  "description": "Core events, the app's own commands, closing the main window (the close handler saves first), and native Open/Save dialogs (they only return a path; the app's own commands do the file work). Pop-out panel windows (panel-*, ADR 0004) use events to talk to the main window. No shell, no fs plugin, no http.",
+  "windows": ["main", "panel-*"],
   "permissions": ["core:default", "core:window:allow-close", "core:window:allow-destroy", "dialog:allow-open", "dialog:allow-save"]
 }

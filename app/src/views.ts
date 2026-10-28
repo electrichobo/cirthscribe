@@ -1,14 +1,16 @@
-// Navigator and board: two more views of the same scenes. They read scene
-// headings from the editor document and change the script only through
-// MoveScene transactions. Cards show the beat's logline and summary, which
-// are separate authored text, never a copy of the scene.
+// Navigator and board: two more views of the same scenes. They read scenes
+// through a ScriptView and change the script only through MoveScene
+// transactions. Cards show the beat's logline and summary, which are
+// separate authored text, never a copy of the scene.
+//
+// A ScriptView is the editor itself in the main window, or the event bridge
+// in a pop-out panel window (ADR 0004), so the same code draws both.
 //
 // Keyboard: each list is one Tab stop (roving tabindex). Arrows choose an
 // item, Alt+arrows move it, and moves are announced to screen readers.
 
 import type { EditorView } from "prosemirror-view";
 import { TextSelection } from "prosemirror-state";
-import { invoke } from "@tauri-apps/api/core";
 import { moveScene, scenesOf, type SceneInfo } from "./scenes";
 import { newId, type Beat } from "./schema";
 import { announce } from "./a11y";
@@ -28,6 +30,35 @@ export function setSceneNumbers(n: Map<string, { number: string; omitted: boolea
 
 const NAV_HINT = "Up and Down arrows choose a scene, Enter goes to it, Alt+Up and Alt+Down move it.";
 const BOARD_HINT = "Arrow keys choose a card, Enter edits its logline (Tab goes on to the summary) and Escape returns, Alt+arrows move it. Tab reaches the chosen card's buttons.";
+
+/** What the navigator and board need from the script. */
+export interface ScriptView {
+  scenes(): SceneInfo[];
+  /** The scene with the caret. */
+  current(): string | undefined;
+  reveal(sceneId: string): void;
+  /** One MoveScene transaction in the script's history. */
+  move(sceneId: string, beforeSceneId: string | null): void;
+  /** Store a beat (new or changed). */
+  putBeat(beat: Beat): Promise<void>;
+  /** A pop-out (main window) or dock (panel window) button for a panel's header. */
+  panelButton?(panel: "nav" | "board"): HTMLElement | null;
+}
+
+/** The editor as a ScriptView (main window). */
+export function editorScript(view: EditorView, putBeat: (beat: Beat) => Promise<void>, panelButton?: ScriptView["panelButton"]): ScriptView {
+  return {
+    scenes: () => scenesOf(view.state.doc),
+    current: () => sceneAtCursor(view)?.sceneId,
+    reveal: (id) => revealScene(view, id),
+    move: (id, before) => {
+      const tr = moveScene(view.state, id, before);
+      if (tr) view.dispatch(tr);
+    },
+    putBeat,
+    panelButton,
+  };
+}
 
 /** Go to a scene: caret at the end of its heading (so Enter continues the
  *  scene instead of inserting a block above the heading), and the heading
@@ -49,21 +80,16 @@ export function sceneAtCursor(view: EditorView): SceneInfo | undefined {
   return scenesOf(view.state.doc).find((s) => pos >= s.from && pos < s.to);
 }
 
-function doMove(view: EditorView, sceneId: string, beforeSceneId: string | null) {
-  const tr = moveScene(view.state, sceneId, beforeSceneId);
-  if (tr) view.dispatch(tr);
-}
-
 /** Move a scene one place up or down; the editor transaction is the only write. */
-function moveSceneBy(view: EditorView, sceneId: string, dir: -1 | 1) {
-  const scenes = scenesOf(view.state.doc);
+function moveSceneBy(script: ScriptView, sceneId: string, dir: -1 | 1) {
+  const scenes = script.scenes();
   const i = scenes.findIndex((s) => s.sceneId === sceneId);
   const j = i + dir;
   if (i < 0 || j < 0 || j >= scenes.length) {
     announce(dir < 0 ? "Already the first scene" : "Already the last scene");
     return;
   }
-  doMove(view, sceneId, dir < 0 ? scenes[j].sceneId : (scenes[j + 1]?.sceneId ?? null));
+  script.move(sceneId, dir < 0 ? scenes[j].sceneId : (scenes[j + 1]?.sceneId ?? null));
   announce(`Scene moved to position ${j + 1} of ${scenes.length}. Undo reverts it.`);
 }
 
@@ -84,9 +110,9 @@ function arrowTarget<T>(list: T[], at: number, key: string, prev: string[], next
   return undefined;
 }
 
-export function renderNavigator(root: HTMLElement, view: EditorView, focusScene?: string | null) {
-  const scenes = scenesOf(view.state.doc);
-  const current = sceneAtCursor(view)?.sceneId;
+export function renderNavigator(root: HTMLElement, script: ScriptView, focusScene?: string | null) {
+  const scenes = script.scenes();
+  const current = script.current();
   const list = el("ol", { className: "nav-list" });
   list.setAttribute("aria-label", "Scenes");
   list.setAttribute("aria-describedby", "nav-hint");
@@ -104,15 +130,15 @@ export function renderNavigator(root: HTMLElement, view: EditorView, focusScene?
     go.dataset.part = "go";
     go.dataset.roving = "";
     if (s.sceneId === current) go.setAttribute("aria-current", "location");
-    go.addEventListener("click", () => revealScene(view, s.sceneId));
+    go.addEventListener("click", () => script.reveal(s.sceneId));
     const up = el("button", { type: "button", className: "nav-move", disabled: i === 0, title: "Move scene up (Alt+Up)", tabIndex: -1 }, "↑");
     up.setAttribute("aria-label", `Move ${name} up`);
     up.dataset.part = "up";
-    up.addEventListener("click", () => moveSceneBy(view, s.sceneId, -1));
+    up.addEventListener("click", () => moveSceneBy(script, s.sceneId, -1));
     const down = el("button", { type: "button", className: "nav-move", disabled: i === scenes.length - 1, title: "Move scene down (Alt+Down)", tabIndex: -1 }, "↓");
     down.setAttribute("aria-label", `Move ${name} down`);
     down.dataset.part = "down";
-    down.addEventListener("click", () => moveSceneBy(view, s.sceneId, 1));
+    down.addEventListener("click", () => moveSceneBy(script, s.sceneId, 1));
     item.append(go, up, down);
     list.append(item);
     gos.push(go);
@@ -124,7 +150,7 @@ export function renderNavigator(root: HTMLElement, view: EditorView, focusScene?
     if (at < 0) return;
     if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
-      moveSceneBy(view, gos[at].parentElement!.dataset.item!, e.key === "ArrowUp" ? -1 : 1);
+      moveSceneBy(script, gos[at].parentElement!.dataset.item!, e.key === "ArrowUp" ? -1 : 1);
       return;
     }
     if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -135,7 +161,10 @@ export function renderNavigator(root: HTMLElement, view: EditorView, focusScene?
       to.focus();
     }
   });
-  root.replaceChildren(el("h2", {}, `Scenes (${scenes.length})`), el("p", { className: "sr-only", id: "nav-hint" }, NAV_HINT), list);
+  const head = el("div", { className: "panel-head" }, el("h2", {}, `Scenes (${scenes.length})`));
+  const pb = script.panelButton?.("nav");
+  if (pb) head.append(pb);
+  root.replaceChildren(head, el("p", { className: "sr-only", id: "nav-hint" }, NAV_HINT), list);
 }
 
 export interface BoardState {
@@ -151,15 +180,15 @@ export function boardOrder(beats: Beat[], scenes: SceneInfo[], structural: boole
 }
 
 /** Move beat `id` to sit before beat `beforeId` (null = end). */
-export async function moveCard(view: EditorView, st: BoardState, id: string, beforeId: string | null, rerender: () => void) {
-  const scenes = scenesOf(view.state.doc);
+export async function moveCard(script: ScriptView, st: BoardState, id: string, beforeId: string | null, rerender: () => void) {
+  const scenes = script.scenes();
   const order = boardOrder(st.beats, scenes, st.structural);
   const beat = order.find((b) => b.id === id)!;
   if (st.structural) {
     // Linked structural edit: canonical scene order changes once, via the editor.
     const target = beforeId ? order.find((b) => b.id === beforeId) : null;
     if (!beat.scene_id || (target && !target.scene_id)) return;
-    doMove(view, beat.scene_id, target ? target.scene_id : null);
+    script.move(beat.scene_id, target ? target.scene_id : null);
     return;
   }
   // Planning only: reorder beats; the script is untouched.
@@ -168,26 +197,26 @@ export async function moveCard(view: EditorView, st: BoardState, id: string, bef
   const lo = at > 0 ? rest[at - 1].pos : (rest[0]?.pos ?? 0) - 2;
   const hi = at < rest.length ? rest[at].pos : lo + 2;
   beat.pos = (lo + hi) / 2;
-  await invoke("put_beat", { beat });
+  await script.putBeat(beat);
   rerender();
 }
 
-export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState, rerender: () => void, focusBeat?: string | null) {
-  const scenes = scenesOf(view.state.doc);
+export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardState, rerender: () => void, focusBeat?: string | null) {
+  const scenes = script.scenes();
   const byScene = new Map(scenes.map((s) => [s.sceneId, s]));
   const order = boardOrder(st.beats, scenes, st.structural);
   const header = el("div", { className: "board-head" }, el("h2", {}, `Board (${order.length})`));
   const badge = el("span", { className: `badge ${st.structural ? "live" : "planning"}` }, st.structural ? "Moves reorder the script" : "Planning only");
   const add = el("button", { type: "button" }, "New beat for current scene");
   add.addEventListener("click", async () => {
-    const s = sceneAtCursor(view);
-    const beat: Beat = { id: newId(), logline: "", summary: "", scene_id: s?.sceneId ?? null, pos: (order.at(-1)?.pos ?? 0) + 1 };
-    await invoke("put_beat", { beat });
-    st.beats.push(beat);
+    const beat: Beat = { id: newId(), logline: "", summary: "", scene_id: script.current() ?? null, pos: (order.at(-1)?.pos ?? 0) + 1 };
+    await script.putBeat(beat);
     rerender();
     announce("New beat added at the end of the board");
   });
   header.append(badge, add);
+  const pb = script.panelButton?.("board");
+  if (pb) header.append(pb);
   const grid = el("div", { className: "cards", role: "list" });
   grid.setAttribute("aria-label", "Beat cards");
   grid.setAttribute("aria-describedby", "board-hint");
@@ -201,7 +230,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
       announce(dir < 0 ? "Already the first card" : "Already the last card");
       return;
     }
-    await moveCard(view, st, id, dir < 0 ? order[j].id : (order[j + 1]?.id ?? null), rerender);
+    await moveCard(script, st, id, dir < 0 ? order[j].id : (order[j + 1]?.id ?? null), rerender);
     announce(st.structural ? `Card moved to position ${j + 1}; the scene order in the script changed. Undo reverts it.` : `Card moved to position ${j + 1} of ${order.length}. The script is unchanged.`);
   };
   order.forEach((b, i) => {
@@ -216,7 +245,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
       ? el("button", { type: "button", className: "card-link", title: "Go to scene" }, s.heading || "(empty heading)")
       : el("span", { className: "card-link missing" }, b.scene_id ? "Linked scene no longer exists" : "Not linked");
     link.dataset.part = "link";
-    if (s) link.addEventListener("click", () => revealScene(view, s.sceneId));
+    if (s) link.addEventListener("click", () => script.reveal(s.sceneId));
     // A planning card: the writer's logline and summary, never a copy of
     // the scene's script text. Both are authored and stored with the beat.
     const logline = el("input", { type: "text", className: "logline", value: b.logline, placeholder: "Logline: what this scene is about, in one line" });
@@ -228,7 +257,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
     for (const [field, input] of [["logline", logline], ["summary", summary]] as const) {
       input.addEventListener("change", async () => {
         b[field] = input.value;
-        await invoke("put_beat", { beat: b });
+        await script.putBeat(b);
       });
       (input as HTMLElement).addEventListener("keydown", (e: KeyboardEvent) => {
         if (e.key === "Escape") {
@@ -276,7 +305,7 @@ export function renderBoard(root: HTMLElement, view: EditorView, st: BoardState,
     card.addEventListener("drop", (e) => {
       e.preventDefault();
       const from = e.dataTransfer?.getData("text/x-beat");
-      if (from && from !== b.id) void moveCard(view, st, from, b.id, rerender);
+      if (from && from !== b.id) void moveCard(script, st, from, b.id, rerender);
     });
     card.append(link, logline, summary, el("div", { className: "card-moves" }, left, right));
     grid.append(card);

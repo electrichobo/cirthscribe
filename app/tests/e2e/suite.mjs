@@ -2494,6 +2494,47 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.getElementById('notes').getClientRects().length", "View > Tools > Notes hides it again");
   });
 
+  await test("Pop-out panels: scene list, board and notes open in their own windows, draw from the main window, send changes back (moves undo in the script), and dock", async () => {
+    await openFixture("page-boundaries");
+    const labels = () => app.evaluate("window.__TAURI_INTERNALS__.invoke('window_labels')");
+    const scenes0 = await app.evaluate("__cirth.scenes().map(s => ({ id: s.sceneId, heading: s.heading }))");
+    // Scene list: View > Tools > Scene List in Its Own Window.
+    await app.evaluate("(__cirth.menu('popout_nav'), true)");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => l.includes('panel-nav'))", "the scene list window opens");
+    await waitFor(app, `__cirth.panels.rendered.nav?.items === ${scenes0.length} && __cirth.panels.rendered.nav.first === ${JSON.stringify(scenes0[0].heading)}`, "the window drew every scene from the main window's snapshot");
+    assert(!(await app.evaluate("document.getElementById('navigator').getClientRects().length")), "the main window's scene list makes room");
+    // A move sent from the panel window is one script edit: the window redraws, and undo from the window reverts it.
+    await app.evaluate(`__cirth.panelCommand({ panel: 'nav', cmd: 'move', sceneId: ${JSON.stringify(scenes0[1].id)}, before: ${JSON.stringify(scenes0[0].id)} })`);
+    await waitFor(app, `__cirth.scenes()[0].sceneId === ${JSON.stringify(scenes0[1].id)}`, "the move reached the script");
+    await waitFor(app, `__cirth.panels.rendered.nav.first === ${JSON.stringify(scenes0[1].heading)}`, "the window redrew with the new order");
+    await app.evaluate("__cirth.panelCommand({ panel: 'nav', cmd: 'undo' })");
+    await waitFor(app, `__cirth.scenes()[0].sceneId === ${JSON.stringify(scenes0[0].id)}`, "undo from the window reverts the move in the script");
+    assert(await storedMatchesEditor(), "stored order equals the editor");
+    // Board: a card edited in its window is stored once, in the main window's list.
+    await app.evaluate("(__cirth.menu('popout_board'), true)");
+    await waitFor(app, "__cirth.panels.rendered.board !== undefined", "the board window drew");
+    const beat = await app.evaluate("JSON.parse(JSON.stringify(__cirth.board.beats[0]))");
+    beat.logline = "Edited in its own window";
+    await app.evaluate(`__cirth.panelCommand({ panel: 'board', cmd: 'putBeat', beat: ${JSON.stringify(beat)} })`);
+    await waitFor(app, "__cirth.board.beats.find(b => b.logline === 'Edited in its own window') && __cirth.panels.rendered.board.first === 'Edited in its own window'", "card edit stored and redrawn");
+    assert((await app.evaluate("__cirth.board.beats.length")) === (await app.evaluate("new Set(__cirth.board.beats.map(b => b.id)).size")), "no duplicate card");
+    // Closing the board window with its own close button docks the board.
+    await app.evaluate("window.__TAURI_INTERNALS__.invoke('close_panel_window', { panel: 'board' })");
+    await waitFor(app, "!__cirth.panels.isPopped('board') && document.getElementById('board').getClientRects().length > 0", "closing its window puts the board back");
+    // Notes: typed in their window, kept by the main window.
+    await app.evaluate("(__cirth.menu('popout_notes'), true)");
+    await waitFor(app, "__cirth.panels.rendered.notes !== undefined", "the notes window drew");
+    await app.evaluate("__cirth.panelCommand({ panel: 'notes', cmd: 'notes', text: 'From the notes window' })");
+    await waitFor(app, "__cirth.notes.value === 'From the notes window' && document.querySelector('.notes-state').textContent === 'Kept'", "notes from their window are kept");
+    // Dock from the window's Dock button; going Home closes the rest.
+    await app.evaluate("__cirth.panelCommand({ panel: 'nav', cmd: 'dock' })");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => !l.includes('panel-nav'))", "Dock closes the scene list window");
+    assert(await app.evaluate("document.getElementById('navigator').getClientRects().length > 0"), "the scene list is back in the main window");
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    assert(JSON.stringify(await labels()) === JSON.stringify(["main"]), `going Home closes every panel window: ${await labels()}`);
+  });
+
   await test("Help > Typing Latency reports the editor's own samples as copyable text", async () => {
     await openFixture("page-boundaries", false);
     await app.evaluate("__cirth.perf.reset()");

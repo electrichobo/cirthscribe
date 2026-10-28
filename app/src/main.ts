@@ -7,7 +7,7 @@ import { baseKeymap, toggleMark } from "prosemirror-commands";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emitTo } from "@tauri-apps/api/event";
 import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
@@ -16,7 +16,8 @@ import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
 import { sceneNumbersPlugin, sceneNumbersKey, buildSceneNumberDecorations, type SceneNumber } from "./scenenums";
 import { confirmDialog } from "./confirm";
-import { renderBoard, renderNavigator, moveCard, type BoardState, setSceneNumbers, sceneAtCursor } from "./views";
+import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, type BoardState, type ScriptView, setSceneNumbers, sceneAtCursor } from "./views";
+import { createPanelHost, POP_LABEL, type PopPanel } from "./panels";
 import { scenesOf, moveScene } from "./scenes";
 import { installPerf } from "./perf";
 import { adoptDomSelection, selSync } from "./selsync";
@@ -163,6 +164,31 @@ function updateInfo() {
 let navTimer: number | undefined;
 let pageTimer: number | undefined;
 
+/** Store a beat and keep the board's list in step (the main window's panels and pop-out windows both use it). */
+async function putBeat(beat: Beat): Promise<void> {
+  await invoke("put_beat", { beat });
+  const i = board.beats.findIndex((b) => b.id === beat.id);
+  if (i < 0) board.beats.push(beat);
+  else if (board.beats[i] !== beat) board.beats[i] = beat;
+  panelHost.broadcast();
+}
+
+/** A header button that moves a panel into its own window (ADR 0004). */
+function popButton(panel: "nav" | "board"): HTMLElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "panel-pop";
+  b.textContent = "⧉";
+  b.title = `Open the ${POP_LABEL[panel].toLowerCase()} in its own window`;
+  b.setAttribute("aria-label", b.title);
+  b.addEventListener("click", () => void panelHost.popOut(panel));
+  // Not a Tab stop: each panel stays one Tab stop; the keyboard route is View > Tools.
+  b.tabIndex = -1;
+  return b;
+}
+
+const script = (): ScriptView => editorScript(view, putBeat, popButton);
+
 function rerenderSide() {
   renderNav();
   // Never rebuild a card while its logline or summary is being typed in:
@@ -171,15 +197,17 @@ function rerenderSide() {
   const typing = a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === "text");
   if (!boardEl.contains(a) || !typing) {
     const key = focusKey(boardEl);
-    renderBoard(boardBody, view, board, rerenderSide, key?.split("|")[0]);
+    renderBoard(boardBody, script(), board, rerenderSide, key?.split("|")[0]);
     restoreFocus(boardEl, key);
   }
+  panelHost.broadcast();
 }
 
 /** Re-render the navigator, keeping keyboard focus on the same scene. */
 function renderNav() {
   const key = focusKey(navEl);
-  renderNavigator(navEl, view, key?.split("|")[0]);
+  renderNavigator(navEl, script(), key?.split("|")[0]);
+  panelHost.broadcast();
   restoreFocus(navEl, key);
 }
 
@@ -497,6 +525,7 @@ void getCurrentWindow().onCloseRequested(async (event) => {
 async function goHome() {
   await focusMode.leave();
   if (lastOpen) {
+    await panelHost.dockAll();
     try {
       await saveFile(false);
       await invoke("close_project");
@@ -586,6 +615,32 @@ const furniture = createFurnitureDialog(() => saveFile(false));
 const exportDialog = createExportDialog({ hasActiveRevision: () => !!revisions.state.active, run: (f) => exportAs(f) });
 const goTo = createGoToDialog({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], numbers: () => sceneNumbers });
 const shortcuts = createShortcutsDialog();
+const panelHost = createPanelHost({
+  open: () => !!lastOpen,
+  scenes: () => (view ? scenesOf(view.state.doc) : []),
+  current: () => (view ? sceneAtCursor(view)?.sceneId : undefined),
+  numbers: () => sceneNumbers,
+  beats: () => board.beats,
+  structural: () => board.structural,
+  setStructural: (on) => setStructural(on),
+  reveal: (id) => revealScene(view, id),
+  move: (id, before) => script().move(id, before),
+  putBeat: async (beat) => {
+    await putBeat(beat);
+    rerenderSide();
+  },
+  notesText: () => notesPanel.value,
+  setNotes: (text) => notesPanel.set(text),
+  undo: (again) => {
+    if (view && lastOpen) (again ? redo : undo)(view.state, view.dispatch);
+  },
+  changed: () => layoutMode.apply(),
+});
+function setStructural(on: boolean) {
+  ($("structural") as HTMLInputElement).checked = on;
+  board.structural = on;
+  rerenderSide();
+}
 const notesPanel = createNotesPanel($("notes"), { focusScript: () => view?.focus(), close: () => void togglePanel("notes") });
 notesFlush = () => notesPanel.flush();
 onPanelsChanged(() => {
@@ -656,9 +711,10 @@ const layoutMode = createLayoutMode({
   $("island-nav").append(homeBtn, undoBtn, redoBtn);
   const navBtn = iconButton("toggle-nav", "scenes", "Scene list", "Show or hide the scene list");
   // In the floating layout these open the panel over the script instead.
-  navBtn.addEventListener("click", () => (layoutMode.mode === "overlay" && currentPrefs().panels.nav ? layoutMode.toggleFloat("nav") : void togglePanel("nav")));
+  // A panel in its own window comes to the front instead (ADR 0004).
+  navBtn.addEventListener("click", () => (panelHost.isPopped("nav") ? void panelHost.popOut("nav") : layoutMode.mode === "overlay" && currentPrefs().panels.nav ? layoutMode.toggleFloat("nav") : void togglePanel("nav")));
   const boardBtn = iconButton("toggle-board", "board", "Board", "Show or hide the board");
-  boardBtn.addEventListener("click", () => (layoutMode.mode === "overlay" && currentPrefs().panels.board ? layoutMode.toggleFloat("board") : void togglePanel("board")));
+  boardBtn.addEventListener("click", () => (panelHost.isPopped("board") ? void panelHost.popOut("board") : layoutMode.mode === "overlay" && currentPrefs().panels.board ? layoutMode.toggleFloat("board") : void togglePanel("board")));
   const findBtn = iconButton("tool-find", "find", "Find and replace", `Find and replace (${mod}+F)`);
   findBtn.addEventListener("click", () => {
     if (lastOpen) findBar.open();
@@ -1039,6 +1095,11 @@ async function runMenu(id: string): Promise<void> {
       await toggleTypewriter();
       centreTypingLine();
       break;
+    case "popout_nav":
+    case "popout_board":
+    case "popout_notes":
+      if (lastOpen) await panelHost.popOut(id.slice(7) as PopPanel);
+      break;
     case "view_nav":
     case "view_board":
     case "view_toolbar":
@@ -1341,12 +1402,11 @@ $("structural").addEventListener("change", (e) => {
     if (tr) view.dispatch(tr);
     return !!tr;
   },
-  moveCard: (id: string, before: string | null) => moveCard(view, board, id, before, rerenderSide),
-  setStructural: (on: boolean) => {
-    ($("structural") as HTMLInputElement).checked = on;
-    board.structural = on;
-    rerenderSide();
-  },
+  moveCard: (id: string, before: string | null) => moveCard(script(), board, id, before, rerenderSide),
+  setStructural,
+  panels: panelHost,
+  /** Send a command exactly as a pop-out panel window does (tests). */
+  panelCommand: (c: unknown) => emitTo("main", "panel-command", c),
   open,
   goHome,
   home,

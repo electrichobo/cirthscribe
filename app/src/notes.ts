@@ -138,6 +138,12 @@ export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => 
       state.textContent = "";
     },
     flush,
+    /** Text typed in a pop-out notes window (ADR 0004). */
+    set(value: string) {
+      text.value = value;
+      dirty = true;
+      void flush();
+    },
     shown() {
       restorePlace();
     },

@@ -15,6 +15,7 @@ The following defaults allow progress without pretending the owner has already s
 | Working storage | SQLite working copy (WAL, exclusive lock) plus atomic package save; proposal in docs/m0/SCHEMA.md | M0 prototype (done); schema v2 in M1 |
 | Screenplay font | Fixed: pages and exports use Courier Prime 12 pt. Font and size choices change only the on-screen editor (owner, 2026-10-26) | Done |
 | Text colour and highlight | On-screen writer's markup only: stored with the text, never printed or exported (owner, 2026-10-27) | Done |
+| Pop-out panels | Panel windows are remote views; the main window stays the only authority and applies every change (ADR 0004, 2026-10-28) | Done |
 | Comments | All comment work, including the add-comment button, stays in M5 (owner, 2026-10-27) | Done |
 | Formatting priority | US screenplay first; UK and other templates retained in roadmap | Fixed priority, refinable with owner |
 | Structural sync | Off by default; explicit per-document permission | M3 behavior |

@@ -1565,6 +1565,63 @@ fn window_command(window: tauri::WebviewWindow, action: String) -> Result<bool, 
     window.is_fullscreen().map_err(e)
 }
 
+/// Pop-out panels (ADR 0004): a window of its own for the scene list, board
+/// or notes. If it is already open it comes to the front. The window only
+/// draws what the main window sends and sends changes back; it never changes
+/// the project itself. Closing it tells the main window to dock the panel.
+/// Async: building a window inside a synchronous command deadlocks on Windows.
+#[tauri::command]
+async fn pop_out_panel(app: tauri::AppHandle, panel: String, title: String) -> Result<(), String> {
+    use tauri::{Emitter, Manager};
+    if !["nav", "board", "notes"].contains(&panel.as_str()) {
+        return Err(format!("unknown panel {panel}"));
+    }
+    let label = format!("panel-{panel}");
+    let e = |e: tauri::Error| e.to_string();
+    if let Some(w) = app.get_webview_window(&label) {
+        w.unminimize().map_err(e)?;
+        w.show().map_err(e)?;
+        return w.set_focus().map_err(e);
+    }
+    let (w, h) = if panel == "board" { (420.0, 720.0) } else { (340.0, 640.0) };
+    let window = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("panel.html?panel={panel}").into()))
+        .title(format!("{title} - Kolbítar"))
+        .inner_size(w, h)
+        .min_inner_size(240.0, 200.0)
+        .build()
+        .map_err(e)?;
+    // The menu bar belongs to the main window (Windows and Linux give every
+    // window the app menu otherwise).
+    #[cfg(not(target_os = "macos"))]
+    window.remove_menu().map_err(e)?;
+    let handle = app.clone();
+    window.on_window_event(move |ev| {
+        if let tauri::WindowEvent::Destroyed = ev {
+            let _ = handle.emit_to("main", "panel-closed", panel.clone());
+        }
+    });
+    Ok(())
+}
+
+/// Dock a panel: its window closes (the main window shows the panel again).
+#[tauri::command]
+async fn close_panel_window(app: tauri::AppHandle, panel: String) -> Result<(), String> {
+    use tauri::Manager;
+    match app.get_webview_window(&format!("panel-{panel}")) {
+        Some(w) => w.destroy().map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
+/// Labels of the open windows (tests check pop-out windows open and close).
+#[tauri::command]
+fn window_labels(app: tauri::AppHandle) -> Vec<String> {
+    use tauri::Manager;
+    let mut v: Vec<String> = app.webview_windows().into_keys().collect();
+    v.sort();
+    v
+}
+
 /// File > Import…: the start of a file (up to 4 KB, as text), so the app can
 /// tell Final Draft XML from Fountain or plain text by content as well as by
 /// extension. Reads only; the importers do the rest.
@@ -1703,6 +1760,10 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_nav", "Scene List", true)?)
         .item(&check_item(app, "view_board", "Board", true)?)
         .item(&check_item(app, "view_notes", "Notes", false)?)
+        .separator()
+        .text("popout_nav", "Scene List in Its Own Window")
+        .text("popout_board", "Board in Its Own Window")
+        .text("popout_notes", "Notes in Their Own Window")
         .build()?;
     let appearance = SubmenuBuilder::new(app, "Appearance")
         .text("ui_larger", keyed("Larger Interface", "="))
@@ -1945,6 +2006,20 @@ fn main() {
             };
             std::fs::create_dir_all(dir.join("projects"))?;
             *app.state::<App>().data_dir.lock().unwrap() = dir;
+            // Pop-out panel windows close with the main window (its close
+            // handler has saved by then); otherwise they would keep the app alive.
+            if let Some(main) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                main.on_window_event(move |ev| {
+                    if let tauri::WindowEvent::Destroyed = ev {
+                        for (label, w) in handle.webview_windows() {
+                            if label.starts_with("panel-") {
+                                let _ = w.destroy();
+                            }
+                        }
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1971,6 +2046,9 @@ fn main() {
             window_command,
             open_releases_page,
             peek_file,
+            pop_out_panel,
+            close_panel_window,
+            window_labels,
             set_menu_checks,
             title_page,
             set_title_page,
