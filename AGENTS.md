@@ -4,26 +4,17 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 ## Current stage (2026-10-27)
 
-This is a working application, not yet released, plus its product brief. Milestones M0 (feasibility), M1 and M1b (the writing foundation) are closed by the owner. **M2 (layout, interchange and production) is in progress;** docs/M2_PLAN.md has the plan and step order. Steps 1–7 are built:
-- title page;
-- Fountain import and export;
-- Final Draft (.fdx) import and export;
-- scene numbers and scene-number locking;
-- production PDF with headers and footers;
-- revision sets;
-- locked pages with A/B pages.
+A working application, not yet released, plus its product brief. M0, M1 and M1b are closed by the owner. **M2 is in progress** (docs/M2_PLAN.md).
+- Built, steps 1–7: title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages.
+- Left: step 8 (DOCX, RTF and HTML exports with capability reports) and step 9 (compatibility matrix).
 
-Remaining M2 steps:
-- 8: DOCX, RTF and HTML exports with capability reports;
-- 9: compatibility matrix with real external apps.
-
-Later milestones (ROADMAP.md) are still only planned. Never present a planned feature as working. Carried open items: Linux typing latency, named reference machines, the rare End/Enter stress miss (STATUS.md defect 3), and the open manual checks in docs/testing/MANUAL_CHECKS.md.
+Later milestones (ROADMAP.md) are only planned. Never present a planned feature as working. Open items are listed in STATUS.md and docs/testing/MANUAL_CHECKS.md.
 
 ## Read before making changes
 
-1. Read this file and `HANDOFF.md` (the latest working state; see the Session Handoff Protocol below).
+1. Do the startup sequence of the Session Continuity & Constrained Takeover Protocol below. It covers START_HERE.md, HANDOFF.md, STATUS.md, the milestone plan and git state.
 2. Read docs/PRODUCT_SPEC.md, docs/ARCHITECTURE.md and docs/ROADMAP.md.
-3. For the current milestone, read its plan (docs/M2_PLAN.md), STATUS.md and docs/DECISIONS.md. Read the ADRs in docs/adr/ when touching what they decide.
+3. Read docs/DECISIONS.md, and the ADRs in docs/adr/ when touching what they decide.
 4. For the task at hand, read docs/ACCEPTANCE.md and docs/INTEROPERABILITY.md.
 5. Read the existing code and its tests before choosing an implementation.
 6. Work on the next unfinished step of the current milestone unless the owner gives a different priority.
@@ -47,17 +38,17 @@ The owner's latest explicit instructions override this pack. Keep documentation 
 
 ## Stack (decided)
 
-Rust with Tauri 2, a TypeScript web UI, ProseMirror as the editor, and SQLite for the project file. Accepted in ADR 0001 (docs/adr/0001-desktop-stack.md) on milestone-0 evidence. Tauri is only the desktop shell. The screenplay model, pagination and every export live in Rust, and the WebView never measures pages. Avalonia was considered and not built; do not build a second app, switch frameworks, or add another runtime without a documented reason and the owner's agreement.
+Rust, Tauri 2 (desktop shell only), TypeScript, ProseMirror and SQLite. Accepted in ADR 0001 (docs/adr/0001-desktop-stack.md). The WebView never measures pages. Do not build a second app, switch frameworks or add a runtime without a documented reason and the owner's agreement.
 
 - License: GPL-3.0-only with an attribution term (`NOTICE`), chosen by the owner.
 - Fonts: pages and exports always use the bundled Courier Prime 12 pt (OFL); the editor's screen font is a display preference only.
-- Dependencies: ask the owner before adding any. Audit each one's license and keep `app/scripts/third-party-notices.mjs --check` passing. No paid or proprietary components.
+- Dependencies: never add a crate (`Cargo.toml`) or an npm package (`app/package.json`) without the owner's explicit approval. Each license must be compatible with GPL-3.0-only. Record the addition in docs/m0/LICENSES.md (`node app/scripts/license-inventory.mjs`) and keep `node app/scripts/third-party-notices.mjs --check` passing. No paid or proprietary components.
 
 ## Repository map and commands
 
-- `crates/cirth-core`: the domain model, the store, migrations, layout, numbering, revisions, locked pages and every import and export (PDF, TXT, Fountain, FDX). Tests: `crates/cirth-core/tests`.
-- `app/src-tauri`: the desktop shell. It holds Tauri commands and native menus, and it builds the `cirthscribe` binary.
-- `app/src`: the TypeScript UI. The ProseMirror schema and plugins send versioned batches to Rust.
+- `crates/cirth-core`: model, store, migrations, layout, numbering, revisions, locked pages, imports and exports. Tests in `crates/cirth-core/tests`.
+- `app/src-tauri`: Tauri commands and native menus; builds the `cirthscribe` binary.
+- `app/src`: the TypeScript UI (ProseMirror schema and plugins).
 - `app/tests`: `contract.mjs` checks that the TypeScript and Rust data models agree; `e2e/suite.mjs` drives the real app through two drivers, Chrome DevTools (CDP) and WebDriver.
 - `fixtures/`: sample scripts, plus `fixtures/golden/` reference page layouts.
 - `docs/`: product brief, plans, decisions and ADRs, and manual checks (`docs/testing/MANUAL_CHECKS.md`).
@@ -81,6 +72,7 @@ Conventions:
 ## Engineering rules
 
 - Keep domain logic independent of UI toolkit, editor-library internals, storage, AI providers, and cloud services.
+- Core/app boundary: `crates/cirth-core` owns the document model, the SQLite working store, the `.cirth` package, page layout and all imports and exports, and contains no UI code. `app/` (Tauri 2, TypeScript, ProseMirror) is only a view that sends versioned edits to the core.
 - One authoritative persisted domain model. Editor state is a transaction-driven projection, not a second saved manuscript.
 - All views submit domain commands with base-version checks. Invalid/stale commands fail safely or rebase explicitly.
 - No replacement of the whole document on every keystroke, duplicate undo stacks, or permanent storage of DOM offsets.
@@ -109,21 +101,42 @@ Do not suppress errors, bypass tests, or silently reduce requirements. If a plat
 
 Each finished step updates its milestone plan's "Built" notes, README's progress list and, where a person must check something by hand, docs/testing/MANUAL_CHECKS.md. It is tested on both e2e drivers.
 
-## Session Handoff Protocol
+## Session Continuity & Constrained Takeover Protocol
 
-Several AI agents (Claude Code, Gemini CLI and others) may work on this repository in turn. `HANDOFF.md` in the repository root carries the working state between them.
+AI agents take turns on this repository (Claude Code, OpenAI Codex, Google Antigravity or Gemini CLI, Qwen Code); all follow these rules every session. `CLAUDE.md`, `GEMINI.md` and `QWEN.md` only point here.
 
-- **At the start of every session**, read `HANDOFF.md` before making any change. Treat it as the latest state of the work. If it disagrees with the code or git history, trust the code and git, and correct `HANDOFF.md`.
-- **Update `HANDOFF.md`**:
-  - after completing a meaningful sub-task;
-  - after an architectural decision (record lasting decisions in docs/DECISIONS.md or an ADR as well);
-  - before any `git commit` or `git push`.
-  Do not update it on trivial chat turns.
-- Keep its four sections short and factual:
-  - **Current Goal:** what is being built now.
-  - **Completed & Verified:** what was done and how it was checked. Name the tests that actually ran.
-  - **Assumed / Untested:** guesses, platforms not tried, manual checks still open.
-  - **Next Immediate Step:** the next concrete action.
-- Never claim a test passed unless it ran. Never put credentials or personal details (hostnames, IPs, usernames, personal paths) in it.
-- `CLAUDE.md` and `GEMINI.md` only import this file (`@AGENTS.md`). Edit the instructions here, not there.
-- A local `pre-push` hook (`.git/hooks/pre-push`, not versioned) warns when code changes are pushed without a `HANDOFF.md` update. It only warns; it never blocks a push.
+### 1. Startup sequence (read before writing)
+
+At the start of any session, or when asked to "continue" or "pick up where we left off":
+1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M2_PLAN.md`).
+2. Inspect uncommitted work: run `git status`, `git diff` and `git diff --staged`.
+3. **Stop and summarize** before modifying any file:
+   - the uncommitted changes in the working tree;
+   - the Next Immediate Step from `HANDOFF.md`;
+   - your concrete plan for the next edit.
+   Wait for the owner's confirmation if anything is ambiguous or a test is failing.
+
+If `HANDOFF.md` disagrees with the code or git history, trust the code and git, and correct `HANDOFF.md`.
+
+### 2. Constrained takeover rules
+
+When taking over uncommitted work or an unfinished feature:
+- **Do not rewrite working diffs.** Never refactor, restyle or replace a previous session's uncommitted code unless it fails `cargo test -p cirth-core` or breaks a spec in `docs/`.
+- **Respect the core/app boundary** (see Engineering rules).
+- **No unsolicited dependencies** (see Stack).
+- **Verify with the existing suites:** `cargo test -p cirth-core`, and `cd app && npm run build` for the front end. Before a step is called done, also run the contract and e2e suites (see Repository map and commands).
+
+### 3. Checkpoints in `HANDOFF.md`
+
+Update `HANDOFF.md`:
+- after any logical sub-task or passing test gate;
+- after an architectural decision (lasting decisions also go in docs/DECISIONS.md or an ADR);
+- before every `git commit` or `git push`.
+
+Do not update it on trivial chat turns. Keep it under 50 lines, under four headings:
+- **Current Milestone & Goal:** the step being built, from the milestone plan.
+- **Completed & Verified:** what was done, with the checks that actually ran (`cargo test`, `npm run build`, e2e). A "Not verified" list holds open manual checks, untried platforms and known limits.
+- **In-Progress / Uncommitted State:** the files currently modified and what state they are in.
+- **Next Immediate Step:** the exact next function, test or file to touch.
+
+No credentials or personal details in it. A local `pre-push` hook (`.git/hooks/pre-push`, not versioned) warns when code is pushed without a `HANDOFF.md` update; it never blocks a push.

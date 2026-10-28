@@ -1,20 +1,14 @@
-# First prompt for the coding agent
+# Start here
 
-You are helping me build CirthScribe, a free/open-source, offline-first desktop screenplay and story-production application.
+Kolbítar is a free, open-source, offline-first desktop screenplay and production app. It is built in Rust, Tauri 2, TypeScript and ProseMirror, and its project files are SQLite `.cirth` files. It is a working application, not yet released. Milestone 2 (production screenplay output) is in progress.
 
-Read CLAUDE.md and its referenced documents before changing files. Treat the pack as the product brief and acceptance criteria, not evidence that any features already exist.
+For any AI coding agent taking over a session, in this order:
 
-Begin with milestone 0. Prefer Rust + Tauri with a TypeScript structured editor, but test the risky parts before committing. C# + Avalonia is permitted if evidence supports it. Do not build both applications or adopt a paid editor component.
+1. **AGENTS.md:** the rules, the current stage, the repository map, the commands, and the Session Continuity & Constrained Takeover Protocol. Follow its startup sequence before changing anything.
+2. **HANDOFF.md:** where the last session stopped and the next immediate step.
+3. **STATUS.md:** milestone status and open defects.
+4. **docs/M2_PLAN.md:** the current milestone's plan, step order, and what each finished step built.
 
-Build a small runnable prototype demonstrating:
-- typed screenplay blocks and configurable Tab/Enter behavior;
-- realistic text selection, paste, undo/redo, Unicode, and IME;
-- stable scene/block IDs and one canonical document;
-- recoverable save/reopen;
-- long-document editing and a pagination/PDF proof of concept;
-- one scene represented in editor, navigator, and board without duplicated script text.
+Product brief and acceptance criteria: docs/PRODUCT_SPEC.md, docs/ARCHITECTURE.md, docs/ROADMAP.md, docs/ACCEPTANCE.md, docs/INTEROPERABILITY.md. Decisions: docs/DECISIONS.md and docs/adr/.
 
-Use original synthetic scripts, including long dialogue and page-boundary cases. Record actual platform coverage, measurements, dependency licenses, failures, and unresolved risks. Do not label browser-print output production-ready.
-
-Finish with a concise framework decision record and a concrete milestone 1 plan. Keep later features in the roadmap. Make routine reversible decisions yourself; flag assumptions clearly and ask only when a decision materially blocks progress.
-
+(The original milestone-0 brief that used to be in this file is in git history.)
