@@ -541,6 +541,99 @@ async fn export_report(
     })
 }
 
+// --- Stripboard and schedule (M4 step 5) --------------------------------------------
+
+#[tauri::command]
+async fn stripboard_state(app: State<'_, App>, scope: cirth_core::reports::ReportScope) -> Result<cirth_core::stripboard::ScheduleState, String> {
+    with_session(&app, |s| cirth_core::stripboard::reconcile_schedule(&s.store, &scope).map_err(err))
+}
+
+#[tauri::command]
+async fn save_stripboard(
+    app: State<'_, App>,
+    scope: String,
+    state: cirth_core::stripboard::ScheduleState,
+    base: u64,
+) -> Result<cirth_core::stripboard::ScheduleState, String> {
+    with_session(&app, |s| {
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::SetSchedule { scope: scope.clone(), state }, base).map_err(err)?;
+        let report_scope = cirth_core::reports::ReportScope {
+            mode: if scope == "project" { "project".into() } else { "document".into() },
+            documents: if scope.starts_with("document:") {
+                vec![scope.trim_start_matches("document:").to_string()]
+            } else {
+                Vec::new()
+            },
+            include_omitted: true,
+        };
+        cirth_core::stripboard::reconcile_schedule(&s.store, &report_scope).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn export_stripboard(
+    app: State<'_, App>,
+    scope: cirth_core::reports::ReportScope,
+    format: String,
+    path: String,
+) -> Result<ReportExported, String> {
+    let (state, stored_prof) = with_session(&app, |s| {
+        let main = s.store.current_document().map_err(err)?;
+        Ok((
+            cirth_core::stripboard::reconcile_schedule(&s.store, &scope).map_err(err)?,
+            s.store.document_profile(&main).map_err(err)?,
+        ))
+    })?;
+    let prof = profile(ui_profile(&stored_prof));
+    let date_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let ext = format.trim().to_lowercase();
+    let (bytes, notes) = match ext.as_str() {
+        "html" => (
+            cirth_core::stripboard::export_html(&state).into_bytes(),
+            vec!["Exported stripboard as standalone HTML with color legend.".into()],
+        ),
+        "pdf" => (
+            cirth_core::stripboard::export_pdf(&state, &prof, date_unix)?,
+            vec!["Exported stripboard as PDF with repeated headers and unclipped descriptions.".into()],
+        ),
+        "xlsx" => (
+            cirth_core::stripboard::export_xlsx(&state)?,
+            vec!["Exported stripboard as XLSX workbook with formula protection.".into()],
+        ),
+        "csv" => (
+            cirth_core::stripboard::export_csv(&state, ',').into_bytes(),
+            vec!["Exported stripboard as UTF-8 CSV.".into()],
+        ),
+        "tsv" => (
+            cirth_core::stripboard::export_csv(&state, '\t').into_bytes(),
+            vec!["Exported stripboard as UTF-8 TSV.".into()],
+        ),
+        other => return Err(format!("unknown stripboard format {other}")),
+    };
+    let target = normalize(Path::new(&path));
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(io_err)?;
+    }
+    let tmp = target.with_extension(format!("{}.tmp", ext));
+    std::fs::write(&tmp, &bytes).map_err(io_err)?;
+    cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
+    Ok(ReportExported {
+        path: target.display().to_string(),
+        report: "stripboard".into(),
+        title: "Stripboard & Schedule".into(),
+        format: ext,
+        scope_label: state.scope_label,
+        source_version: state.source_version,
+        planning_version: state.planning_version,
+        bytes: bytes.len(),
+        notes,
+    })
+}
+
 // --- Evidence board (M3 step 9) ---------------------------------------------------
 
 #[derive(Serialize)]
@@ -2315,6 +2408,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_notes", "Notes", false)?)
         .text("overview", "Overview…")
         .text("storyscry", "StoryScry…")
+        .text("stripboard", "Stripboard…")
         .text("tags", "Breakdown Tags…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
@@ -2630,6 +2724,9 @@ fn main() {
             planning_state_now,
             project_tree,
             storyscry_reports,
+            stripboard_state,
+            save_stripboard,
+            export_stripboard,
             store_versions,
             export_report,
             tags_state,

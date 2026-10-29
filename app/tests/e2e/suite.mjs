@@ -3688,5 +3688,184 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, `!document.getElementById('storyscry-dialog').open && (() => { const at = __cirth.view.state.selection.from; const s = __cirth.scenes().find(x => at >= x.from && at < x.to); return s?.sceneId === ${JSON.stringify(sc4Id)}; })()`, "clicking a tag scene link jumps to that scene");
   });
 
+  await test("Stripboard and schedule (E3, E4, E9): independent schedule order, omitted scene reconciliation, color legend and unclipped exports", async () => {
+    await openFixture("page-boundaries");
+
+    // Open stripboard from the native menu
+    await app.evaluate("(__cirth.menu('stripboard'), true)");
+    await waitFor(app, "!!document.getElementById('stripboard-dialog')?.open", "stripboard dialog opened");
+    await waitFor(app, "document.querySelectorAll('#stripboard-scheduled-list .strip-card').length > 0", "scheduled strips rendered");
+
+    // Color Legend (E3, E9): symbols, contrast, and readable labels
+    const legendText = await app.evaluate("document.querySelector('#stripboard-dialog .stripboard-legend').textContent");
+    assert(legendText.includes("Day Interior") && legendText.includes("Night Interior") && legendText.includes("Day Exterior") && legendText.includes("Night Exterior"), `Color legend has complete labels: ${legendText}`);
+    assert(legendText.includes("○") && legendText.includes("●") && legendText.includes("☼") && legendText.includes("☽"), `Color legend pairs color with symbols`);
+
+    // Verify initial strips: Day 1 break + 4 scenes in script order
+    const initialStrips = await app.evaluate(`(() => {
+      const cards = Array.from(document.querySelectorAll('#stripboard-scheduled-list .strip-card'));
+      return cards.map(c => ({
+        id: c.dataset.id,
+        kind: c.classList.contains('strip-day-break') ? 'day_break' : 'scene',
+        heading: c.querySelector('.strip-heading-text')?.textContent ?? '',
+        sceneNumber: c.querySelector('.badge-scene')?.textContent ?? '',
+      }));
+    })()`);
+    assert(initialStrips[0].kind === "day_break", "starts with Day 1 break");
+    assert(initialStrips.length === 5, `initial schedule has 5 strips (1 day break + 4 scenes): got ${initialStrips.length}`);
+
+    // Reorder for scheduling: move Scene 2 before Scene 1 (E3)
+    const pv0 = await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now').then(s => s.version)");
+    await app.evaluate(`(() => {
+      const cards = document.querySelectorAll('#stripboard-scheduled-list .strip-card');
+      const sc2UpBtn = cards[2].querySelector('.btn-move-up');
+      sc2UpBtn?.click();
+    })()`);
+    await waitFor(app, `window.__TAURI_INTERNALS__.invoke('planning_state_now').then(s => s.version > ${pv0})`, "move up saved");
+    await waitFor(app, "document.querySelectorAll('#stripboard-scheduled-list .strip-card')[1]?.querySelector('.strip-heading-text')?.textContent.includes('WEIGH STATION')", "Scene 2 moved up to index 1");
+
+    // Add user note to Scene 2 (now at index 1)
+    const pv1 = await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now').then(s => s.version)");
+    await app.evaluate(`(() => {
+      const cards = document.querySelectorAll('#stripboard-scheduled-list .strip-card');
+      const noteInput = cards[1].querySelector('.strip-note-input');
+      if (noteInput) {
+        noteInput.value = "Night crane required for exterior";
+        noteInput.dispatchEvent(new Event('change'));
+      }
+    })()`);
+    await waitFor(app, `window.__TAURI_INTERNALS__.invoke('planning_state_now').then(s => s.version > ${pv1})`, "note change saved");
+
+    // Add Day 2 break
+    const pv2 = await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now').then(s => s.version)");
+    await app.evaluate("(document.getElementById('stripboard-add-day').click(), true)");
+    await waitFor(app, `window.__TAURI_INTERNALS__.invoke('planning_state_now').then(s => s.version > ${pv2})`, "Day 2 break saved");
+    await waitFor(app, "document.querySelectorAll('#stripboard-scheduled-list .strip-day-break').length === 2", "Day 2 break added");
+
+    // Verify schedule order before screenplay changes
+    const scheduledBefore = await app.evaluate(`(() => {
+      const cards = Array.from(document.querySelectorAll('#stripboard-scheduled-list .strip-card'));
+      return cards.map(c => ({
+        id: c.dataset.id,
+        kind: c.classList.contains('strip-day-break') ? 'day_break' : 'scene',
+        heading: c.querySelector('.strip-heading-text')?.textContent ?? '',
+        note: c.querySelector('.strip-note-input')?.value ?? '',
+      }));
+    })()`);
+    assert(scheduledBefore[1].heading.includes("WEIGH STATION"), `Scene 2 moved before Scene 1: ${scheduledBefore[1].heading}`);
+    assert(scheduledBefore[1].note === "Night crane required for exterior", "note recorded on Scene 2");
+
+    // Close stripboard
+    await app.evaluate("(document.getElementById('stripboard-close').click(), true)");
+    await waitFor(app, "!document.getElementById('stripboard-dialog')?.open", "stripboard closed");
+
+    // Reorder screenplay blocks (E3): move Scene 4 to the top of the screenplay
+    const scenesBeforeScript = await app.evaluate("__cirth.scenes()");
+    assert(scenesBeforeScript.length === 4, "found 4 scenes in screenplay");
+    const sc4Id = scenesBeforeScript[3].sceneId;
+
+    // Put Scene 4 first in the script
+    const sc1Id = scenesBeforeScript[0].sceneId;
+    await app.evaluate(`__cirth.moveScene(${JSON.stringify(sc4Id)}, ${JSON.stringify(sc1Id)})`);
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    // Reopen stripboard: verify scheduled order stays independent while source fields refresh (E3)
+    await app.evaluate("(__cirth.menu('stripboard'), true)");
+    await waitFor(app, "!!document.getElementById('stripboard-dialog')?.open", "stripboard reopened after script reorder");
+    await waitFor(app, "document.querySelectorAll('#stripboard-scheduled-list .strip-card').length > 0", "scheduled strips rendered after reorder");
+
+    const scheduledAfterScriptReorder = await app.evaluate(`(() => {
+      const cards = Array.from(document.querySelectorAll('#stripboard-scheduled-list .strip-card'));
+      return cards.map(c => ({
+        id: c.dataset.id,
+        kind: c.classList.contains('strip-day-break') ? 'day_break' : 'scene',
+        heading: c.querySelector('.strip-heading-text')?.textContent ?? '',
+        sceneNumber: c.querySelector('.badge-scene')?.textContent ?? '',
+        note: c.querySelector('.strip-note-input')?.value ?? '',
+      }));
+    })()`);
+
+    // In schedule: Scene 2 is still at position 1 (first scene strip after Day 1 break)!
+    assert(scheduledAfterScriptReorder[1].heading.includes("WEIGH STATION"), `E3: schedule order stays independent after screenplay edit: ${scheduledAfterScriptReorder[1].heading}`);
+    assert(scheduledAfterScriptReorder[1].note === "Night crane required for exterior", `E3: manual note preserved: ${scheduledAfterScriptReorder[1].note}`);
+
+    // But scene numbers refreshed from live script (Scene 4 is now scene #1 in script)
+    const sc4Strip = scheduledAfterScriptReorder.find(s => s.id === "strip_" + sc4Id);
+    assert(sc4Strip && sc4Strip.sceneNumber === "SCENE 1", `E3: source scene number refreshed from script: got ${sc4Strip?.sceneNumber}`);
+
+    // Omit a scheduled scene (E4): lock numbers, omit Scene 2
+    const docId = await app.evaluate("__cirth.lastOpen.document_id");
+    const sc2Id = scenesBeforeScript[1].sceneId;
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'lock', sceneId: null })`);
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'omit', sceneId: ${JSON.stringify(sc2Id)} })`);
+
+    // Refresh stripboard
+    await app.evaluate("(document.getElementById('stripboard-refresh').click(), true)");
+    await waitFor(app, `document.querySelector('#stripboard-scheduled-list .strip-card[data-id="strip_${sc2Id}"]')?.classList.contains('omitted')`, "omitted scene strip flagged omitted");
+
+    const omittedCheck = await app.evaluate(`(() => {
+      const card = document.querySelector('#stripboard-scheduled-list .strip-card[data-id="strip_${sc2Id}"]');
+      return {
+        isOmittedClass: card?.classList.contains('omitted'),
+        hasOmittedBadge: !!card?.querySelector('.badge-omitted'),
+        note: card?.querySelector('.strip-note-input')?.value ?? '',
+      };
+    })()`);
+    assert(omittedCheck.isOmittedClass && omittedCheck.hasOmittedBadge, `E4: omitted scene strip is flagged visibly: ${JSON.stringify(omittedCheck)}`);
+    assert(omittedCheck.note === "Night crane required for exterior", `E4: omitted scene keeps its manual notes: ${omittedCheck.note}`);
+
+    // Export tests (E9): HTML and PDF exports with unclipped text and color legend
+    const outDir = join(dataDir, "stripboard-exports");
+    mkdirSync(outDir, { recursive: true });
+    const htmlExportPath = join(outDir, "test-stripboard.html");
+    const pdfExportPath = join(outDir, "test-stripboard.pdf");
+    const xlsxExportPath = join(outDir, "test-stripboard.xlsx");
+    const csvExportPath = join(outDir, "test-stripboard.csv");
+
+    const expHtml = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('export_stripboard', {
+      scope: { mode: 'document', documents: [${JSON.stringify(docId)}], include_omitted: true },
+      format: 'html',
+      path: ${JSON.stringify(htmlExportPath)},
+    })`);
+    assert(expHtml.format === "html" && expHtml.bytes > 0, `HTML stripboard exported: ${JSON.stringify(expHtml)}`);
+    const htmlContent = readFileSync(htmlExportPath, "utf8");
+    assert(htmlContent.includes("Color Legend") && htmlContent.includes("Day Interior"), `E9: HTML export contains color legend`);
+    assert(htmlContent.includes("Night crane required for exterior"), `E9: HTML export contains manual strip notes`);
+    assert(htmlContent.includes("[OMITTED]"), `E9: HTML export flags omitted scene`);
+
+    const expPdf = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('export_stripboard', {
+      scope: { mode: 'document', documents: [${JSON.stringify(docId)}], include_omitted: true },
+      format: 'pdf',
+      path: ${JSON.stringify(pdfExportPath)},
+    })`);
+    assert(expPdf.format === "pdf" && expPdf.bytes > 0, `PDF stripboard exported: ${JSON.stringify(expPdf)}`);
+    const pdfBytes = readFileSync(pdfExportPath);
+    assert(pdfBytes.slice(0, 4).toString() === "%PDF", "PDF starts with %PDF");
+
+    const expXlsx = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('export_stripboard', {
+      scope: { mode: 'document', documents: [${JSON.stringify(docId)}], include_omitted: true },
+      format: 'xlsx',
+      path: ${JSON.stringify(xlsxExportPath)},
+    })`);
+    assert(expXlsx.format === "xlsx" && expXlsx.bytes > 0, `XLSX stripboard exported: ${JSON.stringify(expXlsx)}`);
+
+    const expCsv = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('export_stripboard', {
+      scope: { mode: 'document', documents: [${JSON.stringify(docId)}], include_omitted: true },
+      format: 'csv',
+      path: ${JSON.stringify(csvExportPath)},
+    })`);
+    assert(expCsv.format === "csv" && expCsv.bytes > 0, `CSV stripboard exported: ${JSON.stringify(expCsv)}`);
+    const csvContent = readFileSync(csvExportPath, "utf8");
+    assert(csvContent.includes("Night crane required for exterior"), "CSV export contains user notes");
+
+    // Screenshot for visual inspection
+    await screenshot(app, "stripboard");
+
+    // Close stripboard dialog
+    await app.evaluate("(document.getElementById('stripboard-close').click(), true)");
+    await waitFor(app, "!document.getElementById('stripboard-dialog')?.open", "stripboard closed at test end");
+  });
+
   await app.close();
 }

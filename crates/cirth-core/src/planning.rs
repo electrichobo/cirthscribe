@@ -42,6 +42,8 @@ pub enum PlanningOp {
     /// Breakdown tags anchored to text spans (M4 step 3, ADR 0005).
     PutTag(crate::tags::Tag),
     DeleteTag(String),
+    /// Stripboard schedule order, day breaks, banners and notes (M4 step 5, E3, E4).
+    SetSchedule { scope: String, state: crate::stripboard::ScheduleState },
 }
 
 #[derive(Clone, Debug)]

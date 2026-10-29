@@ -120,7 +120,7 @@ Then the plan itself:
 - [x] Reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, revisions, and breakdown tag categories (occurrences and distinct scenes kept apart)
 - [x] Character participation: speaking scenes, present-but-silent scenes (cast tags), V.O./O.S./dual speeches, dialogue share, and documented participation estimates
 - [ ] Character sides: a character's scenes as pages for actors
-- [ ] Stripboard and shooting schedule
+- [x] Stripboard and shooting schedule (independent order, day breaks, banners, unscheduled pile, color legend and notes; exports in PDF, HTML, XLSX, CSV; View > Tools > Stripboard…)
 - [x] Page counts in eighths, and character appearance charts
 - [x] Reports in PDF, spreadsheet (XLSX, CSV, TSV), HTML and RTF
 

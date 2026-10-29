@@ -44,6 +44,7 @@ import { createProjectTree } from "./projecttree";
 import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
 import { createStoryScry, type ExportableReport, type ReportBundle, type ReportExported, type ReportFormat, type ReportScope } from "./storyscry";
+import { createStripboard } from "./stripboard";
 import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
@@ -500,6 +501,38 @@ const storyScry = createStoryScry({
   }),
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
   exportReport: (scope, report, format, path) => exportReport(report, format, path, scope),
+});
+
+// The stripboard and shooting schedule (M4 step 5, E3, E4, E9).
+const stripboard = createStripboard({
+  documentId: () => lastOpen?.document_id ?? "",
+  version: () => syncer?.currentVersion ?? 0,
+  planningVersion: () => planningVersion,
+  applyPlanning: (op) =>
+    queued(async () => {
+      try {
+        takePlanning(await invoke<PlanningState>("planning_command", { op, base: planningVersion }));
+        return true;
+      } catch (e) {
+        showBanner(`Stripboard: ${e}`);
+        await refreshPlanning().catch(() => undefined);
+        return false;
+      }
+    }),
+  undoPlanning: () =>
+    queued(async () => {
+      const st = await invoke<PlanningState>("planning_undo", { redo: false });
+      takePlanning(st);
+      return st.done;
+    }),
+  redoPlanning: () =>
+    queued(async () => {
+      const st = await invoke<PlanningState>("planning_undo", { redo: true });
+      takePlanning(st);
+      return st.done;
+    }),
+  episodes: async () => (await invoke<{ id: string; title: string; kind: string }[]>("project_tree")).filter((i) => i.kind === "document").map((i) => ({ id: i.id, title: i.title })),
+  onGoToScene: (sceneId) => revealScene(view, sceneId),
 });
 
 // The project bible (M3 step 7): entries are planning data; renames change the scripts.
@@ -1537,6 +1570,9 @@ async function runMenu(id: string): Promise<void> {
     case "storyscry":
       if (lastOpen) await storyScry.open();
       break;
+    case "stripboard":
+      if (lastOpen) await stripboard.open();
+      break;
     case "tags":
       if (lastOpen) await breakdownTags.open();
       break;
@@ -1972,6 +2008,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   importAny,
   overview,
   storyScry,
+  stripboard,
   tags: breakdownTags,
   bible,
   timeline,
@@ -2021,6 +2058,11 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   scenes: () => scenesOf(view.state.doc),
   moveScene: (id: string, before: string | null) => {
     const tr = moveScene(view.state, id, before);
+    if (tr) view.dispatch(tr);
+    return !!tr;
+  },
+  reorderScenes: (order: string[]) => {
+    const tr = reorderScenes(view.state, order);
     if (tr) view.dispatch(tr);
     return !!tr;
   },

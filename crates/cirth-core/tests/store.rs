@@ -950,4 +950,121 @@ fn breakdown_tags_map_across_edits_splits_joins_omitted_scenes_and_orphans() {
     assert!(!t2_rec.orphaned && t2_rec.start == 11 && t2_rec.end == 21);
 }
 
+#[test]
+fn stripboard_scheduling_order_is_independent_and_omitted_scenes_are_flagged() {
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    use cirth_core::reports::ReportScope;
+    use cirth_core::stripboard::{reconcile_schedule, StripKind};
+
+    let d = tmpdir("stripboard-test");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    let doc_id = s.default_document().unwrap();
+
+    let b_sc1 = Block { id: "sc-1".into(), scene_id: Some("sc-1".into()), ..Block::new(BlockKind::Heading, "INT. CAFE - DAY") };
+    let b_a1 = Block { id: "a1".into(), ..Block::new(BlockKind::Action, "Mara drinks coffee.") };
+    let b_sc2 = Block { id: "sc-2".into(), scene_id: Some("sc-2".into()), ..Block::new(BlockKind::Heading, "EXT. ALLEY - NIGHT") };
+    let b_a2 = Block { id: "a2".into(), ..Block::new(BlockKind::Action, "Rain pours over the fire escape.") };
+    let b_sc3 = Block { id: "sc-3".into(), scene_id: Some("sc-3".into()), ..Block::new(BlockKind::Heading, "INT. WAREHOUSE - DAY") };
+    let b_a3 = Block { id: "a3".into(), ..Block::new(BlockKind::Action, "Dust floats in the sunbeams.") };
+
+    s.seed(&cirth_core::model::Document {
+        title: "Stripboard Test".into(),
+        version: 0,
+        blocks: vec![b_sc1.clone(), b_a1.clone(), b_sc2.clone(), b_a2.clone(), b_sc3.clone(), b_a3.clone()],
+    })
+    .unwrap();
+
+    let scope = ReportScope {
+        mode: "document".into(),
+        documents: vec![doc_id.clone()],
+        include_omitted: true,
+    };
+
+    // 1. Initial schedule generation
+    let mut sched = reconcile_schedule(&s, &scope).unwrap();
+    let scene_strips: Vec<&str> = sched.scheduled.iter().filter(|st| st.kind == StripKind::Scene).map(|st| st.scene_id.as_deref().unwrap()).collect();
+    assert_eq!(scene_strips, vec!["sc-1", "sc-2", "sc-3"]);
+
+    // 2. Reorder strips for scheduling: sc-2, sc-3, sc-1, and add a note to sc-2 (E3)
+    let s1 = sched.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-1")).cloned().unwrap();
+    let mut s2 = sched.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-2")).cloned().unwrap();
+    let s3 = sched.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-3")).cloned().unwrap();
+    let day1 = sched.scheduled.iter().find(|st| st.kind == StripKind::DayBreak).cloned().unwrap();
+
+    s2.note = "Bring stunt double and rain rig".into();
+    sched.scheduled = vec![day1, s2, s3, s1];
+
+    let mut ph = PlanningHistory::default();
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::SetSchedule { scope: format!("document:{doc_id}"), state: sched.clone() }, pv).unwrap();
+
+    // Verify undo & redo of schedule reordering
+    assert!(ph.can_undo());
+    ph.undo(&s).unwrap();
+    let undone = reconcile_schedule(&s, &scope).unwrap();
+    let undone_scenes: Vec<&str> = undone.scheduled.iter().filter(|st| st.kind == StripKind::Scene).map(|st| st.scene_id.as_deref().unwrap()).collect();
+    assert_eq!(undone_scenes, vec!["sc-1", "sc-2", "sc-3"], "undo restores previous schedule order");
+
+    assert!(ph.can_redo());
+    ph.redo(&s).unwrap();
+    let redone = reconcile_schedule(&s, &scope).unwrap();
+    let redone_scenes: Vec<&str> = redone.scheduled.iter().filter(|st| st.kind == StripKind::Scene).map(|st| st.scene_id.as_deref().unwrap()).collect();
+    assert_eq!(redone_scenes, vec!["sc-2", "sc-3", "sc-1"], "redo restores custom schedule order");
+
+    // 3. Screenplay reorder: move Scene 3 (sc-3 + a3) to before Scene 1 (sc-1) (E3)
+    let v1 = s.version().unwrap();
+    s.apply(&Batch {
+        tx_id: "move-sc3".into(),
+        base_version: v1,
+        document_id: Some(doc_id.clone()),
+        ops: vec![
+            Op::Delete { id: "sc-3".into() },
+            Op::Delete { id: "a3".into() },
+            Op::Put { block: b_sc3.clone(), after: None },
+            Op::Put { block: b_a3.clone(), after: Some("sc-3".into()) },
+        ],
+    })
+    .unwrap();
+
+    // Reconcile stripboard: scheduled order stays independent (sc-2, sc-3, sc-1) while source fields refresh (E3)
+    let refreshed = reconcile_schedule(&s, &scope).unwrap();
+    let refreshed_scenes: Vec<&str> = refreshed.scheduled.iter().filter(|st| st.kind == StripKind::Scene).map(|st| st.scene_id.as_deref().unwrap()).collect();
+    assert_eq!(refreshed_scenes, vec!["sc-2", "sc-3", "sc-1"], "scheduled order is independent of screenplay order (E3)");
+
+    let sc2_refreshed = refreshed.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-2")).unwrap();
+    assert_eq!(sc2_refreshed.note, "Bring stunt double and rain rig", "manual strip notes survive screenplay edits (E3)");
+
+    let sc3_refreshed = refreshed.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-3")).unwrap();
+    assert_eq!(sc3_refreshed.scene_number, "1", "source scene number refreshed from updated screenplay (E3)");
+
+    // 4. Omit a scheduled scene (sc-2) under locked scene numbers (E4)
+    s.lock_scene_numbers(&doc_id).unwrap();
+    s.set_scene_omitted(&doc_id, "sc-2", true).unwrap();
+
+    let omitted_reconciled = reconcile_schedule(&s, &scope).unwrap();
+    let sc2_omitted = omitted_reconciled.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-2")).unwrap();
+    assert!(sc2_omitted.omitted, "omitted scene strip is flagged omitted (E4)");
+    assert!(!sc2_omitted.deleted, "omitted scene is not deleted (E4)");
+    assert_eq!(sc2_omitted.note, "Bring stunt double and rain rig", "omitted scene retains its manual notes (E4)");
+
+    // 5. Delete a scheduled scene (sc-3) from screenplay (E4)
+    let v2 = s.version().unwrap();
+    s.apply(&Batch {
+        tx_id: "delete-sc3".into(),
+        base_version: v2,
+        document_id: Some(doc_id.clone()),
+        ops: vec![
+            Op::Delete { id: "sc-3".into() },
+            Op::Delete { id: "a3".into() },
+        ],
+    })
+    .unwrap();
+
+    let del_reconciled = reconcile_schedule(&s, &scope).unwrap();
+    let sc3_del = del_reconciled.scheduled.iter().find(|st| st.scene_id.as_deref() == Some("sc-3")).unwrap();
+    assert!(sc3_del.deleted && sc3_del.omitted, "deleted scene strip remains in schedule flagged deleted (E4)");
+    assert_eq!(del_reconciled.scheduled.iter().filter(|st| st.kind == StripKind::Scene).count(), 3, "strips are never silently dropped (E4)");
+}
+
+
 

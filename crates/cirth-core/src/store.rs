@@ -1135,6 +1135,17 @@ impl Store {
         self.set_setting("project", "notes", text)
     }
 
+    /// Stripboard schedule for a scope ("project" or "document:<id>").
+    pub fn schedule(&self, scope: &str) -> Result<Option<crate::stripboard::ScheduleState>> {
+        let json = self.setting(&format!("schedule:{scope}"), "state")?;
+        Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
+    }
+
+    pub fn set_schedule(&self, scope: &str, state: &crate::stripboard::ScheduleState) -> Result<()> {
+        let json = serde_json::to_string(state).map_err(|e| StoreError::Invalid(e.to_string()))?;
+        self.set_setting(&format!("schedule:{scope}"), "state", &json)
+    }
+
     pub fn setting(&self, scope: &str, key: &str) -> Result<Option<String>> {
         Ok(self.conn.query_row("SELECT value FROM settings WHERE scope = ?1 AND key = ?2", [scope, key], |r| r.get(0)).optional()?)
     }
@@ -1509,6 +1520,16 @@ impl Store {
                 self.conn.execute("DELETE FROM breakdown_tags WHERE id = ?1", [id])?;
                 self.mark_unsaved()?;
                 PlanningOp::PutTag(old)
+            }
+            PlanningOp::SetSchedule { scope, state } => {
+                let before = self.schedule(scope)?.unwrap_or_else(|| {
+                    crate::stripboard::ScheduleState {
+                        scope: scope.clone(),
+                        ..Default::default()
+                    }
+                });
+                self.set_schedule(scope, state)?;
+                PlanningOp::SetSchedule { scope: scope.clone(), state: before }
             }
             PlanningOp::DeleteBeat(id) => {
                 let Some(old) = self.beat(id)? else {
