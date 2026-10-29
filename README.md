@@ -100,7 +100,7 @@ First, from the owner's notes on the current build:
 
 
 - [x] Episodes and series: folders for seasons, any number of episodes per project, each with its own script, scene list, cards and exports (File > Episodes and Documents…)
-- [ ] One story bible shared by every episode
+- [x] One story bible shared by every episode: characters, locations and world entries, suggested from the scripts, with aliases and previewed renames (View > Tools > Bible…)
 - [x] Tabbed navigator: Scenes (page, length in eighths, colour label, characters, the card's logline) and Characters (speeches, words, scenes, first appearance), with a filter and a whole-project view
 - [ ] Navigator tabs for notes and the outline
 - [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
@@ -110,7 +110,7 @@ First, from the owner's notes on the current build:
 - [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo
 - [x] Reordering scenes from the board (only with your permission, which is remembered per script, and undoable)
 - [ ] Story timeline, kept separate from script order
-- [ ] Character, location and world profiles
+- [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
 
 ### Stage 4: Production tools
 

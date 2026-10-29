@@ -612,6 +612,72 @@ fn outline_items_nest_acts_sequences_and_beats_and_refuse_bad_places() {
 }
 
 #[test]
+fn bible_candidates_entries_aliases_rename_and_unreferenced_across_episodes() {
+    use cirth_core::bible::{self, Entity};
+    use cirth_core::model::{Block, BlockKind};
+    use cirth_core::ops::{Batch, Op};
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    let d = tmpdir("bible");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+    let ep = s.create_episode("Episode 2", None).unwrap();
+    s.set_current_document(&ep).unwrap();
+    let head = s.load().unwrap().blocks[0].clone();
+    let base = s.version().unwrap();
+    let (cue, line) = (Block::new(BlockKind::Character, "INES (V.O.)"), Block::new(BlockKind::Dialogue, "Low water."));
+    s.apply(&Batch { tx_id: "ep2".into(), base_version: base, document_id: None, ops: vec![Op::Update { block: Block { runs: vec![cirth_core::model::Run::plain("INT. HARBOUR - DAWN")], ..head.clone() } }, Op::Put { block: cue.clone(), after: Some(head.id.clone()) }, Op::Put { block: line, after: Some(cue.id.clone()) }] }).unwrap();
+    let docs = |s: &Store| s.all_documents().unwrap().into_iter().map(|(id, _, b)| (id, b)).collect::<Vec<_>>();
+
+    // C1: candidates from cues and headings, with evidence in both episodes.
+    let (cands, _) = bible::derive(&[], &Default::default(), &docs(&s));
+    let ines = cands.iter().find(|c| c.kind == "character" && c.name == "INES").expect("INES is a candidate");
+    assert!(ines.evidence.iter().any(|e| e.document_id == ep) && ines.evidence.iter().any(|e| e.document_id != ep), "found in both episodes");
+    assert!(cands.iter().any(|c| c.kind == "location" && c.name == "HARBOUR"));
+
+    // Accept INES with an authored biography; reject a location; both undoable.
+    let mut h = PlanningHistory::default();
+    let v = s.planning_version().unwrap();
+    let entry = Entity { id: "ines".into(), kind: "character".into(), name: "INES".into(), description: "Harbour clerk; counts everything twice.".into(), fields: vec![("Age".into(), "47".into())], ..Default::default() };
+    h.apply(&s, PlanningOp::PutEntity(entry.clone()), v).unwrap();
+    let v = s.planning_version().unwrap();
+    h.apply(&s, PlanningOp::Reject { kind: "location".into(), name: "harbour".into(), on: true }, v).unwrap();
+    let (cands, occ) = bible::derive(&s.entities().unwrap(), &s.rejected().unwrap(), &docs(&s));
+    assert!(!cands.iter().any(|c| c.name == "INES" || c.name == "HARBOUR"), "accepted and rejected names are no longer candidates");
+    assert!(occ["ines"].len() >= 2, "occurrences refresh from every episode");
+    h.undo(&s).unwrap();
+    assert!(s.rejected().unwrap().is_empty(), "undo brings the rejected name back");
+
+    // C2: rename INES to INEZ through the previewed plan: cues change, other mentions are listed, the entry keeps its fields and the old name as an alias.
+    let plan = bible::rename_plan(&entry, "INES", "Inez", &docs(&s));
+    assert!(plan.changes.len() >= 2 && plan.changes.iter().all(|c| c.after.starts_with("INEZ")), "{:?}", plan.changes);
+    assert!(plan.changes.iter().any(|c| c.after == "INEZ (V.O.)"), "extensions kept");
+    assert!(!plan.untouched.is_empty(), "INES in action lines is listed, not changed: {:?}", plan.untouched.len());
+    s.apply_rename(&plan).unwrap();
+    let v = s.planning_version().unwrap();
+    h.apply(&s, PlanningOp::PutEntity(Entity { name: "INEZ".into(), aliases: vec!["INES".into()], ..entry.clone() }), v).unwrap();
+    let after = s.entity("ines").unwrap().unwrap();
+    assert_eq!((after.name.as_str(), after.description.as_str(), after.fields.clone()), ("INEZ", entry.description.as_str(), entry.fields.clone()), "authored fields survive");
+    let (_, occ) = bible::derive(&s.entities().unwrap(), &s.rejected().unwrap(), &docs(&s));
+    assert!(occ["ines"].len() >= 2, "still found under the new name");
+    for u in &plan.untouched {
+        let doc = s.load_document(&u.document_id).unwrap();
+        assert_eq!(doc.blocks.iter().find(|b| b.id == u.block_id).unwrap().text(), u.text, "untouched text unchanged");
+    }
+
+    // C3: delete the only cue of a character with an entry: flagged, never deleted.
+    let pell = Entity { id: "pell".into(), kind: "character".into(), name: "PELL".into(), description: "Weigh-station clerk.".into(), ..Default::default() };
+    let v = s.planning_version().unwrap();
+    h.apply(&s, PlanningOp::PutEntity(pell.clone()), v).unwrap();
+    s.set_current_document(&s.default_document().unwrap()).unwrap();
+    let pell_cues: Vec<String> = s.load().unwrap().blocks.iter().filter(|b| b.kind == BlockKind::Character && b.text().starts_with("PELL")).map(|b| b.id.clone()).collect();
+    let base = s.version().unwrap();
+    s.apply(&Batch { tx_id: "nopell".into(), base_version: base, document_id: None, ops: pell_cues.iter().map(|id| Op::Delete { id: id.clone() }).collect() }).unwrap();
+    let (_, occ) = bible::derive(&s.entities().unwrap(), &s.rejected().unwrap(), &docs(&s));
+    assert!(occ["pell"].is_empty(), "no occurrences left: the entry is unreferenced");
+    assert_eq!(s.entity("pell").unwrap().unwrap(), pell, "and its profile is kept");
+}
+
+#[test]
 fn scene_numbers_lock_keep_through_edits_take_letters_and_omit() {
     let d = tmpdir("scenenumbers");
     let work = d.join("w.db");

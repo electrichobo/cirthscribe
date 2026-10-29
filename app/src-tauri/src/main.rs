@@ -262,7 +262,14 @@ async fn navigator_info(app: State<'_, App>, project: bool) -> Result<NavigatorI
             let d = s.store.load().map_err(err)?;
             vec![(id, d.title, d.blocks)]
         };
-        let characters = cirth_core::navigator::characters(&docs.iter().map(|(id, _, b)| (id.clone(), b.clone())).collect::<Vec<_>>());
+        // A character entry's aliases count under its name.
+        let mut names = std::collections::HashMap::new();
+        for e in s.store.entities().map_err(err)?.into_iter().filter(|e| e.kind == "character") {
+            for n in std::iter::once(&e.name).chain(e.aliases.iter()) {
+                names.insert(n.trim().to_uppercase(), e.name.trim().to_uppercase());
+            }
+        }
+        let characters = cirth_core::navigator::characters_named(&docs.iter().map(|(id, _, b)| (id.clone(), b.clone())).collect::<Vec<_>>(), &names);
         let project_scenes = if project {
             let mut out = Vec::new();
             for (id, title, blocks) in &docs {
@@ -285,6 +292,80 @@ async fn navigator_info(app: State<'_, App>, project: bool) -> Result<NavigatorI
 #[tauri::command]
 async fn set_label_name(app: State<'_, App>, key: String, name: String) -> Result<(), String> {
     with_session(&app, |s| s.store.set_label_name(&key, &name).map_err(err))
+}
+
+// --- Project bible (M3 step 7) ----------------------------------------------------
+
+#[derive(Serialize)]
+struct BibleEntry {
+    #[serde(flatten)]
+    entity: cirth_core::bible::Entity,
+    occurrences: Vec<cirth_core::bible::Evidence>,
+}
+
+/// Where a scene is, for showing evidence: its document and heading.
+#[derive(Serialize)]
+struct Place {
+    document_id: String,
+    document_title: String,
+    heading: String,
+}
+
+#[derive(Serialize)]
+struct BibleState {
+    entries: Vec<BibleEntry>,
+    candidates: Vec<cirth_core::bible::Candidate>,
+    places: std::collections::HashMap<String, Place>,
+}
+
+fn bible_docs(s: &Session) -> Result<(Vec<(String, Vec<cirth_core::model::Block>)>, std::collections::HashMap<String, Place>), String> {
+    let all = s.store.all_documents().map_err(err)?;
+    let mut places = std::collections::HashMap::new();
+    for (id, title, blocks) in &all {
+        for b in blocks.iter().filter(|b| b.scene_id.is_some()) {
+            places.insert(b.scene_id.clone().unwrap(), Place { document_id: id.clone(), document_title: title.clone(), heading: b.text() });
+        }
+    }
+    Ok((all.into_iter().map(|(id, _, b)| (id, b)).collect(), places))
+}
+
+/// The bible as it stands: entries with their occurrences (refreshed from
+/// every script), and candidates with their evidence.
+#[tauri::command]
+async fn bible_state(app: State<'_, App>) -> Result<BibleState, String> {
+    with_session(&app, |s| {
+        let (docs, places) = bible_docs(s)?;
+        let entities = s.store.entities().map_err(err)?;
+        let (candidates, mut occ) = cirth_core::bible::derive(&entities, &s.store.rejected().map_err(err)?, &docs);
+        let entries = entities.into_iter().map(|e| BibleEntry { occurrences: occ.remove(&e.id).unwrap_or_default(), entity: e }).collect();
+        Ok(BibleState { entries, candidates, places })
+    })
+}
+
+/// What renaming an entry would change (cues or headings) and leave alone.
+#[tauri::command]
+async fn bible_rename_preview(app: State<'_, App>, id: String, from: String, to: String) -> Result<cirth_core::bible::RenamePlan, String> {
+    with_session(&app, |s| {
+        let e = s.store.entity(&id).map_err(err)?.ok_or("no such entry")?;
+        let (docs, _) = bible_docs(s)?;
+        Ok(cirth_core::bible::rename_plan(&e, &from, &to, &docs))
+    })
+}
+
+/// Apply the rename the preview showed; refused if the script changed since.
+/// The UI reloads the open script and updates the entry (a planning step).
+#[tauri::command]
+async fn bible_rename_apply(app: State<'_, App>, id: String, from: String, to: String, expect: usize) -> Result<usize, String> {
+    with_session(&app, |s| {
+        let e = s.store.entity(&id).map_err(err)?.ok_or("no such entry")?;
+        let (docs, _) = bible_docs(s)?;
+        let plan = cirth_core::bible::rename_plan(&e, &from, &to, &docs);
+        if plan.changes.len() != expect {
+            return Err("the script changed since the preview; preview the rename again".into());
+        }
+        s.store.apply_rename(&plan).map_err(err)?;
+        Ok(plan.changes.len())
+    })
 }
 
 // --- Episodes and series (M3 step 2) -------------------------------------------
@@ -1952,6 +2033,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_board", "Board", true)?)
         .item(&check_item(app, "view_notes", "Notes", false)?)
         .text("overview", "Overview…")
+        .text("bible", "Bible…")
         .separator()
         .text("popout_nav", "Scene List in Its Own Window")
         .text("popout_board", "Board in Its Own Window")
@@ -2259,6 +2341,9 @@ fn main() {
             load_document,
             planning_state_now,
             project_tree,
+            bible_state,
+            bible_rename_preview,
+            bible_rename_apply,
             navigator_info,
             set_label_name,
             open_document,

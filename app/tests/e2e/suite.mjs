@@ -819,6 +819,71 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(document.getElementById('overview-close').click(), true)");
   });
 
+  await test("Bible: candidates from cues and headings with evidence; accept, describe, undo, merge as alias, reject; previewed rename changes cues only; unreferenced entries stay; kept with the project", async () => {
+    await openFixture("page-boundaries");
+    const actionCaps = await app.evaluate("__cirth.view.state.doc.textContent.match(/\\b[A-Z]{4,}\\b/g) ?? []");
+    await app.evaluate("__cirth.menu('bible')");
+    await waitFor(app, "document.getElementById('bible-dialog').open && document.querySelectorAll('#bible-candidates .bible-cand').length > 0", "the bible opens with candidates");
+    const cands = await app.evaluate("[...document.querySelectorAll('#bible-candidates .bible-cand')].map(li => li.dataset.name)");
+    assert(["INES", "PELL"].every((n) => cands.includes(n)), `cue names are candidates: ${cands}`);
+    assert(cands.every((n) => !/^FILLER|^SENTENCE/.test(n)), `nothing from action or dialogue text: ${cands} (caps in the script: ${actionCaps.slice(0, 5)})`);
+    const cand = (n) => `#bible-candidates .bible-cand[data-name="${n}"]`;
+    const click = (sel) => app.evaluate(`(document.querySelector(${JSON.stringify(sel)}).click(), true)`);
+    // Evidence: choosing a candidate lists where it appears.
+    await click(`${cand("INES")} .bible-cand-name`);
+    await waitFor(app, "document.querySelectorAll('#bible-detail .bible-evidence li').length >= 1", "evidence listed");
+    // Accept INES, describe her, then undo the description.
+    await click(`${cand("INES")} .bible-accept`);
+    await waitFor(app, "document.getElementById('bible-name')?.value === 'INES' && /Appears \\d+ time/.test(document.getElementById('bible-detail').textContent)", "INES is an entry with her occurrences");
+    await app.evaluate("(() => { const d = document.getElementById('bible-description'); d.value = 'Harbour clerk.'; d.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "document.getElementById('bible-description')?.value === 'Harbour clerk.'", "description saved");
+    await click("#bible-undo");
+    await waitFor(app, "document.getElementById('bible-description')?.value === ''", "Undo takes the description back");
+    // Merge TOBIAS into INES as another name: the Characters tab counts them as one.
+    await app.evaluate(`(() => { const s = document.querySelector('${cand("TOBIAS")} .bible-merge'); s.value = s.options[1].value; s.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, "document.getElementById('bible-aliases')?.value === 'TOBIAS'", "TOBIAS is another name of INES");
+    // Reject PELL; accept a location.
+    await click(`${cand("PELL")} .bible-reject`);
+    await waitFor(app, `!document.querySelector('${cand("PELL")}')`, "PELL is no longer suggested");
+    await app.evaluate("(() => { const k = document.getElementById('bible-kind'); k.value = 'location'; k.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `!!document.querySelector('${cand("COUNTING HOUSE")}')`, "locations from headings");
+    await click(`${cand("COUNTING HOUSE")} .bible-accept`);
+    await waitFor(app, "document.getElementById('bible-name')?.value === 'COUNTING HOUSE'", "location entry");
+    await app.evaluate("(() => { const k = document.getElementById('bible-kind'); k.value = 'character'; k.dispatchEvent(new Event('change')); document.querySelector('#bible-entries .bible-entry')?.click(); return true; })()");
+    await sleep(300);
+    await screenshot(app, "bible");
+    // A new character no script mentions: marked, kept.
+    await app.evaluate("(() => { const k = document.getElementById('bible-kind'); k.value = 'character'; k.dispatchEvent(new Event('change')); return true; })()");
+    await click("#bible-new");
+    await waitFor(app, "!!document.getElementById('bible-unreferenced')", "an entry with no mentions is marked unreferenced");
+    await click("#bible-delete");
+    await waitFor(app, "![...document.querySelectorAll('#bible-entries .bible-entry')].some(b => b.textContent.startsWith('NEW NAME')) && /deleted/.test(document.getElementById('bible-status').textContent)", "the new entry deleted");
+    // Rename INES to Inez: preview, then the cues change and nothing else does.
+    await app.evaluate("([...document.querySelectorAll('#bible-entries .bible-entry')].find(b => b.textContent.startsWith('INES')).click(), true)");
+    await waitFor(app, "document.getElementById('bible-name')?.value === 'INES' && !!document.getElementById('bible-rename')", "INES chosen, rename panel");
+    const before = await blocks();
+    const inesCues = before.filter((b) => b.kind === "character" && /^INES/.test(text(b))).length;
+    await app.evaluate("(() => { document.getElementById('bible-rename').open = true; document.getElementById('bible-rename-to').value = 'Inez'; document.getElementById('bible-rename-preview').click(); return true; })()");
+    await waitFor(app, "!!document.getElementById('bible-rename-apply')", "preview shown");
+    assert((await app.evaluate("document.querySelectorAll('#bible-rename-out .bible-changes li').length")) === inesCues, "the preview lists every INES cue");
+    await click("#bible-rename-apply");
+    await waitFor(app, "document.getElementById('bible-name')?.value === 'INEZ' && document.getElementById('bible-aliases').value.split(', ').includes('INES')", "the entry is INEZ, INES kept as another name");
+    const after = await blocks();
+    assert(after.filter((b) => b.kind === "character" && /^INEZ/.test(text(b))).length === inesCues && !after.some((b) => b.kind === "character" && /^INES/.test(text(b))), "every INES cue is now INEZ");
+    assert(after.filter((b) => b.kind !== "character").map(text).join("|") === before.filter((b) => b.kind !== "character").map(text).join("|"), "no other text changed");
+    await click("#bible-close");
+    // The Characters tab counts TOBIAS under INEZ.
+    await app.evaluate("(document.getElementById('nav-tab-characters').click(), true)");
+    await waitFor(app, "(() => { const n = [...document.querySelectorAll('#navigator .char-list strong')].map(s => s.textContent); return n.includes('INEZ') && !n.includes('TOBIAS'); })()", "aliases count under the entry's name");
+    await app.evaluate("(document.getElementById('nav-tab-scenes').click(), true)");
+    // Kept with the project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    const st = await app.evaluate("window.__TAURI_INTERNALS__.invoke('bible_state')");
+    assert(st.entries.some((e) => e.name === "INEZ" && e.aliases.includes("TOBIAS")) && st.entries.some((e) => e.name === "COUNTING HOUSE") && !st.candidates.some((c) => c.name === "PELL"), `kept: ${JSON.stringify(st.entries.map((e) => e.name))}`);
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

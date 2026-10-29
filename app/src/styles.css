@@ -178,6 +178,30 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 /* A pop-out board window is wide enough for acts side by side. */
 body[data-panel="board"] .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; }
 body[data-panel="board"] .board-act { flex: 0 0 260px; }
+/* Project bible (M3 step 7). */
+dialog.bible { width: min(1000px, 94vw); }
+.bible-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+.bible-tools .form-note { margin: 0; }
+.bible-cols { display: grid; grid-template-columns: minmax(220px, 2fr) 3fr; gap: 16px; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+.bible-left, .bible-right { overflow: auto; min-height: 0; padding-right: 4px; }
+.bible-left h3, .bible-right h3 { font-size: 12px; margin: 10px 0 4px; }
+.bible-list { list-style: none; margin: 0 0 6px; padding: 0; }
+.bible-entry { width: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; border: 0; background: none; padding: 3px 6px; border-radius: 4px; }
+.bible-entry[aria-current="true"], .bible-cand-name[aria-current="true"] { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.bible-meta { color: var(--muted); font-size: 11px; }
+.bible-cand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 3px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.bible-cand-name { flex: 1 1 100%; text-align: left; border: 0; background: none; padding: 2px 4px; font-weight: 600; }
+.bible-cand button, .bible-cand select { font-size: 12px; padding: 1px 6px; }
+.bible-right { display: grid; gap: 4px; align-content: start; }
+.bible-right input, .bible-right textarea, .bible-right select { width: 100%; padding: 4px 6px; }
+.bible-fields { display: grid; grid-template-columns: 1fr 2fr auto; gap: 4px; }
+.bible-evidence, .bible-changes, .bible-untouched { margin: 0; padding-left: 18px; font-size: 12px; }
+.bible-go { border: 0; background: none; padding: 1px 0; text-align: left; color: var(--accent); }
+.bible-unref { color: var(--warn); font-size: 12px; margin: 0; }
+.bible-rename { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; margin-top: 6px; }
+.bible-rename-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; margin: 4px 0; }
+#bible-delete { justify-self: start; margin-top: 8px; }
+#bible-add-field { justify-self: start; }
 /* Overview map (M3 step 6): scenes as blocks, width = length. */
 dialog.overview { width: min(1100px, 94vw); }
 .overview-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }

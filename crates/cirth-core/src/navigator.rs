@@ -130,6 +130,12 @@ pub struct CharacterStat {
 
 /// Speaking characters over one or more documents (in project order), most speeches first.
 pub fn characters(documents: &[(Id, Vec<Block>)]) -> Vec<CharacterStat> {
+    characters_named(documents, &HashMap::new())
+}
+
+/// The same, with cue names counted under another name: a bible entry's name
+/// for each of its aliases (upper-case cue name -> entry name).
+pub fn characters_named(documents: &[(Id, Vec<Block>)], names: &HashMap<String, String>) -> Vec<CharacterStat> {
     let mut by: Vec<CharacterStat> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
     for (doc, blocks) in documents {
@@ -143,6 +149,7 @@ pub fn characters(documents: &[(Id, Vec<Block>)]) -> Vec<CharacterStat> {
                             speaker = None;
                             continue;
                         }
+                        let n = names.get(&n).cloned().unwrap_or(n);
                         let i = *index.entry(n.clone()).or_insert_with(|| {
                             by.push(CharacterStat { name: n, speeches: 0, words: 0, scenes: Vec::new() });
                             by.len() - 1

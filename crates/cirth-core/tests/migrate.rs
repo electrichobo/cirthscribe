@@ -399,3 +399,25 @@ fn opening_a_v6_project_makes_beats_outline_items_keeping_ids_text_links_and_ord
         assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
     }
 }
+
+#[test]
+fn opening_a_v7_project_adds_an_empty_bible() {
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v7-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v7-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 7, "fixture must be schema v7");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(7));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v7 copy kept");
+        let s = o.store;
+        assert!(s.entities().unwrap().is_empty() && s.rejected().unwrap().is_empty(), "no entries yet");
+        let e = cirth_core::bible::Entity { id: "e1".into(), kind: "location".into(), name: "Counting house".into(), ..Default::default() };
+        s.put_entity(&e).unwrap();
+        assert_eq!(s.entity("e1").unwrap().unwrap(), e);
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}

@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { listen, emitTo } from "@tauri-apps/api/event";
-import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, type Beat, type Block, type Kind } from "./schema";
+import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, newId, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
 import { Syncer, diff, type SyncStatus } from "./sync";
@@ -43,6 +43,8 @@ import { createShortcutsDialog } from "./shortcuts";
 import { createProjectTree } from "./projecttree";
 import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
+import { createBible, type BibleOp, type Entity } from "./bible";
+import { setBibleNames } from "./complete";
 import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
@@ -443,6 +445,53 @@ const overview = createOverview({
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
 });
 
+// The project bible (M3 step 7): entries are planning data; renames change the scripts.
+const bible = createBible({
+  state: () => invoke("bible_state"),
+  apply: (op: BibleOp) =>
+    queued(async () => {
+      try {
+        takePlanning(await invoke<PlanningState>("planning_command", { op, base: planningVersion }));
+        return true;
+      } catch (e) {
+        showBanner(`Bible: ${e}`);
+        await refreshPlanning().catch(() => undefined);
+        return false;
+      }
+    }),
+  undo: () =>
+    queued(async () => {
+      const st = await invoke<PlanningState>("planning_undo", { redo: false });
+      takePlanning(st);
+      return st.done;
+    }),
+  scopes: async () => (await invoke<{ id: string; title: string; kind: string }[]>("project_tree")).map((i) => ({ id: i.id, title: i.title, kind: i.kind })),
+  renamePreview: (id, from, to) => invoke("bible_rename_preview", { id, from, to }),
+  renameApply: async (id, from, to, expect) => {
+    await syncer.flush();
+    const n = await invoke<number>("bible_rename_apply", { id, from, to, expect });
+    // The open script changed underneath the editor: reload it (its undo history starts again).
+    if (lastOpen) await openWith("open_document", { id: lastOpen.document_id });
+    return n;
+  },
+  go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+  newId,
+});
+/** Autocomplete offers the bible's names (characters for cues, locations for headings). */
+async function refreshBibleNames() {
+  try {
+    const st = await invoke<{ entries: Entity[] }>("bible_state");
+    const names = (k: string) => st.entries.filter((e) => e.kind === k).flatMap((e) => [e.name, ...e.aliases]).map((n) => n.toUpperCase());
+    setBibleNames({ cues: names("character"), locations: names("location") });
+  } catch {
+    setBibleNames({ cues: [], locations: [] });
+  }
+}
+document.getElementById("bible-dialog")?.addEventListener("close", () => {
+  void refreshBibleNames();
+  void refreshNav();
+});
+
 const script = (): ScriptView => ({
   ...editorScript(view, (b) => putBeat(b, "nav").then(() => rerenderSide()), popButton),
   deleteItem: (id) => void deleteItem(id),
@@ -597,6 +646,7 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   $("project-title").textContent = o.is_default ? o.doc.title || o.name : `${o.project_title || o.name} › ${o.doc.title}`;
   board.beats = o.beats;
   await refreshPlanning();
+  void refreshBibleNames();
   navSteps = [];
   navRedo = [];
   const state = makeState(o.doc.blocks);
@@ -1243,6 +1293,9 @@ async function runMenu(id: string): Promise<void> {
     case "import":
       await importAny();
       break;
+    case "bible":
+      if (lastOpen) await bible.open();
+      break;
     case "overview":
       if (lastOpen) await overview.open();
       break;
@@ -1674,6 +1727,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   importFountain,
   importAny,
   overview,
+  bible,
   projectTree,
   openDocument: (id: string) => openWith("open_document", { id }),
   notes: notesPanel,

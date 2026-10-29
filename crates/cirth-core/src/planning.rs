@@ -21,6 +21,11 @@ pub enum PlanningOp {
     DeleteBeat(String),
     /// A scene's colour label ("" for none).
     SetSceneLabel { scene_id: String, label: String },
+    /// A bible entry created or changed (M3 step 7).
+    PutEntity(crate::bible::Entity),
+    DeleteEntity(String),
+    /// A candidate name rejected (or brought back).
+    Reject { kind: String, name: String, on: bool },
 }
 
 #[derive(Clone, Debug)]

@@ -90,6 +90,16 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
    - Occurrence lists refresh from the scripts; authored fields are never overwritten. An entity no longer mentioned is flagged, never deleted.
    - Rename: a previewed replace of cues and headings only; matching words in action text are listed, not changed.
    - The navigator's Characters tab and autocomplete use the entities.
+   - **Built 2026-10-28:**
+     - View > Tools > Bible… (no default key): characters, locations and world entries for the whole project (every episode), each with a name, other names (aliases), a description, the writer's own fields, and an optional scope (a folder or a script; stored, not yet used to filter).
+     - Candidates (C1): character names from cues (extensions stripped) and places from scene headings that no entry or alias covers, with how often and where they appear in every script; action and dialogue text never make a candidate, and nothing becomes an entry by itself. Accept, Merge into an entry (as another name) or Reject (remembered).
+     - Occurrences refresh from the scripts on every look; an entry no script mentions any more is marked "Unreferenced" and kept (C3). Authored text is never changed by the app (C2).
+     - Rename in the scripts (C2): a preview lists the cues (characters) or headings (locations) that will change and the other mentions that stay as they are; Rename applies it in every script at once (refused if the scripts changed since the preview), and the entry keeps the old name as another name. The open script reloads, so its undo history starts again; renaming back reverses it.
+     - Every entry change, merge and rejection is a planning step (ADR 0003); the dialog's Undo takes back its last change.
+     - The Characters tab counts a character's other names under the entry's name; autocomplete offers bible names for cues and heading places.
+     - Core: `cirth_core::bible` (heading places, candidates and occurrences, rename plans keeping each run's marks), schema v8 (`bible_entities`, `bible_rejected`; frozen v7 files and an upgrade test), planning ops `PutEntity`, `DeleteEntity`, `Reject`, `Store::apply_rename`.
+     - Not yet: scoped facts that differ by season (the scope is stored only); world entries have no occurrences; candidates for props come with tags in M4.
+     - Tests: core (heading places; candidates only from cues and headings, with evidence; aliases and rejections; rename changing cues only, keeping marks and listing other mentions; a two-episode project: accept, reject and undo, rename across episodes with authored fields kept, an unreferenced entry kept); e2e "Bible" on both drivers; checked by eye from the screenshot.
 8. **Story timeline** (B5).
    - Story events in their own chronological order, across episodes, linked to one or more scenes; flashbacks, simultaneous events and uncertain or relative dates representable.
    - Moving an event never moves a scene. "Apply chronology to script order" is a separate, previewed, undoable command, offered only with the structural permission on.

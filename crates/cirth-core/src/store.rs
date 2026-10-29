@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 7;
+pub const SCHEMA_VERSION: i64 = 8;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -241,10 +241,30 @@ fn migrate_v7(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v7 -> v8: the project bible (M3 step 7). Entries are authored (kind, name,
+/// aliases, description, the writer's fields, an optional season or episode
+/// scope); rejected candidates are remembered so they do not come back.
+/// Projects start with no entries.
+fn migrate_v8(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE bible_entities (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          name TEXT NOT NULL,
+          aliases TEXT NOT NULL DEFAULT '[]',
+          description TEXT NOT NULL DEFAULT '',
+          fields TEXT NOT NULL DEFAULT '[]',
+          scope TEXT
+        );
+        CREATE TABLE bible_rejected (kind TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY (kind, name));",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7), (8, migrate_v8)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -744,6 +764,82 @@ impl Store {
         order.into_iter().map(|d| Ok((d.id.clone(), d.title.clone(), self.load_document(&d.id)?.blocks))).collect()
     }
 
+    // --- Project bible (M3 step 7, bible.rs) -----------------------------------
+
+    pub fn entities(&self) -> Result<Vec<crate::bible::Entity>> {
+        let mut stmt = self.conn.prepare("SELECT id, kind, name, aliases, description, fields, scope FROM bible_entities ORDER BY kind, name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| {
+            let aliases: String = r.get(3)?;
+            let fields: String = r.get(5)?;
+            Ok(crate::bible::Entity { id: r.get(0)?, kind: r.get(1)?, name: r.get(2)?, aliases: serde_json::from_str(&aliases).unwrap_or_default(), description: r.get(4)?, fields: serde_json::from_str(&fields).unwrap_or_default(), scope: r.get(6)? })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub fn entity(&self, id: &str) -> Result<Option<crate::bible::Entity>> {
+        Ok(self.entities()?.into_iter().find(|e| e.id == id))
+    }
+
+    /// Store an entry as written (planning command `PutEntity` makes it undoable).
+    pub fn put_entity(&self, e: &crate::bible::Entity) -> Result<()> {
+        if !crate::bible::KINDS.contains(&e.kind.as_str()) || e.name.trim().is_empty() || e.id.trim().is_empty() {
+            return Err(StoreError::Invalid("an entry needs an id, a kind (character, location, world) and a name".into()));
+        }
+        let mut seen = std::collections::HashSet::new();
+        let aliases: Vec<String> = e.aliases.iter().map(|a| a.trim().to_string()).filter(|a| !a.is_empty() && !a.eq_ignore_ascii_case(e.name.trim()) && seen.insert(a.to_uppercase())).collect();
+        self.conn.execute(
+            "INSERT OR REPLACE INTO bible_entities(id, kind, name, aliases, description, fields, scope) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![e.id, e.kind, e.name.trim(), serde_json::to_string(&aliases).unwrap_or_default(), e.description, serde_json::to_string(&e.fields).unwrap_or_default(), e.scope],
+        )?;
+        self.mark_unsaved()
+    }
+
+    /// Names the writer said are not entries ("kind", "NAME").
+    pub fn rejected(&self) -> Result<std::collections::HashSet<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT kind, name FROM bible_rejected")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    fn set_rejected(&self, kind: &str, name: &str, on: bool) -> Result<()> {
+        let name = name.trim().to_uppercase();
+        if on {
+            self.conn.execute("INSERT OR REPLACE INTO bible_rejected(kind, name) VALUES (?1, ?2)", [kind, &name])?;
+        } else {
+            self.conn.execute("DELETE FROM bible_rejected WHERE kind = ?1 AND name = ?2", [kind, &name])?;
+        }
+        self.mark_unsaved()
+    }
+
+    /// Apply a previewed rename (bible.rs `rename_plan`): each changed block
+    /// is updated in its own document, one batch per document. Returns the
+    /// new script version.
+    pub fn apply_rename(&mut self, plan: &crate::bible::RenamePlan) -> Result<u64> {
+        let mut by_doc: Vec<(Id, Vec<Op>)> = Vec::new();
+        for c in &plan.changes {
+            let doc = self.load_document(&c.document_id)?;
+            let Some(b) = doc.blocks.iter().find(|b| b.id == c.block_id) else { continue };
+            if b.text() != c.before {
+                return Err(StoreError::Invalid("the script changed since the preview; preview the rename again".into()));
+            }
+            let start = crate::bible::find_name(&c.before, &c.after);
+            let mut nb = b.clone();
+            nb.runs = match start {
+                Some((s, e, new)) => crate::bible::replace_in_runs(&b.runs, s, e, &new),
+                None => vec![Run::plain(c.after.clone())],
+            };
+            match by_doc.iter_mut().find(|(d, _)| *d == c.document_id) {
+                Some((_, ops)) => ops.push(Op::Update { block: nb }),
+                None => by_doc.push((c.document_id.clone(), vec![Op::Update { block: nb }])),
+            }
+        }
+        let mut version = self.version()?;
+        for (doc, ops) in by_doc {
+            version = self.apply(&Batch { tx_id: crate::model::new_id(), base_version: version, document_id: Some(doc), ops })?.version;
+        }
+        Ok(version)
+    }
+
     /// The project's notes panel: free text saved with the project and tied
     /// to no document, scene or block (owner, 2026-10-28). Empty if never written.
     pub fn project_notes(&self) -> Result<String> {
@@ -998,6 +1094,27 @@ impl Store {
                 let before = self.scene_label(scene_id)?;
                 self.set_scene_label(scene_id, label)?;
                 PlanningOp::SetSceneLabel { scene_id: scene_id.clone(), label: before }
+            }
+            PlanningOp::PutEntity(e) => {
+                let before = self.entity(&e.id)?;
+                self.put_entity(e)?;
+                match before {
+                    Some(old) => PlanningOp::PutEntity(old),
+                    None => PlanningOp::DeleteEntity(e.id.clone()),
+                }
+            }
+            PlanningOp::DeleteEntity(id) => {
+                let Some(old) = self.entity(id)? else {
+                    return Err(StoreError::Invalid(format!("no entry {id}")));
+                };
+                self.conn.execute("DELETE FROM bible_entities WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::PutEntity(old)
+            }
+            PlanningOp::Reject { kind, name, on } => {
+                let was = self.rejected()?.contains(&(kind.clone(), name.trim().to_uppercase()));
+                self.set_rejected(kind, name, *on)?;
+                PlanningOp::Reject { kind: kind.clone(), name: name.clone(), on: was }
             }
             PlanningOp::DeleteBeat(id) => {
                 let Some(old) = self.beat(id)? else {

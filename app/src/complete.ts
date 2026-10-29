@@ -1,6 +1,6 @@
 // Autocomplete for character cues, scene headings and transitions.
 //
-// Suggestions come from the script itself (no project bible yet): cue names
+// Suggestions come from the script itself and the project bible: cue names
 // already used (extensions like "(V.O.)" stripped, most frequent first),
 // heading prefixes, known locations and times of day, and standard
 // transitions. Shown only with the caret at the end of the block, never
@@ -48,9 +48,17 @@ interface Known {
   times: Map<string, number>;
 }
 
+/** Names from the project bible (M3 step 7), offered even before a script uses them. */
+let bibleNames: { cues: string[]; locations: string[] } = { cues: [], locations: [] };
+export function setBibleNames(n: { cues: string[]; locations: string[] }) {
+  bibleNames = n;
+}
+
 function collect(doc: PMNode, skipPos: number): Known {
   const k: Known = { cues: new Map(), locations: new Map(), times: new Map() };
   const bump = (m: Map<string, number>, v: string) => v && m.set(v, (m.get(v) ?? 0) + 1);
+  for (const n of bibleNames.cues) bump(k.cues, n);
+  for (const n of bibleNames.locations) bump(k.locations, n);
   doc.forEach((n, pos) => {
     if (pos === skipPos) return;
     const t = n.textContent;
