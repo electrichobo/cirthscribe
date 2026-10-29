@@ -155,6 +155,30 @@ export type ReportTab =
   | "day_night"
   | "revisions";
 
+export type ExportableReport =
+  | "all"
+  | "scenes"
+  | "characters"
+  | "locations"
+  | "action_dialogue"
+  | "int_ext"
+  | "day_night"
+  | "revisions";
+
+export type ReportFormat = "xlsx" | "csv" | "tsv" | "pdf" | "html" | "rtf";
+
+export interface ReportExported {
+  path: string;
+  report: string;
+  title: string;
+  format: string;
+  scope_label: string;
+  source_version: number;
+  planning_version: number;
+  bytes: number;
+  notes: string[];
+}
+
 const TABS: { id: ReportTab; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "scenes", label: "Scenes" },
@@ -417,6 +441,7 @@ export function createStoryScry(hooks: {
   fetch: (scope: ReportScope) => Promise<ReportBundle>;
   versions: () => { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
   go: (documentId: string, sceneId: string) => void;
+  exportReport: (scope: ReportScope, report: ExportableReport, format: ReportFormat, path?: string) => Promise<ReportExported | null>;
 }) {
   const dialog = document.createElement("dialog");
   dialog.id = "storyscry-dialog";
@@ -509,13 +534,48 @@ export function createStoryScry(hooks: {
   body.id = "storyscry-body";
   body.className = "storyscry-body";
 
+  const exportBar = document.createElement("div");
+  exportBar.className = "storyscry-export-bar";
+  const exportReportSel = document.createElement("select");
+  exportReportSel.id = "storyscry-export-report";
+  exportReportSel.setAttribute("aria-label", "Report to export");
+  exportReportSel.append(
+    new Option("All reports", "all"),
+    new Option("Scenes report", "scenes"),
+    new Option("Characters report", "characters"),
+    new Option("Locations report", "locations"),
+    new Option("Action vs Dialogue report", "action_dialogue"),
+    new Option("Interior vs Exterior report", "int_ext"),
+    new Option("Day vs Night report", "day_night"),
+    new Option("Revisions report", "revisions"),
+  );
+  const exportFormatSel = document.createElement("select");
+  exportFormatSel.id = "storyscry-export-format";
+  exportFormatSel.setAttribute("aria-label", "Report export format");
+  exportFormatSel.append(
+    new Option("Spreadsheet (.xlsx)", "xlsx"),
+    new Option("CSV (.csv)", "csv"),
+    new Option("TSV (.tsv)", "tsv"),
+    new Option("PDF (.pdf)", "pdf"),
+    new Option("Web page (.html)", "html"),
+    new Option("Rich Text (.rtf)", "rtf"),
+  );
+  const exportBtn = document.createElement("button");
+  exportBtn.type = "button";
+  exportBtn.id = "storyscry-export-btn";
+  exportBtn.textContent = "Export…";
+  const exportStatus = document.createElement("span");
+  exportStatus.id = "storyscry-export-status";
+  exportStatus.className = "form-note storyscry-export-status";
+  exportBar.append(exportReportSel, exportFormatSel, exportBtn, exportStatus);
+
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.id = "storyscry-close";
   closeBtn.textContent = "Close";
   const actions = document.createElement("div");
-  actions.className = "dialog-actions";
-  actions.append(closeBtn);
+  actions.className = "dialog-actions storyscry-actions";
+  actions.append(exportBar, closeBtn);
 
   dialog.append(head, tools, episodesBar, staleBar, tabBar, body, actions);
   document.body.append(dialog);
@@ -601,6 +661,7 @@ export function createStoryScry(hooks: {
       sortAsc = true;
     }
     tab = next;
+    exportReportSel.value = tab === "dashboard" ? "all" : tab;
     for (const [id, b] of tabButtons) {
       const on = id === tab;
       b.classList.toggle("current", on);
@@ -1022,6 +1083,19 @@ export function createStoryScry(hooks: {
     draw();
   }
 
+  async function runExport(path?: string, reportOverride?: ExportableReport, formatOverride?: ReportFormat): Promise<ReportExported | null> {
+    const rep = reportOverride ?? (exportReportSel.value as ExportableReport);
+    const fmt = formatOverride ?? (exportFormatSel.value as ReportFormat);
+    exportReportSel.value = rep;
+    exportFormatSel.value = fmt;
+    const res = await hooks.exportReport(currentScope(), rep, fmt, path);
+    if (res) {
+      exportStatus.textContent = `${res.title} (${res.format.toUpperCase()}) written: ${res.scope_label} · v${res.source_version}`;
+      announce(`${res.title} exported as ${res.format.toUpperCase()}`);
+    }
+    return res;
+  }
+
   scopeSel.addEventListener("change", () => void load());
   omittedCheck.addEventListener("change", () => void load());
   tablesBtn.addEventListener("click", () => {
@@ -1032,11 +1106,14 @@ export function createStoryScry(hooks: {
   });
   filterInput.addEventListener("input", () => draw());
   refreshBtn.addEventListener("click", () => void load());
+  exportBtn.addEventListener("click", () => void runExport());
   closeBtn.addEventListener("click", () => dialog.close());
 
   return {
     async open(initialTab: ReportTab = "dashboard") {
       tab = initialTab;
+      exportReportSel.value = tab === "dashboard" ? "all" : tab;
+      exportStatus.textContent = "";
       for (const [id, b] of tabButtons) {
         const on = id === tab;
         b.classList.toggle("current", on);
@@ -1051,6 +1128,8 @@ export function createStoryScry(hooks: {
     },
     close: () => dialog.close(),
     refresh: () => load(),
+    export: (path?: string, report?: ExportableReport, format?: ReportFormat) => runExport(path, report, format),
+    scope: () => currentScope(),
     /** Called by main.ts when the script or planning state changes so an open report marks itself out of date (B6). */
     notifyChanged() {
       if (dialog.open && data) checkStaleness();

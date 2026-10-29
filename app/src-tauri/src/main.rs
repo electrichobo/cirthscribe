@@ -368,7 +368,7 @@ async fn bible_rename_apply(app: State<'_, App>, id: String, from: String, to: S
     })
 }
 
-// --- StoryScry and reports (M4 step 1) --------------------------------------------
+// --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
 
 #[tauri::command]
 async fn storyscry_reports(app: State<'_, App>, scope: cirth_core::reports::ReportScope) -> Result<cirth_core::reports::ReportBundle, String> {
@@ -378,6 +378,65 @@ async fn storyscry_reports(app: State<'_, App>, scope: cirth_core::reports::Repo
 #[tauri::command]
 async fn store_versions(app: State<'_, App>) -> Result<(u64, u64), String> {
     with_session(&app, |s| Ok((s.store.version().map_err(err)?, s.store.planning_version().map_err(err)?)))
+}
+
+#[derive(Serialize)]
+struct ReportExported {
+    path: String,
+    report: String,
+    title: String,
+    format: String,
+    scope_label: String,
+    source_version: u64,
+    planning_version: u64,
+    bytes: usize,
+    notes: Vec<String>,
+}
+
+/// Export a report (or all reports) from StoryScry in CSV, TSV, XLSX, HTML, PDF or RTF.
+#[tauri::command]
+async fn export_report(
+    app: State<'_, App>,
+    scope: cirth_core::reports::ReportScope,
+    report: String,
+    format: String,
+    path: String,
+) -> Result<ReportExported, String> {
+    let kind = cirth_core::report_export::ReportKind::parse(&report)?;
+    let fmt = cirth_core::report_export::ReportFormat::parse(&format)?;
+    let (bundle, stored_prof, project_id) = with_session(&app, |s| {
+        let main = s.store.current_document().map_err(err)?;
+        Ok((
+            cirth_core::reports::from_store(&s.store, &scope).map_err(err)?,
+            s.store.document_profile(&main).map_err(err)?,
+            s.store.project_id().map_err(err)?,
+        ))
+    })?;
+    let prof = profile(ui_profile(&stored_prof));
+    let date_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let out = cirth_core::report_export::export(&bundle, kind, fmt, &prof, date_unix, &project_id)?;
+    let target = normalize(Path::new(&path));
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(io_err)?;
+    }
+    let tmp = target.with_extension(format!("{}.tmp", fmt.extension()));
+    std::fs::write(&tmp, &out.bytes).map_err(io_err)?;
+    cirth_core::fsutil::sync_file(&tmp).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
+    Ok(ReportExported {
+        path: target.display().to_string(),
+        report: kind.id().to_string(),
+        title: kind.title().to_string(),
+        format: fmt.extension().to_string(),
+        scope_label: bundle.scope_label,
+        source_version: bundle.source_version,
+        planning_version: bundle.planning_version,
+        bytes: out.bytes.len(),
+        notes: out.notes,
+    })
 }
 
 // --- Evidence board (M3 step 9) ---------------------------------------------------
@@ -2469,6 +2528,7 @@ fn main() {
             project_tree,
             storyscry_reports,
             store_versions,
+            export_report,
             bible_state,
             timeline_state,
             evidence_state,

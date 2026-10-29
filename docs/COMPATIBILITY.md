@@ -31,7 +31,7 @@ Statuses: not implemented · implemented, unverified · verified within profile 
 | .docx | Partial with documented losses | Word and Google Docs profile | TextEdit (macOS) 2026-10-27, on pack v1: formatting lost, fixed since in pack v2. Pending: recheck on v2, Pages (not installed on the test Mac), Word, Google Docs (N28) |
 | .rtf | Partial with documented losses | Word, LibreOffice, TextEdit | TextEdit (macOS) 2026-10-27, on pack v1. Text and indents right; title page break fixed since, in pack v2. Pending: Word, LibreOffice |
 | .html | Verified within profile on screen (Safari); print unverified | Any current browser, screen and print | Safari (macOS) 2026-10-27, and the owner's informal check. Print preview not yet run |
-| .xlsx / .csv | Not implemented | Reports and stripboards (later milestones) | — |
+| .xlsx / .csv / .tsv (reports) | Implemented, unverified externally | StoryScry reports (individual or 7-sheet workbook): typed numeric columns, human scene numbers + stable IDs, formula-safe text cells | Automated XML well-formedness, typed-cell, formula-escaping and deterministic-bytes tests (`report_export::tests`) + e2e on Windows. External checks in Google Sheets, Excel and LibreOffice pending (N33, M4 step 7) |
 
 ## Deferred
 

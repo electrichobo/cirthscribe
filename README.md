@@ -121,7 +121,7 @@ Then the plan itself:
 - [ ] Character sides: a character's scenes as pages for actors
 - [ ] Stripboard and shooting schedule
 - [x] Page counts in eighths, and character appearance charts
-- [ ] Reports in PDF, spreadsheet (XLSX/CSV) and HTML
+- [x] Reports in PDF, spreadsheet (XLSX, CSV, TSV), HTML and RTF
 
 ### Stage 5: Notes, alternatives and versions
 

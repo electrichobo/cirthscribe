@@ -2401,7 +2401,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(__cirth.menu('export'), true)");
     await waitFor(app, "document.getElementById('export-dialog').open", "File > Export… opens the dialog");
     const formats = await app.evaluate("[...document.querySelectorAll('#export-dialog input[name=export-format]')].map(r => r.value + (r.disabled ? ':off' : ''))");
-    assert(formats.join() === "pdf,pdf_changed:off,txt,fountain,fdx,docx,rtf,html", `export formats: ${formats}`);
+    assert(formats.join() === "pdf,pdf_changed:off,txt,fountain,fdx,docx,rtf,html,reports", `export formats: ${formats}`);
     await app.evaluate("(document.getElementById('export-cancel').click(), true)");
     // View > Go To > Scene… and Page…: the caret moves there.
     const scenes = await app.evaluate("__cirth.scenes()");
@@ -3281,6 +3281,77 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const targetSceneId = await app.evaluate("__cirth.storyScry.data.scenes.at(-1).scene_id");
     await app.evaluate("(document.querySelectorAll('#storyscry-scenes-table .storyscry-go')[document.querySelectorAll('#storyscry-scenes-table .storyscry-go').length - 1].click(), true)");
     await waitFor(app, `!document.getElementById('storyscry-dialog').open && (() => { const at = __cirth.view.state.selection.from; const s = __cirth.scenes().find(x => at >= x.from && at < x.to); return s?.sceneId === ${JSON.stringify(targetSceneId)}; })()`, "clicking a scene row jumps to that scene");
+  });
+
+  await test("Report exports (E1, E8, E9): each report and all reports in CSV, TSV, XLSX, HTML, PDF and RTF; scope, version stamp, stable IDs and formula safety", async () => {
+    await openFixture("page-boundaries");
+    // Put a formula-like logline on the first scene's beat card to verify CSV/TSV/XLSX formula-injection protection.
+    const firstBeat = await app.evaluate("__cirth.board.beats.find(b => b.kind === 'beat' && b.scene_id)");
+    await app.evaluate(`__cirth.putBeat({ ...${JSON.stringify(firstBeat)}, logline: '=1+1 dangerous, "quoted" logline' })`);
+
+    // File > Export… > Reports (StoryScry)… opens StoryScry.
+    await app.evaluate("(__cirth.menu('export'), true)");
+    await waitFor(app, "document.getElementById('export-dialog')?.open === true", "Export dialog opens");
+    await app.evaluate("(() => { document.getElementById('export-reports').checked = true; document.getElementById('export-go').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('export-dialog').open && document.getElementById('storyscry-dialog')?.open === true && !!__cirth.storyScry.data", "StoryScry opened from File > Export…");
+
+    // Switching tabs updates the report export selector automatically.
+    assert((await app.evaluate("document.getElementById('storyscry-export-report').value")) === "all", "Dashboard defaults export selector to all");
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"scenes\"]').click(), true)");
+    assert((await app.evaluate("document.getElementById('storyscry-export-report').value")) === "scenes", "Scenes tab selects scenes report for export");
+
+    // 1. CSV (Scenes report): UTF-8, quoted, formula-safe, scope + version stamp, human number + stable scene_id.
+    const csvPath = join(dataDir, "report-scenes.csv");
+    const rCsv = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(csvPath)}, 'scenes', 'csv')`);
+    assert(rCsv && rCsv.report === "scenes" && rCsv.format === "csv", `CSV export result: ${JSON.stringify(rCsv)}`);
+    const statusText = await app.evaluate("document.getElementById('storyscry-export-status').textContent");
+    assert(statusText.includes("Scenes Report (CSV) written") && statusText.includes(`v${rCsv.source_version}`), `export status in dialog: ${statusText}`);
+    const csv = readFileSync(csvPath, "utf8");
+    assert(csv.includes("Report,Scenes Report") && csv.includes(`Source Script Version,${rCsv.source_version}`), "CSV header stamps report title and source version");
+    assert(csv.includes("Methodology,Page and eighth lengths are estimates from the layout engine (1 page = 8 eighths)."), "CSV states estimate note");
+    assert(csv.includes("Scene Number,Omitted,INT/EXT,Location,Time of Day,Heading,Page") && csv.includes("Document ID,Scene ID"), "CSV includes both human Scene Number and stable Scene ID / Document ID");
+    assert(csv.includes(`"'=1+1 dangerous, ""quoted"" logline"`), `CSV neutralizes formula and escapes quotes: ${csv}`);
+    assert(csv.includes(firstBeat.scene_id), "CSV carries the canonical scene_id");
+
+    // 2. TSV (Characters report): tab-delimited, stable IDs and numbers.
+    const tsvPath = join(dataDir, "report-characters.tsv");
+    const rTsv = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(tsvPath)}, 'characters', 'tsv')`);
+    assert(rTsv && rTsv.report === "characters" && rTsv.format === "tsv", "TSV exported");
+    const tsv = readFileSync(tsvPath, "utf8");
+    assert(tsv.includes("Report\tCharacters Report") && tsv.includes("Character\tSpeeches\tDual Speeches\tDialogue Words"), "TSV headers present");
+    assert(tsv.includes("First Appearance Scene\tFirst Appearance Page\tFirst Document Title\tFirst Document ID\tFirst Scene ID"), "TSV has both human scene number and stable scene ID");
+
+    // 3. XLSX (All 7 reports): valid OpenXML ZIP with 7 worksheets.
+    const xlsxPath = join(dataDir, "report-all.xlsx");
+    const rXlsx = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(xlsxPath)}, 'all', 'xlsx')`);
+    assert(rXlsx && rXlsx.report === "all" && rXlsx.format === "xlsx" && rXlsx.bytes > 1000, "XLSX exported");
+    const xlsxRaw = readFileSync(xlsxPath, "latin1");
+    assert(xlsxRaw.startsWith("PK\x03\x04"), "XLSX is a ZIP package");
+    for (let i = 1; i <= 7; i++) {
+      assert(xlsxRaw.includes(`xl/worksheets/sheet${i}.xml`), `XLSX contains worksheet ${i}`);
+    }
+
+    // 4. HTML (Locations report), RTF (Action vs Dialogue report), and PDF (All reports).
+    const htmlPath = join(dataDir, "report-locations.html");
+    const rHtml = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(htmlPath)}, 'locations', 'html')`);
+    assert(rHtml && rHtml.format === "html", "HTML report exported");
+    const html = readFileSync(htmlPath, "utf8");
+    assert(html.startsWith("<!DOCTYPE html>") && html.includes("Locations Report") && html.includes(`v${rHtml.source_version}`) && html.includes("estimates"), "HTML has doctype, title, version and estimate note");
+
+    const rtfPath = join(dataDir, "report-ad.rtf");
+    const rRtf = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(rtfPath)}, 'action_dialogue', 'rtf')`);
+    assert(rRtf && rRtf.format === "rtf", "RTF report exported");
+    const rtf = readFileSync(rtfPath, "utf8");
+    assert(rtf.startsWith("{\\rtf1\\ansi") && rtf.includes("Action vs Dialogue Report") && rtf.includes("\\trowd"), "RTF has header, title and table rows");
+
+    const pdfPath = join(dataDir, "report-all.pdf");
+    const rPdf = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(pdfPath)}, 'all', 'pdf')`);
+    assert(rPdf && rPdf.format === "pdf", "PDF report exported");
+    const pdf = readFileSync(pdfPath, "latin1");
+    assert(pdf.startsWith("%PDF-") && (pdf.match(/\/Type\s*\/Page(?!s)/g) ?? []).length >= 1 && pdf.includes("All Reports"), "PDF report rendered with pages and heading");
+
+    await app.evaluate("(document.getElementById('storyscry-close').click(), true)");
+    await waitFor(app, "!document.getElementById('storyscry-dialog').open", "StoryScry closed");
   });
 
   await app.close();

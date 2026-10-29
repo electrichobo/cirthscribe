@@ -43,7 +43,7 @@ import { createShortcutsDialog } from "./shortcuts";
 import { createProjectTree } from "./projecttree";
 import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
-import { createStoryScry, type ReportBundle, type ReportScope } from "./storyscry";
+import { createStoryScry, type ExportableReport, type ReportBundle, type ReportExported, type ReportFormat, type ReportScope } from "./storyscry";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -450,6 +450,43 @@ const overview = createOverview({
   data: overviewData,
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
 });
+const REPORT_FORMAT_FILTERS: Record<ReportFormat, { name: string; ext: string }> = {
+  xlsx: { name: "Spreadsheet (.xlsx)", ext: "xlsx" },
+  csv: { name: "CSV (.csv)", ext: "csv" },
+  tsv: { name: "TSV (.tsv)", ext: "tsv" },
+  pdf: { name: "PDF (.pdf)", ext: "pdf" },
+  html: { name: "Web page (.html)", ext: "html" },
+  rtf: { name: "Rich Text (.rtf)", ext: "rtf" },
+};
+
+async function exportReport(
+  report: ExportableReport,
+  format: ReportFormat,
+  path?: string,
+  scope?: ReportScope,
+): Promise<ReportExported | null> {
+  if (!lastOpen) return null;
+  const f = REPORT_FORMAT_FILTERS[format];
+  const suffix = `-${report === "all" ? "reports" : report.replace(/_/g, "-")}.${f.ext}`;
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(suffix), filters: [{ name: f.name, extensions: [f.ext] }] }));
+  if (!target) return null;
+  await syncer.flush();
+  const activeScope: ReportScope = scope ?? storyScry.scope();
+  try {
+    const r = await invoke<ReportExported>("export_report", {
+      scope: activeScope,
+      report,
+      format,
+      path: target,
+    });
+    showBanner(`${r.title} (${r.format.toUpperCase()}) written: ${r.path}. ${r.notes.join(" ")}`);
+    return r;
+  } catch (e) {
+    showBanner(`Report export failed: ${e}`);
+    return null;
+  }
+}
+
 const storyScry = createStoryScry({
   fetch: async (scope: ReportScope) => {
     await syncer.flush();
@@ -461,6 +498,7 @@ const storyScry = createStoryScry({
     planningVersion,
   }),
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+  exportReport: (scope, report, format, path) => exportReport(report, format, path, scope),
 });
 
 // The project bible (M3 step 7): entries are planning data; renames change the scripts.
@@ -1757,6 +1795,9 @@ async function exportAs(format: ExportFormat): Promise<boolean> {
       return exportFountain();
     case "fdx":
       return exportFdx();
+    case "reports":
+      await storyScry.open();
+      return true;
     default:
       return exportDocument(format);
   }
@@ -1891,6 +1932,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   exportFdx,
   exportDocument,
   exportPdf,
+  exportReport,
   get view() {
     return view;
   },

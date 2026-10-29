@@ -19,6 +19,7 @@ pub mod ops;
 pub mod pdf;
 pub mod planning;
 pub mod printdoc;
+pub mod report_export;
 pub mod reports;
 pub mod revisions;
 pub mod rtf;
