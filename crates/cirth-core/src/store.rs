@@ -1141,10 +1141,14 @@ impl Store {
 
     /// The current document's cards.
     pub fn beats(&self) -> Result<Vec<Beat>> {
-        let doc = self.current_document()?;
+        self.beats_of(&self.current_document()?)
+    }
+
+    /// A document's outline items and cards, in outline order.
+    pub fn beats_of(&self, document_id: &str) -> Result<Vec<Beat>> {
         let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id FROM beats WHERE document_id = ?1 ORDER BY pos")?;
         let beats = stmt
-            .query_map([&doc], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)? }))?
+            .query_map([document_id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(beats)
     }

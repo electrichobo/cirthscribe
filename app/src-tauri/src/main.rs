@@ -368,6 +368,18 @@ async fn bible_rename_apply(app: State<'_, App>, id: String, from: String, to: S
     })
 }
 
+// --- StoryScry and reports (M4 step 1) --------------------------------------------
+
+#[tauri::command]
+async fn storyscry_reports(app: State<'_, App>, scope: cirth_core::reports::ReportScope) -> Result<cirth_core::reports::ReportBundle, String> {
+    with_session(&app, |s| cirth_core::reports::from_store(&s.store, &scope).map_err(err))
+}
+
+#[tauri::command]
+async fn store_versions(app: State<'_, App>) -> Result<(u64, u64), String> {
+    with_session(&app, |s| Ok((s.store.version().map_err(err)?, s.store.planning_version().map_err(err)?)))
+}
+
 // --- Evidence board (M3 step 9) ---------------------------------------------------
 
 #[derive(Serialize)]
@@ -2141,6 +2153,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_board", "Board", true)?)
         .item(&check_item(app, "view_notes", "Notes", false)?)
         .text("overview", "Overview…")
+        .text("storyscry", "StoryScry…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
         .text("evidence", "Evidence Board…")
@@ -2454,6 +2467,8 @@ fn main() {
             load_document,
             planning_state_now,
             project_tree,
+            storyscry_reports,
+            store_versions,
             bible_state,
             timeline_state,
             evidence_state,

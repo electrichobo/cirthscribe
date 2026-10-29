@@ -779,3 +779,61 @@ fn page_lock_is_kept_refuses_a_second_lock_and_a_page_size_change() {
     assert!(o.store.page_lock(&main).unwrap().is_none());
     o.store.set_document_profile(&main, "a4").unwrap();
 }
+
+#[test]
+fn reports_from_store_stamp_version_and_respect_scope_and_omitted_scenes() {
+    use cirth_core::reports::{ReportScope, from_store};
+    let d = tmpdir("reports-store");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+    let ep1 = s.default_document().unwrap();
+    let ep2 = s.create_episode("Episode 2", None).unwrap();
+    let h2 = s.load_document(&ep2).unwrap().blocks[0].clone();
+    let mut h2_up = h2.clone();
+    h2_up.runs = vec![cirth_core::model::Run::plain("EXT. LIGHTHOUSE - NIGHT")];
+    let cue = Block::new(BlockKind::Character, "KEEPER");
+    let dlg = Block::new(BlockKind::Dialogue, "Keep the lamp lit.");
+    let base = s.version().unwrap();
+    s.apply(&Batch {
+        tx_id: "ep2-fill".into(),
+        base_version: base,
+        document_id: Some(ep2.clone()),
+        ops: vec![
+            Op::Update { block: h2_up },
+            Op::Put { block: cue.clone(), after: Some(h2.id.clone()) },
+            Op::Put { block: dlg, after: Some(cue.id) },
+        ],
+    })
+    .unwrap();
+
+    // Lock scene numbers on ep1 and omit its first scene.
+    s.lock_scene_numbers(&ep1).unwrap();
+    let first_scene = s.load_document(&ep1).unwrap().blocks[0].scene_id.clone().unwrap();
+    s.set_scene_omitted(&ep1, &first_scene, true).unwrap();
+
+    let v_before = s.version().unwrap();
+    let r_doc = from_store(&s, &ReportScope { mode: "document".into(), documents: vec![ep1.clone()], include_omitted: false }).unwrap();
+    assert_eq!(r_doc.source_version, v_before);
+    assert_eq!(r_doc.omitted_in_scope, 1);
+    assert!(!r_doc.scenes.iter().any(|sc| sc.scene_id == first_scene));
+
+    let r_doc_incl = from_store(&s, &ReportScope { mode: "document".into(), documents: vec![ep1.clone()], include_omitted: true }).unwrap();
+    assert_eq!(r_doc_incl.scenes.len(), r_doc.scenes.len() + 1);
+    assert!(r_doc_incl.scenes.iter().any(|sc| sc.scene_id == first_scene && sc.omitted));
+
+    // Episode-specific scope (Episode 2 only) vs whole project.
+    let r_ep2 = from_store(&s, &ReportScope { mode: "episodes".into(), documents: vec![ep2.clone()], include_omitted: false }).unwrap();
+    assert_eq!(r_ep2.scenes.len(), 1);
+    assert_eq!(r_ep2.scenes[0].location, "LIGHTHOUSE");
+    assert_eq!(r_ep2.characters.len(), 1);
+    assert_eq!(r_ep2.characters[0].name, "KEEPER");
+
+    let r_proj = from_store(&s, &ReportScope { mode: "project".into(), documents: Vec::new(), include_omitted: false }).unwrap();
+    assert_eq!(r_proj.scenes.len(), r_doc.scenes.len() + 1);
+
+    // B6: editing the script advances `Store::version()`, so `r_proj.source_version` is now stale.
+    let extra = Block::new(BlockKind::Action, "Wind rattles the panes.");
+    s.apply(&Batch { tx_id: "ep2-edit".into(), base_version: v_before, document_id: Some(ep2), ops: vec![Op::Put { block: extra, after: None }] }).unwrap();
+    assert!(s.version().unwrap() > r_proj.source_version, "earlier report version is detectably stale after an edit");
+}
+

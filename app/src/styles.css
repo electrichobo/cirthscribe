@@ -265,6 +265,48 @@ dialog.overview { width: min(1100px, 94vw); }
 .overview-table th, .overview-table td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); }
 .overview-go { border: 0; background: none; padding: 0; text-align: left; color: var(--accent); }
 :root { --act-0: #3b73d6; --act-1: #3a9a4a; --act-2: #d4b106; --act-3: #8a55c8; --act-4: #e07b21; --act-5: #d65a9f; }
+/* StoryScry (M4 step 1): dashboard of SVG charts and full filterable/sortable reports. */
+dialog.storyscry { width: min(1140px, 95vw); height: min(760px, 88vh); }
+.storyscry-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.storyscry-head h2 { margin: 0; }
+.storyscry-stamp { margin: 0; font-size: 12px; }
+.storyscry-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; }
+.storyscry-tools .form-note { margin: 0; }
+.storyscry-check, .storyscry-ep-check { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+#storyscry-filter { min-width: 20ch; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+.storyscry-episodes { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.storyscry-episodes[hidden], .storyscry-stale[hidden] { display: none; }
+.storyscry-stale { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--warn); border-radius: 6px; background: color-mix(in srgb, var(--warn) 12%, var(--panel)); color: var(--ink); font-size: 12px; }
+.storyscry-tabs { flex-wrap: wrap; margin-bottom: 8px; }
+.storyscry-body { overflow: auto; min-height: 0; flex: 1 1 auto; padding-right: 4px; }
+.storyscry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+.storyscry-card { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: var(--bg); display: grid; align-content: start; gap: 6px; }
+.storyscry-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.storyscry-card-head h3 { margin: 0; font-size: 14px; }
+.storyscry-card-sub { margin: 0; font-size: 12px; }
+.storyscry-open-report { font-size: 12px; padding: 2px 8px; }
+.storyscry-chart-wrap { display: grid; gap: 6px; align-items: center; }
+.storyscry-svg { width: 100%; max-height: 150px; display: block; overflow: visible; }
+.chart-ring { fill: none; stroke: var(--line); stroke-dasharray: 2,2; stroke-width: 1; }
+.chart-track { fill: color-mix(in srgb, var(--line) 45%, var(--panel)); stroke: var(--line); stroke-width: 1; }
+.chart-target { stroke: var(--ink); stroke-width: 1.5; }
+.chart-stem { stroke: var(--line); stroke-width: 1.5; }
+.chart-label { fill: var(--ink); font: 600 10px system-ui, sans-serif; }
+.chart-sub { fill: var(--muted); font: 10px system-ui, sans-serif; }
+.chart-slice { stroke: var(--ink); stroke-width: 1; fill-opacity: .82; }
+.chart-c0 { fill: var(--act-0); color: var(--act-0); }
+.chart-c1 { fill: var(--act-1); color: var(--act-1); }
+.chart-c2 { fill: var(--act-2); color: var(--act-2); }
+.chart-c3 { fill: var(--act-3); color: var(--act-3); }
+.chart-c4 { fill: var(--act-4); color: var(--act-4); }
+.chart-c5 { fill: var(--act-5); color: var(--act-5); }
+.storyscry-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 11px; }
+.storyscry-legend li { display: flex; align-items: baseline; gap: 6px; }
+.chart-swatch { font-size: 11px; line-height: 1; }
+.storyscry-table, .storyscry-mini-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.storyscry-table th, .storyscry-table td, .storyscry-mini-table th, .storyscry-mini-table td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.storyscry-sort { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; text-align: left; }
+.storyscry-go { border: 0; background: none; padding: 0; text-align: left; color: var(--accent); cursor: pointer; }
 /* Outline tab (M3 step 4): acts, sequences and beats as one tree. */
 .outline-tools { display: flex; gap: 4px; margin: 0 0 6px; }
 .outline-tools button { font-size: 12px; padding: 2px 8px; }

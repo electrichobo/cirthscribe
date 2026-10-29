@@ -113,14 +113,14 @@ Then the plan itself:
 - [x] Story timeline, kept separate from script order: events linked to scenes in any episode, flashbacks marked, and an optional, previewed "put the script in story order" (View > Tools > Timeline…)
 - [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
 
-### 🔜 Stage 4: Production tools (next; plan accepted)
+### 🔜 Stage 4: Production tools (in progress; plan accepted)
 
 - [ ] Script breakdown tags (props, wardrobe, cast and more)
-- [ ] StoryScry: a dashboard of charts summarising every report, each opening into the full report
-- [ ] Separate reports for characters, scenes, locations and props, plus action vs dialogue, interior vs exterior, and day vs night
+- [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
+- [x] Initial reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, and revisions (props and breakdown-tag reports come with tags)
 - [ ] Character sides: a character's scenes as pages for actors
 - [ ] Stripboard and shooting schedule
-- [ ] Page counts in eighths, and character appearance charts
+- [x] Page counts in eighths, and character appearance charts
 - [ ] Reports in PDF, spreadsheet (XLSX/CSV) and HTML
 
 ### Stage 5: Notes, alternatives and versions
@@ -166,7 +166,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 
 ### How it is built
 
-- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, title pages, scene numbering, revision sets and locked pages, PDF, text, Word, RTF and HTML export, Fountain and Final Draft exchange, word counts, spell check and Free Writing. It has no UI code.
+- **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, title pages, scene numbering, revision sets and locked pages, production reports, PDF, text, Word, RTF and HTML export, Fountain and Final Draft exchange, word counts, spell check and Free Writing. It has no UI code.
 - **App** (`app/`, Tauri 2 + TypeScript + ProseMirror): the desktop shell and editor. The editor is a view of the core's document and sends versioned edits to it, so there is one saved copy of the script.
 - **Tests**: Rust unit and integration tests, plus an end-to-end suite that drives the real app through two drivers (DevTools and WebDriver).
 

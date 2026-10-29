@@ -43,6 +43,7 @@ import { createShortcutsDialog } from "./shortcuts";
 import { createProjectTree } from "./projecttree";
 import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
+import { createStoryScry, type ReportBundle, type ReportScope } from "./storyscry";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -120,6 +121,7 @@ function setStatus(s: SyncStatus) {
   if (s.state === "error" && statusEl.dataset.state !== "error") announce(text, true);
   statusEl.textContent = text;
   statusEl.dataset.state = s.state;
+  storyScry?.notifyChanged();
 }
 
 function blockKindAtCursor(): string {
@@ -206,6 +208,7 @@ function takePlanning(st: PlanningState) {
   board.beats = st.beats.map((b) => Object.assign(old.get(b.id) ?? b, b));
   board.structural = st.structural;
   ($("structural") as HTMLInputElement).checked = st.structural;
+  storyScry?.notifyChanged();
 }
 
 async function refreshPlanning() {
@@ -445,6 +448,18 @@ async function overviewData(project: boolean): Promise<OverviewData> {
 }
 const overview = createOverview({
   data: overviewData,
+  go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+});
+const storyScry = createStoryScry({
+  fetch: async (scope: ReportScope) => {
+    await syncer.flush();
+    return invoke<ReportBundle>("storyscry_reports", { scope });
+  },
+  versions: () => ({
+    scriptVersion: syncer?.currentVersion ?? 0,
+    hasUnsynced: syncer?.hasUnsynced ?? false,
+    planningVersion,
+  }),
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
 });
 
@@ -694,6 +709,7 @@ function dispatch(tr: Transaction) {
   }
   if (tr.docChanged) {
     syncer.changed(next.doc);
+    storyScry.notifyChanged();
     findBar.refreshCount();
     spell.schedule();
     window.clearTimeout(navTimer);
@@ -1425,6 +1441,9 @@ async function runMenu(id: string): Promise<void> {
     case "overview":
       if (lastOpen) await overview.open();
       break;
+    case "storyscry":
+      if (lastOpen) await storyScry.open();
+      break;
     case "project_tree":
       if (lastOpen) await projectTree.open();
       break;
@@ -1853,6 +1872,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   importFountain,
   importAny,
   overview,
+  storyScry,
   bible,
   timeline,
   evidence,

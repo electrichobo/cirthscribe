@@ -2344,7 +2344,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
     const ids = new Set(items.map((i) => i.id));
     const want = ["new", "open", "import", "save", "save_as", "export", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
-      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
+      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
       "goto_page", "goto_scene", "win_minimize", "win_zoom", "focus_next",
       "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "latency", "updates", "licences", "about",
       ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
@@ -2355,7 +2355,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
     // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
     const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
-    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", ui_contrast: "View > Appearance > High Contrast",
+    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
       goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
       font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
     for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
@@ -3193,6 +3193,94 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert((bytes.match(/\/Type\s*\/Page(?!s)/g) ?? []).length === scriptPages + 1, "title page plus script pages");
     assert(bytes.includes("(PAGE BOUNDARIES)") && bytes.includes("(Jared Hoy)") && bytes.includes("(Blue Revision)"), "title, author and draft in the PDF's properties");
     return { banner };
+  });
+
+  await test("StoryScry (B6, E6–E8): SVG charts and tables from the same report rows; scope and omitted scenes; sort, filter and scene links; flagged out of date on edit until refreshed", async () => {
+    await openFixture("page-boundaries");
+    const scenes0 = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    // Lock scene numbers and omit the second scene so we can test omitted-scene filtering.
+    await app.evaluate("window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'lock', sceneId: null })");
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'omit', sceneId: ${JSON.stringify(scenes0[1])} })`);
+    // Merge TOBIAS as an alias of INES in the bible so character reports combine them.
+    const pBase = (await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now')")).version;
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('planning_command', { op: { PutEntity: { id: 'ent-ines', kind: 'character', name: 'INES', aliases: ['TOBIAS'], description: '', tags: [] } }, base: ${pBase} })`);
+    await app.evaluate("__cirth.reloadPlanning()");
+
+    await app.evaluate("(__cirth.menu('storyscry'), true)");
+    await waitFor(app, "document.getElementById('storyscry-dialog')?.open === true && !!__cirth.storyScry.data", "StoryScry opens with data");
+    await audit("StoryScry dashboard");
+    await screenshot(app, "storyscry-dashboard");
+
+    const d0 = await app.evaluate("__cirth.storyScry.data");
+    assert(d0.scenes.length === scenes0.length - 1 && d0.omitted_in_scope === 1, `omitted scene excluded by default: ${d0.scenes.length} shown, ${d0.omitted_in_scope} omitted`);
+    const stamp0 = await app.evaluate("document.getElementById('storyscry-stamp').textContent");
+    assert(stamp0.includes(`v${d0.source_version}`) && /1 omitted scene excluded/.test(stamp0) && /estimate/.test(stamp0), `stamp states scope, version and estimate: ${stamp0}`);
+    assert((await app.evaluate("document.querySelectorAll('#storyscry-body .storyscry-card').length")) === 7, "seven report cards on the dashboard");
+    assert((await app.evaluate("document.querySelectorAll('#storyscry-body svg.storyscry-svg').length")) >= 6, "SVG charts rendered");
+    // Every Nightingale slice has a stroke-dasharray and every legend item has a symbol + text so colour is never the only signal.
+    const a11ySignals = await app.evaluate(`(() => {
+      const slices = [...document.querySelectorAll('#storyscry-body .chart-slice[stroke-dasharray]')].length;
+      const swatches = [...document.querySelectorAll('#storyscry-body .chart-swatch')].map(s => s.textContent.trim()).filter(Boolean).length;
+      return { slices, swatches };
+    })()`);
+    assert(a11ySignals.slices > 0 && a11ySignals.swatches > 0, `non-colour signals present: ${JSON.stringify(a11ySignals)}`);
+
+    // E8: "Show charts as tables" renders tables from the exact same report rows.
+    await app.evaluate("(document.getElementById('storyscry-tables-toggle').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#storyscry-body table.storyscry-mini-table').length === 7", "seven mini tables shown");
+    const miniSceneRows = await app.evaluate("document.querySelectorAll('#storyscry-body [data-report=\"scenes\"] tbody tr').length");
+    assert(miniSceneRows === d0.scenes.length, `dashboard table rows (${miniSceneRows}) match report scenes (${d0.scenes.length})`);
+    await app.evaluate("(document.getElementById('storyscry-tables-toggle').click(), true)");
+
+    // Include omitted scenes: the omitted scene returns with its measured stats and omitted flag.
+    await app.evaluate("(() => { const c = document.getElementById('storyscry-omitted'); c.checked = true; c.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `__cirth.storyScry.data.scenes.length === ${scenes0.length} && __cirth.storyScry.data.include_omitted === true`, "omitted scene included");
+    assert((await app.evaluate("__cirth.storyScry.data.scenes.some(s => s.omitted && s.eighths >= 1)")), "omitted scene has measured eighths and omitted flag");
+    await app.evaluate("(() => { const c = document.getElementById('storyscry-omitted'); c.checked = false; c.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `__cirth.storyScry.data.scenes.length === ${scenes0.length - 1}`, "omitted scene excluded again");
+
+    // Characters report: bible alias TOBIAS is merged under INES; sorting and filtering work.
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"characters\"]').click(), true)");
+    await waitFor(app, "!!document.getElementById('storyscry-characters-table')", "Characters report table");
+    await audit("StoryScry characters report");
+    const charNames = await app.evaluate("__cirth.storyScry.data.characters.map(c => c.name)");
+    assert(charNames.includes("INES") && !charNames.includes("TOBIAS"), `TOBIAS merged into INES: ${charNames}`);
+    await app.evaluate("(() => { const f = document.getElementById('storyscry-filter'); f.value = 'ines'; f.dispatchEvent(new Event('input')); return true; })()");
+    assert((await app.evaluate("document.querySelectorAll('#storyscry-characters-table tbody tr').length")) === 1, "filter narrows to INES");
+    await app.evaluate("(() => { const f = document.getElementById('storyscry-filter'); f.value = ''; f.dispatchEvent(new Event('input')); return true; })()");
+    await app.evaluate("(document.querySelector('#storyscry-characters-table [data-sort=\"name\"]').click(), true)");
+    const sortedAsc = await app.evaluate("[...document.querySelectorAll('#storyscry-characters-table tbody tr')].map(r => r.cells[0].textContent)");
+    assert(JSON.stringify(sortedAsc) === JSON.stringify([...sortedAsc].sort()), `sorted ascending by name: ${sortedAsc}`);
+
+    // B6: if the script changes while StoryScry is open, the report is flagged out of date with its old version until refreshed.
+    const vBefore = await app.evaluate("__cirth.storyScry.data.source_version");
+    assert(!(await app.evaluate("__cirth.storyScry.isStale")) && (await app.evaluate("document.getElementById('storyscry-stale').hidden")), "fresh before edit");
+    await app.evaluate("(() => { const v = __cirth.view; v.dispatch(v.state.tr.insertText(' REVISED', v.state.doc.content.size - 1)); return true; })()");
+    await waitFor(app, "__cirth.storyScry.isStale && !document.getElementById('storyscry-stale').hidden", "B6: flagged out of date at once when script changes");
+    const staleMsg = await app.evaluate("document.getElementById('storyscry-stale-text').textContent");
+    assert(staleMsg.includes(`v${vBefore}`), `stale banner names the report's source version: ${staleMsg}`);
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    await app.evaluate("(document.getElementById('storyscry-refresh').click(), true)");
+    await waitFor(app, `!__cirth.storyScry.isStale && document.getElementById('storyscry-stale').hidden && __cirth.storyScry.data.source_version > ${vBefore}`, "Refresh updates the report to the new version");
+
+    // Whole project and Selected scripts scopes with a second episode.
+    const ep2 = await app.evaluate("window.__TAURI_INTERNALS__.invoke('create_episode', { title: 'Episode 2', folder: null })");
+    await app.evaluate("(() => { const s = document.getElementById('storyscry-scope'); s.value = 'project'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "__cirth.storyScry.data.documents.length === 2", "whole project has 2 scripts");
+    await app.evaluate("(() => { const s = document.getElementById('storyscry-scope'); s.value = 'episodes'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "!document.getElementById('storyscry-episodes').hidden && document.querySelectorAll('#storyscry-episodes input[type=checkbox]').length === 2", "episode picker shown");
+    await app.evaluate(`(() => { const cb = [...document.querySelectorAll('#storyscry-episodes input[type=checkbox]')].find(c => c.value === ${JSON.stringify(ep2)}); cb.checked = false; cb.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, "__cirth.storyScry.data.documents.length === 1", "episode unchecked");
+    await app.evaluate("(() => { const s = document.getElementById('storyscry-scope'); s.value = 'document'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "__cirth.storyScry.data.scope.mode === 'document'", "back to This script");
+
+    // Scenes report: clicking a scene jumps to it and closes StoryScry.
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"scenes\"]').click(), true)");
+    await waitFor(app, "!!document.getElementById('storyscry-scenes-table')", "Scenes report table");
+    const targetSceneId = await app.evaluate("__cirth.storyScry.data.scenes.at(-1).scene_id");
+    await app.evaluate("(document.querySelectorAll('#storyscry-scenes-table .storyscry-go')[document.querySelectorAll('#storyscry-scenes-table .storyscry-go').length - 1].click(), true)");
+    await waitFor(app, `!document.getElementById('storyscry-dialog').open && (() => { const at = __cirth.view.state.selection.from; const s = __cirth.scenes().find(x => at >= x.from && at < x.to); return s?.sceneId === ${JSON.stringify(targetSceneId)}; })()`, "clicking a scene row jumps to that scene");
   });
 
   await app.close();
