@@ -935,6 +935,75 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.setStructural(false)");
   });
 
+  await test("Evidence board (C4): notes, scene cards, pictures in the project file, video links never fetched, labelled strings; moving never touches the script; delete and undo; bookmarks", async () => {
+    await openFixture("page-boundaries");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    const script0 = JSON.stringify(await blocks());
+    const cards = () => app.evaluate("[...document.querySelectorAll('#evidence-canvas .evidence-card')].map(c => ({ id: c.dataset.id, kind: c.className, x: c.offsetLeft, text: c.textContent }))");
+    await app.evaluate("__cirth.menu('evidence')");
+    await waitFor(app, "document.getElementById('evidence-dialog').open", "the board opens");
+    // A note, and a card for the second scene.
+    await app.evaluate("(document.getElementById('evidence-add-note').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-card').length === 1 && !!document.getElementById('evidence-card-body')", "note added and chosen");
+    await app.evaluate("(() => { const b = document.getElementById('evidence-card-body'); b.value = 'Who took the ledger?'; b.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "/Who took the ledger/.test(document.getElementById('evidence-canvas').textContent)", "note text shown");
+    await app.evaluate(`(() => { const s = document.getElementById('evidence-add-scene'); s.value = ${JSON.stringify(scenes[1])}; s.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-card.scene').length === 1", "scene card added");
+    const sceneCard = (await cards()).find((c) => c.kind.includes("scene"));
+    const note = (await cards()).find((c) => c.kind.includes("note"));
+    assert(/WEIGH STATION/.test(sceneCard.text), `the scene card shows the scene's current heading: ${sceneCard.text}`);
+    // A labelled string from the note to the scene.
+    await app.evaluate(`(document.querySelector('#evidence-canvas .evidence-card[data-id="${note.id}"]').focus(), true)`);
+    await app.evaluate(`(() => { document.getElementById('evidence-string-to').value = ${JSON.stringify(sceneCard.id)}; document.getElementById('evidence-string-label').value = 'answered in'; document.getElementById('evidence-string-add').click(); return true; })()`);
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-string').length === 1 && document.querySelector('#evidence-canvas .evidence-string-label')?.textContent === 'answered in'", "a labelled string");
+    // Moving a card by keyboard: the board changes, the script does not.
+    await app.evaluate(`(document.querySelector('#evidence-canvas .evidence-card[data-id="${note.id}"]').focus(), true)`);
+    await press("ArrowRight", ["alt"]);
+    await waitFor(app, `document.querySelector('#evidence-canvas .evidence-card[data-id="${note.id}"]').offsetLeft === ${note.x + 20}`, "Alt+Right moves the card");
+    assert(JSON.stringify(await blocks()) === script0, "moving a card never touches the script");
+    // A picture, packaged: shown from the project file as data.
+    const png = join(dataDir, "harbour.png");
+    writeFileSync(png, Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000" + "1f15c4890000000d49444154789c6360f8cfc0f01f0005000201" + "f8a3a1b00000000049454e44ae426082", "hex"));
+    const pic = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('add_picture', { path: ${JSON.stringify(png)} })`);
+    await app.evaluate(`__cirth.evidence.addCard({ kind: 'image', ref_id: null, title: 'harbour.png', body: '', url: '', asset: ${JSON.stringify(pic.id)} })`);
+    await waitFor(app, "document.querySelector('#evidence-canvas .evidence-card.image img')?.src.startsWith('data:image/png;base64,')", "the picture shows from the project file");
+    // A video link: stored as text, never loaded.
+    await app.evaluate("__cirth.evidence.addCard({ kind: 'video', ref_id: null, title: 'Tide footage', body: '', url: 'https://example.com/tides', asset: null })");
+    await waitFor(app, "/example\\.com\\/tides/.test(document.querySelector('#evidence-canvas .evidence-card.video')?.textContent ?? '')", "the link is shown as text");
+    assert(await app.evaluate("!document.querySelector('#evidence-dialog iframe, #evidence-dialog video, #evidence-dialog img[src^=\"http\"]')"), "nothing is embedded or fetched");
+    // Deleting the scene card cuts its string; Undo brings both back.
+    await app.evaluate(`(document.querySelector('#evidence-canvas .evidence-card[data-id="${sceneCard.id}"]').focus(), true)`);
+    await press("Delete");
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-card.scene').length === 0 && document.querySelectorAll('#evidence-canvas .evidence-string').length === 0", "card and its string removed");
+    await app.evaluate("(document.getElementById('evidence-undo').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-card.scene').length === 1 && document.querySelectorAll('#evidence-canvas .evidence-string').length === 1", "Undo restores both");
+    // The same board as text.
+    await app.evaluate("(document.getElementById('evidence-list-toggle').click(), true)");
+    assert(/answered in/.test(await app.evaluate("document.getElementById('evidence-list-strings').textContent")), "list view names the string");
+    await app.evaluate("(document.getElementById('evidence-list-toggle').click(), true)");
+    await screenshot(app, "evidence-board");
+    await app.evaluate("(document.getElementById('evidence-close').click(), true)");
+    // A bookmark at the third block, then back to it from the start.
+    await caretAtEndOf(2);
+    await app.evaluate("(__cirth.menu('bookmark_add'), true)");
+    await waitFor(app, "document.getElementById('bookmarks-dialog').open", "bookmarks open");
+    await app.evaluate("(() => { document.getElementById('bookmark-name').value = 'The speech'; document.getElementById('bookmark-name').form.requestSubmit(); return true; })()");
+    await waitFor(app, "/The speech/.test(document.getElementById('bookmarks-list').textContent)", "bookmark added");
+    await app.evaluate("(document.querySelector('#bookmarks-dialog .dialog-actions button').click(), true)");
+    await caretAtEndOf(0);
+    await app.evaluate("(__cirth.menu('bookmarks'), true)");
+    await waitFor(app, "document.querySelector('#bookmarks-list .bible-go')", "listed");
+    const third = (await blocks())[2].id;
+    await app.evaluate("(document.querySelector('#bookmarks-list .bible-go').click(), true)");
+    await waitFor(app, `__cirth.view.state.selection.$from.node(1)?.attrs.id === ${JSON.stringify(third)}`, "the bookmark goes to its block");
+    // Kept with the project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    const st = await app.evaluate("window.__TAURI_INTERNALS__.invoke('evidence_state')");
+    assert(st.cards.length === 4 && st.threads.length === 1 && st.bookmarks.length === 1, `kept: ${st.cards.length} cards, ${st.threads.length} strings, ${st.bookmarks.length} bookmarks`);
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

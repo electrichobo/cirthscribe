@@ -1,5 +1,5 @@
 import "./styles.css";
-import { EditorState, type Transaction } from "prosemirror-state";
+import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history, undo, redo, undoDepth, redoDepth } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
@@ -46,6 +46,8 @@ import { createOverview, type OverviewData, type OverviewScene } from "./overvie
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
+import { createEvidenceBoard, type EvidenceOp } from "./evidence";
+import { createBookmarks, type BookmarkOp } from "./bookmarks";
 import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
@@ -514,6 +516,80 @@ const timeline = createTimeline({
     return true;
   },
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+  newId,
+});
+
+/** A planning command from a dialog: true when stored (planning steps, ADR 0003). */
+const planOp = (op: unknown, what: string) =>
+  queued(async () => {
+    try {
+      takePlanning(await invoke<PlanningState>("planning_command", { op, base: planningVersion }));
+      return true;
+    } catch (e) {
+      showBanner(`${what}: ${e}`);
+      await refreshPlanning().catch(() => undefined);
+      return false;
+    }
+  });
+const planUndo = () =>
+  queued(async () => {
+    const st = await invoke<PlanningState>("planning_undo", { redo: false });
+    takePlanning(st);
+    return st.done;
+  });
+
+// The evidence board (M3 step 9): cards and strings are planning data; pictures are packaged; links are never fetched.
+const evidence = createEvidenceBoard({
+  state: () => invoke("evidence_state"),
+  apply: (op: EvidenceOp) => planOp(op, "Evidence board"),
+  undo: planUndo,
+  sources: async () => {
+    const places = (await invoke<{ places: Record<string, { document_title: string; heading: string }> }>("evidence_state")).places;
+    const bible = await invoke<{ entries: { id: string; name: string; kind: string }[] }>("bible_state");
+    const tl = await invoke<{ events: { id: string; title: string }[] }>("timeline_state");
+    return {
+      scene: Object.entries(places).map(([id, p]) => ({ id, title: `${p.heading || "(empty heading)"} · ${p.document_title}` })),
+      beat: board.beats.filter((b) => b.kind === "beat").map((b) => ({ id: b.id, title: b.logline || b.summary || "(beat)" })),
+      entity: bible.entries.map((e) => ({ id: e.id, title: `${e.name} (${e.kind})` })),
+      event: tl.events.map((e) => ({ id: e.id, title: e.title })),
+    };
+  },
+  pickPicture: async () => {
+    const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "Pictures (PNG, JPEG, GIF, WebP)", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
+    if (!path || Array.isArray(path)) return null;
+    return invoke("add_picture", { path });
+  },
+  pictureData: (id) => invoke("picture_data", { id }),
+  openLink: (url) => invoke("open_link", { url }),
+  go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+  newId,
+});
+
+// Bookmarks: a named block; going there opens its script and puts the caret at the block.
+async function goToBlock(documentId: string, blockId: string) {
+  if (documentId !== lastOpen?.document_id && !(await openWith("open_document", { id: documentId }))) return;
+  let at = -1;
+  view.state.doc.forEach((n, pos) => {
+    if (at < 0 && n.attrs.id === blockId) at = pos + 1;
+  });
+  if (at < 0) return showBanner("That bookmark's text is no longer in the script.");
+  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)).scrollIntoView());
+  view.focus();
+}
+const bookmarks = createBookmarks({
+  list: async () => {
+    const st = await invoke<{ bookmarks: { id: string; name: string; document_id: string; block_id: string }[] }>("evidence_state");
+    const titles = Object.fromEntries((await invoke<{ id: string; title: string }[]>("project_tree")).map((i) => [i.id, i.title]));
+    return { bookmarks: st.bookmarks, titles };
+  },
+  here: () => {
+    if (!view || !lastOpen) return null;
+    const $p = view.state.selection.$from;
+    const block = $p.depth ? $p.node(1) : null;
+    return block?.attrs.id ? { document_id: lastOpen.document_id, block_id: block.attrs.id, text: block.textContent } : null;
+  },
+  apply: (op: BookmarkOp) => planOp(op, "Bookmark"),
+  go: (b) => void goToBlock(b.document_id, b.block_id),
   newId,
 });
 
@@ -1333,6 +1409,13 @@ async function runMenu(id: string): Promise<void> {
     case "import":
       await importAny();
       break;
+    case "evidence":
+      if (lastOpen) await evidence.open();
+      break;
+    case "bookmarks":
+    case "bookmark_add":
+      if (lastOpen) await bookmarks.open(id === "bookmark_add");
+      break;
     case "timeline":
       if (lastOpen) await timeline.open();
       break;
@@ -1772,6 +1855,8 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   overview,
   bible,
   timeline,
+  evidence,
+  bookmarks,
   projectTree,
   openDocument: (id: string) => openWith("open_document", { id }),
   notes: notesPanel,

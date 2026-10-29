@@ -116,6 +116,19 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
    - Moving a card never reorders the script.
    - Local images packaged in the `.cirth` file, checked by type and size, with a warning above a size limit; video links stored as URLs only. Opening a project makes no network request (C4).
    - Notes and bookmarks: free notes as board and outline items, and named bookmarks on a block in the navigator. Anchored comments stay in M5.
+   - **Built 2026-10-28:**
+     - View > Tools > Evidence Board… (no default key): a canvas of cards: notes, pictures, video links, and cards for scenes (any script), beats, bible entries and timeline events. A linked card shows its item's current title and holds no copy of it.
+     - Strings join two cards with a label in the writer's words ("answered in", "lies about"), drawn on the canvas and listed for each card. Deleting a card takes its strings, and Undo brings both back.
+     - Moving: drag a card by its top line, or Alt+arrows (Shift for bigger steps). Nothing on the board ever moves the script. Enter edits the focused card on the right; Delete removes it. "Show as list" gives every card and string as text.
+     - Pictures (decision E): PNG, JPEG, GIF or WebP, recognised by their bytes (not the file name; SVG refused), stored once per content inside the project file, with only the file's name, never its path; a warning above 20 MB, refused above 100 MB. They are shown from the project file as data.
+     - Video links: http or https only, stored as text, never fetched or embedded; "Open in your browser" hands the address to the browser only when the writer asks (C4).
+     - Bookmarks: View > Go To > Add Bookmark Here… and Bookmarks…: a name on a block (by stable id), so it follows its text when scenes move; choosing one opens its script there.
+     - Every board change and bookmark is a planning step (ADR 0003); the board's Undo takes back its last change.
+     - Core: `cirth_core::evidence` (card kinds, picture types, link check, base64), schema v10 (`board_cards`, `board_threads`, `assets`, `bookmarks`; frozen v9 files and an upgrade test), planning ops for cards, strings and bookmarks; shell `evidence_state`, `add_picture`, `picture_data`, `open_link`.
+     - Not yet: pictures no card uses are kept in the project file until a later clean-up; notes inside the outline (the board and the notes panel cover them).
+     - Tests: core (picture types and links, base64; v9 upgrade: picture packaged once with no path, refused SVG and file links, strings, a card move with the script unchanged, delete and undo with strings, a bookmark, all kept through a save); e2e "Evidence board (C4)" on both drivers; checked by eye from the screenshot (which found the edit panel pushed off-screen and strings hidden between close cards; both fixed).
+
+**All nine M3 steps are built (2026-10-28).** The exit review is next.
 
 The exit review comes after 9. Steps 5 and 6 can swap.
 

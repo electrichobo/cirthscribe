@@ -89,7 +89,7 @@ Carried forward:
 - [ ] Check the page measurements against an industry-standard PDF
 - [ ] Tested exchange with other screenwriting apps
 
-### 🔜 Stage 3: Story planning (next; plan accepted)
+### 🔨 Stage 3: Story planning (built; exit review next)
 
 First, from the owner's notes on the current build:
 - [x] Reorganised menus: one Import (it recognises Fountain, Final Draft and plain text) and one Export dialog; View > Mode, Tools, Appearance, Go To (page or scene) and Window; elements, screen font, title page and spelling under Format; a keyboard shortcut list
@@ -98,14 +98,15 @@ First, from the owner's notes on the current build:
 - [x] Themes: Day, Night, Midnight, OLED (true black) and Match System, with high contrast on top of any of them
 - [x] Remappable keyboard shortcuts (Help > Keyboard Shortcuts…), with conflicts handled and Reset all
 
-
+Then the plan itself:
 - [x] Episodes and series: folders for seasons, any number of episodes per project, each with its own script, scene list, cards and exports (File > Episodes and Documents…)
 - [x] One story bible shared by every episode: characters, locations and world entries, suggested from the scripts, with aliases and previewed renames (View > Tools > Bible…)
 - [x] Tabbed navigator: Scenes (page, length in eighths, colour label, characters, the card's logline) and Characters (speeches, words, scenes, first appearance), with a filter and a whole-project view
-- [ ] Navigator tabs for notes and the outline
+- [x] An Outline tab in the navigator (notes live in their own panel and on the evidence board)
 - [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
 - [x] An overview map of the whole script or series: scenes as blocks sized by length, coloured by label or act, with a list view (View > Tools > Overview…)
-- [ ] Index-card board, and a mind map / evidence board where cards are joined by strings
+- [x] Index-card board, and an evidence board where notes, pictures, video links and cards for scenes, beats, bible entries and events are joined by labelled strings (View > Tools > Evidence Board…)
+- [x] Bookmarks: named places in the scripts (View > Go To)
 - [x] Beat and pacing board: cards divided into any number of acts (start from three or five), with a pacing strip and page and minute estimates
 - [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo
 - [x] Reordering scenes from the board (only with your permission, which is remembered per script, and undoable)

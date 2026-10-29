@@ -178,6 +178,34 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 /* A pop-out board window is wide enough for acts side by side. */
 body[data-panel="board"] .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; }
 body[data-panel="board"] .board-act { flex: 0 0 260px; }
+/* Evidence board (M3 step 9). */
+dialog.evidence { width: min(1300px, 96vw); height: 88vh; }
+.evidence-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.evidence-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.evidence-tools select, .evidence-tools button { font-size: 12px; max-width: 12em; }
+.evidence-bar .form-note { margin: 0; }
+.evidence-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; min-height: 0; flex: 1 1 auto; margin-top: 6px; overflow: hidden; }
+.evidence-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.evidence-scroll { flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: color-mix(in srgb, var(--panel) 70%, var(--bg)); }
+.evidence-scroll[hidden], .evidence-listview[hidden] { display: none; }
+.evidence-listview { overflow: auto; font-size: 12px; }
+.evidence-canvas { position: relative; }
+.evidence-strings { position: absolute; left: 0; top: 0; pointer-events: none; }
+.evidence-string { stroke: var(--bad); stroke-width: 2; }
+.evidence-string-label { fill: var(--ink); font: 11px system-ui, sans-serif; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; }
+.evidence-card { position: absolute; width: 200px; padding: 6px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); font-size: 12px; }
+.evidence-card.chosen { outline: 2px solid var(--accent); }
+.evidence-card.note { background: color-mix(in srgb, #f3d36b 22%, var(--panel)); }
+.evidence-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); cursor: move; touch-action: none; }
+.evidence-card-title { font-weight: 600; margin: 2px 0; overflow-wrap: anywhere; }
+.evidence-body, .evidence-url { color: var(--muted); overflow-wrap: anywhere; }
+.evidence-card img { display: block; max-width: 100%; max-height: 140px; margin-top: 4px; border-radius: 3px; }
+.evidence-empty { padding: 20px; }
+.evidence-detail { display: grid; gap: 4px; align-content: start; overflow: auto; min-height: 0; }
+.evidence-detail input, .evidence-detail textarea, .evidence-detail select { width: 100%; padding: 4px 6px; }
+.evidence-detail h3 { font-size: 12px; margin: 8px 0 2px; }
+.evidence-threads { margin: 0; padding-left: 16px; font-size: 12px; }
+#evidence-delete { justify-self: start; margin-top: 8px; }
 /* Story timeline (M3 step 8). */
 dialog.timeline { width: min(1000px, 94vw); }
 .timeline-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }

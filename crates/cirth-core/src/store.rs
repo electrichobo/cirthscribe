@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 9;
+pub const SCHEMA_VERSION: i64 = 10;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -280,10 +280,33 @@ fn migrate_v9(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v9 -> v10: the evidence board and bookmarks (M3 step 9, evidence.rs):
+/// cards, the strings between them, packaged pictures (content-addressed
+/// bytes, no paths) and bookmarks on blocks. Projects start with none.
+fn migrate_v10(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE board_cards (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          ref_id TEXT,
+          title TEXT NOT NULL DEFAULT '',
+          body TEXT NOT NULL DEFAULT '',
+          url TEXT NOT NULL DEFAULT '',
+          asset TEXT,
+          x REAL NOT NULL,
+          y REAL NOT NULL
+        );
+        CREATE TABLE board_threads (id TEXT PRIMARY KEY, from_id TEXT NOT NULL, to_id TEXT NOT NULL, label TEXT NOT NULL DEFAULT '');
+        CREATE TABLE assets (id TEXT PRIMARY KEY, mime TEXT NOT NULL, name TEXT NOT NULL, size INTEGER NOT NULL, bytes BLOB NOT NULL);
+        CREATE TABLE bookmarks (id TEXT PRIMARY KEY, name TEXT NOT NULL, document_id TEXT NOT NULL, block_id TEXT NOT NULL);",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7), (8, migrate_v8), (9, migrate_v9)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7), (8, migrate_v8), (9, migrate_v9), (10, migrate_v10)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -783,6 +806,82 @@ impl Store {
         order.into_iter().map(|d| Ok((d.id.clone(), d.title.clone(), self.load_document(&d.id)?.blocks))).collect()
     }
 
+    // --- Evidence board and bookmarks (M3 step 9, evidence.rs) ------------------
+
+    pub fn cards(&self) -> Result<Vec<crate::evidence::Card>> {
+        let mut stmt = self.conn.prepare("SELECT id, kind, ref_id, title, body, url, asset, x, y FROM board_cards ORDER BY y, x, id")?;
+        let rows = stmt.query_map([], |r| Ok(crate::evidence::Card { id: r.get(0)?, kind: r.get(1)?, ref_id: r.get(2)?, title: r.get(3)?, body: r.get(4)?, url: r.get(5)?, asset: r.get(6)?, x: r.get(7)?, y: r.get(8)? }))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub fn card(&self, id: &str) -> Result<Option<crate::evidence::Card>> {
+        Ok(self.cards()?.into_iter().find(|c| c.id == id))
+    }
+
+    fn put_card(&self, c: &crate::evidence::Card) -> Result<()> {
+        use crate::evidence::*;
+        if c.id.trim().is_empty() || !CARD_KINDS.contains(&c.kind.as_str()) || !c.x.is_finite() || !c.y.is_finite() {
+            return Err(StoreError::Invalid("a card needs an id, a known kind and a place".into()));
+        }
+        if c.kind == "video" && !valid_link(&c.url) {
+            return Err(StoreError::Invalid("a video link must be an http or https address".into()));
+        }
+        if let Some(a) = &c.asset {
+            if self.conn.query_row("SELECT 1 FROM assets WHERE id = ?1", [a], |_| Ok(())).optional()?.is_none() {
+                return Err(StoreError::Invalid("that picture is not in the project".into()));
+            }
+        }
+        self.conn.execute(
+            "INSERT OR REPLACE INTO board_cards(id, kind, ref_id, title, body, url, asset, x, y) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![c.id, c.kind, c.ref_id, c.title, c.body, c.url.trim(), c.asset, c.x, c.y],
+        )?;
+        self.mark_unsaved()
+    }
+
+    pub fn threads(&self) -> Result<Vec<crate::evidence::Thread>> {
+        let mut stmt = self.conn.prepare("SELECT id, from_id, to_id, label FROM board_threads ORDER BY id")?;
+        let rows = stmt.query_map([], |r| Ok(crate::evidence::Thread { id: r.get(0)?, from: r.get(1)?, to: r.get(2)?, label: r.get(3)? }))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    fn put_thread(&self, t: &crate::evidence::Thread) -> Result<()> {
+        let has = |id: &str| -> Result<bool> { Ok(self.conn.query_row("SELECT 1 FROM board_cards WHERE id = ?1", [id], |_| Ok(())).optional()?.is_some()) };
+        if t.id.trim().is_empty() || t.from == t.to || !has(&t.from)? || !has(&t.to)? {
+            return Err(StoreError::Invalid("a string joins two different cards on the board".into()));
+        }
+        self.conn.execute("INSERT OR REPLACE INTO board_threads(id, from_id, to_id, label) VALUES (?1, ?2, ?3, ?4)", params![t.id, t.from, t.to, t.label])?;
+        self.mark_unsaved()
+    }
+
+    pub fn bookmarks(&self) -> Result<Vec<crate::evidence::Bookmark>> {
+        let mut stmt = self.conn.prepare("SELECT id, name, document_id, block_id FROM bookmarks ORDER BY name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| Ok(crate::evidence::Bookmark { id: r.get(0)?, name: r.get(1)?, document_id: r.get(2)?, block_id: r.get(3)? }))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// Package a picture: checked by its bytes, stored once per content,
+    /// named without any path. Returns its id and whether it is large
+    /// enough to warn about.
+    pub fn add_asset(&self, name: &str, bytes: &[u8]) -> Result<(String, bool)> {
+        use crate::evidence::*;
+        let Some(mime) = image_type(bytes) else {
+            return Err(StoreError::Invalid("only PNG, JPEG, GIF and WebP pictures can be added".into()));
+        };
+        if bytes.len() > MAX_BYTES {
+            return Err(StoreError::Invalid(format!("the picture is over {} MB", MAX_BYTES / 1024 / 1024)));
+        }
+        let id = crate::compat::fnv64(bytes);
+        let name: String = std::path::Path::new(name).file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default().chars().take(120).collect();
+        self.conn.execute("INSERT OR IGNORE INTO assets(id, mime, name, size, bytes) VALUES (?1, ?2, ?3, ?4, ?5)", params![id, mime, name, bytes.len() as i64, bytes])?;
+        self.mark_unsaved()?;
+        Ok((id, bytes.len() > WARN_BYTES))
+    }
+
+    /// A packaged picture's type and bytes.
+    pub fn asset(&self, id: &str) -> Result<Option<(String, Vec<u8>)>> {
+        Ok(self.conn.query_row("SELECT mime, bytes FROM assets WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?)
+    }
+
     // --- Story timeline (M3 step 8, timeline.rs) --------------------------------
 
     pub fn story_events(&self) -> Result<Vec<crate::timeline::StoryEvent>> {
@@ -1142,6 +1241,68 @@ impl Store {
                 let before = self.scene_label(scene_id)?;
                 self.set_scene_label(scene_id, label)?;
                 PlanningOp::SetSceneLabel { scene_id: scene_id.clone(), label: before }
+            }
+            PlanningOp::PutCard(c) => {
+                let before = self.card(&c.id)?;
+                self.put_card(c)?;
+                match before {
+                    Some(old) => PlanningOp::PutCard(old),
+                    None => PlanningOp::DeleteCard(c.id.clone()),
+                }
+            }
+            PlanningOp::DeleteCard(id) => {
+                // The card and every string tied to it go together and come back together.
+                let Some(card) = self.card(id)? else {
+                    return Err(StoreError::Invalid(format!("no card {id}")));
+                };
+                let threads: Vec<_> = self.threads()?.into_iter().filter(|t| &t.from == id || &t.to == id).collect();
+                self.conn.execute("DELETE FROM board_threads WHERE from_id = ?1 OR to_id = ?1", [id])?;
+                self.conn.execute("DELETE FROM board_cards WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::RestoreCard { card, threads }
+            }
+            PlanningOp::RestoreCard { card, threads } => {
+                self.put_card(card)?;
+                for t in threads {
+                    self.put_thread(t)?;
+                }
+                PlanningOp::DeleteCard(card.id.clone())
+            }
+            PlanningOp::PutThread(t) => {
+                let before = self.threads()?.into_iter().find(|x| x.id == t.id);
+                self.put_thread(t)?;
+                match before {
+                    Some(old) => PlanningOp::PutThread(old),
+                    None => PlanningOp::DeleteThread(t.id.clone()),
+                }
+            }
+            PlanningOp::DeleteThread(id) => {
+                let Some(old) = self.threads()?.into_iter().find(|x| &x.id == id) else {
+                    return Err(StoreError::Invalid(format!("no string {id}")));
+                };
+                self.conn.execute("DELETE FROM board_threads WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::PutThread(old)
+            }
+            PlanningOp::PutBookmark(b) => {
+                if b.name.trim().is_empty() || b.id.trim().is_empty() {
+                    return Err(StoreError::Invalid("a bookmark needs a name".into()));
+                }
+                let before = self.bookmarks()?.into_iter().find(|x| x.id == b.id);
+                self.conn.execute("INSERT OR REPLACE INTO bookmarks(id, name, document_id, block_id) VALUES (?1, ?2, ?3, ?4)", params![b.id, b.name.trim(), b.document_id, b.block_id])?;
+                self.mark_unsaved()?;
+                match before {
+                    Some(old) => PlanningOp::PutBookmark(old),
+                    None => PlanningOp::DeleteBookmark(b.id.clone()),
+                }
+            }
+            PlanningOp::DeleteBookmark(id) => {
+                let Some(old) = self.bookmarks()?.into_iter().find(|x| &x.id == id) else {
+                    return Err(StoreError::Invalid(format!("no bookmark {id}")));
+                };
+                self.conn.execute("DELETE FROM bookmarks WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::PutBookmark(old)
             }
             PlanningOp::PutEvent(e) => {
                 let before = self.story_event(&e.id)?;

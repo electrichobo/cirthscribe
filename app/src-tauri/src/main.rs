@@ -368,6 +368,69 @@ async fn bible_rename_apply(app: State<'_, App>, id: String, from: String, to: S
     })
 }
 
+// --- Evidence board (M3 step 9) ---------------------------------------------------
+
+#[derive(Serialize)]
+struct BoardState {
+    cards: Vec<cirth_core::evidence::Card>,
+    threads: Vec<cirth_core::evidence::Thread>,
+    bookmarks: Vec<cirth_core::evidence::Bookmark>,
+    /// What a linked card shows: the scene heading, beat line, entry name or event title, by id.
+    titles: std::collections::HashMap<String, String>,
+    places: std::collections::HashMap<String, Place>,
+}
+
+#[tauri::command]
+async fn evidence_state(app: State<'_, App>) -> Result<BoardState, String> {
+    with_session(&app, |s| {
+        let (_, places) = bible_docs(s)?;
+        let mut titles: std::collections::HashMap<String, String> = places.iter().map(|(k, p)| (k.clone(), p.heading.clone())).collect();
+        for b in s.store.beats().map_err(err)? {
+            titles.insert(b.id.clone(), if b.kind == "beat" { if b.logline.is_empty() { b.summary } else { b.logline } } else { b.title });
+        }
+        for e in s.store.entities().map_err(err)? {
+            titles.insert(e.id, e.name);
+        }
+        for e in s.store.story_events().map_err(err)? {
+            titles.insert(e.id, e.title);
+        }
+        Ok(BoardState { cards: s.store.cards().map_err(err)?, threads: s.store.threads().map_err(err)?, bookmarks: s.store.bookmarks().map_err(err)?, titles, places })
+    })
+}
+
+#[derive(Serialize)]
+struct AddedPicture {
+    id: String,
+    name: String,
+    /// Over 20 MB: kept, but the project file grows by as much.
+    large: bool,
+}
+
+/// Package a picture from a file the writer chose (the path is not kept).
+#[tauri::command]
+async fn add_picture(app: State<'_, App>, path: String) -> Result<AddedPicture, String> {
+    let p = Path::new(&path);
+    let len = std::fs::metadata(p).map_err(|e| format!("{path}: {e}"))?.len() as usize;
+    if len > cirth_core::evidence::MAX_BYTES {
+        return Err(format!("the picture is over {} MB", cirth_core::evidence::MAX_BYTES / 1024 / 1024));
+    }
+    let bytes = std::fs::read(p).map_err(|e| format!("{path}: {e}"))?;
+    let name = p.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+    with_session(&app, |s| {
+        let (id, large) = s.store.add_asset(&name, &bytes).map_err(err)?;
+        Ok(AddedPicture { id, name, large })
+    })
+}
+
+/// A packaged picture as a data: URL (the page may show data: images only).
+#[tauri::command]
+async fn picture_data(app: State<'_, App>, id: String) -> Result<String, String> {
+    with_session(&app, |s| {
+        let (mime, bytes) = s.store.asset(&id).map_err(err)?.ok_or("no such picture")?;
+        Ok(format!("data:{mime};base64,{}", cirth_core::evidence::base64(&bytes)))
+    })
+}
+
 // --- Story timeline (M3 step 8) ---------------------------------------------------
 
 #[derive(Serialize)]
@@ -1939,26 +2002,40 @@ fn peek_file(path: String) -> Result<String, String> {
 /// writer's browser. Only on that click: the app never checks by itself.
 #[tauri::command]
 fn open_releases_page() -> Result<(), String> {
-    const URL: &str = "https://github.com/electrichobo/cirthscribe/releases";
+    open_in_browser("https://github.com/electrichobo/cirthscribe/releases")
+}
+
+/// Hand an http(s) address to the writer's browser (no shell is involved).
+fn open_in_browser(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let mut cmd = {
         let mut c = std::process::Command::new("rundll32");
-        c.args(["url.dll,FileProtocolHandler", URL]);
+        c.args(["url.dll,FileProtocolHandler", url]);
         c
     };
     #[cfg(target_os = "macos")]
     let mut cmd = {
         let mut c = std::process::Command::new("open");
-        c.arg(URL);
+        c.arg(url);
         c
     };
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd = {
         let mut c = std::process::Command::new("xdg-open");
-        c.arg(URL);
+        c.arg(url);
         c
     };
     cmd.spawn().map(|_| ()).map_err(|e| format!("could not open the browser: {e}"))
+}
+
+/// Evidence board: a video card's link, opened in the browser only when the
+/// writer asks (checked: http or https, no spaces or quotes). Nothing is fetched by the app.
+#[tauri::command]
+fn open_link(url: String) -> Result<(), String> {
+    if !cirth_core::evidence::valid_link(&url) {
+        return Err("only http and https links can be opened".into());
+    }
+    open_in_browser(url.trim())
 }
 
 #[tauri::command]
@@ -2066,6 +2143,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("overview", "Overview…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
+        .text("evidence", "Evidence Board…")
         .separator()
         .text("popout_nav", "Scene List in Its Own Window")
         .text("popout_board", "Board in Its Own Window")
@@ -2091,6 +2169,9 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
     let go_to = SubmenuBuilder::new(app, "Go To")
         .text("goto_page", keyed("Page…", "G"))
         .text("goto_scene", keyed("Scene…", "Shift+G"))
+        .separator()
+        .text("bookmark_add", "Add Bookmark Here…")
+        .text("bookmarks", "Bookmarks…")
         .build()?;
     let window = SubmenuBuilder::new(app, "Window")
         .text("win_minimize", "Minimise")
@@ -2375,6 +2456,10 @@ fn main() {
             project_tree,
             bible_state,
             timeline_state,
+            evidence_state,
+            add_picture,
+            picture_data,
+            open_link,
             bible_rename_preview,
             bible_rename_apply,
             navigator_info,

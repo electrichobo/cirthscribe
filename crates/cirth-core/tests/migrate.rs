@@ -457,3 +457,70 @@ fn opening_a_v8_project_adds_an_empty_timeline() {
         assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
     }
 }
+
+#[test]
+fn opening_a_v9_project_adds_an_empty_evidence_board_that_packages_pictures() {
+    use cirth_core::evidence::{Bookmark, Card, Thread};
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v9-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v9-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 9, "fixture must be schema v9");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(9));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v9 copy kept");
+        let s = o.store;
+        assert!(s.cards().unwrap().is_empty() && s.threads().unwrap().is_empty() && s.bookmarks().unwrap().is_empty());
+        let before = s.load().unwrap();
+        let scene = before.scenes()[0].scene_id.clone();
+
+        // C4: a picture is packaged by its bytes, with no path; a non-picture is refused.
+        let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89".to_vec();
+        let (asset, big) = s.add_asset("C:/Users/someone/Pictures/harbour.png", &png).unwrap();
+        assert!(!big);
+        assert_eq!(s.add_asset("again.png", &png).unwrap().0, asset, "the same picture is stored once");
+        assert!(s.add_asset("evil.svg", b"<svg onload=alert(1)>").is_err());
+        let mut h = PlanningHistory::default();
+        let put = |h: &mut PlanningHistory, op: PlanningOp| {
+            let v = s.planning_version().unwrap();
+            h.apply(&s, op, v)
+        };
+        let note = Card { id: "c1".into(), kind: "note".into(), title: "Who took the ledger?".into(), x: 10.0, y: 10.0, ..Default::default() };
+        let pic = Card { id: "c2".into(), kind: "image".into(), title: "Harbour".into(), asset: Some(asset.clone()), x: 300.0, y: 10.0, ..Default::default() };
+        let clip = Card { id: "c3".into(), kind: "video".into(), title: "Tide reference".into(), url: "https://example.com/tides".into(), x: 10.0, y: 200.0, ..Default::default() };
+        let sc = Card { id: "c4".into(), kind: "scene".into(), ref_id: Some(scene.clone()), x: 300.0, y: 200.0, ..Default::default() };
+        for c in [&note, &pic, &clip, &sc] {
+            put(&mut h, PlanningOp::PutCard(c.clone())).unwrap();
+        }
+        assert!(put(&mut h, PlanningOp::PutCard(Card { id: "bad".into(), kind: "video".into(), url: "file:///etc/passwd".into(), ..Default::default() })).is_err(), "only http(s) links");
+        put(&mut h, PlanningOp::PutThread(Thread { id: "t1".into(), from: "c1".into(), to: "c4".into(), label: "answered in".into() })).unwrap();
+        put(&mut h, PlanningOp::PutThread(Thread { id: "t2".into(), from: "c2".into(), to: "c4".into(), label: "looks like".into() })).unwrap();
+        assert!(put(&mut h, PlanningOp::PutThread(Thread { id: "t3".into(), from: "c1".into(), to: "c1".into(), label: String::new() })).is_err());
+        // Moving a card never moves the script.
+        put(&mut h, PlanningOp::PutCard(Card { x: 900.0, ..sc.clone() })).unwrap();
+        assert_eq!(serde_json::to_string(&s.load().unwrap().blocks).unwrap(), serde_json::to_string(&before.blocks).unwrap());
+        // Deleting a card takes its strings; undo brings both back.
+        put(&mut h, PlanningOp::DeleteCard("c4".into())).unwrap();
+        assert!(s.threads().unwrap().is_empty());
+        h.undo(&s).unwrap();
+        assert_eq!(s.threads().unwrap().len(), 2);
+        assert_eq!(s.card("c4").unwrap().unwrap().x, 900.0);
+        let block = before.blocks[0].id.clone();
+        let doc = s.current_document().unwrap();
+        put(&mut h, PlanningOp::PutBookmark(Bookmark { id: "b1".into(), name: "Ledger goes missing".into(), document_id: doc, block_id: block })).unwrap();
+
+        // Saved in the project file: the picture's bytes, no path anywhere.
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+        let raw = std::fs::read(&pkg).unwrap();
+        assert!(raw.windows(png.len()).any(|w| w == png.as_slice()), "the picture is inside the project file");
+        assert!(!raw.windows(b"someone".len()).any(|w| w == b"someone"), "no absolute path is stored");
+        let s = Store::open_package(&pkg, &d.join("work2.db"), None).unwrap().store;
+        assert_eq!(s.asset(&asset).unwrap().unwrap().1, png);
+        assert_eq!(s.cards().unwrap().len(), 4);
+        assert_eq!(s.bookmarks().unwrap()[0].name, "Ledger goes missing");
+    }
+}

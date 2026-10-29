@@ -29,6 +29,16 @@ pub enum PlanningOp {
     /// A story event created or changed: text, time, place in the timeline, linked scenes (M3 step 8).
     PutEvent(crate::timeline::StoryEvent),
     DeleteEvent(String),
+    /// Evidence board cards and strings, and bookmarks (M3 step 9).
+    PutCard(crate::evidence::Card),
+    /// Deletes the card and the strings tied to it.
+    DeleteCard(String),
+    /// Undoes `DeleteCard`: the card and its strings together.
+    RestoreCard { card: crate::evidence::Card, threads: Vec<crate::evidence::Thread> },
+    PutThread(crate::evidence::Thread),
+    DeleteThread(String),
+    PutBookmark(crate::evidence::Bookmark),
+    DeleteBookmark(String),
 }
 
 #[derive(Clone, Debug)]
