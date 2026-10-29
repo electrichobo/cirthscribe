@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 10;
+pub const SCHEMA_VERSION: i64 = 11;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -303,10 +303,43 @@ fn migrate_v10(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v10 -> v11: breakdown tags anchored to text spans (M4 step 3, ADR 0005,
+/// tags.rs). Offsets (`start_char`, `end_char`) are in Unicode scalar values.
+/// Projects start with no breakdown tags.
+fn migrate_v11(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE breakdown_tags (
+          id TEXT PRIMARY KEY,
+          document_id TEXT NOT NULL,
+          block_id TEXT NOT NULL,
+          start_char INTEGER NOT NULL,
+          end_char INTEGER NOT NULL,
+          quote TEXT NOT NULL,
+          category TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          note TEXT NOT NULL DEFAULT '',
+          orphaned INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX breakdown_tags_doc_block ON breakdown_tags(document_id, block_id);",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7), (8, migrate_v8), (9, migrate_v9), (10, migrate_v10)];
+const MIGRATIONS: &[(i64, Migration)] = &[
+    (2, migrate_v2),
+    (3, migrate_v3),
+    (4, migrate_v4),
+    (5, migrate_v5),
+    (6, migrate_v6),
+    (7, migrate_v7),
+    (8, migrate_v8),
+    (9, migrate_v9),
+    (10, migrate_v10),
+    (11, migrate_v11),
+];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -929,14 +962,119 @@ impl Store {
 
     /// Store an entry as written (planning command `PutEntity` makes it undoable).
     pub fn put_entity(&self, e: &crate::bible::Entity) -> Result<()> {
-        if !crate::bible::KINDS.contains(&e.kind.as_str()) || e.name.trim().is_empty() || e.id.trim().is_empty() {
-            return Err(StoreError::Invalid("an entry needs an id, a kind (character, location, world) and a name".into()));
+        let valid_kind = crate::bible::KINDS.contains(&e.kind.as_str())
+            || self.tag_categories()?.iter().any(|(k, _)| k == &e.kind);
+        if !valid_kind || e.name.trim().is_empty() || e.id.trim().is_empty() {
+            return Err(StoreError::Invalid("an entry needs an id, a valid kind or category, and a name".into()));
         }
         let mut seen = std::collections::HashSet::new();
         let aliases: Vec<String> = e.aliases.iter().map(|a| a.trim().to_string()).filter(|a| !a.is_empty() && !a.eq_ignore_ascii_case(e.name.trim()) && seen.insert(a.to_uppercase())).collect();
         self.conn.execute(
             "INSERT OR REPLACE INTO bible_entities(id, kind, name, aliases, description, fields, scope) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![e.id, e.kind, e.name.trim(), serde_json::to_string(&aliases).unwrap_or_default(), e.description, serde_json::to_string(&e.fields).unwrap_or_default(), e.scope],
+        )?;
+        self.mark_unsaved()
+    }
+
+    // --- Breakdown tags (M4 step 3, ADR 0005, tags.rs) -------------------------
+
+    /// Standard breakdown categories followed by any writer-defined project categories
+    /// (`(key, label)`).
+    pub fn tag_categories(&self) -> Result<Vec<(String, String)>> {
+        let mut out: Vec<(String, String)> = crate::bible::TAG_CATEGORIES.iter().map(|(k, l)| (k.to_string(), l.to_string())).collect();
+        let custom: Vec<(String, String)> = self.setting("project", "tag_categories")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        for (k, l) in custom {
+            if !out.iter().any(|(ek, _)| ek == &k) && crate::bible::valid_kind_key(&k) && !l.trim().is_empty() {
+                out.push((k, l.trim().to_string()));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Add or rename a custom breakdown category (`(key, label)`). Returns `(key, label)`.
+    pub fn add_tag_category(&self, label: &str) -> Result<(String, String)> {
+        let label = label.trim();
+        let key = crate::tags::slug_category(label);
+        if label.is_empty() || !crate::bible::valid_kind_key(&key) {
+            return Err(StoreError::Invalid("a category needs a name with letters or numbers".into()));
+        }
+        if let Some((k, l)) = crate::bible::TAG_CATEGORIES.iter().find(|(k, l)| *k == key || l.eq_ignore_ascii_case(label)) {
+            return Ok((k.to_string(), l.to_string()));
+        }
+        let mut custom: Vec<(String, String)> = self.setting("project", "tag_categories")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        let clean_label: String = label.chars().take(40).collect();
+        if let Some(existing) = custom.iter_mut().find(|(k, _)| *k == key) {
+            existing.1 = clean_label.clone();
+        } else {
+            custom.push((key.clone(), clean_label.clone()));
+        }
+        self.set_setting("project", "tag_categories", &serde_json::to_string(&custom).unwrap_or_default())?;
+        Ok((key, clean_label))
+    }
+
+    /// All breakdown tags in the project, ordered by document, block, and start offset.
+    pub fn tags(&self) -> Result<Vec<crate::tags::Tag>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, document_id, block_id, start_char, end_char, quote, category, entity_id, note, orphaned
+             FROM breakdown_tags
+             ORDER BY document_id, block_id, start_char, end_char, id",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(crate::tags::Tag {
+                id: r.get(0)?,
+                document_id: r.get(1)?,
+                block_id: r.get(2)?,
+                start: r.get::<_, i64>(3)?.max(0) as usize,
+                end: r.get::<_, i64>(4)?.max(0) as usize,
+                quote: r.get(5)?,
+                category: r.get(6)?,
+                entity_id: r.get(7)?,
+                note: r.get(8)?,
+                orphaned: r.get::<_, i64>(9)? != 0,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// Breakdown tags in a single document.
+    pub fn tags_of(&self, document_id: &str) -> Result<Vec<crate::tags::Tag>> {
+        Ok(self.tags()?.into_iter().filter(|t| t.document_id == document_id).collect())
+    }
+
+    pub fn tag(&self, id: &str) -> Result<Option<crate::tags::Tag>> {
+        Ok(self.tags()?.into_iter().find(|t| t.id == id))
+    }
+
+    /// Store a breakdown tag (planning command `PutTag` makes it undoable).
+    pub fn put_tag(&self, t: &crate::tags::Tag) -> Result<()> {
+        if t.id.trim().is_empty() || t.document_id.trim().is_empty() || t.block_id.trim().is_empty() {
+            return Err(StoreError::Invalid("a tag needs an id, a document and a block".into()));
+        }
+        if t.start >= t.end || t.quote.trim().is_empty() {
+            return Err(StoreError::Invalid("a tag must cover a non-empty text span".into()));
+        }
+        let cats = self.tag_categories()?;
+        if !cats.iter().any(|(k, _)| k == &t.category) {
+            return Err(StoreError::Invalid(format!("unknown tag category {}", t.category)));
+        }
+        if self.entity(&t.entity_id)?.is_none() {
+            return Err(StoreError::Invalid(format!("no bible entry {}", t.entity_id)));
+        }
+        self.conn.execute(
+            "INSERT OR REPLACE INTO breakdown_tags(id, document_id, block_id, start_char, end_char, quote, category, entity_id, note, orphaned)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                t.id,
+                t.document_id,
+                t.block_id,
+                t.start as i64,
+                t.end as i64,
+                t.quote,
+                t.category,
+                t.entity_id,
+                t.note.trim(),
+                t.orphaned as i64
+            ],
         )?;
         self.mark_unsaved()
     }
@@ -1126,9 +1264,20 @@ impl Store {
         if tx.query_row("SELECT 1 FROM documents WHERE id = ?1", [&doc], |_| Ok(())).optional()?.is_none() {
             return Err(StoreError::Invalid(format!("unknown document {doc}")));
         }
+        let doc_tags = load_doc_tags(&tx, &doc)?;
+        let before_blocks = if doc_tags.is_empty() { std::collections::HashMap::new() } else { load_doc_block_texts(&tx, &doc)? };
         let next = current + 1;
         for op in &batch.ops {
             apply_op(&tx, &doc, op, next)?;
+        }
+        if !doc_tags.is_empty() {
+            let after_blocks = load_doc_block_texts(&tx, &doc)?;
+            for t in crate::tags::map_tags_through_batch(&doc_tags, &before_blocks, &after_blocks, &batch.ops) {
+                tx.execute(
+                    "UPDATE breakdown_tags SET block_id = ?2, start_char = ?3, end_char = ?4, quote = ?5, orphaned = ?6 WHERE id = ?1",
+                    params![t.id, t.block_id, t.start as i64, t.end as i64, t.quote, t.orphaned as i64],
+                )?;
+            }
         }
         Self::set_meta(&tx, "version", &next.to_string())?;
         tx.execute(
@@ -1344,6 +1493,22 @@ impl Store {
                 let was = self.rejected()?.contains(&(kind.clone(), name.trim().to_uppercase()));
                 self.set_rejected(kind, name, *on)?;
                 PlanningOp::Reject { kind: kind.clone(), name: name.clone(), on: was }
+            }
+            PlanningOp::PutTag(t) => {
+                let before = self.tag(&t.id)?;
+                self.put_tag(t)?;
+                match before {
+                    Some(old) => PlanningOp::PutTag(old),
+                    None => PlanningOp::DeleteTag(t.id.clone()),
+                }
+            }
+            PlanningOp::DeleteTag(id) => {
+                let Some(old) = self.tag(id)? else {
+                    return Err(StoreError::Invalid(format!("no tag {id}")));
+                };
+                self.conn.execute("DELETE FROM breakdown_tags WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::PutTag(old)
             }
             PlanningOp::DeleteBeat(id) => {
                 let Some(old) = self.beat(id)? else {
@@ -1667,4 +1832,38 @@ fn apply_op(tx: &Connection, doc: &str, op: &Op, version: u64) -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn load_doc_tags(tx: &Connection, doc: &str) -> Result<Vec<crate::tags::Tag>> {
+    let mut stmt = tx.prepare(
+        "SELECT id, document_id, block_id, start_char, end_char, quote, category, entity_id, note, orphaned
+         FROM breakdown_tags WHERE document_id = ?1 ORDER BY block_id, start_char, end_char, id",
+    )?;
+    let rows = stmt.query_map([doc], |r| {
+        Ok(crate::tags::Tag {
+            id: r.get(0)?,
+            document_id: r.get(1)?,
+            block_id: r.get(2)?,
+            start: r.get::<_, i64>(3)?.max(0) as usize,
+            end: r.get::<_, i64>(4)?.max(0) as usize,
+            quote: r.get(5)?,
+            category: r.get(6)?,
+            entity_id: r.get(7)?,
+            note: r.get(8)?,
+            orphaned: r.get::<_, i64>(9)? != 0,
+        })
+    })?;
+    Ok(rows.collect::<std::result::Result<_, _>>()?)
+}
+
+fn load_doc_block_texts(tx: &Connection, doc: &str) -> Result<std::collections::HashMap<Id, String>> {
+    let mut stmt = tx.prepare("SELECT id, runs FROM blocks WHERE document_id = ?1")?;
+    let mut out = std::collections::HashMap::new();
+    for r in stmt.query_map([doc], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
+        let (id, runs_json) = r?;
+        let runs: Vec<Run> = serde_json::from_str(&runs_json).unwrap_or_default();
+        let text: String = runs.iter().map(|r| r.text.as_str()).collect();
+        out.insert(id, text);
+    }
+    Ok(out)
 }

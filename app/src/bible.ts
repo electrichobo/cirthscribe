@@ -18,7 +18,7 @@ import { announce } from "./a11y";
 
 export interface Entity {
   id: string;
-  kind: "character" | "location" | "world";
+  kind: string;
   name: string;
   aliases: string[];
   description: string;
@@ -43,6 +43,7 @@ interface BibleState {
   entries: Entry[];
   candidates: Candidate[];
   places: Record<string, { document_id: string; document_title: string; heading: string }>;
+  categories?: [string, string][];
 }
 interface RenamePlan {
   changes: { document_id: string; block_id: string; before: string; after: string }[];
@@ -50,8 +51,22 @@ interface RenamePlan {
 }
 export type BibleOp = { PutEntity: Entity } | { DeleteEntity: string } | { Reject: { kind: string; name: string; on: boolean } };
 
-const KIND_LABEL = { character: "Characters", location: "Locations", world: "World" } as const;
-const ONE = { character: "character", location: "location", world: "world entry" } as const;
+const BASE_KIND_LABEL: Record<string, string> = { character: "Characters", location: "Locations", world: "World" };
+const BASE_ONE: Record<string, string> = {
+  character: "character",
+  location: "location",
+  world: "world entry",
+  cast: "cast entry",
+  extras: "extras entry",
+  props: "prop",
+  costume: "costume entry",
+  vehicles: "vehicle",
+  sound: "sound cue",
+  vfx_sfx: "VFX / SFX entry",
+  stunts: "stunt entry",
+  makeup: "makeup entry",
+  set_dressing: "set dressing entry",
+};
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
@@ -75,7 +90,7 @@ export function createBible(hooks: {
   const h = el("h2", { id: "bible-title" }, "Bible");
   const kind = el("select", { id: "bible-kind" });
   kind.setAttribute("aria-label", "Kind of entry");
-  for (const k of ["character", "location", "world"] as const) kind.add(new Option(KIND_LABEL[k], k));
+  for (const k of ["character", "location", "world"] as const) kind.add(new Option(BASE_KIND_LABEL[k], k));
   const status = el("p", { id: "bible-status", className: "form-note" });
   status.setAttribute("role", "status");
   const left = el("div", { className: "bible-left" });
@@ -85,10 +100,23 @@ export function createBible(hooks: {
   dialog.append(h, el("div", { className: "bible-tools" }, kind, status), el("div", { className: "bible-cols" }, left, right), el("div", { className: "dialog-actions" }, undoBtn, close));
   document.body.append(dialog);
 
-  let st: BibleState = { entries: [], candidates: [], places: {} };
+  let st: BibleState = { entries: [], candidates: [], places: {}, categories: [] };
   let chosen: { entry?: string; candidate?: string } = {};
   let steps = 0;
   let scopes: { id: string; title: string; kind: string }[] = [];
+
+  const kindLabel = (k: string): string => BASE_KIND_LABEL[k] ?? st.categories?.find(([ck]) => ck === k)?.[1] ?? k;
+  const oneLabel = (k: string): string => BASE_ONE[k] ?? `${kindLabel(k).toLowerCase()} entry`;
+
+  function syncKindOptions() {
+    const prev = kind.value || "character";
+    kind.replaceChildren();
+    for (const k of ["character", "location", "world"]) kind.add(new Option(BASE_KIND_LABEL[k], k));
+    for (const [ck, cl] of st.categories ?? []) {
+      if (!BASE_KIND_LABEL[ck]) kind.add(new Option(cl, ck));
+    }
+    kind.value = [...kind.options].some((o) => o.value === prev) ? prev : "character";
+  }
 
   const say = (t: string) => {
     status.textContent = t;
@@ -128,17 +156,18 @@ export function createBible(hooks: {
 
   async function reload() {
     st = await hooks.state();
+    syncKindOptions();
     draw();
   }
 
   function draw() {
-    const k = kind.value as Entity["kind"];
+    const k = kind.value;
     const entries = st.entries.filter((e) => e.kind === k);
     const cands = st.candidates.filter((c) => c.kind === k);
     left.replaceChildren();
     // Entries.
     const list = el("ul", { className: "bible-list", id: "bible-entries" });
-    list.setAttribute("aria-label", `${KIND_LABEL[k]} in the bible`);
+    list.setAttribute("aria-label", `${kindLabel(k)} in the bible`);
     for (const e of entries) {
       const b = el("button", { type: "button", className: "bible-entry" }, el("span", {}, e.name), el("span", { className: "bible-meta" }, e.occurrences.length ? `${e.occurrences.length}×` : k === "world" ? "" : "Unreferenced"));
       b.dataset.id = e.id;
@@ -149,15 +178,15 @@ export function createBible(hooks: {
       });
       list.append(el("li", {}, b));
     }
-    const add = el("button", { type: "button", id: "bible-new" }, `New ${ONE[k]}`);
+    const add = el("button", { type: "button", id: "bible-new" }, `New ${oneLabel(k)}`);
     add.addEventListener("click", () => {
       const e: Entity = { id: hooks.newId(), kind: k, name: k === "world" ? "New fact" : "NEW NAME", aliases: [], description: "", fields: [], scope: null };
       chosen = { entry: e.id };
-      void change({ PutEntity: e }, `New ${ONE[k]} added`);
+      void change({ PutEntity: e }, `New ${oneLabel(k)} added`);
     });
-    left.append(el("h3", {}, `${KIND_LABEL[k]} (${entries.length})`), list, add);
+    left.append(el("h3", {}, `${kindLabel(k)} (${entries.length})`), list, add);
     // Candidates.
-    if (k !== "world") {
+    if (k === "character" || k === "location") {
       const cl = el("ul", { className: "bible-list", id: "bible-candidates" });
       cl.setAttribute("aria-label", "Candidates from the scripts");
       for (const c of cands) {
@@ -170,14 +199,14 @@ export function createBible(hooks: {
           draw();
         });
         const accept = el("button", { type: "button", className: "bible-accept" }, "Accept");
-        accept.setAttribute("aria-label", `Accept ${c.name} as a ${ONE[k]}`);
+        accept.setAttribute("aria-label", `Accept ${c.name} as a ${oneLabel(k)}`);
         accept.addEventListener("click", () => {
           const id = hooks.newId();
           chosen = { entry: id };
           void change({ PutEntity: { id, kind: k, name: c.name, aliases: [], description: "", fields: [], scope: null } }, `${c.name} added to the bible`);
         });
         const reject = el("button", { type: "button", className: "bible-reject" }, "Reject");
-        reject.setAttribute("aria-label", `Reject ${c.name}: not a ${ONE[k]}`);
+        reject.setAttribute("aria-label", `Reject ${c.name}: not a ${oneLabel(k)}`);
         reject.addEventListener("click", () => void change({ Reject: { kind: k, name: c.name, on: true } }, `${c.name} will not be suggested again`));
         const merge = el("select", { className: "bible-merge" });
         merge.setAttribute("aria-label", `Add ${c.name} as another name of`);
@@ -267,7 +296,7 @@ export function createBible(hooks: {
       right.append(el("h3", {}, `Appears ${e.occurrences.length} time${e.occurrences.length === 1 ? "" : "s"}`));
       if (e.occurrences.length) right.append(evidenceList(e.occurrences, `Where ${e.name} appears`));
       else right.append(el("p", { className: "bible-unref", id: "bible-unreferenced" }, "Unreferenced: no script mentions this entry any more. It is kept; delete it yourself if it should go."));
-      right.append(renamePanel(e));
+      if (e.kind === "character" || e.kind === "location") right.append(renamePanel(e));
     }
     right.append(del);
   }

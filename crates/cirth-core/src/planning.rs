@@ -39,6 +39,9 @@ pub enum PlanningOp {
     DeleteThread(String),
     PutBookmark(crate::evidence::Bookmark),
     DeleteBookmark(String),
+    /// Breakdown tags anchored to text spans (M4 step 3, ADR 0005).
+    PutTag(crate::tags::Tag),
+    DeleteTag(String),
 }
 
 #[derive(Clone, Debug)]

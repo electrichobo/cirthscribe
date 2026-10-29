@@ -56,6 +56,7 @@ export const BINDINGS: Binding[] = [
   { id: "bookmarks", group: "Moving around", label: "Bookmarks", menu: "Bookmarks…", scope: "app", defaults: [] },
   { id: "overview", group: "Moving around", label: "Overview of the script", menu: "Overview…", scope: "app", defaults: [] },
   { id: "storyscry", group: "Project", label: "StoryScry (reports and charts)", menu: "StoryScry…", scope: "app", defaults: [] },
+  { id: "tags", group: "Project", label: "Breakdown tags", menu: "Breakdown Tags…", scope: "app", defaults: [] },
   { id: "goto_page", group: "Moving around", label: "Go to page", menu: "Page…", scope: "app", defaults: ["Mod+G"] },
   { id: "goto_scene", group: "Moving around", label: "Go to scene", menu: "Scene…", scope: "app", defaults: ["Mod+Shift+G"] },
   { id: "focus_mode", group: "View", label: "Focus mode", menu: "Focus Mode", scope: "app", defaults: ["Mod+Shift+F"] },

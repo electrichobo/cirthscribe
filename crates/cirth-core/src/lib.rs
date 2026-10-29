@@ -24,6 +24,7 @@ pub mod reports;
 pub mod revisions;
 pub mod rtf;
 pub mod spell;
+pub mod tags;
 pub mod timeline;
 pub mod title;
 pub mod txt;

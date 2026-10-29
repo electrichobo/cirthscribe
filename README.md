@@ -115,9 +115,9 @@ Then the plan itself:
 
 ### 🔜 Stage 4: Production tools (in progress; plan accepted)
 
-- [ ] Script breakdown tags (props, wardrobe, cast and more)
+- [x] Script breakdown tags (props, wardrobe, cast and more, linked to the project bible with aliases and suggested tags; View > Tools > Breakdown Tags…)
 - [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
-- [x] Initial reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, and revisions (props and breakdown-tag reports come with tags)
+- [x] Initial reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, and revisions (breakdown-tag reports and silent-character participation next)
 - [ ] Character sides: a character's scenes as pages for actors
 - [ ] Stripboard and shooting schedule
 - [x] Page counts in eighths, and character appearance charts

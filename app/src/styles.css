@@ -310,6 +310,26 @@ dialog.storyscry { width: min(1140px, 95vw); height: min(760px, 88vh); }
 .storyscry-actions { justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .storyscry-export-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .storyscry-export-status { margin: 0; font-size: 12px; }
+/* Breakdown tags (M4 step 3, ADR 0005, tags.ts): on-screen span indicator + dialog. */
+.cirth-tag-mark { border-bottom: 1.5px dotted var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 2px; }
+dialog.tags-dialog { width: min(1040px, 94vw); height: min(720px, 88vh); }
+.tags-selection-box { padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); display: grid; gap: 6px; }
+.tags-selection-box .form-note { margin: 0; }
+.tags-selection-row { font-size: 13px; }
+.tags-selection-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tags-selection-controls select, .tags-selection-controls input { padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+.tags-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.tags-toolbar select, .tags-toolbar input { padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+#tags-search { flex: 1 1 180px; }
+.tags-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+.tags-left, .tags-right { overflow: auto; min-height: 0; padding-right: 4px; }
+.tags-item, .tags-suggestion-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; padding: 5px 6px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); font-size: 12px; }
+.tags-item-orphaned { background: color-mix(in srgb, var(--warn) 12%, transparent); border-left: 3px solid var(--warn); }
+.tags-badge { font-size: 11px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); margin-right: 6px; font-weight: 600; }
+.tags-item-orphaned .tags-badge { color: var(--warn); border-color: var(--warn); }
+.tags-item-note { color: var(--muted); font-style: italic; }
+.tags-item-actions { display: flex; gap: 4px; align-items: center; }
+.tags-item-actions button { font-size: 11px; padding: 2px 7px; }
 /* Outline tab (M3 step 4): acts, sequences and beats as one tree. */
 .outline-tools { display: flex; gap: 4px; margin: 0 0 6px; }
 .outline-tools button { font-size: 12px; padding: 2px 8px; }

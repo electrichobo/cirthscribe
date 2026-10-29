@@ -19,7 +19,42 @@ use serde::{Deserialize, Serialize};
 use crate::model::{Block, BlockKind, Id, Run};
 use crate::navigator::cue_name;
 
-pub const KINDS: [&str; 3] = ["character", "location", "world"];
+/// Built-in entry kinds in the project bible (M3 step 7 + M4 step 3 breakdown categories).
+/// Writers can also add custom breakdown categories (`Store::tag_categories`).
+pub const KINDS: [&str; 13] = [
+    "character",
+    "location",
+    "world",
+    "cast",
+    "extras",
+    "props",
+    "costume",
+    "vehicles",
+    "sound",
+    "vfx_sfx",
+    "stunts",
+    "makeup",
+    "set_dressing",
+];
+
+/// Standard breakdown tag categories (M4 step 3).
+pub const TAG_CATEGORIES: [(&str, &str); 10] = [
+    ("cast", "Cast"),
+    ("extras", "Extras"),
+    ("props", "Props"),
+    ("costume", "Costume"),
+    ("vehicles", "Vehicles"),
+    ("sound", "Sound"),
+    ("vfx_sfx", "VFX / SFX"),
+    ("stunts", "Stunts"),
+    ("makeup", "Makeup"),
+    ("set_dressing", "Set Dressing"),
+];
+
+pub fn valid_kind_key(kind: &str) -> bool {
+    let k = kind.trim();
+    !k.is_empty() && k.len() <= 40 && k.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct Entity {
@@ -94,6 +129,18 @@ fn mentions(docs: &[(Id, Vec<Block>)]) -> Vec<(&'static str, String, Evidence)> 
 
 /// Candidates (names no entry covers, not rejected) and each entry's occurrences.
 pub fn derive(entities: &[Entity], rejected: &HashSet<(String, String)>, docs: &[(Id, Vec<Block>)]) -> (Vec<Candidate>, HashMap<Id, Vec<Evidence>>) {
+    derive_with_tags(entities, rejected, docs, &[])
+}
+
+/// Like `derive`, and also counts non-orphaned breakdown tags (`cirth_core::tags::Tag`)
+/// as occurrences of their linked bible entry so tagged props, costumes, cast, etc.
+/// show where they appear in the Bible dialog.
+pub fn derive_with_tags(
+    entities: &[Entity],
+    rejected: &HashSet<(String, String)>,
+    docs: &[(Id, Vec<Block>)],
+    tags: &[crate::tags::Tag],
+) -> (Vec<Candidate>, HashMap<Id, Vec<Evidence>>) {
     let mut owner: HashMap<(String, String), Id> = HashMap::new();
     for e in entities {
         for n in std::iter::once(&e.name).chain(e.aliases.iter()) {
@@ -115,6 +162,24 @@ pub fn derive(entities: &[Entity], rejected: &HashSet<(String, String)>, docs: &
             cands[i].count += 1;
             if cands[i].evidence.len() < 50 {
                 cands[i].evidence.push(ev);
+            }
+        }
+    }
+    if !tags.is_empty() {
+        let mut block_scene: HashMap<(Id, Id), Option<Id>> = HashMap::new();
+        for (doc_id, blocks) in docs {
+            let mut sc: Option<Id> = None;
+            for b in blocks {
+                if b.kind == BlockKind::Heading {
+                    sc = b.scene_id.clone();
+                }
+                block_scene.insert((doc_id.clone(), b.id.clone()), sc.clone());
+            }
+        }
+        for t in tags.iter().filter(|t| !t.orphaned) {
+            if let Some(list) = occ.get_mut(&t.entity_id) {
+                let scene_id = block_scene.get(&(t.document_id.clone(), t.block_id.clone())).cloned().flatten();
+                list.push(Evidence { document_id: t.document_id.clone(), scene_id, block_id: t.block_id.clone() });
             }
         }
     }

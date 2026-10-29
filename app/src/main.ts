@@ -44,6 +44,7 @@ import { createProjectTree } from "./projecttree";
 import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
 import { createStoryScry, type ExportableReport, type ReportBundle, type ReportExported, type ReportFormat, type ReportScope } from "./storyscry";
+import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -629,6 +630,57 @@ async function goToBlock(documentId: string, blockId: string) {
   view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)).scrollIntoView());
   view.focus();
 }
+
+async function goToTagSpan(documentId: string, blockId: string, startChar: number, endChar: number) {
+  if (documentId !== lastOpen?.document_id && !(await openWith("open_document", { id: documentId }))) return;
+  let fromPos = -1;
+  let toPos = -1;
+  view.state.doc.forEach((n, pos) => {
+    if (fromPos >= 0 || n.attrs.id !== blockId) return;
+    const text = n.textContent;
+    const uStart = Math.min(text.length, Math.max(0, charToUtf16Offset(text, startChar)));
+    const uEnd = Math.min(text.length, Math.max(uStart, charToUtf16Offset(text, endChar)));
+    fromPos = pos + 1 + uStart;
+    toPos = pos + 1 + uEnd;
+  });
+  if (fromPos < 0) return showBanner("That tag's paragraph is no longer in the script.");
+  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, fromPos, toPos)).scrollIntoView());
+  view.focus();
+}
+
+function decorateTags(tags: TagView[]) {
+  if (!view || !lastOpen) return;
+  view.dispatch(
+    view.state.tr
+      .setMeta(tagsPluginKey, { tags, documentId: lastOpen.document_id })
+      .setMeta("addToHistory", false),
+  );
+}
+
+async function refreshTagDecorations() {
+  if (!view || !lastOpen) return;
+  try {
+    const st = await invoke<TagsState>("tags_state");
+    decorateTags(st.tags);
+  } catch {
+    // Decoration is visual only; never block editing.
+  }
+}
+
+const breakdownTags = createBreakdownTags({
+  state: async () => {
+    await syncer.flush();
+    return invoke<TagsState>("tags_state");
+  },
+  apply: (op: TagOp) => planOp(op, "Breakdown tags"),
+  undo: planUndo,
+  addCategory: (label) => invoke<[string, string]>("add_tag_category", { label }),
+  selection: () => selectionAnchor(view ?? null, lastOpen?.document_id ?? null),
+  currentDocument: () => lastOpen?.document_id ?? null,
+  decorate: decorateTags,
+  go: (doc, block, s, e) => void goToTagSpan(doc, block, s, e),
+  newId,
+});
 const bookmarks = createBookmarks({
   list: async () => {
     const st = await invoke<{ bookmarks: { id: string; name: string; document_id: string; block_id: string }[] }>("evidence_state");
@@ -781,6 +833,7 @@ function makeState(blocks: Block[]) {
       spellPlugin(),
       dualPlugin(),
       revisionsPlugin(),
+      tagsPlugin(),
     ],
   });
 }
@@ -843,7 +896,9 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   syncer.onAck = () => {
     schedulePaginate();
     scheduleCounts(true);
+    void refreshTagDecorations();
   };
+  void refreshTagDecorations();
   docCounts = null;
   scheduleCounts(true);
   void spell.onOpen($("spelling") as HTMLSelectElement).then(syncMenuChecks);
@@ -1482,6 +1537,9 @@ async function runMenu(id: string): Promise<void> {
     case "storyscry":
       if (lastOpen) await storyScry.open();
       break;
+    case "tags":
+      if (lastOpen) await breakdownTags.open();
+      break;
     case "project_tree":
       if (lastOpen) await projectTree.open();
       break;
@@ -1914,6 +1972,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   importAny,
   overview,
   storyScry,
+  tags: breakdownTags,
   bible,
   timeline,
   evidence,

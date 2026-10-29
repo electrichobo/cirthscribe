@@ -524,3 +524,73 @@ fn opening_a_v9_project_adds_an_empty_evidence_board_that_packages_pictures() {
         assert_eq!(s.bookmarks().unwrap()[0].name, "Ledger goes missing");
     }
 }
+
+#[test]
+fn opening_a_v10_project_adds_empty_breakdown_tags_and_maps_anchors_through_edits() {
+    use cirth_core::bible::Entity;
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    use cirth_core::tags::Tag;
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v10-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v10-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 10, "fixture must be schema v10");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(10));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v10 copy kept");
+        let mut s = o.store;
+        assert!(s.tags().unwrap().is_empty(), "upgraded projects start with no breakdown tags");
+
+        // Add a prop entry with aliases in the bible, then tag a span in the first non-empty block.
+        let mut h = PlanningHistory::default();
+        let prop = Entity {
+            id: "e-prop-1".into(),
+            kind: "props".into(),
+            name: "Red Ledger".into(),
+            aliases: vec!["the ledger".into()],
+            ..Default::default()
+        };
+        let v = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::PutEntity(prop), v).unwrap();
+
+        let doc_id = s.current_document().unwrap();
+        let before = s.load().unwrap();
+        let target = before.blocks.iter().find(|b| b.text().chars().count() >= 4).unwrap().clone();
+        let quote: String = target.text().chars().take(4).collect();
+        let tag = Tag {
+            id: "t-prop-1".into(),
+            document_id: doc_id.clone(),
+            block_id: target.id.clone(),
+            start: 0,
+            end: 4,
+            quote: quote.clone(),
+            category: "props".into(),
+            entity_id: "e-prop-1".into(),
+            note: "Hero prop".into(),
+            orphaned: false,
+        };
+        let v = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::PutTag(tag.clone()), v).unwrap();
+        assert_eq!(s.tags().unwrap(), vec![tag.clone()]);
+
+        // Typing 3 characters ("🕯️ ") before the tag shifts its Unicode scalar offsets by 3.
+        let mut edited = target.clone();
+        edited.runs = vec![cirth_core::model::Run::plain(format!("🕯️ {}", target.text()))];
+        let sv = s.version().unwrap();
+        s.apply(&Batch { tx_id: "edit-pre".into(), base_version: sv, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: edited }] }).unwrap();
+        let shifted = s.tag("t-prop-1").unwrap().unwrap();
+        assert_eq!((shifted.start, shifted.end, shifted.quote.as_str(), shifted.orphaned), (3, 7, quote.as_str(), false));
+
+        // Undo the tag creation via PlanningHistory.
+        h.undo(&s).unwrap();
+        assert!(s.tags().unwrap().is_empty());
+        h.redo(&s).unwrap();
+        assert_eq!(s.tags().unwrap().len(), 1);
+
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}
+

@@ -837,3 +837,117 @@ fn reports_from_store_stamp_version_and_respect_scope_and_omitted_scenes() {
     assert!(s.version().unwrap() > r_proj.source_version, "earlier report version is detectably stale after an edit");
 }
 
+#[test]
+fn breakdown_tags_map_across_edits_splits_joins_omitted_scenes_and_orphans() {
+    use cirth_core::bible::Entity;
+    use cirth_core::model::Run;
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    use cirth_core::tags::{Tag, suggest, suggestion_reject_key};
+
+    let d = tmpdir("breakdown-tags");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    let doc_id = s.default_document().unwrap();
+    let h1 = Block { id: "h1".into(), scene_id: Some("sc-1".into()), ..Block::new(BlockKind::Heading, "INT. COUNTING HOUSE - NIGHT") };
+    let a1 = Block { id: "a1".into(), ..Block::new(BlockKind::Action, "Mara opens the red ledger. She checks the ledger.") };
+    s.seed(&cirth_core::model::Document { title: "Tag Test".into(), version: 0, blocks: vec![h1.clone(), a1.clone()] }).unwrap();
+
+    // Custom category + bible prop with aliases ("the red ledger", "the ledger").
+    let (cat_key, cat_label) = s.add_tag_category("Animal Wrangler").unwrap();
+    assert_eq!((cat_key.as_str(), cat_label.as_str()), ("animal_wrangler", "Animal Wrangler"));
+    assert!(s.tag_categories().unwrap().iter().any(|(k, _)| k == "animal_wrangler"));
+
+    let mut ph = PlanningHistory::default();
+    let ledger = Entity {
+        id: "e-ledger".into(),
+        kind: "props".into(),
+        name: "Red Ledger".into(),
+        aliases: vec!["the red ledger".into(), "the ledger".into()],
+        ..Default::default()
+    };
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::PutEntity(ledger), pv).unwrap();
+
+    // Suggested tags find both "the red ledger" (11..25) and "the ledger" (38..48) in `a1`.
+    let docs = vec![(doc_id.clone(), s.load().unwrap().blocks)];
+    let sugg = suggest(&s.entities().unwrap(), &s.tags().unwrap(), &s.rejected().unwrap(), &docs);
+    assert_eq!(sugg.len(), 2);
+    assert_eq!((sugg[0].start, sugg[0].end, sugg[0].quote.as_str()), (11, 25, "the red ledger"));
+    assert_eq!((sugg[1].start, sugg[1].end, sugg[1].quote.as_str()), (38, 48, "the ledger"));
+
+    // Accept the first suggestion as a tag; reject the second suggestion.
+    let tag1 = Tag {
+        id: "t-1".into(),
+        document_id: doc_id.clone(),
+        block_id: "a1".into(),
+        start: 11,
+        end: 25,
+        quote: "the red ledger".into(),
+        category: "props".into(),
+        entity_id: "e-ledger".into(),
+        note: "Stained with salt water".into(),
+        orphaned: false,
+    };
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::PutTag(tag1.clone()), pv).unwrap();
+    let (rk_kind, rk_name) = suggestion_reject_key("props", "e-ledger", "a1", "the ledger");
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::Reject { kind: rk_kind, name: rk_name, on: true }, pv).unwrap();
+    assert!(suggest(&s.entities().unwrap(), &s.tags().unwrap(), &s.rejected().unwrap(), &docs).is_empty());
+
+    // Tag the second occurrence too so we can test block split and join.
+    let tag2 = Tag {
+        id: "t-2".into(),
+        document_id: doc_id.clone(),
+        block_id: "a1".into(),
+        start: 38,
+        end: 48,
+        quote: "the ledger".into(),
+        category: "props".into(),
+        entity_id: "e-ledger".into(),
+        note: String::new(),
+        orphaned: false,
+    };
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::PutTag(tag2), pv).unwrap();
+
+    // Split `a1` into `a1` ("Mara opens the red ledger.") and `a2` ("She checks the ledger.").
+    let a1_part = Block { id: "a1".into(), ..Block::new(BlockKind::Action, "Mara opens the red ledger.") };
+    let a2_part = Block { id: "a2".into(), ..Block::new(BlockKind::Action, "She checks the ledger.") };
+    let v = s.version().unwrap();
+    s.apply(&Batch {
+        tx_id: "split-a1".into(),
+        base_version: v,
+        document_id: Some(doc_id.clone()),
+        ops: vec![
+            Op::Update { block: a1_part.clone() },
+            Op::Put { block: a2_part.clone(), after: Some("a1".into()) },
+        ],
+    })
+    .unwrap();
+    let t1_after = s.tag("t-1").unwrap().unwrap();
+    let t2_after = s.tag("t-2").unwrap().unwrap();
+    assert_eq!((t1_after.block_id.as_str(), t1_after.start, t1_after.end, t1_after.orphaned), ("a1", 11, 25, false));
+    assert_eq!((t2_after.block_id.as_str(), t2_after.start, t2_after.end, t2_after.orphaned), ("a2", 11, 21, false));
+
+    // Omitting and restoring the scene (`D5`) keeps tags linked.
+    s.lock_scene_numbers(&doc_id).unwrap();
+    s.set_scene_omitted(&doc_id, "sc-1", true).unwrap();
+    assert_eq!(s.tags_of(&doc_id).unwrap().len(), 2);
+    s.set_scene_omitted(&doc_id, "sc-1", false).unwrap();
+    assert!(s.tags_of(&doc_id).unwrap().iter().all(|t| !t.orphaned));
+
+    // Delete "the ledger" from `a2`: `t-2` becomes an orphan (never dropped).
+    let a2_del = Block { id: "a2".into(), runs: vec![Run::plain("She checks the desk.")], ..a2_part.clone() };
+    let v = s.version().unwrap();
+    s.apply(&Batch { tx_id: "del-t2-text".into(), base_version: v, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: a2_del }] }).unwrap();
+    let t2_orph = s.tag("t-2").unwrap().unwrap();
+    assert!(t2_orph.orphaned && t2_orph.quote == "the ledger");
+
+    // Undoing the script edit (restoring `a2_part`) recovers `t-2` automatically.
+    let v = s.version().unwrap();
+    s.apply(&Batch { tx_id: "undo-del-t2".into(), base_version: v, document_id: Some(doc_id), ops: vec![Op::Update { block: a2_part }] }).unwrap();
+    let t2_rec = s.tag("t-2").unwrap().unwrap();
+    assert!(!t2_rec.orphaned && t2_rec.start == 11 && t2_rec.end == 21);
+}
+
+

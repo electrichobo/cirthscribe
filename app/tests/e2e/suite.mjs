@@ -2344,7 +2344,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
     const ids = new Set(items.map((i) => i.id));
     const want = ["new", "open", "import", "save", "save_as", "export", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
-      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
+      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "tags", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
       "goto_page", "goto_scene", "win_minimize", "win_zoom", "focus_next",
       "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "latency", "updates", "licences", "about",
       ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
@@ -2355,7 +2355,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
     // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
     const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
-    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
+    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
       goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
       font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
     for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
@@ -3352,6 +3352,139 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
     await app.evaluate("(document.getElementById('storyscry-close').click(), true)");
     await waitFor(app, "!document.getElementById('storyscry-dialog').open", "StoryScry closed");
+  });
+
+  await test("Breakdown tags (ADR 0005, D5, E1, E2, F1, F2): anchored records, custom categories, bible aliases, suggestions, edit/split/join/omit survival and orphan recovery", async () => {
+    await openFixture("page-boundaries");
+    // Put a known action line at the end of the first scene so we can test exact offsets, aliases, splits, joins and orphans.
+    const b0 = await blocks();
+    const firstActionIdx = b0.findIndex((b) => b.kind === "action");
+    await caretAtEndOf(firstActionIdx);
+    await press("Enter");
+    const line = "Mara opens the red ledger on the desk. Later she checks the ledger again.";
+    await typeText(line);
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    const b1 = await blocks();
+    const bi = firstActionIdx + 1;
+    const blockId = b1[bi].id;
+    assert(text(b1[bi]) === line, `action line ready: ${text(b1[bi])}`);
+
+    // Select "the red ledger" (char offsets 11..25 -> ProseMirror pos ps[bi][0] + 1 + offset).
+    await setCaret(`[ps[${bi}][0] + 1 + 11, ps[${bi}][0] + 1 + 25]`);
+    await app.evaluate("(__cirth.menu('tags'), true)");
+    await waitFor(app, "document.getElementById('tags-dialog')?.open === true && !!__cirth.tags.data", "Breakdown Tags dialog opens");
+    const selText = await app.evaluate("document.getElementById('tags-selection-quote').textContent");
+    assert(selText.includes("“the red ledger”"), `selection captured: ${selText}`);
+
+    // Create a Props tag with a new bible entry "Red Ledger" and alias "the ledger".
+    await app.evaluate(`(() => {
+      const cat = document.getElementById('tags-create-category');
+      cat.value = 'props';
+      cat.dispatchEvent(new Event('change'));
+      document.getElementById('tags-create-name').value = 'Red Ledger';
+      document.getElementById('tags-create-aliases').value = 'the ledger';
+      document.getElementById('tags-create-note').value = 'Leather-bound';
+      document.getElementById('tags-create-submit').click();
+      return true;
+    })()`);
+    await waitFor(app, "__cirth.tags.data?.tags?.length === 1 && __cirth.tags.data?.suggestions?.length >= 1", "tag created and alias suggestion found");
+    await audit("Breakdown tags dialog");
+    await screenshot(app, "breakdown-tags");
+
+    // Inline decoration .cirth-tag-mark is rendered in ProseMirror over "the red ledger".
+    const markTexts = await app.evaluate("[...document.querySelectorAll('.ProseMirror .cirth-tag-mark')].map(e => e.textContent)");
+    assert(markTexts.includes("the red ledger"), `editor decorates tagged span: ${JSON.stringify(markTexts)}`);
+
+    // F2: Suggested tags found "the ledger" in the second sentence via the bible alias.
+    const sug0 = await app.evaluate("__cirth.tags.data.suggestions.find(s => s.entity_name === 'Red Ledger')");
+    assert(sug0 && sug0.quote === "the ledger" && sug0.start === 56 && sug0.end === 66, `alias suggestion: ${JSON.stringify(sug0)}`);
+
+    // Reject the suggestion, then Undo to bring it back, then Accept it.
+    await app.evaluate("(document.querySelector('#tags-suggestions .tags-reject').click(), true)");
+    await waitFor(app, "!__cirth.tags.data.suggestions.some(s => s.entity_name === 'Red Ledger')", "suggestion rejected");
+    await app.evaluate("(document.getElementById('tags-undo').click(), true)");
+    await waitFor(app, "__cirth.tags.data.suggestions.some(s => s.entity_name === 'Red Ledger')", "Undo restores rejected suggestion");
+    await app.evaluate("(document.querySelector('#tags-suggestions .tags-accept').click(), true)");
+    await waitFor(app, "__cirth.tags.data.tags.length === 2", "Accept turns suggestion into a second anchored tag");
+
+    // Add a custom breakdown category ("Animal Wrangler" -> slug "animal_wrangler").
+    await app.evaluate(`(() => {
+      document.getElementById('tags-new-category-name').value = 'Animal Wrangler';
+      document.getElementById('tags-add-category').click();
+      return true;
+    })()`);
+    await waitFor(app, "__cirth.tags.data.categories.some(([k, l]) => k === 'animal_wrangler' && l === 'Animal Wrangler')", "custom category added");
+
+    // Close Breakdown Tags and check Bible dialog: "Red Ledger" is under Props with 2 occurrences (not Unreferenced), and Animal Wrangler is a filter tab.
+    await app.evaluate("(document.getElementById('tags-close').click(), true)");
+    await waitFor(app, "!document.getElementById('tags-dialog').open", "Breakdown Tags closed");
+    await app.evaluate("(__cirth.menu('bible'), true)");
+    await waitFor(app, "document.getElementById('bible-dialog')?.open === true", "Bible opens");
+    const bibleCheck = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('bible_state').then(s => ({
+      hasCustomCat: s.categories.some(([k]) => k === 'animal_wrangler'),
+      ledger: s.entries.find(e => e.name === 'Red Ledger'),
+    }))`);
+    assert(bibleCheck.hasCustomCat, "custom category in bible_state");
+    assert(bibleCheck.ledger && bibleCheck.ledger.kind === "props" && bibleCheck.ledger.occurrences.length === 2, `Red Ledger has 2 tag occurrences in bible: ${JSON.stringify(bibleCheck.ledger)}`);
+    await app.evaluate("(document.getElementById('bible-close').click(), true)");
+    await waitFor(app, "!document.getElementById('bible-dialog').open", "Bible closed");
+
+    // ADR 0005 / E2 / F1: Edit before the tags with a 4-byte emoji ("🔑 " = 2 Unicode scalars, 3 UTF-16 code units).
+    await setCaret(`[ps[${bi}][0] + 1]`);
+    await typeText("🔑 ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    let ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
+    const tFirst = ts.find((t) => t.quote === "the red ledger");
+    const tSecond = ts.find((t) => t.quote === "the ledger");
+    assert(tFirst && !tFirst.orphaned && tFirst.start === 13 && tFirst.end === 27, `emoji prefix shifts first tag by 2 Unicode scalars: ${JSON.stringify(tFirst)}`);
+    assert(tSecond && !tSecond.orphaned && tSecond.start === 58 && tSecond.end === 68, `emoji prefix shifts second tag by 2 Unicode scalars: ${JSON.stringify(tSecond)}`);
+
+    // Split the block with Enter between the two sentences (after "desk." at scalar offset 40 -> UTF-16 offset 41).
+    await setCaret(`[ps[${bi}][0] + 1 + 41]`);
+    await press("Enter");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
+    const splitFirst = ts.find((t) => t.quote === "the red ledger");
+    const splitSecond = ts.find((t) => t.quote === "the ledger");
+    assert(splitFirst.block_id === blockId && !splitFirst.orphaned, "first tag stays on left block after split");
+    assert(splitSecond.block_id !== blockId && !splitSecond.orphaned && splitSecond.start === 18 && splitSecond.end === 28, `second tag moved to right block on split: ${JSON.stringify(splitSecond)}`);
+
+    // Join the blocks back with Backspace at the start of the second block.
+    await press("Backspace");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
+    const joinedSecond = ts.find((t) => t.quote === "the ledger");
+    assert(joinedSecond.block_id === blockId && !joinedSecond.orphaned && joinedSecond.start === 58 && joinedSecond.end === 68, `second tag returned to original block on join: ${JSON.stringify(joinedSecond)}`);
+
+    // D5: Omitting and restoring the scene preserves its breakdown tags.
+    const firstSceneId = (await app.evaluate("__cirth.scenes()"))[0].sceneId;
+    await app.evaluate("window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'lock', sceneId: null })");
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'omit', sceneId: ${JSON.stringify(firstSceneId)} })`);
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('scene_numbers_command', { action: 'restore', sceneId: ${JSON.stringify(firstSceneId)} })`);
+    ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
+    assert(ts.length === 2 && ts.every((t) => !t.orphaned), "tags survive scene omit and restore");
+
+    // Delete "the red ledger" (UTF-16 offsets 14..28 in the block because of the surrogate pair "🔑 ").
+    await setCaret(`[ps[${bi}][0] + 1 + 14, ps[${bi}][0] + 1 + 28]`);
+    await press("Backspace");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
+    const orphanedTag = ts.find((t) => t.quote === "the red ledger");
+    assert(orphanedTag && orphanedTag.orphaned === true, `deleting tagged text marks the tag orphaned (never dropped): ${JSON.stringify(orphanedTag)}`);
+
+    // Undoing the script deletion automatically recovers the orphaned tag!
+    await press("z", [MOD_KEY]);
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
+    const recoveredTag = ts.find((t) => t.quote === "the red ledger");
+    assert(recoveredTag && recoveredTag.orphaned === false && recoveredTag.start === 13 && recoveredTag.end === 27, `script undo auto-recovers the orphaned tag: ${JSON.stringify(recoveredTag)}`);
   });
 
   await app.close();

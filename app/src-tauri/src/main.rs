@@ -316,6 +316,7 @@ struct BibleState {
     entries: Vec<BibleEntry>,
     candidates: Vec<cirth_core::bible::Candidate>,
     places: std::collections::HashMap<String, Place>,
+    categories: Vec<(String, String)>,
 }
 
 fn bible_docs(s: &Session) -> Result<(Vec<(String, Vec<cirth_core::model::Block>)>, std::collections::HashMap<String, Place>), String> {
@@ -330,15 +331,17 @@ fn bible_docs(s: &Session) -> Result<(Vec<(String, Vec<cirth_core::model::Block>
 }
 
 /// The bible as it stands: entries with their occurrences (refreshed from
-/// every script), and candidates with their evidence.
+/// every script and breakdown tags), and candidates with their evidence.
 #[tauri::command]
 async fn bible_state(app: State<'_, App>) -> Result<BibleState, String> {
     with_session(&app, |s| {
         let (docs, places) = bible_docs(s)?;
         let entities = s.store.entities().map_err(err)?;
-        let (candidates, mut occ) = cirth_core::bible::derive(&entities, &s.store.rejected().map_err(err)?, &docs);
+        let tags = s.store.tags().map_err(err)?;
+        let categories = s.store.tag_categories().map_err(err)?;
+        let (candidates, mut occ) = cirth_core::bible::derive_with_tags(&entities, &s.store.rejected().map_err(err)?, &docs, &tags);
         let entries = entities.into_iter().map(|e| BibleEntry { occurrences: occ.remove(&e.id).unwrap_or_default(), entity: e }).collect();
-        Ok(BibleState { entries, candidates, places })
+        Ok(BibleState { entries, candidates, places, categories })
     })
 }
 
@@ -366,6 +369,103 @@ async fn bible_rename_apply(app: State<'_, App>, id: String, from: String, to: S
         s.store.apply_rename(&plan).map_err(err)?;
         Ok(plan.changes.len())
     })
+}
+
+// --- Breakdown tags (M4 step 3, ADR 0005, tags.rs) --------------------------------
+
+#[derive(Serialize)]
+struct TagView {
+    #[serde(flatten)]
+    tag: cirth_core::tags::Tag,
+    entity_name: String,
+    scene_id: Option<String>,
+    scene_number: Option<String>,
+    heading: String,
+    document_title: String,
+}
+
+#[derive(Serialize)]
+struct TagsState {
+    tags: Vec<TagView>,
+    suggestions: Vec<cirth_core::tags::TagSuggestion>,
+    categories: Vec<(String, String)>,
+    entities: Vec<cirth_core::bible::Entity>,
+    places: std::collections::HashMap<String, Place>,
+}
+
+#[tauri::command]
+async fn tags_state(app: State<'_, App>) -> Result<TagsState, String> {
+    with_session(&app, |s| {
+        let all = s.store.all_documents().map_err(err)?;
+        let mut places = std::collections::HashMap::new();
+        let mut block_scene: std::collections::HashMap<(String, String), (Option<String>, Option<String>, String, String)> =
+            std::collections::HashMap::new();
+        for (doc_id, doc_title, blocks) in &all {
+            let locked_nums = s.store.scene_numbers(doc_id).map_err(err)?;
+            let mut auto_idx = 0usize;
+            let mut cur_scene: Option<String> = None;
+            let mut cur_num: Option<String> = None;
+            let mut cur_heading = String::new();
+            for b in blocks {
+                if b.kind == cirth_core::model::BlockKind::Heading {
+                    cur_scene = b.scene_id.clone();
+                    cur_heading = b.text();
+                    if let Some(sid) = &cur_scene {
+                        places.insert(
+                            sid.clone(),
+                            Place { document_id: doc_id.clone(), document_title: doc_title.clone(), heading: cur_heading.clone() },
+                        );
+                        if let Some(sn) = locked_nums.get(sid) {
+                            cur_num = Some(sn.number.clone());
+                        } else {
+                            auto_idx += 1;
+                            cur_num = Some(auto_idx.to_string());
+                        }
+                    } else {
+                        cur_num = None;
+                    }
+                }
+                block_scene.insert(
+                    (doc_id.clone(), b.id.clone()),
+                    (cur_scene.clone(), cur_num.clone(), cur_heading.clone(), doc_title.clone()),
+                );
+            }
+        }
+        let doc_titles: std::collections::HashMap<String, String> =
+            all.iter().map(|(id, t, _)| (id.clone(), t.clone())).collect();
+        let docs: Vec<(String, Vec<cirth_core::model::Block>)> =
+            all.into_iter().map(|(id, _, b)| (id, b)).collect();
+        let entities = s.store.entities().map_err(err)?;
+        let entity_names: std::collections::HashMap<String, String> =
+            entities.iter().map(|e| (e.id.clone(), e.name.clone())).collect();
+        let raw_tags = s.store.tags().map_err(err)?;
+        let suggestions = cirth_core::tags::suggest(&entities, &raw_tags, &s.store.rejected().map_err(err)?, &docs);
+        let tags = raw_tags
+            .into_iter()
+            .map(|t| {
+                let (scene_id, scene_number, heading, document_title) = block_scene
+                    .get(&(t.document_id.clone(), t.block_id.clone()))
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        (
+                            None,
+                            None,
+                            String::new(),
+                            doc_titles.get(&t.document_id).cloned().unwrap_or_default(),
+                        )
+                    });
+                let entity_name = entity_names.get(&t.entity_id).cloned().unwrap_or_else(|| "(deleted entry)".into());
+                TagView { tag: t, entity_name, scene_id, scene_number, heading, document_title }
+            })
+            .collect();
+        let categories = s.store.tag_categories().map_err(err)?;
+        Ok(TagsState { tags, suggestions, categories, entities, places })
+    })
+}
+
+#[tauri::command]
+async fn add_tag_category(app: State<'_, App>, label: String) -> Result<(String, String), String> {
+    with_session(&app, |s| s.store.add_tag_category(&label).map_err(err))
 }
 
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
@@ -2213,6 +2313,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_notes", "Notes", false)?)
         .text("overview", "Overview…")
         .text("storyscry", "StoryScry…")
+        .text("tags", "Breakdown Tags…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
         .text("evidence", "Evidence Board…")
@@ -2529,6 +2630,8 @@ fn main() {
             storyscry_reports,
             store_versions,
             export_report,
+            tags_state,
+            add_tag_category,
             bible_state,
             timeline_state,
             evidence_state,
