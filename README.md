@@ -113,7 +113,7 @@ Then the plan itself:
 - [x] Story timeline, kept separate from script order: events linked to scenes in any episode, flashbacks marked, and an optional, previewed "put the script in story order" (View > Tools > Timeline…)
 - [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
 
-### 🔜 Stage 4: Production tools (next)
+### 🔜 Stage 4: Production tools (next; plan accepted)
 
 - [ ] Script breakdown tags (props, wardrobe, cast and more)
 - [ ] StoryScry: a dashboard of charts summarising every report, each opening into the full report
@@ -176,7 +176,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | - | - |
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
-| [docs/M4_PLAN.md](docs/M4_PLAN.md) | Stage 4 plan (proposed, awaiting the owner) |
+| [docs/M4_PLAN.md](docs/M4_PLAN.md) | Stage 4 plan (accepted) and what each step builds |
 | [docs/M3_PLAN.md](docs/M3_PLAN.md) and [docs/m3/EXIT_REVIEW.md](docs/m3/EXIT_REVIEW.md) | Stage 3 plan, what each step built, and its exit review |
 | [docs/M2_PLAN.md](docs/M2_PLAN.md) and [docs/m2/EXIT_REVIEW.md](docs/m2/EXIT_REVIEW.md) | Stage 2 plan, what each step built, and its exit review |
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Which formats have been tested in which other apps, and how to test |

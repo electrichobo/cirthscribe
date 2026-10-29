@@ -1,6 +1,6 @@
 # Milestone 4 plan: production analysis and stripboard
 
-Status: **proposed, 2026-10-28.** Builds on M1–M3 (M3 closed by the owner 2026-10-28). ROADMAP's M4 exit: each report works independently; manual schedule data survives script changes; charts and reports agree on the selected scope. Acceptance section E (reports and stripboards) is the test, with B6 carried from M3.
+Status: **accepted by the owner, 2026-10-28**, with decisions A–E below (B: tags tracked as separate anchored records). Builds on M1–M3 (M3 closed by the owner 2026-10-28). ROADMAP's M4 exit: each report works independently; manual schedule data survives script changes; charts and reports agree on the selected scope. Acceptance section E (reports and stripboards) is the test, with B6 carried from M3.
 
 ## Starting point (what exists)
 
@@ -20,7 +20,7 @@ Each step is a working, tested slice on both e2e drivers. Every report states it
    - First reports: **Scenes** (one-liners: number, INT/EXT, location, time of day, page, eighths, speakers, the card's logline), **Characters** (speeches, words, share of dialogue, scenes speaking, first appearance), **Locations** (scenes, pages, first and last use), **Action vs dialogue** (words and lines, per scene and overall), **Interior vs exterior**, **Day vs night**, **Revisions** (changed pages and passages per set).
    - StoryScry (View > Tools): a dashboard of charts, one per report; each opens its full report, filterable and sortable, with a table view for every chart. Estimates are labelled; colour is never the only signal.
 2. **Report exports.** Each report on its own: CSV and TSV (quoted, UTF-8, formula-safe), XLSX (one sheet per report, numbers as numbers, written with the approved `zip` crate), HTML, PDF and RTF. Google Sheets and Docs results go in docs/COMPATIBILITY.md from real tests.
-3. **Breakdown tags.** Categories: cast, extras, props, costume, vehicles, sound, VFX/SFX, stunts, makeup, set dressing, and the writer's own. A tag marks exact text (decision B) and points at a bible entry, so "the red ledger" and "the ledger" can be one prop. Suggested tags (bible names and aliases found in action text) are shown for the writer to accept or reject, never applied by themselves. Bible kinds grow to include props and the other categories.
+3. **Breakdown tags.** Categories: cast, extras, props, costume, vehicles, sound, VFX/SFX, stunts, makeup, set dressing, and the writer's own. A tag is a record of the exact text it covers (block id and offsets, decision B), carried through every edit, and points at a bible entry, so "the red ledger" and "the ledger" can be one prop. Suggested tags (bible names and aliases found in action text) are shown for the writer to accept or reject, never applied by themselves. Bible kinds grow to include props and the other categories.
 4. **Tag reports and character participation.** One report per category: occurrences and distinct scenes kept apart (E2), each row linked to its scenes (E1). Characters: speaking scenes, present-but-silent scenes (from cast tags), dialogue words and share, and an estimated participation time by a documented method, labelled as an estimate and never "screen time" (E6, E7).
 5. **Stripboard and schedule.** A vertical strip per scene: number, INT/EXT, location, time of day, a short description, characters, eighths, tags as configured. Its own schedule order (dragging strips never moves the script), day breaks, banners, an unscheduled pile, notes, sorting and a colour legend (with names). Script edits refresh strip fields and keep the schedule and notes (E3); an omitted or deleted scene's strip is flagged, not erased (E4). Exports: PDF and HTML (no clipped text, readable legend and headers, E9), XLSX and CSV.
 6. **Character sides.** For one or more characters, a PDF of the scenes they are in: their scenes only, or full pages with the other scenes struck through. Locked scene numbers and page labels are kept; a dual-dialogue pair stays whole. Built on the production PDF.
@@ -34,7 +34,16 @@ The exit review comes after 7. Steps 2 and 3 can swap if tags matter more to you
 - From M2: external app results, the Mac recheck of compat pack v2, manual checks N20–N28, non-Latin PDF glyphs.
 - From M1: Linux desktop latency, reference machines, defect 3; Windows e2e on the hosted runner.
 
-## Decisions needed
+## Decisions (owner, 2026-10-28)
+
+- **A. Charts:** original SVG charts written for Kolbítar (option 1). No dependency.
+- **B. Tags are tracked as separate records** (option 2): each tag stores the block id and character offsets of its text, with the quoted text for recovery, and is mapped through every edit (ARCHITECTURE section 5: offsets in Unicode scalar values at the core boundary, insertion affinity, behaviour on split, join, cut and paste, scene moves and omitted scenes). The same anchors will serve comments in M5. Step 3 starts with an ADR for the anchor design, and a tag whose text is deleted becomes an orphan to review, never silently dropped.
+- **C. Report PDFs and RTF** are written by the core (no new dependency).
+- **D.** E5 (inactive alternatives) and the branch part of E8 wait for M5; M4's scope is scripts and episodes.
+- **E. Order:** reports first, then tags, as proposed.
+- **Dependencies:** none expected.
+
+The questions as asked:
 
 - **A. Charts.**
   - (1) Original SVG charts written for Kolbítar: Nightingale (polar area), bullet, dot plot, bar and line. No dependency; they follow the themes and high contrast, and every chart has its table. **Proposed.**

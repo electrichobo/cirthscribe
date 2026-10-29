@@ -4,7 +4,7 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 ## Current stage (2026-10-28)
 
-A working application, not yet released, plus its product brief. M0–M3 (and M1b) are closed by the owner. **Next: M4**, plan proposed (docs/M4_PLAN.md).
+A working application, not yet released, plus its product brief. M0–M3 (and M1b) are closed by the owner. **Next: M4**, plan accepted (docs/M4_PLAN.md).
 - M3 built planning, episodes, navigator, outline, boards, bible, timeline, evidence board (docs/M3_PLAN.md).
 - Carried (docs/m3/EXIT_REVIEW.md, docs/m2/EXIT_REVIEW.md): the Mac run, external app tests, manual checks.
 

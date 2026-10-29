@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**M3 closed by the owner on 2026-10-28** (docs/m3/EXIT_REVIEW.md: decision A option 1, close and carry; decision B, straight on to M4). Next is M4, production analysis and stripboard (docs/ROADMAP.md). **docs/M4_PLAN.md is drafted (proposed, 2026-10-28) and awaits the owner**: seven steps, decisions A–E.
+**M3 closed by the owner on 2026-10-28** (docs/m3/EXIT_REVIEW.md: decision A option 1, close and carry; decision B, straight on to M4). Next is M4, production analysis and stripboard (docs/ROADMAP.md). **docs/M4_PLAN.md accepted by the owner 2026-10-28** (A: original SVG charts; B: tags tracked as separate anchored records, ADR at step 3; C: report PDFs/RTF from the core; D: E5 and branch scope wait for M5; E: reports first). Step 1 not started.
 
 ## Completed & Verified
 
@@ -28,5 +28,5 @@ None once the closure commit is made.
 
 ## Next Immediate Step
 
-1. Owner reviews docs/M4_PLAN.md and answers decisions A–E. No M4 code before acceptance. Then step 1: core `reports` (row data per report with scope and source version) and the StoryScry dialog.
+1. M4 step 1: core `reports` (row data per report with scope and source version) and the StoryScry dialog.
 2. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.
