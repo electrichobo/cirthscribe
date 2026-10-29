@@ -4,7 +4,7 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 ## Current stage (2026-10-28)
 
-A working application, not yet released, plus its product brief. M0–M3 (and M1b) are closed by the owner. **Next: M4** (ROADMAP); no plan written yet.
+A working application, not yet released, plus its product brief. M0–M3 (and M1b) are closed by the owner. **Next: M4**, plan proposed (docs/M4_PLAN.md).
 - M3 built planning, episodes, navigator, outline, boards, bible, timeline, evidence board (docs/M3_PLAN.md).
 - Carried (docs/m3/EXIT_REVIEW.md, docs/m2/EXIT_REVIEW.md): the Mac run, external app tests, manual checks.
 
@@ -108,7 +108,7 @@ AI agents take turns on this repository (Claude Code, OpenAI Codex, Google Antig
 ### 1. Startup sequence (read before writing)
 
 At the start of any session, or when asked to "continue" or "pick up where we left off":
-1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M4_PLAN.md`; until written, ROADMAP's M4).
+1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M4_PLAN.md`).
 2. Inspect uncommitted work: run `git status`, `git diff` and `git diff --staged`.
 3. **Stop and summarize** before modifying any file:
    - the uncommitted changes in the working tree;
