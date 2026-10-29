@@ -2344,7 +2344,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
     const ids = new Set(items.map((i) => i.id));
     const want = ["new", "open", "import", "save", "save_as", "export", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
-      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "tags", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
+      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "tags", "comments", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
       "goto_page", "goto_scene", "win_minimize", "win_zoom", "focus_next",
       "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "latency", "updates", "licences", "about",
       ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
@@ -2355,7 +2355,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
     // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
     const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
-    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
+    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", comments: "View > Tools > Comments…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
       goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
       font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
     for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
@@ -3969,6 +3969,117 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(expCross.bytes > 0 && expCross.pages > 0, `Cross out export generated: ${JSON.stringify(expCross)}`);
     assert(existsSync(crossOutPath), `Cross out PDF exists at ${crossOutPath}`);
     assert(expCross.pages >= expOnly.pages, `Cross out pages (${expCross.pages}) >= scenes only pages (${expOnly.pages})`);
+  });
+
+  await test("Comment threads and review (ADR 0005, F1, F2, F3): anchored threads, inline/panel toggle, replies, orphan on text deletion, reattach, and planning undo", async () => {
+    await openFixture("page-boundaries");
+
+    // 1. Open native menu "comments"
+    await app.evaluate("(__cirth.menu('comments'), true)");
+    await waitFor(app, "!document.getElementById('comments-overlay')?.hidden", "Comments dialog opened");
+    await audit("Comments and review dialog");
+    await screenshot(app, "comments-dialog");
+
+    // Check empty state
+    const emptyMsg = await app.evaluate("document.querySelector('#comments-list-container .cirth-comments-empty')?.textContent");
+    assert(emptyMsg && emptyMsg.includes("No comments"), `Empty state displayed: ${emptyMsg}`);
+
+    // Close comments dialog
+    await app.evaluate("(__cirth.comments.close(), true)");
+    await waitFor(app, "document.getElementById('comments-overlay')?.hidden", "Comments dialog closed");
+
+    // 2. Add a comment thread to a block in the script
+    const b0 = await blocks();
+    const actionBlock = b0.find((b) => b.kind === "action" && text(b).length >= 10);
+    assert(actionBlock, "Found action block with at least 10 chars");
+    const quote = text(actionBlock).slice(0, 10);
+
+    const docId = await app.evaluate("window.__cirth.lastOpen?.document_id || null");
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('comments_add_thread', {
+      documentId: ${JSON.stringify(docId)},
+      blockId: ${JSON.stringify(actionBlock.id)},
+      start: 0,
+      end: 10,
+      quote: ${JSON.stringify(quote)},
+      author: 'Script Doctor',
+      text: 'Pacing feels slightly fast in this beat.'
+    })`);
+    await app.evaluate("(__cirth.comments.refresh(), true)");
+
+    // 3. Check inline highlight decoration (.cirth-comment-mark) in the editor
+    await waitFor(app, "document.querySelectorAll('.cirth-comment-mark').length > 0", "Inline comment highlight rendered");
+    const markText = await app.evaluate("document.querySelector('.cirth-comment-mark')?.textContent");
+    assert(markText === quote, `Mark text matches quote: "${markText}" vs "${quote}"`);
+
+    // 4. Reopen comments dialog: verify thread exists with 1 message
+    await app.evaluate("(__cirth.comments.open(), true)");
+    await waitFor(app, "!document.getElementById('comments-overlay')?.hidden", "Comments dialog open");
+    await waitFor(app, "document.querySelectorAll('.cirth-comment-card').length === 1", "One comment thread card rendered");
+
+    const authorText = await app.evaluate("document.querySelector('.cirth-comment-msg-head strong')?.textContent");
+    assert(authorText === "Script Doctor", `Author displayed: ${authorText}`);
+    const msgBody = await app.evaluate("document.querySelector('.cirth-comment-msg-body')?.textContent");
+    assert(msgBody && msgBody.includes("Pacing feels"), `Message text displayed: ${msgBody}`);
+
+    // 5. Add a reply via UI
+    await app.evaluate(`(() => {
+      const input = document.querySelector('.cirth-comment-reply-input');
+      input.value = 'Agreed, will lengthen the pause.';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('.cirth-comment-reply-row button')?.click();
+    })()`);
+    await waitFor(app, "document.querySelectorAll('.cirth-comment-msg').length === 2", "Reply added to thread");
+
+    // 6. F3: Toggle inline view (toggle inline/panel views: same thread ID/replies appear, no duplicate comments)
+    await app.evaluate("(document.getElementById('comments-toggle-inline-btn')?.click(), true)");
+    await waitFor(app, "document.querySelectorAll('.cirth-comment-mark').length === 0", "Inline comment highlights hidden");
+    await app.evaluate("(document.getElementById('comments-toggle-inline-btn')?.click(), true)");
+    await waitFor(app, "document.querySelectorAll('.cirth-comment-mark').length > 0", "Inline comment highlights restored");
+    const threadCount = await app.evaluate("document.querySelectorAll('.cirth-comment-card').length");
+    assert(threadCount === 1, "Toggling inline view creates no duplicate comment threads");
+
+    // 7. Resolve thread
+    await app.evaluate(`(() => {
+      const footerBtns = Array.from(document.querySelectorAll('.cirth-comment-card-footer button'));
+      const resolveBtn = footerBtns.find(b => b.textContent.includes('Resolve'));
+      resolveBtn?.click();
+    })()`);
+    await waitFor(app, "document.querySelector('.cirth-comment-badge')?.textContent === 'Resolved'", "Thread marked resolved");
+    const resolveBtnText = await app.evaluate("Array.from(document.querySelectorAll('.cirth-comment-card-footer button')).find(b => b.textContent.includes('Reopen'))?.textContent");
+    assert(resolveBtnText && resolveBtnText.includes("Reopen"), "Button text changed to Reopen thread");
+
+    // 8. Planning undo reverses resolve
+    await app.evaluate("(document.querySelector('.cirth-comments-toolbar button:nth-child(3)')?.click(), true)");
+    await waitFor(app, "document.querySelector('.cirth-comment-badge')?.textContent === 'Open'", "Planning undo reopened thread");
+
+    // Close comments dialog
+    await app.evaluate("(__cirth.comments.close(), true)");
+
+    // 9. F1: Insert text before the span -> anchor follows
+    const actIdx = b0.findIndex((b) => b.id === actionBlock.id);
+    await setCaret(`[ps[${actIdx}][0] + 1]`);
+    await typeText("Quickly, ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    await waitFor(app, "document.querySelector('.cirth-comment-mark')?.textContent === " + JSON.stringify(quote), "Anchor followed insert before");
+
+    // 10. F2: Delete the referenced text -> thread becomes orphaned with original quote & replies kept
+    await setCaret(`[ps[${actIdx}][0] + 1, ps[${actIdx}][0] + ps[${actIdx}][1] - 1]`);
+    await press("Backspace");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+    await waitFor(app, "document.querySelectorAll('.cirth-comment-mark').length === 0", "Inline mark removed on deletion");
+
+    // Reopen comments dialog and verify orphan card
+    await app.evaluate("(__cirth.comments.open(), true)");
+    await waitFor(app, "document.querySelector('.cirth-comment-badge.badge-orphan')?.textContent === 'Orphaned'", "Thread flagged orphaned");
+    const orphQuote = await app.evaluate("document.querySelector('.cirth-comment-quote')?.textContent");
+    assert(orphQuote && orphQuote.includes(quote), `Orphan preserves original quote: ${orphQuote}`);
+    const orphMsgs = await app.evaluate("document.querySelectorAll('.cirth-comment-msg').length");
+    assert(orphMsgs === 2, `Orphan preserves both thread messages: ${orphMsgs}`);
+
+    // Close comments dialog
+    await app.evaluate("(__cirth.comments.close(), true)");
   });
 
   await app.close();

@@ -27,7 +27,9 @@ The following defaults allow progress without pretending the owner has already s
 | OS support | Owner, 2026-10-26: Windows 10 or later, x64 only (no 32-bit build); macOS 11 Big Sur or later; Linux distribution-agnostic. macOS builds for both Apple Silicon and Intel, since Big Sur runs on both (inferred, not stated by the owner). Distribution-agnostic Linux needs packaging that carries or targets an old enough base (AppImage built on an older distribution, or Flatpak); a binary built on CI's Ubuntu 24.04 needs glibc 2.39 and WebKitGTK 4.1, so it would not run on older distributions. Not yet stated: Windows on ARM | Packaging before the first release |
 | Fonts/dictionaries | Courier Prime (OFL 1.1) for the screenplay profile; non-Latin fallback and dictionaries unselected | Font M0 (done); fallback and dictionaries M1/M2 |
 | Signing/installers | Plan separately; no promise that every release can be signed at no cost | Before distribution |
-| Git-like history | In-app snapshots/branches, no Git installation requirement | M5 implementation ADR |
+| Git-like history | In-app snapshots/branches, no Git installation requirement; branch-isolated snapshots in SQLite (owner, 2026-10-29) | Done (M5) |
+| Alternatives | Block-level alternatives for dialogue, parentheticals, action, headings (owner, 2026-10-29) | Done (M5) |
+| Comments identity | Anonymous by default with optional author name/initials, fully offline (owner, 2026-10-29) | Done (M5) |
 
 ## Later questions that do not block drafting or M0
 

@@ -594,3 +594,92 @@ fn opening_a_v10_project_adds_empty_breakdown_tags_and_maps_anchors_through_edit
     }
 }
 
+#[test]
+fn opening_a_v11_project_adds_empty_comment_threads_and_maps_anchors_through_edits() {
+    use cirth_core::comments::{CommentMessage, CommentThread};
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v11-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v11-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 11, "fixture must be schema v11");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(11));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v11 copy kept");
+        let mut s = o.store;
+        assert!(s.comment_threads().unwrap().is_empty(), "upgraded projects start with no comment threads");
+
+        let doc_id = s.current_document().unwrap();
+        let before = s.load().unwrap();
+        let target = before.blocks.iter().find(|b| b.text().chars().count() >= 5).unwrap().clone();
+        let quote: String = target.text().chars().take(5).collect();
+
+        let thread = CommentThread {
+            id: "ct-1".into(),
+            document_id: doc_id.clone(),
+            block_id: target.id.clone(),
+            start: 0,
+            end: 5,
+            quote: quote.clone(),
+            author: "".into(),
+            created_at: "2026-10-29T15:00:00Z".into(),
+            resolved: false,
+            orphaned: false,
+        };
+        let msg = CommentMessage {
+            id: "cm-1".into(),
+            thread_id: "ct-1".into(),
+            author: "Anonymous".into(),
+            text: "Check this opening line".into(),
+            created_at: "2026-10-29T15:00:00Z".into(),
+            edited_at: None,
+        };
+
+        let mut h = PlanningHistory::default();
+        let v = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::PutCommentThread { thread: thread.clone(), initial_message: Some(msg.clone()) }, v).unwrap();
+
+        let list = s.comment_threads().unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].thread, thread);
+        assert_eq!(list[0].messages, vec![msg.clone()]);
+
+        // Insert text before the target block: 4 chars "Hey "
+        let mut edited = target.clone();
+        edited.runs = vec![cirth_core::model::Run::plain(format!("Hey {}", target.text()))];
+        let sv = s.version().unwrap();
+        s.apply(&Batch { tx_id: "edit-cm-pre".into(), base_version: sv, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: edited }] }).unwrap();
+
+        let shifted = s.comment_thread("ct-1").unwrap().unwrap();
+        assert_eq!((shifted.thread.start, shifted.thread.end, shifted.thread.quote.as_str(), shifted.thread.orphaned), (4, 9, quote.as_str(), false));
+
+        // Add a reply message via PlanningOp
+        let reply = CommentMessage {
+            id: "cm-2".into(),
+            thread_id: "ct-1".into(),
+            author: "Editor".into(),
+            text: "Looks good to me".into(),
+            created_at: "2026-10-29T15:05:00Z".into(),
+            edited_at: None,
+        };
+        let pv = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::PutCommentMessage(reply.clone()), pv).unwrap();
+        let updated = s.comment_thread("ct-1").unwrap().unwrap();
+        assert_eq!(updated.messages.len(), 2);
+
+        // Resolve thread
+        let pv = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::SetCommentThreadResolved { thread_id: "ct-1".into(), resolved: true }, pv).unwrap();
+        assert!(s.comment_thread("ct-1").unwrap().unwrap().thread.resolved);
+
+        // Undo resolve
+        h.undo(&s).unwrap();
+        assert!(!s.comment_thread("ct-1").unwrap().unwrap().thread.resolved);
+
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}
+

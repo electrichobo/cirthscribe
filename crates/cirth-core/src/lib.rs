@@ -1,5 +1,6 @@
 pub mod backup;
 pub mod bible;
+pub mod comments;
 pub mod compat;
 pub mod compat_m4;
 pub mod docx;

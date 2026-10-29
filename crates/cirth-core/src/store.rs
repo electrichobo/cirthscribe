@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 11;
+pub const SCHEMA_VERSION: i64 = 12;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -325,6 +325,37 @@ fn migrate_v11(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v11 -> v12: anchored comment threads and messages (M5 step 1, comments.rs).
+/// Offsets (`start_char`, `end_char`) are in Unicode scalar values.
+/// Projects start with no comment threads.
+fn migrate_v12(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE comment_threads (
+          id TEXT PRIMARY KEY,
+          document_id TEXT NOT NULL,
+          block_id TEXT NOT NULL,
+          start_char INTEGER NOT NULL,
+          end_char INTEGER NOT NULL,
+          quote TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          resolved INTEGER NOT NULL DEFAULT 0,
+          orphaned INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX comment_threads_doc_block ON comment_threads(document_id, block_id);
+        CREATE TABLE comment_messages (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT '',
+          text TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          edited_at TEXT
+        );
+        CREATE INDEX comment_messages_thread ON comment_messages(thread_id);",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -339,6 +370,7 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (9, migrate_v9),
     (10, migrate_v10),
     (11, migrate_v11),
+    (12, migrate_v12),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
@@ -1079,6 +1111,193 @@ impl Store {
         self.mark_unsaved()
     }
 
+    // --- Comments (M5 step 1, comments.rs) --------------------------------
+
+    pub fn comment_threads(&self) -> Result<Vec<crate::comments::CommentThreadWithMessages>> {
+        self.comment_threads_of(&self.current_document()?)
+    }
+
+    pub fn comment_threads_of(&self, document_id: &str) -> Result<Vec<crate::comments::CommentThreadWithMessages>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned
+             FROM comment_threads WHERE document_id = ?1 ORDER BY block_id, start_char, end_char, id",
+        )?;
+        let threads = stmt
+            .query_map([document_id], |r| {
+                Ok(crate::comments::CommentThread {
+                    id: r.get(0)?,
+                    document_id: r.get(1)?,
+                    block_id: r.get(2)?,
+                    start: r.get::<_, i64>(3)?.max(0) as usize,
+                    end: r.get::<_, i64>(4)?.max(0) as usize,
+                    quote: r.get(5)?,
+                    author: r.get(6)?,
+                    created_at: r.get(7)?,
+                    resolved: r.get::<_, i64>(8)? != 0,
+                    orphaned: r.get::<_, i64>(9)? != 0,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let mut out = Vec::with_capacity(threads.len());
+        for t in threads {
+            let msgs = self.comment_messages_of(&t.id)?;
+            out.push(crate::comments::CommentThreadWithMessages { thread: t, messages: msgs });
+        }
+        Ok(out)
+    }
+
+    pub fn comment_thread(&self, thread_id: &str) -> Result<Option<crate::comments::CommentThreadWithMessages>> {
+        let t = self
+            .conn
+            .query_row(
+                "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned
+                 FROM comment_threads WHERE id = ?1",
+                [thread_id],
+                |r| {
+                    Ok(crate::comments::CommentThread {
+                        id: r.get(0)?,
+                        document_id: r.get(1)?,
+                        block_id: r.get(2)?,
+                        start: r.get::<_, i64>(3)?.max(0) as usize,
+                        end: r.get::<_, i64>(4)?.max(0) as usize,
+                        quote: r.get(5)?,
+                        author: r.get(6)?,
+                        created_at: r.get(7)?,
+                        resolved: r.get::<_, i64>(8)? != 0,
+                        orphaned: r.get::<_, i64>(9)? != 0,
+                    })
+                },
+            )
+            .optional()?;
+        match t {
+            Some(thread) => {
+                let messages = self.comment_messages_of(&thread.id)?;
+                Ok(Some(crate::comments::CommentThreadWithMessages { thread, messages }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub fn comment_messages_of(&self, thread_id: &str) -> Result<Vec<crate::comments::CommentMessage>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, thread_id, author, text, created_at, edited_at
+             FROM comment_messages WHERE thread_id = ?1 ORDER BY created_at, id",
+        )?;
+        let rows = stmt.query_map([thread_id], |r| {
+            Ok(crate::comments::CommentMessage {
+                id: r.get(0)?,
+                thread_id: r.get(1)?,
+                author: r.get(2)?,
+                text: r.get(3)?,
+                created_at: r.get(4)?,
+                edited_at: r.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub fn put_comment_thread(
+        &self,
+        thread: &crate::comments::CommentThread,
+        initial_message: Option<&crate::comments::CommentMessage>,
+    ) -> Result<()> {
+        if thread.id.trim().is_empty() || thread.document_id.trim().is_empty() || thread.block_id.trim().is_empty() {
+            return Err(StoreError::Invalid("thread needs id, document_id and block_id".into()));
+        }
+        self.conn.execute(
+            "INSERT OR REPLACE INTO comment_threads(id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                thread.id,
+                thread.document_id,
+                thread.block_id,
+                thread.start as i64,
+                thread.end as i64,
+                thread.quote,
+                thread.author,
+                thread.created_at,
+                thread.resolved as i64,
+                thread.orphaned as i64
+            ],
+        )?;
+        if let Some(msg) = initial_message {
+            self.put_comment_message(msg)?;
+        }
+        self.mark_unsaved()
+    }
+
+    pub fn put_comment_message(&self, message: &crate::comments::CommentMessage) -> Result<()> {
+        if message.id.trim().is_empty() || message.thread_id.trim().is_empty() {
+            return Err(StoreError::Invalid("comment message needs id and thread_id".into()));
+        }
+        self.conn.execute(
+            "INSERT OR REPLACE INTO comment_messages(id, thread_id, author, text, created_at, edited_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                message.id,
+                message.thread_id,
+                message.author,
+                message.text,
+                message.created_at,
+                message.edited_at
+            ],
+        )?;
+        self.mark_unsaved()
+    }
+
+    pub fn set_comment_thread_resolved(&self, thread_id: &str, resolved: bool) -> Result<()> {
+        let count = self.conn.execute(
+            "UPDATE comment_threads SET resolved = ?2 WHERE id = ?1",
+            params![thread_id, resolved as i64],
+        )?;
+        if count == 0 {
+            return Err(StoreError::Invalid(format!("no comment thread {thread_id}")));
+        }
+        self.mark_unsaved()
+    }
+
+    pub fn set_comment_thread_anchor(
+        &self,
+        thread_id: &str,
+        block_id: &str,
+        start: usize,
+        end: usize,
+        quote: &str,
+        orphaned: bool,
+    ) -> Result<()> {
+        let count = self.conn.execute(
+            "UPDATE comment_threads SET block_id = ?2, start_char = ?3, end_char = ?4, quote = ?5, orphaned = ?6 WHERE id = ?1",
+            params![thread_id, block_id, start as i64, end as i64, quote, orphaned as i64],
+        )?;
+        if count == 0 {
+            return Err(StoreError::Invalid(format!("no comment thread {thread_id}")));
+        }
+        self.mark_unsaved()
+    }
+
+    pub fn reattach_comment_thread(
+        &self,
+        thread_id: &str,
+        block_id: &str,
+        start: usize,
+        end: usize,
+        quote: &str,
+    ) -> Result<()> {
+        self.set_comment_thread_anchor(thread_id, block_id, start, end, quote, false)
+    }
+
+    pub fn delete_comment_thread(&self, thread_id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM comment_messages WHERE thread_id = ?1", [thread_id])?;
+        self.conn.execute("DELETE FROM comment_threads WHERE id = ?1", [thread_id])?;
+        self.mark_unsaved()
+    }
+
+    pub fn delete_comment_message(&self, message_id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM comment_messages WHERE id = ?1", [message_id])?;
+        self.mark_unsaved()
+    }
+
     /// Names the writer said are not entries ("kind", "NAME").
     pub fn rejected(&self) -> Result<std::collections::HashSet<(String, String)>> {
         let mut stmt = self.conn.prepare("SELECT kind, name FROM bible_rejected")?;
@@ -1276,18 +1495,33 @@ impl Store {
             return Err(StoreError::Invalid(format!("unknown document {doc}")));
         }
         let doc_tags = load_doc_tags(&tx, &doc)?;
-        let before_blocks = if doc_tags.is_empty() { std::collections::HashMap::new() } else { load_doc_block_texts(&tx, &doc)? };
+        let doc_comments = load_doc_comments(&tx, &doc)?;
+        let before_blocks = if doc_tags.is_empty() && doc_comments.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            load_doc_block_texts(&tx, &doc)?
+        };
         let next = current + 1;
         for op in &batch.ops {
             apply_op(&tx, &doc, op, next)?;
         }
-        if !doc_tags.is_empty() {
+        if !doc_tags.is_empty() || !doc_comments.is_empty() {
             let after_blocks = load_doc_block_texts(&tx, &doc)?;
-            for t in crate::tags::map_tags_through_batch(&doc_tags, &before_blocks, &after_blocks, &batch.ops) {
-                tx.execute(
-                    "UPDATE breakdown_tags SET block_id = ?2, start_char = ?3, end_char = ?4, quote = ?5, orphaned = ?6 WHERE id = ?1",
-                    params![t.id, t.block_id, t.start as i64, t.end as i64, t.quote, t.orphaned as i64],
-                )?;
+            if !doc_tags.is_empty() {
+                for t in crate::tags::map_tags_through_batch(&doc_tags, &before_blocks, &after_blocks, &batch.ops) {
+                    tx.execute(
+                        "UPDATE breakdown_tags SET block_id = ?2, start_char = ?3, end_char = ?4, quote = ?5, orphaned = ?6 WHERE id = ?1",
+                        params![t.id, t.block_id, t.start as i64, t.end as i64, t.quote, t.orphaned as i64],
+                    )?;
+                }
+            }
+            if !doc_comments.is_empty() {
+                for c in crate::comments::map_comments_through_batch(&doc_comments, &before_blocks, &after_blocks, &batch.ops) {
+                    tx.execute(
+                        "UPDATE comment_threads SET block_id = ?2, start_char = ?3, end_char = ?4, quote = ?5, orphaned = ?6 WHERE id = ?1",
+                        params![c.id, c.block_id, c.start as i64, c.end as i64, c.quote, c.orphaned as i64],
+                    )?;
+                }
             }
         }
         Self::set_meta(&tx, "version", &next.to_string())?;
@@ -1530,6 +1764,87 @@ impl Store {
                 });
                 self.set_schedule(scope, state)?;
                 PlanningOp::SetSchedule { scope: scope.clone(), state: before }
+            }
+            PlanningOp::PutCommentThread { thread, initial_message } => {
+                let before = self.comment_thread(&thread.id)?;
+                self.put_comment_thread(thread, initial_message.as_ref())?;
+                match before {
+                    Some(old) => PlanningOp::RestoreCommentThread { thread: old.thread, messages: old.messages },
+                    None => PlanningOp::DeleteCommentThread(thread.id.clone()),
+                }
+            }
+            PlanningOp::DeleteCommentThread(id) => {
+                let Some(old) = self.comment_thread(id)? else {
+                    return Err(StoreError::Invalid(format!("no comment thread {id}")));
+                };
+                self.delete_comment_thread(id)?;
+                PlanningOp::RestoreCommentThread { thread: old.thread, messages: old.messages }
+            }
+            PlanningOp::RestoreCommentThread { thread, messages } => {
+                self.put_comment_thread(thread, None)?;
+                for m in messages {
+                    self.put_comment_message(m)?;
+                }
+                PlanningOp::DeleteCommentThread(thread.id.clone())
+            }
+            PlanningOp::PutCommentMessage(m) => {
+                let before = self.conn.query_row(
+                    "SELECT id, thread_id, author, text, created_at, edited_at FROM comment_messages WHERE id = ?1",
+                    [&m.id],
+                    |r| Ok(crate::comments::CommentMessage {
+                        id: r.get(0)?,
+                        thread_id: r.get(1)?,
+                        author: r.get(2)?,
+                        text: r.get(3)?,
+                        created_at: r.get(4)?,
+                        edited_at: r.get(5)?,
+                    }),
+                ).optional()?;
+                self.put_comment_message(m)?;
+                match before {
+                    Some(old) => PlanningOp::PutCommentMessage(old),
+                    None => PlanningOp::DeleteCommentMessage(m.id.clone()),
+                }
+            }
+            PlanningOp::DeleteCommentMessage(id) => {
+                let before = self.conn.query_row(
+                    "SELECT id, thread_id, author, text, created_at, edited_at FROM comment_messages WHERE id = ?1",
+                    [id],
+                    |r| Ok(crate::comments::CommentMessage {
+                        id: r.get(0)?,
+                        thread_id: r.get(1)?,
+                        author: r.get(2)?,
+                        text: r.get(3)?,
+                        created_at: r.get(4)?,
+                        edited_at: r.get(5)?,
+                    }),
+                ).optional()?;
+                let Some(old) = before else {
+                    return Err(StoreError::Invalid(format!("no comment message {id}")));
+                };
+                self.delete_comment_message(id)?;
+                PlanningOp::PutCommentMessage(old)
+            }
+            PlanningOp::SetCommentThreadResolved { thread_id, resolved } => {
+                let old = self.comment_thread(thread_id)?;
+                let was = old.as_ref().map(|t| t.thread.resolved).unwrap_or(false);
+                self.set_comment_thread_resolved(thread_id, *resolved)?;
+                PlanningOp::SetCommentThreadResolved { thread_id: thread_id.clone(), resolved: was }
+            }
+            PlanningOp::ReattachCommentThread { thread_id, block_id, start, end, quote, orphaned } => {
+                let old = self.comment_thread(thread_id)?;
+                let Some(old) = old else {
+                    return Err(StoreError::Invalid(format!("no comment thread {thread_id}")));
+                };
+                self.set_comment_thread_anchor(thread_id, block_id, *start, *end, quote, *orphaned)?;
+                PlanningOp::ReattachCommentThread {
+                    thread_id: thread_id.clone(),
+                    block_id: old.thread.block_id,
+                    start: old.thread.start,
+                    end: old.thread.end,
+                    quote: old.thread.quote,
+                    orphaned: old.thread.orphaned,
+                }
             }
             PlanningOp::DeleteBeat(id) => {
                 let Some(old) = self.beat(id)? else {
@@ -1871,6 +2186,28 @@ fn load_doc_tags(tx: &Connection, doc: &str) -> Result<Vec<crate::tags::Tag>> {
             category: r.get(6)?,
             entity_id: r.get(7)?,
             note: r.get(8)?,
+            orphaned: r.get::<_, i64>(9)? != 0,
+        })
+    })?;
+    Ok(rows.collect::<std::result::Result<_, _>>()?)
+}
+
+fn load_doc_comments(tx: &Connection, doc: &str) -> Result<Vec<crate::comments::CommentThread>> {
+    let mut stmt = tx.prepare(
+        "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned
+         FROM comment_threads WHERE document_id = ?1 ORDER BY block_id, start_char, end_char, id",
+    )?;
+    let rows = stmt.query_map([doc], |r| {
+        Ok(crate::comments::CommentThread {
+            id: r.get(0)?,
+            document_id: r.get(1)?,
+            block_id: r.get(2)?,
+            start: r.get::<_, i64>(3)?.max(0) as usize,
+            end: r.get::<_, i64>(4)?.max(0) as usize,
+            quote: r.get(5)?,
+            author: r.get(6)?,
+            created_at: r.get(7)?,
+            resolved: r.get::<_, i64>(8)? != 0,
             orphaned: r.get::<_, i64>(9)? != 0,
         })
     })?;

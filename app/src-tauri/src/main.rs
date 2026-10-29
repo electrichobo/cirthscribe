@@ -468,6 +468,250 @@ async fn add_tag_category(app: State<'_, App>, label: String) -> Result<(String,
     with_session(&app, |s| s.store.add_tag_category(&label).map_err(err))
 }
 
+// --- Comment threads (M5 step 1, ROADMAP M5, comments.rs) -----------------------
+
+#[derive(Serialize)]
+struct CommentThreadView {
+    #[serde(flatten)]
+    thread: cirth_core::comments::CommentThread,
+    messages: Vec<cirth_core::comments::CommentMessage>,
+    scene_id: Option<String>,
+    scene_number: Option<String>,
+    heading: String,
+    document_title: String,
+}
+
+#[derive(Serialize)]
+struct CommentsState {
+    threads: Vec<CommentThreadView>,
+    planning_version: u64,
+    can_undo: bool,
+    can_redo: bool,
+}
+
+fn comments_state_for(s: &Session, filter_doc: Option<&str>) -> Result<CommentsState, String> {
+    let all = s.store.all_documents().map_err(err)?;
+    let mut block_scene: std::collections::HashMap<(String, String), (Option<String>, Option<String>, String, String)> =
+        std::collections::HashMap::new();
+    let mut doc_titles = std::collections::HashMap::new();
+    for (doc_id, doc_title, blocks) in &all {
+        doc_titles.insert(doc_id.clone(), doc_title.clone());
+        let locked_nums = s.store.scene_numbers(doc_id).map_err(err)?;
+        let mut auto_idx = 0usize;
+        let mut cur_scene: Option<String> = None;
+        let mut cur_num: Option<String> = None;
+        let mut cur_heading = String::new();
+        for b in blocks {
+            if b.kind == cirth_core::model::BlockKind::Heading {
+                cur_scene = b.scene_id.clone();
+                cur_heading = b.text();
+                if let Some(sid) = &cur_scene {
+                    if let Some(sn) = locked_nums.get(sid) {
+                        cur_num = Some(sn.number.clone());
+                    } else {
+                        auto_idx += 1;
+                        cur_num = Some(auto_idx.to_string());
+                    }
+                } else {
+                    cur_num = None;
+                }
+            }
+            block_scene.insert(
+                (doc_id.clone(), b.id.clone()),
+                (cur_scene.clone(), cur_num.clone(), cur_heading.clone(), doc_title.clone()),
+            );
+        }
+    }
+
+    let raw_threads = if let Some(doc_id) = filter_doc {
+        s.store.comment_threads_of(doc_id).map_err(err)?
+    } else {
+        let mut list = Vec::new();
+        for (doc_id, _, _) in &all {
+            list.extend(s.store.comment_threads_of(doc_id).map_err(err)?);
+        }
+        list
+    };
+
+    let threads = raw_threads
+        .into_iter()
+        .map(|twm| {
+            let (scene_id, scene_number, heading, document_title) = block_scene
+                .get(&(twm.thread.document_id.clone(), twm.thread.block_id.clone()))
+                .cloned()
+                .unwrap_or_else(|| {
+                    (
+                        None,
+                        None,
+                        String::new(),
+                        doc_titles.get(&twm.thread.document_id).cloned().unwrap_or_default(),
+                    )
+                });
+            CommentThreadView {
+                thread: twm.thread,
+                messages: twm.messages,
+                scene_id,
+                scene_number,
+                heading,
+                document_title,
+            }
+        })
+        .collect();
+
+    Ok(CommentsState {
+        threads,
+        planning_version: s.store.planning_version().map_err(err)?,
+        can_undo: s.planning.can_undo(),
+        can_redo: s.planning.can_redo(),
+    })
+}
+
+fn comment_now_iso() -> String {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let s = cirth_core::backup::utc_stamp(secs);
+    format!("{}-{}-{}T{}:{}:{}Z", &s[0..4], &s[4..6], &s[6..8], &s[9..11], &s[11..13], &s[13..15])
+}
+
+#[tauri::command]
+async fn comments_state(app: State<'_, App>, document_id: Option<String>) -> Result<CommentsState, String> {
+    with_session(&app, |s| comments_state_for(s, document_id.as_deref()))
+}
+
+#[tauri::command]
+async fn comments_add_thread(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    block_id: String,
+    start: usize,
+    end: usize,
+    quote: String,
+    author: String,
+    text: String,
+) -> Result<CommentsState, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let thread_id = cirth_core::model::new_id();
+        let created_at = comment_now_iso();
+        let thread = cirth_core::comments::CommentThread {
+            id: thread_id.clone(),
+            document_id: doc_id.clone(),
+            block_id,
+            start,
+            end,
+            quote,
+            author: author.clone(),
+            created_at: created_at.clone(),
+            resolved: false,
+            orphaned: false,
+        };
+        let initial_message = if !text.trim().is_empty() {
+            Some(cirth_core::comments::CommentMessage {
+                id: cirth_core::model::new_id(),
+                thread_id,
+                author,
+                text,
+                created_at,
+                edited_at: None,
+            })
+        } else {
+            None
+        };
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::PutCommentThread { thread, initial_message }, pv).map_err(err)?;
+        comments_state_for(s, Some(&doc_id))
+    })
+}
+
+#[tauri::command]
+async fn comments_add_reply(
+    app: State<'_, App>,
+    thread_id: String,
+    author: String,
+    text: String,
+) -> Result<CommentsState, String> {
+    with_session(&app, |s| {
+        let msg = cirth_core::comments::CommentMessage {
+            id: cirth_core::model::new_id(),
+            thread_id,
+            author,
+            text,
+            created_at: comment_now_iso(),
+            edited_at: None,
+        };
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::PutCommentMessage(msg), pv).map_err(err)?;
+        let cur_doc = s.store.current_document().map_err(err)?;
+        comments_state_for(s, Some(&cur_doc))
+    })
+}
+
+#[tauri::command]
+async fn comments_set_resolved(
+    app: State<'_, App>,
+    thread_id: String,
+    resolved: bool,
+) -> Result<CommentsState, String> {
+    with_session(&app, |s| {
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::SetCommentThreadResolved { thread_id, resolved }, pv).map_err(err)?;
+        let cur_doc = s.store.current_document().map_err(err)?;
+        comments_state_for(s, Some(&cur_doc))
+    })
+}
+
+#[tauri::command]
+async fn comments_reattach(
+    app: State<'_, App>,
+    thread_id: String,
+    block_id: String,
+    start: usize,
+    end: usize,
+    quote: String,
+) -> Result<CommentsState, String> {
+    with_session(&app, |s| {
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::ReattachCommentThread {
+            thread_id,
+            block_id,
+            start,
+            end,
+            quote,
+            orphaned: false,
+        }, pv).map_err(err)?;
+        let cur_doc = s.store.current_document().map_err(err)?;
+        comments_state_for(s, Some(&cur_doc))
+    })
+}
+
+#[tauri::command]
+async fn comments_delete_thread(
+    app: State<'_, App>,
+    thread_id: String,
+) -> Result<CommentsState, String> {
+    with_session(&app, |s| {
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::DeleteCommentThread(thread_id), pv).map_err(err)?;
+        let cur_doc = s.store.current_document().map_err(err)?;
+        comments_state_for(s, Some(&cur_doc))
+    })
+}
+
+#[tauri::command]
+async fn comments_delete_message(
+    app: State<'_, App>,
+    message_id: String,
+) -> Result<CommentsState, String> {
+    with_session(&app, |s| {
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::DeleteCommentMessage(message_id), pv).map_err(err)?;
+        let cur_doc = s.store.current_document().map_err(err)?;
+        comments_state_for(s, Some(&cur_doc))
+    })
+}
+
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
 
 #[tauri::command]
@@ -2465,6 +2709,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("stripboard", "Stripboard…")
         .text("sides", "Character Sides…")
         .text("tags", "Breakdown Tags…")
+        .text("comments", "Comments…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
         .text("evidence", "Evidence Board…")
@@ -2788,6 +3033,13 @@ fn main() {
             export_report,
             tags_state,
             add_tag_category,
+            comments_state,
+            comments_add_thread,
+            comments_add_reply,
+            comments_set_resolved,
+            comments_reattach,
+            comments_delete_thread,
+            comments_delete_message,
             bible_state,
             timeline_state,
             evidence_state,

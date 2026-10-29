@@ -36,7 +36,7 @@ pub fn readable_utc(secs: u64) -> String {
 }
 
 /// UTC civil date and time from Unix seconds (proleptic Gregorian).
-pub(crate) fn utc_stamp(secs: u64) -> String {
+pub fn utc_stamp(secs: u64) -> String {
     let days = (secs / 86_400) as i64;
     let rem = secs % 86_400;
     // Howard Hinnant's days-to-civil algorithm.

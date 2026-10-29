@@ -951,6 +951,138 @@ fn breakdown_tags_map_across_edits_splits_joins_omitted_scenes_and_orphans() {
 }
 
 #[test]
+fn comment_threads_follow_anchors_across_edits_moves_splits_and_orphans() {
+    use cirth_core::comments::{CommentMessage, CommentThread};
+    use cirth_core::model::Run;
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+
+    let d = tmpdir("comments-anchor-test");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    let doc_id = s.default_document().unwrap();
+
+    let h1 = Block { id: "h1".into(), scene_id: Some("sc-1".into()), ..Block::new(BlockKind::Heading, "INT. CAFE - DAY") };
+    let a1 = Block { id: "a1".into(), ..Block::new(BlockKind::Action, "Mara holds the envelope. She opens it slowly.") };
+    let h2 = Block { id: "h2".into(), scene_id: Some("sc-2".into()), ..Block::new(BlockKind::Heading, "EXT. STREET - NIGHT") };
+    let a2 = Block { id: "a2".into(), ..Block::new(BlockKind::Action, "The rain beats down on the pavement.") };
+
+    s.seed(&cirth_core::model::Document {
+        title: "Comments Test".into(),
+        version: 0,
+        blocks: vec![h1.clone(), a1.clone(), h2.clone(), a2.clone()],
+    }).unwrap();
+
+    // Attach comment thread to "the envelope" (start=11, end=23) in block a1.
+    let thread = CommentThread {
+        id: "ct-env".into(),
+        document_id: doc_id.clone(),
+        block_id: "a1".into(),
+        start: 11,
+        end: 23,
+        quote: "the envelope".into(),
+        author: "".into(),
+        created_at: "2026-10-29T15:00:00Z".into(),
+        resolved: false,
+        orphaned: false,
+    };
+    let msg1 = CommentMessage {
+        id: "cm-1".into(),
+        thread_id: "ct-env".into(),
+        author: "".into(),
+        text: "Is this the blue envelope?".into(),
+        created_at: "2026-10-29T15:00:00Z".into(),
+        edited_at: None,
+    };
+
+    let mut ph = PlanningHistory::default();
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::PutCommentThread { thread: thread.clone(), initial_message: Some(msg1.clone()) }, pv).unwrap();
+
+    // 1. Insert text before the span: "Cautiously, " (12 chars) -> shifts anchor from 11..23 to 23..35.
+    let a1_pre = Block { id: "a1".into(), runs: vec![Run::plain("Cautiously, Mara holds the envelope. She opens it slowly.")], ..a1.clone() };
+    let v = s.version().unwrap();
+    s.apply(&Batch { tx_id: "ins-pre".into(), base_version: v, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: a1_pre.clone() }] }).unwrap();
+    let ct = s.comment_thread("ct-env").unwrap().unwrap();
+    assert_eq!((ct.thread.start, ct.thread.end, ct.thread.quote.as_str(), ct.thread.orphaned), (23, 35, "the envelope", false));
+
+    // 2. Move scene 2 before scene 1 (moving scene around the block preserves thread anchor).
+    let v = s.version().unwrap();
+    s.apply(&Batch {
+        tx_id: "move-scene".into(),
+        base_version: v,
+        document_id: Some(doc_id.clone()),
+        ops: vec![
+            Op::Delete { id: "h2".into() },
+            Op::Delete { id: "a2".into() },
+            Op::Put { block: h2.clone(), after: None },
+            Op::Put { block: a2.clone(), after: Some("h2".into()) },
+        ],
+    }).unwrap();
+    let ct = s.comment_thread("ct-env").unwrap().unwrap();
+    assert_eq!((ct.thread.start, ct.thread.end, ct.thread.block_id.as_str()), (23, 35, "a1"));
+
+    // 3. Split block a1: split into "Cautiously, Mara holds " (a1) and "the envelope. She opens it slowly." (a1_split).
+    // The anchor "the envelope" moves to a1_split at start 0.
+    let a1_split_pre = Block { id: "a1".into(), runs: vec![Run::plain("Cautiously, Mara holds ")], ..a1.clone() };
+    let a1_split_post = Block { id: "a1_post".into(), ..Block::new(BlockKind::Action, "the envelope. She opens it slowly.") };
+    let v = s.version().unwrap();
+    s.apply(&Batch {
+        tx_id: "split-a1".into(),
+        base_version: v,
+        document_id: Some(doc_id.clone()),
+        ops: vec![
+            Op::Update { block: a1_split_pre },
+            Op::Put { block: a1_split_post.clone(), after: Some("a1".into()) },
+        ],
+    }).unwrap();
+    let ct = s.comment_thread("ct-env").unwrap().unwrap();
+    assert_eq!((ct.thread.block_id.as_str(), ct.thread.start, ct.thread.end, ct.thread.quote.as_str(), ct.thread.orphaned), ("a1_post", 0, 12, "the envelope", false));
+
+    // 4. Delete the referenced text (Acceptance F2).
+    let a1_del_text = Block { id: "a1_post".into(), runs: vec![Run::plain("She opens it slowly.")], ..a1_split_post.clone() };
+    let v = s.version().unwrap();
+    s.apply(&Batch { tx_id: "del-quote".into(), base_version: v, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: a1_del_text }] }).unwrap();
+    let ct_orph = s.comment_thread("ct-env").unwrap().unwrap();
+    assert!(ct_orph.thread.orphaned);
+    assert_eq!(ct_orph.thread.quote, "the envelope");
+    assert_eq!(ct_orph.messages.len(), 1); // replies preserved
+
+    // Add a reply message to the orphaned thread
+    let msg2 = CommentMessage {
+        id: "cm-2".into(),
+        thread_id: "ct-env".into(),
+        author: "".into(),
+        text: "Text was cut, need to reattach elsewhere".into(),
+        created_at: "2026-10-29T15:10:00Z".into(),
+        edited_at: None,
+    };
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::PutCommentMessage(msg2), pv).unwrap();
+    assert_eq!(s.comment_thread("ct-env").unwrap().unwrap().messages.len(), 2);
+
+    // 5. Reattach option (Acceptance F2).
+    // Reattach to "the pavement" (start=25, end=37) in a2.
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::ReattachCommentThread {
+        thread_id: "ct-env".into(),
+        block_id: "a2".into(),
+        start: 25,
+        end: 37,
+        quote: "the pavement".into(),
+        orphaned: false,
+    }, pv).unwrap();
+
+    let ct_reattached = s.comment_thread("ct-env").unwrap().unwrap();
+    assert!(!ct_reattached.thread.orphaned);
+    assert_eq!((ct_reattached.thread.block_id.as_str(), ct_reattached.thread.start, ct_reattached.thread.end, ct_reattached.thread.quote.as_str()), ("a2", 25, 37, "the pavement"));
+
+    // Undo the reattach restores orphan state.
+    ph.undo(&s).unwrap();
+    let ct_undone = s.comment_thread("ct-env").unwrap().unwrap();
+    assert!(ct_undone.thread.orphaned);
+    assert_eq!(ct_undone.thread.quote, "the envelope");
+}
+
+#[test]
 fn stripboard_scheduling_order_is_independent_and_omitted_scenes_are_flagged() {
     use cirth_core::planning::{PlanningHistory, PlanningOp};
     use cirth_core::reports::ReportScope;

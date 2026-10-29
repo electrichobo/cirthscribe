@@ -47,6 +47,7 @@ import { createStoryScry, type ExportableReport, type ReportBundle, type ReportE
 import { createStripboard } from "./stripboard";
 import { createCharacterSides } from "./sides";
 import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
+import { createCommentsDialog, commentsPlugin } from "./comments";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -720,6 +721,11 @@ const breakdownTags = createBreakdownTags({
   go: (doc, block, s, e) => void goToTagSpan(doc, block, s, e),
   newId,
 });
+const commentsDialog = createCommentsDialog({
+  getView: () => view ?? null,
+  getDocumentId: () => lastOpen?.document_id ?? null,
+  jumpToBlock: (blockId) => void goToTagSpan(lastOpen?.document_id ?? "", blockId, 0, 0),
+});
 const bookmarks = createBookmarks({
   list: async () => {
     const st = await invoke<{ bookmarks: { id: string; name: string; document_id: string; block_id: string }[] }>("evidence_state");
@@ -873,6 +879,7 @@ function makeState(blocks: Block[]) {
       dualPlugin(),
       revisionsPlugin(),
       tagsPlugin(),
+      commentsPlugin(),
     ],
   });
 }
@@ -936,8 +943,10 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
     schedulePaginate();
     scheduleCounts(true);
     void refreshTagDecorations();
+    void commentsDialog.refresh();
   };
   void refreshTagDecorations();
+  void commentsDialog.refresh();
   docCounts = null;
   scheduleCounts(true);
   void spell.onOpen($("spelling") as HTMLSelectElement).then(syncMenuChecks);
@@ -1585,6 +1594,9 @@ async function runMenu(id: string): Promise<void> {
     case "tags":
       if (lastOpen) await breakdownTags.open();
       break;
+    case "comments":
+      if (lastOpen) await commentsDialog.open();
+      break;
     case "project_tree":
       if (lastOpen) await projectTree.open();
       break;
@@ -2026,6 +2038,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   stripboard,
   characterSides,
   tags: breakdownTags,
+  comments: commentsDialog,
   bible,
   timeline,
   evidence,

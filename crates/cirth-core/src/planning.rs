@@ -44,6 +44,14 @@ pub enum PlanningOp {
     DeleteTag(String),
     /// Stripboard schedule order, day breaks, banners and notes (M4 step 5, E3, E4).
     SetSchedule { scope: String, state: crate::stripboard::ScheduleState },
+    /// Anchored comment threads and messages (M5 step 1, ROADMAP M5, ACCEPTANCE F1-F3).
+    PutCommentThread { thread: crate::comments::CommentThread, initial_message: Option<crate::comments::CommentMessage> },
+    DeleteCommentThread(String),
+    RestoreCommentThread { thread: crate::comments::CommentThread, messages: Vec<crate::comments::CommentMessage> },
+    PutCommentMessage(crate::comments::CommentMessage),
+    DeleteCommentMessage(String),
+    SetCommentThreadResolved { thread_id: String, resolved: bool },
+    ReattachCommentThread { thread_id: String, block_id: String, start: usize, end: usize, quote: String, orphaned: bool },
 }
 
 #[derive(Clone, Debug)]
