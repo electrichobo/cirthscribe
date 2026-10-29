@@ -155,20 +155,22 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
     let mut out = BufWriter::new(Vec::new());
     doc.save(&mut out).map_err(|e| e.to_string())?;
     let mut bytes = out.into_inner().map_err(|e| e.to_string())?;
-    // The trailer reads /ID[(<random>)(<random>)] (printpdf keeps its own
-    // random ids there): write the fixed document id into both, same length,
-    // so equal input gives equal bytes and no offset moves.
-    if let Some(at) = find(&bytes, b"/ID[(").or_else(|| find(&bytes, b"/ID [(")) {
+    fix_trailer_id(&mut bytes, &doc_id);
+    Ok(fix_info_strings(bytes))
+}
+
+pub(crate) fn fix_trailer_id(bytes: &mut [u8], doc_id: &str) {
+    let id = id32(doc_id);
+    if let Some(at) = find(bytes, b"/ID[(").or_else(|| find(bytes, b"/ID [(")) {
         let mut pos = at;
         for _ in 0..2 {
             let Some(open) = bytes[pos..].iter().position(|&b| b == b'(').map(|i| pos + i + 1) else { break };
             if bytes.len() >= open + 33 && bytes[open + 32] == b')' {
-                bytes[open..open + 32].copy_from_slice(doc_id.as_bytes());
+                bytes[open..open + 32].copy_from_slice(id.as_bytes());
             }
             pos = open + 33;
         }
     }
-    Ok(fix_info_strings(bytes))
 }
 
 fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {

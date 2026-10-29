@@ -64,6 +64,11 @@ Each step is a working, tested slice on both e2e drivers. Every report states it
      - UI (`app/src/sides.ts`, `app/src/main.ts`, `app/src-tauri/src/main.rs`, `app/src/styles.css`): `View > Tools > Character Sides…` modal dialog (`#sides-dialog`) and `File > Export… > Character Sides (PDF)`. Character list with search filter, dual badges, mode toggle, watermark/header inputs, and PDF export integration.
      - Tests: unit and integration tests in `cirth_core::sides` and `crates/cirth-core/tests/store.rs` (`character_sides_preserve_dual_dialogue_locked_scene_numbers_and_page_labels`); e2e automated tests passing on both CDP and WebDriver (`out/screens-cdp/character-sides.png`).
 7. **Compatibility checks.** Report and stripboard files in Google Sheets, Excel and LibreOffice; report PDFs and HTML in a browser; results labelled from real tests.
+   - **Built 2026-10-29:**
+     - Automated M4 test pack generator: `cirth-cli compat-m4 [dir]` in `crates/cirth-core/src/compat_m4.rs`, producing 20 production artifacts from sample script `page-boundaries` (US Letter, locked scene numbers 1..N): multi-sheet StoryScry XLSX workbook, individual scenes CSV/TSV/XLSX/HTML/PDF/RTF, characters CSV/XLSX/HTML/PDF, locations CSV/XLSX, stripboard PDF/HTML/XLSX/CSV, and character sides PDFs (scenes-only, cross-out, and dual dialogue preservation).
+     - Deterministic byte generation verified by core test `the_m4_pack_is_complete_repeatable_and_valid` and test pack `out/compat-pack-m4-v1/MANIFEST.md` with FNV-1a 64-bit hashes. Overwrote `printpdf` random trailer ID with deterministic document ID (`fix_trailer_id`) for byte-identical PDF generation.
+     - Documented in `docs/COMPATIBILITY.md` with status by format and results log for M4 production exports.
+     - Added manual check specifications N35 (Stripboard) and N36 (Character Sides) to `docs/testing/MANUAL_CHECKS.md`. External spreadsheet and desktop viewer manual runs recorded as carried forward.
 
 The exit review comes after 7. Steps 2 and 3 can swap if tags matter more to you than exports.
 

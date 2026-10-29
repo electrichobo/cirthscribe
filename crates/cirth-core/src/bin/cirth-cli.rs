@@ -18,6 +18,13 @@ fn main() {
             let files = cirth_core::compat::write_pack(&dir).unwrap_or_else(|e| panic!("{e}"));
             println!("wrote {} files and MANIFEST.md to {}", files.len(), dir.display());
         }
+        // compat-m4 [dir]: all M4 production artifacts (reports, stripboard, sides)
+        // with MANIFEST.md (compat_m4.rs). Default: out/compat-pack-m4-v<N> in the repo.
+        "compat-m4" => {
+            let dir = args.get(1).map(PathBuf::from).unwrap_or_else(|| cirth_core::compat_m4::default_dir(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("..")));
+            let files = cirth_core::compat_m4::write_m4_pack(&dir).unwrap_or_else(|e| panic!("{e}"));
+            println!("wrote {} files and MANIFEST.md to {}", files.len(), dir.display());
+        }
         "gen-fixtures" => {
             let dir = arg(1);
             std::fs::create_dir_all(&dir).unwrap();
@@ -153,7 +160,7 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("usage: cirth-cli compat-pack [dir] | gen-fixtures <dir> | pdf <fixture> <out.pdf> [a4] | pagemap <fixture> | crash-writer <db> <n> | crash-inflight <db> | crash-at <point> save <db> <pkg> | crash-at <point> open <pkg> <db> <backups> | hold <db>");
+            eprintln!("usage: cirth-cli compat-pack [dir] | compat-m4 [dir] | gen-fixtures <dir> | pdf <fixture> <out.pdf> [a4] | pagemap <fixture> | crash-writer <db> <n> | crash-inflight <db> | crash-at <point> save <db> <pkg> | crash-at <point> open <pkg> <db> <backups> | hold <db>");
             std::process::exit(2);
         }
     }

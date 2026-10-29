@@ -1,6 +1,7 @@
 pub mod backup;
 pub mod bible;
 pub mod compat;
+pub mod compat_m4;
 pub mod docx;
 pub mod evidence;
 pub mod fdx;

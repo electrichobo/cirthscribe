@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::layout::Profile;
 use crate::model::{BlockKind, Document, Id};
 use crate::navigator::cue_name;
-use crate::pdf::{fix_info_strings, id32, mm, page_mm, BOLD, BOLD_ITALIC, ITALIC, REGULAR};
+use crate::pdf::{fix_info_strings, fix_trailer_id, id32, mm, page_mm, BOLD, BOLD_ITALIC, ITALIC, REGULAR};
 use crate::store::Store;
 
 fn default_true() -> bool {
@@ -513,7 +513,8 @@ pub fn generate_sides(
 
     let mut out = BufWriter::new(Vec::new());
     pdf_doc.save(&mut out).map_err(|e| e.to_string())?;
-    let bytes = out.into_inner().map_err(|e| e.to_string())?;
+    let mut bytes = out.into_inner().map_err(|e| e.to_string())?;
+    fix_trailer_id(&mut bytes, &doc_id_str);
     Ok(fix_info_strings(bytes))
 }
 

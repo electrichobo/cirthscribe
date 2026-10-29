@@ -104,7 +104,7 @@ pub struct TreeItem {
 }
 
 pub struct Store {
-    conn: Connection,
+    pub(crate) conn: Connection,
     path: PathBuf,
     migrated_from: Option<i64>,
 }

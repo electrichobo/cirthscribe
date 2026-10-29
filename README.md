@@ -113,8 +113,9 @@ Then the plan itself:
 - [x] Story timeline, kept separate from script order: events linked to scenes in any episode, flashbacks marked, and an optional, previewed "put the script in story order" (View > Tools > Timeline…)
 - [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
 
-### 🔜 Stage 4: Production tools (in progress; plan accepted)
+### ✅ Stage 4: Production tools (done)
 
+Done:
 - [x] Script breakdown tags (props, wardrobe, cast and more, linked to the project bible with aliases and suggested tags; View > Tools > Breakdown Tags…)
 - [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
 - [x] Reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, revisions, and breakdown tag categories (occurrences and distinct scenes kept apart)
@@ -123,8 +124,13 @@ Then the plan itself:
 - [x] Stripboard and shooting schedule (independent order, day breaks, banners, unscheduled pile, color legend and notes; exports in PDF, HTML, XLSX, CSV; View > Tools > Stripboard…)
 - [x] Page counts in eighths, and character appearance charts
 - [x] Reports in PDF, spreadsheet (XLSX, CSV, TSV), HTML and RTF
+- [x] Compatibility test pack for production exports (`cirth-cli compat-m4`)
 
-### Stage 5: Notes, alternatives and versions
+Carried forward:
+- [ ] Results from external spreadsheet apps (Excel, Google Sheets, LibreOffice) for StoryScry and stripboard files
+- [ ] Visual checks in external PDF viewers for stripboards and sides
+
+### 🔜 Stage 5: Notes, alternatives and versions (next)
 
 - [ ] Comments attached to the text, with an add-comment button
 - [ ] Alternative takes on a scene or line
