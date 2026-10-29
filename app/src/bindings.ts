@@ -57,6 +57,7 @@ export const BINDINGS: Binding[] = [
   { id: "overview", group: "Moving around", label: "Overview of the script", menu: "Overview…", scope: "app", defaults: [] },
   { id: "storyscry", group: "Project", label: "StoryScry (reports and charts)", menu: "StoryScry…", scope: "app", defaults: [] },
   { id: "stripboard", group: "Project", label: "Stripboard and schedule", menu: "Stripboard…", scope: "app", defaults: [] },
+  { id: "sides", group: "Project", label: "Character sides", menu: "Character Sides…", scope: "app", defaults: [] },
   { id: "tags", group: "Project", label: "Breakdown tags", menu: "Breakdown Tags…", scope: "app", defaults: [] },
   { id: "goto_page", group: "Moving around", label: "Go to page", menu: "Page…", scope: "app", defaults: ["Mod+G"] },
   { id: "goto_scene", group: "Moving around", label: "Go to scene", menu: "Scene…", scope: "app", defaults: ["Mod+Shift+G"] },

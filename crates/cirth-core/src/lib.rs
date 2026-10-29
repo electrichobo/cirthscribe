@@ -23,6 +23,7 @@ pub mod report_export;
 pub mod reports;
 pub mod revisions;
 pub mod rtf;
+pub mod sides;
 pub mod spell;
 pub mod stripboard;
 pub mod tags;

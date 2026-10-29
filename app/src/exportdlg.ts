@@ -5,7 +5,7 @@
 
 import { announce } from "./a11y";
 
-export type ExportFormat = "pdf" | "pdf_changed" | "txt" | "fountain" | "fdx" | "docx" | "rtf" | "html" | "reports";
+export type ExportFormat = "pdf" | "pdf_changed" | "txt" | "fountain" | "fdx" | "docx" | "rtf" | "html" | "reports" | "stripboard" | "sides";
 
 const FORMATS: { id: ExportFormat; label: string; note: string }[] = [
   { id: "pdf", label: "PDF", note: "The printed script: title page, scene numbers, headers and footers, revision marks." },
@@ -17,6 +17,8 @@ const FORMATS: { id: ExportFormat; label: string; note: string }[] = [
   { id: "rtf", label: "Rich Text (.rtf)", note: "For older word processors and TextEdit." },
   { id: "html", label: "Web page (.html)", note: "One standalone page to read in a browser." },
   { id: "reports", label: "Reports (StoryScry)…", note: "Scenes, characters, locations, action vs dialogue, INT/EXT, day/night and revisions in XLSX, CSV, TSV, PDF, HTML or RTF." },
+  { id: "stripboard", label: "Stripboard & schedule…", note: "Scene strips, day breaks, banners and notes in PDF, HTML, XLSX, CSV or TSV." },
+  { id: "sides", label: "Character sides…", note: "Pages for actors: their scenes only or full pages struck through, keeping dual dialogue intact." },
 ];
 
 export function createExportDialog(hooks: { hasActiveRevision: () => boolean; run: (format: ExportFormat) => Promise<unknown> }) {

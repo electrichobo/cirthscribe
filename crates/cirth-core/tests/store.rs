@@ -1066,5 +1066,58 @@ fn stripboard_scheduling_order_is_independent_and_omitted_scenes_are_flagged() {
     assert_eq!(del_reconciled.scheduled.iter().filter(|st| st.kind == StripKind::Scene).count(), 3, "strips are never silently dropped (E4)");
 }
 
+#[test]
+fn character_sides_preserve_dual_dialogue_locked_scene_numbers_and_page_labels() {
+    let d = tmpdir("sides_integration");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    s.seed(&fixtures::page_boundaries().to_document().unwrap()).unwrap();
+    let doc_id = s.current_document().unwrap();
+    let prof = cirth_core::layout::Profile::us_letter();
+
+    // 1. Lock scene numbers and lock pages
+    s.lock_scene_numbers(&doc_id).unwrap();
+    let map = cirth_core::layout::paginate(&s.load_document(&doc_id).unwrap().blocks, &prof, 0);
+    s.lock_pages(&doc_id, &map).unwrap();
+
+    // 2. List characters
+    let chars = cirth_core::sides::list_characters(&s, &doc_id).unwrap();
+    assert!(chars.iter().any(|c| c.name == "INES"));
+    assert!(chars.iter().any(|c| c.name == "MARGIT" && c.has_dual));
+    assert!(chars.iter().any(|c| c.name == "TOBIAS" && c.has_dual));
+
+    // 3. Export sides for INES (ScenesOnly)
+    let sides_path = d.join("ines-sides.pdf");
+    let opts_ines = cirth_core::sides::SidesOptions {
+        document_id: Some(doc_id.clone()),
+        characters: vec!["INES".into()],
+        mode: cirth_core::sides::SidesMode::ScenesOnly,
+        include_title_page: true,
+        all_pages: false,
+        watermark: Some("AUDITION COPY".into()),
+        custom_header: None,
+    };
+    let res = cirth_core::sides::export_sides(&s, &doc_id, &opts_ines, &prof, &sides_path, 1700000000).unwrap();
+    assert!(sides_path.exists());
+    assert!(res.bytes > 1000);
+    assert_eq!(res.scenes_included, 1, "INES is in Scene 1");
+
+    // 4. Export sides for TOBIAS (CrossOut) - participating in dual dialogue
+    let tobias_path = d.join("tobias-sides.pdf");
+    let opts_tobias = cirth_core::sides::SidesOptions {
+        document_id: Some(doc_id.clone()),
+        characters: vec!["TOBIAS".into()],
+        mode: cirth_core::sides::SidesMode::CrossOut,
+        include_title_page: true,
+        all_pages: false,
+        watermark: None,
+        custom_header: None,
+    };
+    let res_tobias = cirth_core::sides::export_sides(&s, &doc_id, &opts_tobias, &prof, &tobias_path, 1700000000).unwrap();
+    assert!(tobias_path.exists());
+    assert!(res_tobias.bytes > 1000);
+    assert_eq!(res_tobias.scenes_included, 1, "TOBIAS is in dual dialogue Scene 4");
+}
+
+
 
 

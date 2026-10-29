@@ -16,15 +16,11 @@ pub static BOLD: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/Cou
 pub static ITALIC: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/CourierPrime-Italic.ttf");
 pub static BOLD_ITALIC: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf");
 
-fn mm(inches: f32) -> Mm {
+pub(crate) fn mm(inches: f32) -> Mm {
     Mm(inches * 25.4)
 }
 
-/// A page dimension that printpdf turns into whole points: 8.5 in must be
-/// MediaBox 612, not 612.00006 (viewers then show 8.51 in). printpdf
-/// multiplies millimetres by 2.834646 in f32, so step to the f32 that lands
-/// exactly on the point value.
-fn page_mm(inches: f32) -> Mm {
+pub(crate) fn page_mm(inches: f32) -> Mm {
     let target = (inches * 72.0 * 100.0).round() / 100.0;
     let mut m = target / 2.834_646_f32;
     for _ in 0..64 {
@@ -73,7 +69,7 @@ pub fn expand_tokens(text: &str, tp: &crate::title::TitlePage) -> String {
         .replace("{date}", tp.draft_date.trim())
 }
 
-fn id32(s: &str) -> String {
+pub(crate) fn id32(s: &str) -> String {
     // Exactly 32 printable characters: the trailer replacement must keep the length.
     let clean: String = s.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
     let mut id = if clean.is_empty() { "kolbitar".to_string() } else { clean };
@@ -196,7 +192,7 @@ fn number_after(hay: &[u8], at: usize) -> Option<(usize, usize)> {
 /// offsets after it. Only the layout printpdf/lopdf writes is handled (one
 /// uncompressed cross-reference stream with 4-byte offsets); anything else
 /// is returned unchanged.
-fn fix_info_strings(bytes: Vec<u8>) -> Vec<u8> {
+pub(crate) fn fix_info_strings(bytes: Vec<u8>) -> Vec<u8> {
     let attempt = || -> Option<Vec<u8>> {
         let sx = find(&bytes, b"startxref")?;
         let (xref_at, _) = number_after(&bytes, sx + 9)?;

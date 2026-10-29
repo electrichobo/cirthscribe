@@ -634,6 +634,60 @@ async fn export_stripboard(
     })
 }
 
+// --- Character sides (M4 step 6) ---------------------------------------------------
+
+#[tauri::command]
+async fn sides_characters(app: State<'_, App>, document_id: Option<String>) -> Result<Vec<cirth_core::sides::SidesCharacter>, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(ref d) => d.clone(),
+            None => s.store.current_document().map_err(err)?,
+        };
+        cirth_core::sides::list_characters(&s.store, &doc_id)
+    })
+}
+
+#[tauri::command]
+async fn export_sides(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    options: cirth_core::sides::SidesOptions,
+    path: Option<String>,
+) -> Result<cirth_core::sides::SidesExportResult, String> {
+    let (target_doc_id, stored_prof) = with_session(&app, |s| {
+        let did = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let prof = s.store.document_profile(&did).unwrap_or_else(|_| "us-letter".into());
+        Ok((did, prof))
+    })?;
+    let prof = profile(ui_profile(&stored_prof));
+    let date_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    let target = match path {
+        Some(p) => normalize(Path::new(&p)),
+        None => {
+            let name = with_session(&app, |s| Ok(s.key.clone()))?;
+            let dir = data_dir(&app).join("exports");
+            std::fs::create_dir_all(&dir).map_err(io_err)?;
+            let chars_slug = options.characters.join("-").to_lowercase().replace(' ', "-");
+            dir.join(format!("{name}-sides-{chars_slug}.pdf"))
+        }
+    };
+
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(io_err)?;
+    }
+
+    with_session(&app, |s| {
+        cirth_core::sides::export_sides(&s.store, &target_doc_id, &options, &prof, &target, date_unix)
+    })
+}
+
 // --- Evidence board (M3 step 9) ---------------------------------------------------
 
 #[derive(Serialize)]
@@ -2409,6 +2463,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("overview", "Overview…")
         .text("storyscry", "StoryScry…")
         .text("stripboard", "Stripboard…")
+        .text("sides", "Character Sides…")
         .text("tags", "Breakdown Tags…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
@@ -2727,6 +2782,8 @@ fn main() {
             stripboard_state,
             save_stripboard,
             export_stripboard,
+            sides_characters,
+            export_sides,
             store_versions,
             export_report,
             tags_state,

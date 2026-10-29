@@ -45,6 +45,7 @@ import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
 import { createStoryScry, type ExportableReport, type ReportBundle, type ReportExported, type ReportFormat, type ReportScope } from "./storyscry";
 import { createStripboard } from "./stripboard";
+import { createCharacterSides } from "./sides";
 import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
@@ -533,6 +534,11 @@ const stripboard = createStripboard({
     }),
   episodes: async () => (await invoke<{ id: string; title: string; kind: string }[]>("project_tree")).filter((i) => i.kind === "document").map((i) => ({ id: i.id, title: i.title })),
   onGoToScene: (sceneId) => revealScene(view, sceneId),
+});
+
+// Character sides (M4 step 6; ROADMAP §M4).
+const characterSides = createCharacterSides({
+  documentId: () => lastOpen?.document_id ?? "",
 });
 
 // The project bible (M3 step 7): entries are planning data; renames change the scripts.
@@ -1573,6 +1579,9 @@ async function runMenu(id: string): Promise<void> {
     case "stripboard":
       if (lastOpen) await stripboard.open();
       break;
+    case "sides":
+      if (lastOpen) await characterSides.open();
+      break;
     case "tags":
       if (lastOpen) await breakdownTags.open();
       break;
@@ -1892,6 +1901,12 @@ async function exportAs(format: ExportFormat): Promise<boolean> {
     case "reports":
       await storyScry.open();
       return true;
+    case "stripboard":
+      await stripboard.open();
+      return true;
+    case "sides":
+      await characterSides.open();
+      return true;
     default:
       return exportDocument(format);
   }
@@ -2009,6 +2024,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   overview,
   storyScry,
   stripboard,
+  characterSides,
   tags: breakdownTags,
   bible,
   timeline,

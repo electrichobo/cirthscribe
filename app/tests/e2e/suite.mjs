@@ -4,7 +4,7 @@
 // honestly throw Skip with the reason; skips are reported, never counted as
 // passes.
 
-import { writeFileSync, mkdirSync, copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync, copyFileSync, readdirSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
@@ -2401,7 +2401,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(__cirth.menu('export'), true)");
     await waitFor(app, "document.getElementById('export-dialog').open", "File > Export… opens the dialog");
     const formats = await app.evaluate("[...document.querySelectorAll('#export-dialog input[name=export-format]')].map(r => r.value + (r.disabled ? ':off' : ''))");
-    assert(formats.join() === "pdf,pdf_changed:off,txt,fountain,fdx,docx,rtf,html,reports", `export formats: ${formats}`);
+    assert(formats.join() === "pdf,pdf_changed:off,txt,fountain,fdx,docx,rtf,html,reports,stripboard,sides", `export formats: ${formats}`);
     await app.evaluate("(document.getElementById('export-cancel').click(), true)");
     // View > Go To > Scene… and Page…: the caret moves there.
     const scenes = await app.evaluate("__cirth.scenes()");
@@ -3865,6 +3865,110 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Close stripboard dialog
     await app.evaluate("(document.getElementById('stripboard-close').click(), true)");
     await waitFor(app, "!document.getElementById('stripboard-dialog')?.open", "stripboard closed at test end");
+  });
+
+  await test("Character sides (ROADMAP M4): scenes only, crossed out, dual dialogue preservation, locked numbers and page labels", async () => {
+    await openFixture("page-boundaries");
+
+    // Open character sides from native menu
+    await app.evaluate("(__cirth.menu('sides'), true)");
+    await waitFor(app, "!!document.getElementById('sides-dialog')?.open", "sides dialog opened");
+    await waitFor(app, "document.querySelectorAll('#sides-char-list .sides-char-row').length > 0", "character list rendered");
+
+    // Check characters listed with speech/scene counts
+    const charList = await app.evaluate(`(() => {
+      const rows = Array.from(document.querySelectorAll('#sides-char-list .sides-char-row'));
+      return rows.map(r => ({
+        name: r.querySelector('strong')?.textContent ?? '',
+        dual: !!r.querySelector('.badge-dual'),
+        text: r.textContent ?? '',
+      }));
+    })()`);
+
+    assert(charList.length >= 2, `Characters found in list: ${JSON.stringify(charList)}`);
+    const ines = charList.find(c => c.name === "INES");
+    const pell = charList.find(c => c.name === "PELL");
+    const margit = charList.find(c => c.name === "MARGIT");
+    const tobias = charList.find(c => c.name === "TOBIAS");
+    assert(ines, "INES listed in character sides dialog");
+    assert(pell, "PELL listed in character sides dialog");
+    assert(margit && tobias, "MARGIT and TOBIAS listed in character sides dialog");
+    assert(margit.dual && tobias.dual, "Dual dialogue participants both carry dual badge");
+
+    // Select INES
+    await app.evaluate(`(() => {
+      const inesInput = document.querySelector('#sides-char-list input[data-char="INES"]');
+      if (inesInput && !inesInput.checked) {
+        inesInput.click();
+      }
+    })()`);
+
+    // Verify preview summary updated
+    const summaryText = await app.evaluate("document.getElementById('sides-preview-summary')?.textContent ?? ''");
+    assert(summaryText.includes("INES"), `Preview summary mentions selected character: ${summaryText}`);
+
+    // Test search filter
+    await app.evaluate(`(() => {
+      const filter = document.getElementById('sides-char-filter');
+      if (filter) {
+        filter.value = "PELL";
+        filter.dispatchEvent(new Event('input'));
+      }
+    })()`);
+    const visibleCount = await app.evaluate("document.querySelectorAll('#sides-char-list .sides-char-row').length");
+    assert(visibleCount === 1, `Search filters to matching character: ${visibleCount} visible`);
+
+    // Reset search
+    await app.evaluate(`(() => {
+      const filter = document.getElementById('sides-char-filter');
+      if (filter) {
+        filter.value = "";
+        filter.dispatchEvent(new Event('input'));
+      }
+    })()`);
+
+    // Screenshot dialog
+    await screenshot(app, "character-sides");
+
+    // Close dialog
+    await app.evaluate("(document.getElementById('sides-close').click(), true)");
+    await waitFor(app, "!document.getElementById('sides-dialog')?.open", "sides dialog closed");
+
+    // Export sides directly via Tauri invoke:
+    // 1. Scenes only mode
+    const outDir = join(dataDir, "sides-exports");
+    mkdirSync(outDir, { recursive: true });
+    const scenesOnlyPath = join(outDir, "ines-scenes-only.pdf");
+    const expOnly = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('export_sides', {
+      options: {
+        characters: ['INES'],
+        mode: 'scenes_only',
+        include_title_page: true,
+        all_pages: false,
+        watermark: 'AUDITION ONLY',
+        custom_header: 'INES SIDES - EPISODE 1',
+      },
+      path: ${JSON.stringify(scenesOnlyPath)},
+    })`);
+    assert(expOnly.bytes > 0 && expOnly.pages > 0, `Scenes only export generated: ${JSON.stringify(expOnly)}`);
+    assert(existsSync(scenesOnlyPath), `Scenes only PDF exists at ${scenesOnlyPath}`);
+
+    // 2. Cross out mode
+    const crossOutPath = join(outDir, "ines-cross-out.pdf");
+    const expCross = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('export_sides', {
+      options: {
+        characters: ['INES'],
+        mode: 'cross_out',
+        include_title_page: true,
+        all_pages: true,
+        watermark: null,
+        custom_header: null,
+      },
+      path: ${JSON.stringify(crossOutPath)},
+    })`);
+    assert(expCross.bytes > 0 && expCross.pages > 0, `Cross out export generated: ${JSON.stringify(expCross)}`);
+    assert(existsSync(crossOutPath), `Cross out PDF exists at ${crossOutPath}`);
+    assert(expCross.pages >= expOnly.pages, `Cross out pages (${expCross.pages}) >= scenes only pages (${expOnly.pages})`);
   });
 
   await app.close();

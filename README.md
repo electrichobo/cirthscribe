@@ -119,7 +119,7 @@ Then the plan itself:
 - [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
 - [x] Reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, revisions, and breakdown tag categories (occurrences and distinct scenes kept apart)
 - [x] Character participation: speaking scenes, present-but-silent scenes (cast tags), V.O./O.S./dual speeches, dialogue share, and documented participation estimates
-- [ ] Character sides: a character's scenes as pages for actors
+- [x] Character sides: a character's scenes as pages for actors (scenes-only and cross-out modes, dual dialogue preservation, locked numbers and page labels; View > Tools > Character Sides…)
 - [x] Stripboard and shooting schedule (independent order, day breaks, banners, unscheduled pile, color legend and notes; exports in PDF, HTML, XLSX, CSV; View > Tools > Stripboard…)
 - [x] Page counts in eighths, and character appearance charts
 - [x] Reports in PDF, spreadsheet (XLSX, CSV, TSV), HTML and RTF
