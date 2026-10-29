@@ -21,6 +21,7 @@ pub mod printdoc;
 pub mod revisions;
 pub mod rtf;
 pub mod spell;
+pub mod timeline;
 pub mod title;
 pub mod txt;
 pub mod store;

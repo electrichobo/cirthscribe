@@ -421,3 +421,39 @@ fn opening_a_v7_project_adds_an_empty_bible() {
         assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
     }
 }
+
+#[test]
+fn opening_a_v8_project_adds_an_empty_timeline() {
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    use cirth_core::timeline::StoryEvent;
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v8-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v8-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 8, "fixture must be schema v8");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(8));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v8 copy kept");
+        let s = o.store;
+        assert!(s.story_events().unwrap().is_empty());
+        let before = s.load().unwrap();
+        let scene = before.scenes()[0].scene_id.clone();
+        // B5: an event moved in the timeline never moves a scene; undo is exact.
+        let mut h = PlanningHistory::default();
+        let e = StoryEvent { id: "e1".into(), title: "The storm".into(), when: "Day 1, night".into(), pos: 1.0, scenes: vec![scene.clone(), scene.clone()], ..Default::default() };
+        let v = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::PutEvent(e.clone()), v).unwrap();
+        assert_eq!(s.story_event("e1").unwrap().unwrap().scenes, vec![scene.clone()], "a scene is linked once");
+        let v = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::PutEvent(StoryEvent { pos: -4.0, uncertain: true, ..e.clone() }), v).unwrap();
+        assert_eq!(serde_json::to_string(&s.load().unwrap().blocks).unwrap(), serde_json::to_string(&before.blocks).unwrap(), "the script never moves");
+        h.undo(&s).unwrap();
+        assert_eq!(s.story_event("e1").unwrap().unwrap().pos, 1.0);
+        h.undo(&s).unwrap();
+        assert!(s.story_event("e1").unwrap().is_none());
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}

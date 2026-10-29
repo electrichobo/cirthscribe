@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 8;
+pub const SCHEMA_VERSION: i64 = 9;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -261,10 +261,29 @@ fn migrate_v8(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v8 -> v9: the story timeline (M3 step 8, timeline.rs): events in
+/// chronological order, each linked to scenes by stable id in any script.
+/// Projects start with an empty timeline.
+fn migrate_v9(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE story_events (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          summary TEXT NOT NULL DEFAULT '',
+          when_text TEXT NOT NULL DEFAULT '',
+          uncertain INTEGER NOT NULL DEFAULT 0,
+          simultaneous INTEGER NOT NULL DEFAULT 0,
+          pos REAL NOT NULL,
+          scenes TEXT NOT NULL DEFAULT '[]'
+        );",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
-const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7), (8, migrate_v8)];
+const MIGRATIONS: &[(i64, Migration)] = &[(2, migrate_v2), (3, migrate_v3), (4, migrate_v4), (5, migrate_v5), (6, migrate_v6), (7, migrate_v7), (8, migrate_v8), (9, migrate_v9)];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
 fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
@@ -764,6 +783,35 @@ impl Store {
         order.into_iter().map(|d| Ok((d.id.clone(), d.title.clone(), self.load_document(&d.id)?.blocks))).collect()
     }
 
+    // --- Story timeline (M3 step 8, timeline.rs) --------------------------------
+
+    pub fn story_events(&self) -> Result<Vec<crate::timeline::StoryEvent>> {
+        let mut stmt = self.conn.prepare("SELECT id, title, summary, when_text, uncertain, simultaneous, pos, scenes FROM story_events ORDER BY pos, id")?;
+        let rows = stmt.query_map([], |r| {
+            let scenes: String = r.get(7)?;
+            Ok(crate::timeline::StoryEvent { id: r.get(0)?, title: r.get(1)?, summary: r.get(2)?, when: r.get(3)?, uncertain: r.get::<_, i64>(4)? != 0, simultaneous: r.get::<_, i64>(5)? != 0, pos: r.get(6)?, scenes: serde_json::from_str(&scenes).unwrap_or_default() })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub fn story_event(&self, id: &str) -> Result<Option<crate::timeline::StoryEvent>> {
+        Ok(self.story_events()?.into_iter().find(|e| e.id == id))
+    }
+
+    /// Store an event as written (planning command `PutEvent` makes it undoable).
+    pub fn put_story_event(&self, e: &crate::timeline::StoryEvent) -> Result<()> {
+        if e.id.trim().is_empty() || !e.pos.is_finite() {
+            return Err(StoreError::Invalid("an event needs an id and a place in the timeline".into()));
+        }
+        let mut seen = std::collections::HashSet::new();
+        let scenes: Vec<&String> = e.scenes.iter().filter(|s| seen.insert(s.as_str())).collect();
+        self.conn.execute(
+            "INSERT OR REPLACE INTO story_events(id, title, summary, when_text, uncertain, simultaneous, pos, scenes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![e.id, e.title, e.summary, e.when, e.uncertain as i64, e.simultaneous as i64, e.pos, serde_json::to_string(&scenes).unwrap_or_default()],
+        )?;
+        self.mark_unsaved()
+    }
+
     // --- Project bible (M3 step 7, bible.rs) -----------------------------------
 
     pub fn entities(&self) -> Result<Vec<crate::bible::Entity>> {
@@ -1094,6 +1142,22 @@ impl Store {
                 let before = self.scene_label(scene_id)?;
                 self.set_scene_label(scene_id, label)?;
                 PlanningOp::SetSceneLabel { scene_id: scene_id.clone(), label: before }
+            }
+            PlanningOp::PutEvent(e) => {
+                let before = self.story_event(&e.id)?;
+                self.put_story_event(e)?;
+                match before {
+                    Some(old) => PlanningOp::PutEvent(old),
+                    None => PlanningOp::DeleteEvent(e.id.clone()),
+                }
+            }
+            PlanningOp::DeleteEvent(id) => {
+                let Some(old) = self.story_event(id)? else {
+                    return Err(StoreError::Invalid(format!("no event {id}")));
+                };
+                self.conn.execute("DELETE FROM story_events WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::PutEvent(old)
             }
             PlanningOp::PutEntity(e) => {
                 let before = self.entity(&e.id)?;

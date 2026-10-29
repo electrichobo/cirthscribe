@@ -50,6 +50,7 @@ export const BINDINGS: Binding[] = [
   { id: "page_break", group: "Writing", label: "Page break before", menu: "Page Break Before", scope: "script", defaults: ["Mod+Enter"] },
   ...KIND_MENU.map(([k, name], i): Binding => ({ id: `kind_${k}`, group: "Elements", label: name, menu: name, scope: "script", defaults: [`Mod+${i + 1}`] })),
   { id: "bible", group: "Project", label: "Bible", menu: "Bible…", scope: "app", defaults: [] },
+  { id: "timeline", group: "Project", label: "Story timeline", menu: "Timeline…", scope: "app", defaults: [] },
   { id: "overview", group: "Moving around", label: "Overview of the script", menu: "Overview…", scope: "app", defaults: [] },
   { id: "goto_page", group: "Moving around", label: "Go to page", menu: "Page…", scope: "app", defaults: ["Mod+G"] },
   { id: "goto_scene", group: "Moving around", label: "Go to scene", menu: "Scene…", scope: "app", defaults: ["Mod+Shift+G"] },

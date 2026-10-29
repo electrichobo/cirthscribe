@@ -26,6 +26,9 @@ pub enum PlanningOp {
     DeleteEntity(String),
     /// A candidate name rejected (or brought back).
     Reject { kind: String, name: String, on: bool },
+    /// A story event created or changed: text, time, place in the timeline, linked scenes (M3 step 8).
+    PutEvent(crate::timeline::StoryEvent),
+    DeleteEvent(String),
 }
 
 #[derive(Clone, Debug)]

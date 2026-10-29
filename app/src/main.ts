@@ -18,7 +18,7 @@ import { sceneNumbersPlugin, sceneNumbersKey, buildSceneNumberDecorations, type 
 import { confirmDialog } from "./confirm";
 import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, navUi, outlineOrder, type BoardState, type ScriptView, type NavInfo, type CharacterStat, setSceneNumbers, sceneAtCursor } from "./views";
 import { createPanelHost, POP_LABEL, type PopPanel } from "./panels";
-import { scenesOf, moveScene } from "./scenes";
+import { scenesOf, moveScene, reorderScenes } from "./scenes";
 import { installPerf } from "./perf";
 import { adoptDomSelection, selSync } from "./selsync";
 import { createHome } from "./home";
@@ -45,6 +45,7 @@ import { createLabelNamesDialog } from "./labelnames";
 import { createOverview, type OverviewData, type OverviewScene } from "./overview";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
+import { createTimeline, type TimelineOp } from "./timeline";
 import { comboOf, commandFor, menuTexts } from "./bindings";
 import { createNotesPanel } from "./notes";
 import { createRevisions, revisionsPlugin } from "./revisions";
@@ -477,6 +478,45 @@ const bible = createBible({
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
   newId,
 });
+// The story timeline (M3 step 8): events are planning data; reordering the script is a separate script edit.
+const timeline = createTimeline({
+  state: async () => {
+    await syncer.flush();
+    return invoke("timeline_state");
+  },
+  apply: (op: TimelineOp) =>
+    queued(async () => {
+      try {
+        takePlanning(await invoke<PlanningState>("planning_command", { op, base: planningVersion }));
+        return true;
+      } catch (e) {
+        showBanner(`Timeline: ${e}`);
+        await refreshPlanning().catch(() => undefined);
+        return false;
+      }
+    }),
+  undo: () =>
+    queued(async () => {
+      const st = await invoke<PlanningState>("planning_undo", { redo: false });
+      takePlanning(st);
+      return st.done;
+    }),
+  currentScene: () => (view ? (sceneAtCursor(view)?.sceneId ?? null) : null),
+  structural: () => board.structural,
+  reorder: (order) => {
+    if (!board.structural) return false;
+    const tr = reorderScenes(view.state, order);
+    if (!tr) {
+      showBanner("The script changed; open the timeline again to see the story order.");
+      return false;
+    }
+    view.dispatch(tr);
+    return true;
+  },
+  go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
+  newId,
+});
+
 /** Autocomplete offers the bible's names (characters for cues, locations for headings). */
 async function refreshBibleNames() {
   try {
@@ -1293,6 +1333,9 @@ async function runMenu(id: string): Promise<void> {
     case "import":
       await importAny();
       break;
+    case "timeline":
+      if (lastOpen) await timeline.open();
+      break;
     case "bible":
       if (lastOpen) await bible.open();
       break;
@@ -1728,6 +1771,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   importAny,
   overview,
   bible,
+  timeline,
   projectTree,
   openDocument: (id: string) => openWith("open_document", { id }),
   notes: notesPanel,

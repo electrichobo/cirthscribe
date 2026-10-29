@@ -30,6 +30,20 @@ export function scenesOf(doc: PMNode): SceneInfo[] {
  * `beforeSceneId` (or at the end when null). One transaction, so one undo.
  * Block nodes move intact, so block and scene ids are unchanged.
  */
+/** Put the scenes in `order` (every scene id once) in one transaction: one undo
+ *  step restores the old order. Anything before the first scene stays first.
+ *  Block and scene ids are kept. */
+export function reorderScenes(state: EditorState, order: string[]): Transaction | null {
+  const scenes = scenesOf(state.doc);
+  if (scenes.length < 2 || order.length !== scenes.length || order.join() === scenes.map((s) => s.sceneId).join()) return null;
+  const byId = new Map(scenes.map((s) => [s.sceneId, s]));
+  if (!order.every((id) => byId.has(id))) return null;
+  const start = scenes[0].from;
+  const parts = order.map((id) => state.doc.slice(byId.get(id)!.from, byId.get(id)!.to).content);
+  const content = parts.reduce((a, b) => a.append(b));
+  return state.tr.replaceWith(start, state.doc.content.size, content).setMeta("cirth-move", "reorder").scrollIntoView();
+}
+
 export function moveScene(state: EditorState, sceneId: string, beforeSceneId: string | null): Transaction | null {
   const scenes = scenesOf(state.doc);
   const s = scenes.find((x) => x.sceneId === sceneId);

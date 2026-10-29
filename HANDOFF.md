@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). All workspace steps W1–W5 are built. M3 steps 1–6 and **7 (project bible, schema v8)** are built; next step 8, the story timeline.
+**M2 closed by the owner on 2026-10-27** (docs/m2/EXIT_REVIEW.md: decision B option 2, close and carry; decision A option 2, non-Latin PDF text stays a reported limitation). Next is M3, connected story development. **docs/M3_PLAN.md accepted by the owner 2026-10-27** (decisions A–E; episodes moved to step 2). Step 1 not started. Owner notes 2026-10-28 became workspace steps W1–W5, before step 1; the owner answered all five questions (docs/M3_PLAN.md, "Workspace and menus"). All workspace steps W1–W5 are built. M3 steps 1–7 and **8 (story timeline, schema v9)** are built; next step 9, the evidence board (the last M3 step).
 
 ## Completed & Verified
 
@@ -26,6 +26,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - M3 step 5 built: board grouped into acts (views.ts renderBoard), Add acts… starting structures, card Act menu, drop onto an act, pacing strip; SceneStat.position in core; navigator layout fixes found by screenshot. Checks: `cargo test -p cirth-core` (all pass), e2e CDP 59/59, WebDriver 58/58 (1 skipped: IME), contract 4.
 - M3 step 6 built: overview.ts dialog (map and list), navigator_info project scenes carry page/eighths/position per document, View > Tools > Overview…, bindings entry without a default key. Checks: `cargo test -p cirth-core` (all pass), e2e CDP 60/60, WebDriver 59/59 (1 skipped: IME), contract 4.
 - M3 step 7 built: bible.rs, schema v8, PutEntity/DeleteEntity/Reject planning ops, apply_rename; shell bible_state / bible_rename_preview / bible_rename_apply; bible.ts dialog; Characters tab groups aliases (navigator::characters_named); autocomplete offers bible names. Checks: `cargo test -p cirth-core` (all pass; bible and v7-upgrade tests), e2e CDP 61/61, WebDriver 60/60 (1 skipped: IME), contract 4.
+- M3 step 8 built: timeline.rs, schema v9, PutEvent/DeleteEvent, timeline_state, timeline.ts dialog, scenes.ts reorderScenes (one transaction). Checks: `cargo test -p cirth-core` (all pass; timeline and v8-upgrade tests), e2e CDP 62/62, WebDriver 61/61 (1 skipped: IME), contract 4.
 - M3 plan drafted from ROADMAP M3, PRODUCT_SPEC 3–4, ACCEPTANCE B and C, and the current code (one document in the UI; structural permission not stored; planning edits not undoable).
 - Not verified (carried into M3):
   - external app results (Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages, browser print);
@@ -36,10 +37,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-None once the step 7 commit is made.
+None once the step 8 commit is made.
 
 ## Next Immediate Step
 
-1. M3 step 8, story timeline (ACCEPTANCE B5): story events in chronological order across episodes, each linked to one or more scenes; flashbacks, simultaneous events, uncertain or relative dates. Moving an event never moves a scene; "apply chronology to script order" is separate, previewed, undoable, only with the structural permission (ADR 0003 revisit trigger: one script transaction with its planning side). Schema v9 (freeze v8 files first).
+1. M3 step 9, evidence board (ACCEPTANCE C4): a freeform canvas of cards (scenes, beats, bible entries, timeline events, notes, images, video links) joined by labelled, typed strings; keyboard placing, linking and moving; moving a card never reorders the script. Local images packaged in the .cirth (type and size checked, warning above a limit, no absolute paths); video links stored as URLs only, never fetched; opening a project makes no network request. Notes and bookmarks. Schema v10 (freeze v9 first). Then the M3 exit review.
 2. Then M3 step 1: write ADR 0003 (focus-routed undo), store the structural permission in `document:<id>` settings (store.rs, main.ts `structural`), then planning commands with a core-side undo history.
 3. After any push, read CI through the public API: `curl -s https://api.github.com/repos/electrichobo/cirthscribe/actions/runs?per_page=3`, and a failed job's annotations under `/check-runs/<job id>/annotations`.

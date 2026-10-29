@@ -103,6 +103,14 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
 8. **Story timeline** (B5).
    - Story events in their own chronological order, across episodes, linked to one or more scenes; flashbacks, simultaneous events and uncertain or relative dates representable.
    - Moving an event never moves a scene. "Apply chronology to script order" is a separate, previewed, undoable command, offered only with the structural permission on.
+   - **Built 2026-10-28:**
+     - View > Tools > Timeline… (no default key): events in story order, each with what happens, when (in the writer's words: "Day 3, dawn", "years before"), whether the time is uncertain, whether it happens at the same time as the event before, a summary, and the scenes that show it in any script of the project.
+     - An event the scripts show after a later event is marked "flashback" (events at the same moment are not flashbacks of each other).
+     - Moving an event (Alt+Up/Down) changes only the timeline (B5); every timeline change is a planning step with an Undo in the dialog.
+     - "Put this script's scenes in story order…" previews the new order (a scene with no event stays after the scene it follows now) and, only with "Board may reorder script" on, applies it as one script transaction: one Ctrl/Cmd+Z in the script restores the order exactly.
+     - Core: `cirth_core::timeline` (story order, flashbacks, the proposed scene order), schema v9 (`story_events`, frozen v8 files and an upgrade test), planning ops `PutEvent` and `DeleteEvent`; `timeline_state` in the shell.
+     - Not yet: dates are free text (no calendar arithmetic); applying story order works on the open script only.
+     - Tests: core (flashbacks, simultaneous events, the proposed order; v8 upgrade with an event moved, the script unchanged, exact undo); e2e "Timeline (B5)" on both drivers; checked by eye from the screenshot.
 9. **Evidence board, images and video links** (item 9; decision E).
    - A freeform canvas of cards (scenes, beats, bible entities, timeline events, notes, images, video links) from any episode, joined by labelled, typed "strings" the writer draws. Keyboard alternatives for placing, linking and moving.
    - Moving a card never reorders the script.

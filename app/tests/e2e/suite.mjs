@@ -884,6 +884,57 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(st.entries.some((e) => e.name === "INEZ" && e.aliases.includes("TOBIAS")) && st.entries.some((e) => e.name === "COUNTING HOUSE") && !st.candidates.some((c) => c.name === "PELL"), `kept: ${JSON.stringify(st.entries.map((e) => e.name))}`);
   });
 
+  await test("Timeline (B5): events in story order linked to scenes; a flashback is marked; moving an event never moves a scene; story order applied to the script only with permission, as one undoable edit", async () => {
+    await openFixture("page-boundaries");
+    const scenes = await app.evaluate("__cirth.scenes().map(s => s.sceneId)");
+    const order = () => app.evaluate("__cirth.scenes().map(s => s.sceneId).join()");
+    const script0 = JSON.stringify(await blocks());
+    // An event for the scene with the caret, through the dialog.
+    await caretAtEndOf(0);
+    await app.evaluate("__cirth.menu('timeline')");
+    await waitFor(app, "document.getElementById('timeline-dialog').open", "the timeline opens");
+    await app.evaluate("(document.getElementById('timeline-new-here').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#timeline-list .timeline-event').length === 1 && document.querySelectorAll('#timeline-linked li').length === 1", "an event linked to the current scene");
+    await app.evaluate("(() => { const w = document.getElementById('timeline-when'); w.value = 'Day 2, night'; w.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "/Day 2, night/.test(document.querySelector('#timeline-list .timeline-event').textContent)", "time saved");
+    await app.evaluate("(document.getElementById('timeline-close').click(), true)");
+    // Two more events: what scene 3 shows happens first (a flashback), then scene 2.
+    const put = async (e) => {
+      const base = (await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now')")).version;
+      await app.evaluate(`window.__TAURI_INTERNALS__.invoke('planning_command', { op: { PutEvent: ${JSON.stringify(e)} }, base: ${base} })`);
+    };
+    await put({ id: "ev-childhood", title: "Childhood", summary: "", when: "Years before", uncertain: true, simultaneous: false, pos: -10, scenes: [scenes[2]] });
+    await put({ id: "ev-weigh", title: "The weighing", summary: "", when: "Day 3", uncertain: false, simultaneous: false, pos: 10, scenes: [scenes[1]] });
+    await app.evaluate("__cirth.reloadPlanning()");
+    await app.evaluate("__cirth.menu('timeline')");
+    await waitFor(app, "document.querySelectorAll('#timeline-list .timeline-event').length === 3", "three events");
+    const rows = await app.evaluate("[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.textContent)");
+    assert(/Childhood/.test(rows[0]) && /flashback/.test(rows[0]) && /\(\?\)/.test(rows[0]), `story order first; the flashback and the uncertain time marked: ${rows}`);
+    await screenshot(app, "timeline");
+    // B5: moving an event in the timeline never moves a scene.
+    await app.evaluate("(document.querySelector('#timeline-list .timeline-event[data-id=\"ev-weigh\"]').click(), document.querySelector('#timeline-list .timeline-event[data-id=\"ev-weigh\"]').focus(), true)");
+    await press("ArrowUp", ["alt"]);
+    await waitFor(app, "[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.dataset.id).indexOf('ev-weigh') === 1", "the event moved earlier in the story");
+    assert(JSON.stringify(await blocks()) === script0, "B5: the script did not move");
+    await app.evaluate("(document.getElementById('timeline-undo').click(), true)");
+    await waitFor(app, "[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.dataset.id).indexOf('ev-weigh') === 2", "Undo puts it back");
+    // Story order needs the permission; then it is one script edit.
+    assert(await app.evaluate("document.getElementById('timeline-apply-go').disabled"), "without the permission the script cannot be reordered from here");
+    await app.evaluate("(document.getElementById('timeline-close').click(), true)");
+    await app.evaluate("__cirth.setStructural(true)");
+    await app.evaluate("__cirth.menu('timeline')");
+    await waitFor(app, "document.getElementById('timeline-dialog').open && !document.getElementById('timeline-apply-go').disabled", "with permission");
+    const story = [scenes[2], scenes[3], scenes[0], scenes[1]].join();
+    await app.evaluate("(document.getElementById('timeline-apply-go').click(), true)");
+    await waitFor(app, `__cirth.scenes().map(s => s.sceneId).join() === ${JSON.stringify(story)}`, "the script follows the story (an unlinked scene stays after the scene it followed)");
+    assert(await storedMatchesEditor(), "stored order equals the editor");
+    await app.evaluate("__cirth.view.focus()");
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `__cirth.scenes().map(s => s.sceneId).join() === ${JSON.stringify(scenes.join())}`, "one undo in the script restores the order");
+    assert(JSON.stringify(await blocks()) === script0, "and the script is exactly as before");
+    await app.evaluate("__cirth.setStructural(false)");
+  });
+
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
     await openFixture("page-boundaries");
     await app.evaluate("__cirth.repaginate()");

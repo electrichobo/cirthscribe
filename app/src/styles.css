@@ -178,6 +178,28 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 /* A pop-out board window is wide enough for acts side by side. */
 body[data-panel="board"] .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; }
 body[data-panel="board"] .board-act { flex: 0 0 260px; }
+/* Story timeline (M3 step 8). */
+dialog.timeline { width: min(1000px, 94vw); }
+.timeline-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+.timeline-tools .form-note { margin: 0; }
+.timeline-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+.timeline-left, .timeline-detail { overflow: auto; min-height: 0; }
+.timeline-list { margin: 0; padding-left: 26px; }
+.timeline-list li.simultaneous { list-style-type: "= "; }
+.timeline-event { width: 100%; display: grid; gap: 1px; text-align: left; border: 0; background: none; padding: 4px 6px; border-radius: 4px; }
+.timeline-event[aria-current="true"] { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.timeline-when, .timeline-scenes { font-size: 11px; color: var(--muted); }
+.timeline-flag { font-size: 11px; color: var(--muted); font-style: italic; }
+.timeline-flag.flash { color: var(--warn); font-style: normal; font-weight: 600; }
+.timeline-detail { display: grid; gap: 4px; align-content: start; }
+.timeline-detail input[type="text"], .timeline-detail textarea, .timeline-detail select { width: 100%; padding: 4px 6px; }
+.timeline-detail h3 { font-size: 12px; margin: 8px 0 2px; }
+.timeline-check { font-size: 12px; }
+.timeline-linked { margin: 0; padding-left: 18px; font-size: 12px; }
+.timeline-unlink { font-size: 11px; padding: 0 6px; }
+#timeline-delete { justify-self: start; margin-top: 6px; }
+.timeline-order { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+.timeline-preview { font-size: 12px; margin: 4px 0; }
 /* Project bible (M3 step 7). */
 dialog.bible { width: min(1000px, 94vw); }
 .bible-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }

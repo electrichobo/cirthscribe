@@ -368,6 +368,37 @@ async fn bible_rename_apply(app: State<'_, App>, id: String, from: String, to: S
     })
 }
 
+// --- Story timeline (M3 step 8) ---------------------------------------------------
+
+#[derive(Serialize)]
+struct TimelineState {
+    events: Vec<cirth_core::timeline::StoryEvent>,
+    places: std::collections::HashMap<String, Place>,
+    /// Events the scripts show out of story order (flashbacks).
+    flashbacks: Vec<String>,
+    /// The open script's scenes now, and in story order (for "apply to script order").
+    current_order: Vec<String>,
+    story_order: Vec<String>,
+}
+
+#[tauri::command]
+async fn timeline_state(app: State<'_, App>) -> Result<TimelineState, String> {
+    with_session(&app, |s| {
+        let (docs, places) = bible_docs(s)?;
+        let events = s.store.story_events().map_err(err)?;
+        let mut index = std::collections::HashMap::new();
+        for (_, blocks) in &docs {
+            for b in blocks.iter().filter(|b| b.scene_id.is_some()) {
+                let n = index.len();
+                index.insert(b.scene_id.clone().unwrap(), n);
+            }
+        }
+        let current_order: Vec<String> = s.store.load().map_err(err)?.scenes().into_iter().map(|x| x.scene_id).collect();
+        let story_order = cirth_core::timeline::chronological_order(&events, &current_order);
+        Ok(TimelineState { flashbacks: cirth_core::timeline::flashbacks(&events, &index), events, places, current_order, story_order })
+    })
+}
+
 // --- Episodes and series (M3 step 2) -------------------------------------------
 
 /// The project's folders and documents, in order (cirth_core::store::TreeItem).
@@ -2034,6 +2065,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "view_notes", "Notes", false)?)
         .text("overview", "Overview…")
         .text("bible", "Bible…")
+        .text("timeline", "Timeline…")
         .separator()
         .text("popout_nav", "Scene List in Its Own Window")
         .text("popout_board", "Board in Its Own Window")
@@ -2342,6 +2374,7 @@ fn main() {
             planning_state_now,
             project_tree,
             bible_state,
+            timeline_state,
             bible_rename_preview,
             bible_rename_apply,
             navigator_info,
