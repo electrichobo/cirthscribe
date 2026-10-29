@@ -4,7 +4,9 @@ Date: 2026-10-28. Commit reviewed: 4334037 (all nine steps and the workspace ste
 
 Gate sources: ROADMAP.md (M3 and its exit line), ACCEPTANCE.md sections B and C, docs/M3_PLAN.md.
 
-**Verdict: everything M3 promised is built and tested, with two acceptance items outside M3's reach and a few open checks.**
+**M3 closed by the owner on 2026-10-28 (decision A, option 1), as M1 and M2 were,** carrying into M4: the Mac run of M3 (N31), manual checks N29 and N30, the known limits in docs/m3/EXIT_REVIEW.md section 1, B6 (with M4's reports) and C5 (with M5's branches), and everything carried from M2 and M1. Decision B: straight on to M4.
+
+Verdict before closing: **everything M3 promised is built and tested, with two acceptance items outside M3's reach and a few open checks.**
 - Automated: core tests and both end-to-end drivers on Windows; CI green on Windows, macOS and Linux for every M3 push (Linux runs the whole end-to-end suite, so every new M3 test also passes on WebKitGTK).
 - Not done: B6 belongs to the reports of M4 (the parts that exist are covered); C5 needs M5's branches.
 - Not checked by hand: the new dialogs on a Mac (no M3 run there yet), the pop-out windows and menus by hand on each OS (N29, N30, N31), and the items carried from M2.

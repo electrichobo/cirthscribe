@@ -89,7 +89,7 @@ Carried forward:
 - [ ] Check the page measurements against an industry-standard PDF
 - [ ] Tested exchange with other screenwriting apps
 
-### 🔨 Stage 3: Story planning (built; exit review next)
+### ✅ Stage 3: Story planning (done)
 
 First, from the owner's notes on the current build:
 - [x] Reorganised menus: one Import (it recognises Fountain, Final Draft and plain text) and one Export dialog; View > Mode, Tools, Appearance, Go To (page or scene) and Window; elements, screen font, title page and spelling under Format; a keyboard shortcut list
@@ -113,7 +113,7 @@ Then the plan itself:
 - [x] Story timeline, kept separate from script order: events linked to scenes in any episode, flashbacks marked, and an optional, previewed "put the script in story order" (View > Tools > Timeline…)
 - [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
 
-### Stage 4: Production tools
+### 🔜 Stage 4: Production tools (next)
 
 - [ ] Script breakdown tags (props, wardrobe, cast and more)
 - [ ] StoryScry: a dashboard of charts summarising every report, each opening into the full report

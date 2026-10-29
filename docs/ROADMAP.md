@@ -154,6 +154,8 @@ Jared raised these after the M1 feature work, which so far covered only the scri
 
 Exit: cards, navigator, script, chronology, and bible stay consistent after edits and undo. No duplicated scene prose or accidental reorder.
 
+**Closed by the owner on 2026-10-28** (docs/m3/EXIT_REVIEW.md). Carried into M4: the Mac run of M3 (N31), manual checks N29 and N30, the known limits listed in the review, acceptance B6 (with the reports) and C5 (with M5's branches).
+
 ## M4: Production analysis and stripboard
 
 **StoryScry** (owner's name, 2026-10-26) is where every report and chart lives. Opening it shows a dashboard summary of all available reports, mostly as charts. Each chart opens into the full report, which can be filtered and exported on its own. The reference for the approach is Celtx's Insights; no copying of its look.

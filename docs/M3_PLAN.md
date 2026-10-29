@@ -1,5 +1,7 @@
 # Milestone 3 plan: connected story development
 
+**Closed by the owner on 2026-10-28** (docs/m3/EXIT_REVIEW.md), carrying into M4: the Mac run of M3 (N31), manual checks N29 and N30, the known limits in docs/m3/EXIT_REVIEW.md section 1, B6 (with M4's reports) and C5 (with M5's branches), and everything carried from M2 and M1.
+
 Status: **accepted by the owner, 2026-10-27**, with decisions A–E below (episodes moved to step 2). Builds on M1, M1b and M2 (closed by the owner 2026-10-27). ROADMAP's M3 gate: cards, navigator, script, chronology and bible stay consistent after edits and undo; no duplicated scene prose and no accidental reorder. Acceptance sections B (linked structure) and C1–C4 (bible and media) are the tests; C5 needs M5's branches and is out of scope.
 
 ## Starting point (what exists)
@@ -128,7 +130,7 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
      - Not yet: pictures no card uses are kept in the project file until a later clean-up; notes inside the outline (the board and the notes panel cover them).
      - Tests: core (picture types and links, base64; v9 upgrade: picture packaged once with no path, refused SVG and file links, strings, a card move with the script unchanged, delete and undo with strings, a bookmark, all kept through a save); e2e "Evidence board (C4)" on both drivers; checked by eye from the screenshot (which found the edit panel pushed off-screen and strings hidden between close cards; both fixed).
 
-**All nine M3 steps are built (2026-10-28).** Exit review: docs/m3/EXIT_REVIEW.md (everything built and tested; B6 belongs to M4, C5 to M5; the Mac run N31 and checks N29–N30 open; owner decisions A and B).
+**All nine M3 steps are built (2026-10-28).** Exit review: docs/m3/EXIT_REVIEW.md. **M3 closed by the owner the same day** (close and carry; straight on to M4).
 
 The exit review comes after 9. Steps 5 and 6 can swap.
 

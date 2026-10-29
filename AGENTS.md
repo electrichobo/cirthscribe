@@ -2,11 +2,11 @@
 
 Kolbítar is a free, open-source, offline-first desktop writing and production application for Windows, macOS, and Linux. It combines screenplay editing, story planning, a shared project bible, and script-derived production tools. The project file extension stays `.cirth`; internal crate names (cirth-core) and the app identifier keep the older working name.
 
-## Current stage (2026-10-27)
+## Current stage (2026-10-28)
 
-A working application, not yet released, plus its product brief. M0, M1, M1b and M2 are closed by the owner. **Next: M3**, plan accepted (docs/M3_PLAN.md).
-- Built, steps 1–8: title page, Fountain, FDX, scene numbers, production PDF, revision sets, locked pages, DOCX/RTF/HTML exports.
-- Carried from M2 (docs/m2/EXIT_REVIEW.md): external app tests, the Mac recheck, manual checks.
+A working application, not yet released, plus its product brief. M0–M3 (and M1b) are closed by the owner. **Next: M4** (ROADMAP); no plan written yet.
+- M3 built planning, episodes, navigator, outline, boards, bible, timeline, evidence board (docs/M3_PLAN.md).
+- Carried (docs/m3/EXIT_REVIEW.md, docs/m2/EXIT_REVIEW.md): the Mac run, external app tests, manual checks.
 
 Later milestones (ROADMAP.md) are only planned. Never present a planned feature as working. Open items are listed in STATUS.md and docs/testing/MANUAL_CHECKS.md.
 
@@ -108,7 +108,7 @@ AI agents take turns on this repository (Claude Code, OpenAI Codex, Google Antig
 ### 1. Startup sequence (read before writing)
 
 At the start of any session, or when asked to "continue" or "pick up where we left off":
-1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M3_PLAN.md`).
+1. Read `START_HERE.md`, `HANDOFF.md`, `STATUS.md` and the current milestone plan (`docs/M4_PLAN.md`; until written, ROADMAP's M4).
 2. Inspect uncommitted work: run `git status`, `git diff` and `git diff --staged`.
 3. **Stop and summarize** before modifying any file:
    - the uncommitted changes in the working tree;
