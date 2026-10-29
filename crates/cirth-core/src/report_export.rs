@@ -30,8 +30,8 @@ use crate::pdf::{self, PdfOptions};
 use crate::printdoc;
 use crate::reports::{BucketRow, ReportBundle};
 
-/// Which report to export (`All` bundles all 7 reports into one workbook or document).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Which report to export (`All` bundles all reports into one workbook or document).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReportKind {
     All,
@@ -42,6 +42,25 @@ pub enum ReportKind {
     IntExt,
     DayNight,
     Revisions,
+    TagsAll,
+    TagCategory(String),
+}
+
+fn category_title(slug: &str) -> String {
+    if let Some((_, lbl)) = crate::bible::TAG_CATEGORIES.iter().find(|(k, _)| k.eq_ignore_ascii_case(slug)) {
+        return (*lbl).to_string();
+    }
+    slug.split(['_', '-'])
+        .filter(|s| !s.is_empty())
+        .map(|w| {
+            let mut chars = w.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl ReportKind {
@@ -56,7 +75,8 @@ impl ReportKind {
     ];
 
     pub fn parse(s: &str) -> Result<Self, String> {
-        match s {
+        let trimmed = s.trim();
+        match trimmed {
             "all" | "dashboard" => Ok(ReportKind::All),
             "scenes" => Ok(ReportKind::Scenes),
             "characters" => Ok(ReportKind::Characters),
@@ -65,47 +85,78 @@ impl ReportKind {
             "int_ext" => Ok(ReportKind::IntExt),
             "day_night" => Ok(ReportKind::DayNight),
             "revisions" => Ok(ReportKind::Revisions),
-            other => Err(format!("unknown report kind: {other}")),
+            "tags" | "tags_all" | "tag:all" => Ok(ReportKind::TagsAll),
+            other => {
+                if let Some(rest) = other.strip_prefix("tag:") {
+                    let cat = rest.trim().to_ascii_lowercase();
+                    if !cat.is_empty() {
+                        return Ok(ReportKind::TagCategory(cat));
+                    }
+                }
+                let lower = other.to_ascii_lowercase();
+                if crate::bible::TAG_CATEGORIES.iter().any(|(k, _)| *k == lower) {
+                    return Ok(ReportKind::TagCategory(lower));
+                }
+                Err(format!("unknown report kind: {other}"))
+            }
         }
     }
 
-    pub fn id(self) -> &'static str {
+    pub fn id(&self) -> String {
         match self {
-            ReportKind::All => "all",
-            ReportKind::Scenes => "scenes",
-            ReportKind::Characters => "characters",
-            ReportKind::Locations => "locations",
-            ReportKind::ActionDialogue => "action_dialogue",
-            ReportKind::IntExt => "int_ext",
-            ReportKind::DayNight => "day_night",
-            ReportKind::Revisions => "revisions",
+            ReportKind::All => "all".into(),
+            ReportKind::Scenes => "scenes".into(),
+            ReportKind::Characters => "characters".into(),
+            ReportKind::Locations => "locations".into(),
+            ReportKind::ActionDialogue => "action_dialogue".into(),
+            ReportKind::IntExt => "int_ext".into(),
+            ReportKind::DayNight => "day_night".into(),
+            ReportKind::Revisions => "revisions".into(),
+            ReportKind::TagsAll => "tags".into(),
+            ReportKind::TagCategory(c) => format!("tag:{c}"),
         }
     }
 
-    pub fn title(self) -> &'static str {
+    pub fn title(&self) -> String {
         match self {
-            ReportKind::All => "All Reports",
-            ReportKind::Scenes => "Scenes Report",
-            ReportKind::Characters => "Characters Report",
-            ReportKind::Locations => "Locations Report",
-            ReportKind::ActionDialogue => "Action vs Dialogue Report",
-            ReportKind::IntExt => "Interior vs Exterior Report",
-            ReportKind::DayNight => "Day vs Night Report",
-            ReportKind::Revisions => "Revisions Report",
+            ReportKind::All => "All Reports".into(),
+            ReportKind::Scenes => "Scenes Report".into(),
+            ReportKind::Characters => "Characters Report".into(),
+            ReportKind::Locations => "Locations Report".into(),
+            ReportKind::ActionDialogue => "Action vs Dialogue Report".into(),
+            ReportKind::IntExt => "Interior vs Exterior Report".into(),
+            ReportKind::DayNight => "Day vs Night Report".into(),
+            ReportKind::Revisions => "Revisions Report".into(),
+            ReportKind::TagsAll => "Breakdown Tags Report".into(),
+            ReportKind::TagCategory(c) => format!("{} Report", category_title(c)),
         }
     }
 
     /// Worksheet tab name (<= 31 chars, no `:` `\` `/` `?` `*` `[` `]`).
-    pub fn sheet_name(self) -> &'static str {
+    pub fn sheet_name(&self) -> String {
         match self {
-            ReportKind::All => "Summary",
-            ReportKind::Scenes => "Scenes",
-            ReportKind::Characters => "Characters",
-            ReportKind::Locations => "Locations",
-            ReportKind::ActionDialogue => "Action vs Dialogue",
-            ReportKind::IntExt => "Interior vs Exterior",
-            ReportKind::DayNight => "Day vs Night",
-            ReportKind::Revisions => "Revisions",
+            ReportKind::All => "Summary".into(),
+            ReportKind::Scenes => "Scenes".into(),
+            ReportKind::Characters => "Characters".into(),
+            ReportKind::Locations => "Locations".into(),
+            ReportKind::ActionDialogue => "Action vs Dialogue".into(),
+            ReportKind::IntExt => "Interior vs Exterior".into(),
+            ReportKind::DayNight => "Day vs Night".into(),
+            ReportKind::Revisions => "Revisions".into(),
+            ReportKind::TagsAll => "Breakdown Tags".into(),
+            ReportKind::TagCategory(c) => {
+                let raw = format!("Tag - {}", category_title(c));
+                let clean: String = raw
+                    .chars()
+                    .filter(|ch| !matches!(ch, ':' | '\\' | '/' | '?' | '*' | '[' | ']'))
+                    .take(31)
+                    .collect();
+                if clean.is_empty() {
+                    "Tag Category".into()
+                } else {
+                    clean
+                }
+            }
         }
     }
 }
@@ -230,18 +281,28 @@ pub fn build_table(bundle: &ReportBundle, kind: ReportKind) -> ReportTable {
         ReportKind::IntExt => bucket_table(bundle, ReportKind::IntExt, "Setting (INT/EXT)", &bundle.int_ext),
         ReportKind::DayNight => bucket_table(bundle, ReportKind::DayNight, "Time of Day", &bundle.day_night),
         ReportKind::Revisions => revisions_table(bundle, multi),
+        ReportKind::TagsAll => tags_all_table(bundle, multi),
+        ReportKind::TagCategory(cat) => tag_category_table(bundle, &cat, multi),
     }
 }
 
-/// Build all seven report tables in standard order.
+/// Build all report tables in standard order (7 core reports plus any populated breakdown tag categories).
 pub fn build_all_tables(bundle: &ReportBundle) -> Vec<ReportTable> {
-    ReportKind::SINGLE.iter().map(|&k| build_table(bundle, k)).collect()
+    let multi = bundle.documents.len() > 1;
+    let mut out: Vec<ReportTable> = ReportKind::SINGLE.iter().cloned().map(|k| build_table(bundle, k)).collect();
+    for cat in &bundle.tag_reports {
+        if !cat.rows.is_empty() {
+            out.push(tag_category_table(bundle, &cat.category, multi));
+        }
+    }
+    out
 }
 
 fn base_table(bundle: &ReportBundle, kind: ReportKind, subtitle: String) -> ReportTable {
+    let title = kind.title();
     ReportTable {
         kind,
-        title: kind.title().into(),
+        title,
         scope_label: bundle.scope_label.clone(),
         source_version: bundle.source_version,
         planning_version: bundle.planning_version,
@@ -336,11 +397,24 @@ fn scenes_table(b: &ReportBundle, multi: bool) -> ReportTable {
 }
 
 fn characters_table(b: &ReportBundle, multi: bool) -> ReportTable {
-    let mut t = base_table(
-        b,
-        ReportKind::Characters,
-        format!("{} speaking character{}", b.characters.len(), if b.characters.len() == 1 { "" } else { "s" }),
-    );
+    let speaking = b.characters.iter().filter(|c| c.speeches > 0).count();
+    let silent_only = b.characters.len().saturating_sub(speaking);
+    let sub = if silent_only == 0 {
+        format!(
+            "{} speaking character{} · Participation time (1 page = 8 eighths ≈ 1 min) and dialogue time (150 words ≈ 1 min) are estimates, not actual screen time; overlapping character durations do not sum to 100%",
+            b.characters.len(),
+            if b.characters.len() == 1 { "" } else { "s" }
+        )
+    } else {
+        format!(
+            "{} character{} ({} speaking, {} non-speaking from cast tags) · Participation time (1 page = 8 eighths ≈ 1 min) and dialogue time (150 words ≈ 1 min) are estimates, not actual screen time; overlapping character durations do not sum to 100%",
+            b.characters.len(),
+            if b.characters.len() == 1 { "" } else { "s" },
+            speaking,
+            silent_only
+        )
+    };
+    let mut t = base_table(b, ReportKind::Characters, sub);
     t.headers = vec![
         "Character".into(),
         "Speeches".into(),
@@ -348,6 +422,13 @@ fn characters_table(b: &ReportBundle, multi: bool) -> ReportTable {
         "Dialogue Words".into(),
         "Share of Dialogue (%)".into(),
         "Scenes Speaking".into(),
+        "V.O. Speeches".into(),
+        "O.S. Speeches".into(),
+        "Silent Scenes (Cast Tags)".into(),
+        "Total Scenes Present".into(),
+        "Participation Length (eighths, est.)".into(),
+        "Participation Time (min, est.)".into(),
+        "Dialogue Speaking Time (min, est.)".into(),
         "First Appearance Scene".into(),
         "First Appearance Page".into(),
         "First Document Title".into(),
@@ -362,6 +443,13 @@ fn characters_table(b: &ReportBundle, multi: bool) -> ReportTable {
             Cell::Int(c.words as i64),
             Cell::Float(c.share_pct),
             Cell::Int(c.scenes as i64),
+            Cell::Int(c.vo_speeches as i64),
+            Cell::Int(c.os_speeches as i64),
+            Cell::Int(c.silent_scenes as i64),
+            Cell::Int(c.total_scenes as i64),
+            Cell::Int(c.participation_eighths as i64),
+            Cell::Float(c.participation_minutes_est),
+            Cell::Float(c.dialogue_minutes_est),
             Cell::text(&c.first_scene_number),
             Cell::text(&c.first_page),
             Cell::text(&c.first_document_title),
@@ -374,17 +462,47 @@ fn characters_table(b: &ReportBundle, multi: bool) -> ReportTable {
         "Speeches".into(),
         "Dialogue words".into(),
         "Share %".into(),
+        "Speaking (est.)".into(),
         "Scenes".into(),
+        "Participation (est.)".into(),
         "First appearance".into(),
     ];
     for c in &b.characters {
-        let sp = if c.dual_speeches > 0 { format!("{} ({} dual)", c.speeches, c.dual_speeches) } else { c.speeches.to_string() };
+        let mut ext = Vec::new();
+        if c.vo_speeches > 0 {
+            ext.push(format!("{} V.O.", c.vo_speeches));
+        }
+        if c.os_speeches > 0 {
+            ext.push(format!("{} O.S.", c.os_speeches));
+        }
+        if c.dual_speeches > 0 {
+            ext.push(format!("{} dual", c.dual_speeches));
+        }
+        let sp = if ext.is_empty() {
+            c.speeches.to_string()
+        } else {
+            format!("{} ({})", c.speeches, ext.join(", "))
+        };
+        let sc = if c.silent_scenes > 0 {
+            format!("{} ({} sp, {} sil)", c.total_scenes, c.scenes, c.silent_scenes)
+        } else {
+            c.scenes.to_string()
+        };
         let first = if multi {
             format!("{} · Sc {} (p. {})", c.first_document_title, c.first_scene_number, c.first_page)
         } else {
             format!("Sc {} (p. {})", c.first_scene_number, c.first_page)
         };
-        t.print_rows.push(vec![c.name.clone(), sp, c.words.to_string(), format!("{:.1}%", c.share_pct), c.scenes.to_string(), first]);
+        t.print_rows.push(vec![
+            c.name.clone(),
+            sp,
+            c.words.to_string(),
+            format!("{:.1}%", c.share_pct),
+            format!("{:.1} min", c.dialogue_minutes_est),
+            sc,
+            format!("{} p (~{:.1} min)", fmt_eighths(c.participation_eighths), c.participation_minutes_est),
+            first,
+        ]);
     }
     t
 }
@@ -623,6 +741,195 @@ fn revisions_table(b: &ReportBundle, multi: bool) -> ReportTable {
     t
 }
 
+fn tag_category_table(b: &ReportBundle, cat_key: &str, multi: bool) -> ReportTable {
+    let found = b.tag_reports.iter().find(|r| r.category.eq_ignore_ascii_case(cat_key));
+    let label = found.map(|c| c.label.clone()).unwrap_or_else(|| category_title(cat_key));
+    let items = found.map(|c| c.rows.len()).unwrap_or(0);
+    let occs = found.map(|c| c.total_occurrences).unwrap_or(0);
+    let scs = found.map(|c| c.distinct_scenes).unwrap_or(0);
+    let mut t = base_table(
+        b,
+        ReportKind::TagCategory(cat_key.to_ascii_lowercase()),
+        format!(
+            "{} item{} · {} total occurrence{} across {} distinct scene{}",
+            items,
+            if items == 1 { "" } else { "s" },
+            occs,
+            if occs == 1 { "" } else { "s" },
+            scs,
+            if scs == 1 { "" } else { "s" },
+        ),
+    );
+    t.title = format!("{label} Report");
+    t.headers = vec![
+        "Category".into(),
+        "Item".into(),
+        "Aliases".into(),
+        "Occurrences".into(),
+        "Distinct Scenes".into(),
+        "Length (eighths, est.)".into(),
+        "Length (pages, est.)".into(),
+        "Scenes".into(),
+        "Notes".into(),
+        "First Appearance Scene".into(),
+        "First Appearance Page".into(),
+        "First Document Title".into(),
+        "First Document ID".into(),
+        "First Scene ID".into(),
+        "Entity ID".into(),
+    ];
+    t.print_headers = vec![
+        "Item".into(),
+        "Occurrences".into(),
+        "Distinct scenes".into(),
+        "Length (est.)".into(),
+        "Scenes".into(),
+        "Notes".into(),
+    ];
+    if let Some(cat) = found {
+        for r in &cat.rows {
+            let scenes_list = r
+                .scene_links
+                .iter()
+                .map(|s| {
+                    if multi {
+                        format!("{} Sc {} ({}×)", s.document_title, s.scene_number, s.occurrences)
+                    } else {
+                        format!("Sc {} ({}×)", s.scene_number, s.occurrences)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let notes_joined = r.notes.join("; ");
+            t.rows.push(vec![
+                Cell::text(&cat.label),
+                Cell::text(&r.name),
+                Cell::text(r.aliases.join(", ")),
+                Cell::Int(r.occurrences as i64),
+                Cell::Int(r.scenes as i64),
+                Cell::Int(r.eighths as i64),
+                Cell::text(fmt_eighths(r.eighths)),
+                Cell::text(&scenes_list),
+                Cell::text(&notes_joined),
+                Cell::text(&r.first_scene_number),
+                Cell::text(&r.first_page),
+                Cell::text(&r.first_document_title),
+                Cell::text(&r.first_document_id),
+                Cell::text(&r.first_scene_id),
+                Cell::text(&r.entity_id),
+            ]);
+            let item_label = if r.aliases.is_empty() {
+                r.name.clone()
+            } else {
+                format!("{} ({})", r.name, r.aliases.join(", "))
+            };
+            t.print_rows.push(vec![
+                item_label,
+                r.occurrences.to_string(),
+                r.scenes.to_string(),
+                format!("{} p", fmt_eighths(r.eighths)),
+                scenes_list,
+                notes_joined,
+            ]);
+        }
+    }
+    t
+}
+
+fn tags_all_table(b: &ReportBundle, multi: bool) -> ReportTable {
+    let total_items: usize = b.tag_reports.iter().map(|c| c.rows.len()).sum();
+    let total_occs: usize = b.tag_reports.iter().map(|c| c.total_occurrences).sum();
+    let active_cats = b.tag_reports.iter().filter(|c| !c.rows.is_empty()).count();
+    let mut t = base_table(
+        b,
+        ReportKind::TagsAll,
+        format!(
+            "{} tagged item{} across {} categor{} · {} total occurrence{}",
+            total_items,
+            if total_items == 1 { "" } else { "s" },
+            active_cats,
+            if active_cats == 1 { "y" } else { "ies" },
+            total_occs,
+            if total_occs == 1 { "" } else { "s" },
+        ),
+    );
+    t.headers = vec![
+        "Category".into(),
+        "Item".into(),
+        "Aliases".into(),
+        "Occurrences".into(),
+        "Distinct Scenes".into(),
+        "Length (eighths, est.)".into(),
+        "Length (pages, est.)".into(),
+        "Scenes".into(),
+        "Notes".into(),
+        "First Appearance Scene".into(),
+        "First Appearance Page".into(),
+        "First Document Title".into(),
+        "First Document ID".into(),
+        "First Scene ID".into(),
+        "Entity ID".into(),
+    ];
+    t.print_headers = vec![
+        "Category".into(),
+        "Item".into(),
+        "Occurrences".into(),
+        "Distinct scenes".into(),
+        "Length (est.)".into(),
+        "Scenes".into(),
+        "Notes".into(),
+    ];
+    for cat in &b.tag_reports {
+        for r in &cat.rows {
+            let scenes_list = r
+                .scene_links
+                .iter()
+                .map(|s| {
+                    if multi {
+                        format!("{} Sc {} ({}×)", s.document_title, s.scene_number, s.occurrences)
+                    } else {
+                        format!("Sc {} ({}×)", s.scene_number, s.occurrences)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let notes_joined = r.notes.join("; ");
+            t.rows.push(vec![
+                Cell::text(&cat.label),
+                Cell::text(&r.name),
+                Cell::text(r.aliases.join(", ")),
+                Cell::Int(r.occurrences as i64),
+                Cell::Int(r.scenes as i64),
+                Cell::Int(r.eighths as i64),
+                Cell::text(fmt_eighths(r.eighths)),
+                Cell::text(&scenes_list),
+                Cell::text(&notes_joined),
+                Cell::text(&r.first_scene_number),
+                Cell::text(&r.first_page),
+                Cell::text(&r.first_document_title),
+                Cell::text(&r.first_document_id),
+                Cell::text(&r.first_scene_id),
+                Cell::text(&r.entity_id),
+            ]);
+            let item_label = if r.aliases.is_empty() {
+                r.name.clone()
+            } else {
+                format!("{} ({})", r.name, r.aliases.join(", "))
+            };
+            t.print_rows.push(vec![
+                cat.label.clone(),
+                item_label,
+                r.occurrences.to_string(),
+                r.scenes.to_string(),
+                format!("{} p", fmt_eighths(r.eighths)),
+                scenes_list,
+                notes_joined,
+            ]);
+        }
+    }
+    t
+}
+
 // --- CSV and TSV ------------------------------------------------------------------
 
 fn csv_cell(cell: &Cell, sep: char) -> String {
@@ -809,7 +1116,7 @@ pub fn export_xlsx(bundle: &ReportBundle, kind: ReportKind) -> Result<Vec<u8>, S
     let tables = if kind == ReportKind::All {
         build_all_tables(bundle)
     } else {
-        vec![build_table(bundle, kind)]
+        vec![build_table(bundle, kind.clone())]
     };
 
     let mut content_types = String::from(
@@ -837,7 +1144,7 @@ pub fn export_xlsx(bundle: &ReportBundle, kind: ReportKind) -> Result<Vec<u8>, S
         ));
         wb_sheets.push_str(&format!(
             "<sheet name=\"{}\" sheetId=\"{num}\" r:id=\"rIdSheet{num}\"/>",
-            xml_esc(t.kind.sheet_name())
+            xml_esc(&t.kind.sheet_name())
         ));
         wb_rels.push_str(&format!(
             "<Relationship Id=\"rIdSheet{num}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet{num}.xml\"/>"
@@ -858,7 +1165,7 @@ pub fn export_xlsx(bundle: &ReportBundle, kind: ReportKind) -> Result<Vec<u8>, S
 <cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\
 <dc:title>{}</dc:title><dc:creator>Kolbítar</dc:creator><dc:description>{}</dc:description>\
 </cp:coreProperties>",
-        xml_esc(kind.title()),
+        xml_esc(&kind.title()),
         xml_esc(&format!("{} · v{}", bundle.scope_label, bundle.source_version))
     );
 
@@ -909,7 +1216,7 @@ pub fn export_html(bundle: &ReportBundle, kind: ReportKind) -> String {
     let tables = if kind == ReportKind::All {
         build_all_tables(bundle)
     } else {
-        vec![build_table(bundle, kind)]
+        vec![build_table(bundle, kind.clone())]
     };
     let doc_title = format!("{} — {}", kind.title(), bundle.scope_label);
     let mut out = format!(
@@ -941,7 +1248,7 @@ tr {{ break-inside: avoid; }}\n\
 </header>\n\
 <main>\n",
         html_esc(&doc_title),
-        html_esc(kind.title()),
+        html_esc(&kind.title()),
         html_esc(&bundle.scope_label),
         bundle.source_version,
         bundle.planning_version,
@@ -1010,7 +1317,7 @@ pub fn export_rtf(bundle: &ReportBundle, kind: ReportKind) -> String {
     let tables = if kind == ReportKind::All {
         build_all_tables(bundle)
     } else {
-        vec![build_table(bundle, kind)]
+        vec![build_table(bundle, kind.clone())]
     };
     let mut s = String::from(
         "{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1\n\
@@ -1019,12 +1326,12 @@ pub fn export_rtf(bundle: &ReportBundle, kind: ReportKind) -> String {
     s.push_str(&format!(
         "{{\\info{{\\title {}}}{{\\author Kolb\\u237?tar}}}}\n\
 \\paperw12240\\paperh15840\\margl1080\\margr1080\\margt1080\\margb1080\\widowctrl\n",
-        rtf_esc(kind.title()),
+        rtf_esc(&kind.title()),
     ));
     s.push_str(&format!(
         "\\pard\\plain\\sb0\\sa120\\f0\\fs28\\b {}\\b0\\par\n\
 \\pard\\plain\\sb0\\sa180\\f0\\fs20 {}\\par\n",
-        rtf_esc(kind.title()),
+        rtf_esc(&kind.title()),
         rtf_esc(&format!(
             "Scope: {} | Source script v{} | Planning v{} | {} page{} | Scenes sum to ~{} pages (estimate). Page and eighth lengths are estimates from the layout.",
             bundle.scope_label,
@@ -1193,7 +1500,7 @@ pub fn export_pdf(
     let tables = if kind == ReportKind::All {
         build_all_tables(bundle)
     } else {
-        vec![build_table(bundle, kind)]
+        vec![build_table(bundle, kind.clone())]
     };
 
     let x_in = 1.0_f32;
@@ -1376,8 +1683,9 @@ mod tests {
     use crate::bible::Entity;
     use crate::model::{Beat, Block, BlockKind, Run};
     use crate::numbering::{Numbers, SceneNumber};
-    use crate::reports::{compute, DocInput, ReportScope, ScopeDoc};
+    use crate::reports::{compute, compute_with_tags, DocInput, ReportScope, ScopeDoc};
     use crate::revisions::RevisionSet;
+    use crate::tags::Tag;
     use std::io::Read;
 
     fn sample_bundle() -> ReportBundle {
@@ -1437,6 +1745,7 @@ mod tests {
             page_lock: None,
             revision_sets: vec![rev],
             active_revision: Some("r1".into()),
+            tags: Vec::new(),
         };
 
         compute(
@@ -1515,5 +1824,70 @@ mod tests {
         let pdf_again = export_pdf(&bundle, ReportKind::All, &Profile::us_letter(), 1_767_225_600, "test-doc").unwrap();
         assert_eq!(pdf, pdf_again, "PDF bytes are deterministic");
         assert!(pdf.starts_with(b"%PDF-"));
+    }
+
+    #[test]
+    fn single_tag_category_and_character_participation_export_independently() {
+        let mut s1 = Block::new(BlockKind::Heading, "INT. ARCHIVE - NIGHT");
+        s1.id = "b_s1".into();
+        let mut a1 = Block::new(BlockKind::Action, "A brass key and a second brass key rest on the desk.");
+        a1.id = "b_a1".into();
+        let doc = DocInput {
+            id: "doc_ep2".into(),
+            title: "Episode 2".into(),
+            profile: Profile::us_letter(),
+            blocks: vec![s1, a1],
+            tags: vec![
+                Tag {
+                    id: "t1".into(),
+                    document_id: "doc_ep2".into(),
+                    block_id: "b_a1".into(),
+                    start: 2,
+                    end: 11,
+                    quote: "brass key".into(),
+                    category: "props".into(),
+                    entity_id: "ent_key".into(),
+                    note: "Hero prop".into(),
+                    orphaned: false,
+                },
+                Tag {
+                    id: "t2".into(),
+                    document_id: "doc_ep2".into(),
+                    block_id: "b_a1".into(),
+                    start: 25,
+                    end: 34,
+                    quote: "brass key".into(),
+                    category: "props".into(),
+                    entity_id: "ent_key".into(),
+                    note: String::new(),
+                    orphaned: false,
+                },
+            ],
+            ..DocInput::default()
+        };
+        let ent = Entity {
+            id: "ent_key".into(),
+            kind: "object".into(),
+            name: "BRASS KEY".into(),
+            aliases: vec!["IRON KEY".into()],
+            ..Entity::default()
+        };
+        let bundle = compute_with_tags(
+            &[doc],
+            vec![ScopeDoc { id: "doc_ep2".into(), title: "Episode 2".into() }],
+            &[ent],
+            &[],
+            ReportScope { mode: "episodes".into(), documents: vec!["doc_ep2".into()], include_omitted: false },
+            11,
+            4,
+        );
+
+        let kind = ReportKind::parse("props").unwrap();
+        assert_eq!(kind, ReportKind::TagCategory("props".into()));
+        let csv = export_csv(&bundle, kind);
+        assert!(csv.contains("Report,Props Report"));
+        assert!(csv.contains("Episode 2"));
+        assert!(csv.contains("Props,BRASS KEY,IRON KEY,2,1,"), "2 occurrences vs 1 distinct scene in CSV: {csv}");
+        assert!(csv.contains("Sc 1 (2×)"));
     }
 }

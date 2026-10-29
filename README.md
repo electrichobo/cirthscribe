@@ -117,7 +117,8 @@ Then the plan itself:
 
 - [x] Script breakdown tags (props, wardrobe, cast and more, linked to the project bible with aliases and suggested tags; View > Tools > Breakdown Tags…)
 - [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
-- [x] Initial reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, and revisions (breakdown-tag reports and silent-character participation next)
+- [x] Reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, revisions, and breakdown tag categories (occurrences and distinct scenes kept apart)
+- [x] Character participation: speaking scenes, present-but-silent scenes (cast tags), V.O./O.S./dual speeches, dialogue share, and documented participation estimates
 - [ ] Character sides: a character's scenes as pages for actors
 - [ ] Stripboard and shooting schedule
 - [x] Page counts in eighths, and character appearance charts

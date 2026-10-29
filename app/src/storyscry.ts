@@ -44,18 +44,71 @@ export interface SceneRow {
   logline: string;
 }
 
+export interface CharacterSceneRef {
+  document_id: string;
+  document_title: string;
+  scene_id: string;
+  scene_number: string;
+  page: string;
+  eighths: number;
+  role: "speaking" | "silent" | "both" | string;
+}
+
 export interface CharacterRow {
   name: string;
   speeches: number;
+  vo_speeches: number;
+  os_speeches: number;
   dual_speeches: number;
   words: number;
   share_pct: number;
   scenes: number;
+  silent_scenes: number;
+  total_scenes: number;
+  participation_eighths: number;
+  participation_minutes_est: number;
+  dialogue_minutes_est: number;
   first_document_id: string;
   first_document_title: string;
   first_scene_id: string;
   first_scene_number: string;
   first_page: string;
+  scene_links: CharacterSceneRef[];
+}
+
+export interface TagSceneRef {
+  document_id: string;
+  document_title: string;
+  scene_id: string;
+  scene_number: string;
+  heading: string;
+  page: string;
+  eighths: number;
+  occurrences: number;
+}
+
+export interface TagItemRow {
+  entity_id: string;
+  name: string;
+  aliases: string[];
+  occurrences: number;
+  scenes: number;
+  eighths: number;
+  notes: string[];
+  first_document_id: string;
+  first_document_title: string;
+  first_scene_id: string;
+  first_scene_number: string;
+  first_page: string;
+  scene_links: TagSceneRef[];
+}
+
+export interface TagCategoryReport {
+  category: string;
+  label: string;
+  total_occurrences: number;
+  distinct_scenes: number;
+  rows: TagItemRow[];
 }
 
 export interface LocationRow {
@@ -143,6 +196,7 @@ export interface ReportBundle {
   int_ext: BucketRow[];
   day_night: BucketRow[];
   revisions: RevisionRow[];
+  tag_reports: TagCategoryReport[];
 }
 
 export type ReportTab =
@@ -153,7 +207,8 @@ export type ReportTab =
   | "action_dialogue"
   | "int_ext"
   | "day_night"
-  | "revisions";
+  | "revisions"
+  | "tags";
 
 export type ExportableReport =
   | "all"
@@ -163,7 +218,9 @@ export type ExportableReport =
   | "action_dialogue"
   | "int_ext"
   | "day_night"
-  | "revisions";
+  | "revisions"
+  | "tags"
+  | string;
 
 export type ReportFormat = "xlsx" | "csv" | "tsv" | "pdf" | "html" | "rtf";
 
@@ -188,6 +245,7 @@ const TABS: { id: ReportTab; label: string }[] = [
   { id: "int_ext", label: "Interior vs Exterior" },
   { id: "day_night", label: "Day vs Night" },
   { id: "revisions", label: "Revisions" },
+  { id: "tags", label: "Breakdown Tags" },
 ];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -437,6 +495,142 @@ function revisionsChart(revs: RevisionRow[]): HTMLElement {
   return wrap;
 }
 
+/**
+ * Character participation & dialogue chart (E6, E7, E8):
+ * compares speaking scenes vs silent scenes (from cast breakdown tags),
+ * estimated scene participation length (1 page = 8 eighths ≈ 1.0 min), and
+ * estimated dialogue speaking time (150 words ≈ 1.0 min).
+ */
+function characterParticipationChart(chars: CharacterRow[]): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "storyscry-chart-wrap";
+  if (!chars.length) {
+    const empty = document.createElement("p");
+    empty.className = "form-note";
+    empty.textContent = "No characters in the selected scope.";
+    wrap.append(empty);
+    return wrap;
+  }
+  const top = chars.slice(0, 8);
+  const maxPartE = Math.max(...top.map((c) => c.participation_eighths), 8);
+  const h = top.length * 26 + 20;
+  const svg = svgEl("svg", {
+    viewBox: `0 0 420 ${h}`,
+    class: "storyscry-svg",
+    role: "img",
+    "aria-label": "Character scene participation and dialogue speaking time estimates",
+  });
+  const x0 = 104;
+  const maxW = 140;
+  top.forEach((c, i) => {
+    const y = 8 + i * 26;
+    const lbl = svgEl("text", { x: 4, y: y + 11, class: "chart-label" });
+    lbl.textContent = c.name.length > 14 ? `${c.name.slice(0, 13)}…` : c.name;
+    // Participation bar (speaking + silent scene eighths, estimate).
+    const partW = Math.max(2, (c.participation_eighths / maxPartE) * maxW);
+    const speakRatio = c.total_scenes > 0 ? c.scenes / c.total_scenes : 1;
+    const speakW = Math.max(c.scenes > 0 ? 2 : 0, partW * speakRatio);
+    const silentW = Math.max(0, partW - speakW);
+    if (speakW > 0) {
+      svg.append(
+        svgEl("rect", {
+          x: x0,
+          y,
+          width: speakW.toFixed(1),
+          height: 11,
+          rx: 2,
+          class: `chart-slice chart-c${i % 6}`,
+          "data-character": c.name,
+          "data-participation-eighths": c.participation_eighths,
+          "data-silent-scenes": c.silent_scenes,
+        }),
+      );
+    }
+    if (silentW > 0) {
+      svg.append(
+        svgEl("rect", {
+          x: (x0 + speakW).toFixed(1),
+          y,
+          width: silentW.toFixed(1),
+          height: 11,
+          rx: 2,
+          class: `chart-slice chart-c${(i + 2) % 6}`,
+          "stroke-dasharray": "4,2",
+        }),
+      );
+    }
+    const val = svgEl("text", { x: x0 + maxW + 8, y: y + 11, class: "chart-sub" });
+    const silentNote = c.silent_scenes > 0 ? `+${c.silent_scenes} sil` : "";
+    val.textContent = `${c.scenes}${silentNote} sc · ≈${c.participation_minutes_est.toFixed(1)}m part. · ≈${c.dialogue_minutes_est.toFixed(1)}m dlg (est.)`;
+    svg.append(lbl, val);
+  });
+  wrap.append(svg);
+  return wrap;
+}
+
+/**
+ * Paired bar chart for breakdown tags (E1, E2, E8):
+ * keeps total occurrences and distinct scenes visually and numerically separate.
+ */
+function tagBreakdownChart(
+  title: string,
+  items: { label: string; occurrences: number; scenes: number }[],
+): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "storyscry-chart-wrap";
+  const nonZero = items.filter((it) => it.occurrences > 0);
+  if (!nonZero.length) {
+    const empty = document.createElement("p");
+    empty.className = "form-note";
+    empty.textContent = "No breakdown tags in the selected scope.";
+    wrap.append(empty);
+    return wrap;
+  }
+  const top = nonZero.slice(0, 8);
+  const maxOcc = Math.max(...top.map((it) => it.occurrences), 1);
+  const h = top.length * 26 + 16;
+  const svg = svgEl("svg", {
+    viewBox: `0 0 340 ${h}`,
+    class: "storyscry-svg",
+    role: "img",
+    "aria-label": title,
+  });
+  const x0 = 112;
+  const maxW = 120;
+  top.forEach((it, i) => {
+    const y = 6 + i * 26;
+    const lbl = svgEl("text", { x: 4, y: y + 12, class: "chart-label" });
+    lbl.textContent = it.label.length > 15 ? `${it.label.slice(0, 14)}…` : it.label;
+    const occW = Math.max(3, (it.occurrences / maxOcc) * maxW);
+    const scW = Math.max(3, (it.scenes / maxOcc) * maxW);
+    const occRect = svgEl("rect", {
+      x: x0,
+      y,
+      width: occW.toFixed(1),
+      height: 8,
+      rx: 1,
+      class: `chart-slice chart-c${i % 6}`,
+      "data-tag-label": it.label,
+      "data-occurrences": it.occurrences,
+      "data-scenes": it.scenes,
+    });
+    const scRect = svgEl("rect", {
+      x: x0,
+      y: y + 10,
+      width: scW.toFixed(1),
+      height: 8,
+      rx: 1,
+      class: `chart-slice chart-c${(i + 1) % 6}`,
+      "stroke-dasharray": "4,2",
+    });
+    const val = svgEl("text", { x: x0 + maxW + 8, y: y + 13, class: "chart-sub" });
+    val.textContent = `${it.occurrences} occ · ${it.scenes} sc`;
+    svg.append(lbl, occRect, scRect, val);
+  });
+  wrap.append(svg);
+  return wrap;
+}
+
 export function createStoryScry(hooks: {
   fetch: (scope: ReportScope) => Promise<ReportBundle>;
   versions: () => { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
@@ -539,16 +733,29 @@ export function createStoryScry(hooks: {
   const exportReportSel = document.createElement("select");
   exportReportSel.id = "storyscry-export-report";
   exportReportSel.setAttribute("aria-label", "Report to export");
-  exportReportSel.append(
-    new Option("All reports", "all"),
-    new Option("Scenes report", "scenes"),
-    new Option("Characters report", "characters"),
-    new Option("Locations report", "locations"),
-    new Option("Action vs Dialogue report", "action_dialogue"),
-    new Option("Interior vs Exterior report", "int_ext"),
-    new Option("Day vs Night report", "day_night"),
-    new Option("Revisions report", "revisions"),
-  );
+  function syncExportOptions(d: ReportBundle | null) {
+    const prev = exportReportSel.value;
+    exportReportSel.replaceChildren(
+      new Option("All reports", "all"),
+      new Option("Scenes report", "scenes"),
+      new Option("Characters report", "characters"),
+      new Option("Locations report", "locations"),
+      new Option("Action vs Dialogue report", "action_dialogue"),
+      new Option("Interior vs Exterior report", "int_ext"),
+      new Option("Day vs Night report", "day_night"),
+      new Option("Revisions report", "revisions"),
+      new Option("Breakdown Tags report (all categories)", "tags"),
+    );
+    if (d?.tag_reports) {
+      for (const cat of d.tag_reports) {
+        exportReportSel.append(new Option(`${cat.label} report (breakdown)`, `tag:${cat.category}`));
+      }
+    }
+    if (prev && [...exportReportSel.options].some((o) => o.value === prev)) {
+      exportReportSel.value = prev;
+    }
+  }
+  syncExportOptions(null);
   const exportFormatSel = document.createElement("select");
   exportFormatSel.id = "storyscry-export-format";
   exportFormatSel.setAttribute("aria-label", "Report export format");
@@ -582,6 +789,7 @@ export function createStoryScry(hooks: {
 
   let data: ReportBundle | null = null;
   let tab: ReportTab = "dashboard";
+  let selectedTagCategory = "";
   let showTables = false;
   let chosenDocs = new Set<string>();
   let sortCol = "";
@@ -661,7 +869,13 @@ export function createStoryScry(hooks: {
       sortAsc = true;
     }
     tab = next;
-    exportReportSel.value = tab === "dashboard" ? "all" : tab;
+    if (tab === "dashboard") {
+      exportReportSel.value = "all";
+    } else if (tab === "tags") {
+      exportReportSel.value = selectedTagCategory ? `tag:${selectedTagCategory}` : "tags";
+    } else {
+      exportReportSel.value = tab;
+    }
     for (const [id, b] of tabButtons) {
       const on = id === tab;
       b.classList.toggle("current", on);
@@ -784,12 +998,20 @@ export function createStoryScry(hooks: {
     addCard(
       "characters",
       "Characters",
-      `${d.characters.length} speaking character${d.characters.length === 1 ? "" : "s"}`,
+      `${d.characters.length} character${d.characters.length === 1 ? "" : "s"}`,
       () => characterDotPlot(d.characters),
       () =>
         compactTable(
-          ["Character", "Speeches", "Words", "Share", "Scenes"],
-          d.characters.slice(0, 8).map((c) => [c.name, String(c.speeches), String(c.words), `${c.share_pct}%`, String(c.scenes)]),
+          ["Character", "Speeches", "Words", "Share", "Speaking sc", "Silent sc", "Participation (est.)"],
+          d.characters.slice(0, 8).map((c) => [
+            c.name,
+            String(c.speeches),
+            String(c.words),
+            `${c.share_pct}%`,
+            String(c.scenes),
+            String(c.silent_scenes),
+            `${eighths(c.participation_eighths)} p (~${c.participation_minutes_est.toFixed(1)} min)`,
+          ]),
         ),
     );
 
@@ -869,6 +1091,35 @@ export function createStoryScry(hooks: {
         ),
     );
 
+    const activeTagCats = d.tag_reports.filter((c) => c.rows.length > 0);
+    const totalTaggedItems = activeTagCats.reduce((acc, c) => acc + c.rows.length, 0);
+    const totalTagOccurrences = activeTagCats.reduce((acc, c) => acc + c.total_occurrences, 0);
+    const allTagItems: { catLabel: string; row: TagItemRow }[] = [];
+    for (const c of d.tag_reports) {
+      for (const r of c.rows) allTagItems.push({ catLabel: c.label, row: r });
+    }
+    allTagItems.sort((a, b) => b.row.occurrences - a.row.occurrences || b.row.scenes - a.row.scenes || a.row.name.localeCompare(b.row.name));
+    addCard(
+      "tags",
+      "Breakdown Tags",
+      `${totalTaggedItems} item${totalTaggedItems === 1 ? "" : "s"} · ${totalTagOccurrences} occurrence${totalTagOccurrences === 1 ? "" : "s"} across ${activeTagCats.length} categor${activeTagCats.length === 1 ? "y" : "ies"}`,
+      () =>
+        tagBreakdownChart(
+          "Breakdown tags — occurrences vs distinct scenes",
+          allTagItems.map((it) => ({ label: it.row.name, occurrences: it.row.occurrences, scenes: it.row.scenes })),
+        ),
+      () =>
+        compactTable(
+          ["Category", "Items", "Occurrences", "Distinct scenes"],
+          (activeTagCats.length ? activeTagCats : d.tag_reports.slice(0, 6)).map((c) => [
+            c.label,
+            String(c.rows.length),
+            String(c.total_occurrences),
+            String(c.distinct_scenes),
+          ]),
+        ),
+    );
+
     body.append(grid);
   }
 
@@ -911,7 +1162,14 @@ export function createStoryScry(hooks: {
         break;
       }
       case "characters": {
+        const note = document.createElement("p");
+        note.className = "form-note";
+        note.id = "storyscry-characters-estimate-note";
+        note.textContent =
+          "Estimate method: scene participation uses 1 page = 8 eighths ≈ 1.0 min (speaking + silent scenes from cast tags; overlapping character durations are not divided and do not sum to 100% of runtime); dialogue speaking time uses 150 words ≈ 1.0 min.";
         body.append(
+          note,
+          characterParticipationChart(d.characters),
           makeSortableTable<CharacterRow>(
             "storyscry-characters-table",
             [
@@ -920,23 +1178,62 @@ export function createStoryScry(hooks: {
                 key: "speeches",
                 label: "Speeches",
                 val: (r) => r.speeches,
-                cell: (td, r) => (td.textContent = r.dual_speeches ? `${r.speeches} (${r.dual_speeches} dual)` : String(r.speeches)),
+                cell: (td, r) => {
+                  const quals: string[] = [];
+                  if (r.vo_speeches) quals.push(`${r.vo_speeches} V.O.`);
+                  if (r.os_speeches) quals.push(`${r.os_speeches} O.S.`);
+                  if (r.dual_speeches) quals.push(`${r.dual_speeches} dual`);
+                  td.textContent = quals.length ? `${r.speeches} (${quals.join(", ")})` : String(r.speeches);
+                },
               },
               { key: "words", label: "Dialogue words", val: (r) => r.words, cell: (td, r) => (td.textContent = r.words.toLocaleString()) },
               { key: "share", label: "Share of dialogue", val: (r) => r.share_pct, cell: (td, r) => (td.textContent = `${r.share_pct}%`) },
+              {
+                key: "dlg_min",
+                label: "Speaking time (est.)",
+                val: (r) => r.dialogue_minutes_est,
+                cell: (td, r) => (td.textContent = `${r.dialogue_minutes_est.toFixed(1)} min`),
+              },
               { key: "scenes", label: "Scenes speaking", val: (r) => r.scenes, cell: (td, r) => (td.textContent = String(r.scenes)) },
+              {
+                key: "silent_scenes",
+                label: "Silent scenes (cast tags)",
+                val: (r) => r.silent_scenes,
+                cell: (td, r) => (td.textContent = String(r.silent_scenes)),
+              },
+              {
+                key: "participation",
+                label: "Participation (est.)",
+                val: (r) => r.participation_eighths,
+                cell: (td, r) => (td.textContent = `${eighths(r.participation_eighths)} p (~${r.participation_minutes_est.toFixed(1)} min)`),
+              },
               {
                 key: "first",
                 label: "First appearance",
                 val: (r) => `${r.first_document_title} ${r.first_scene_number}`,
-                cell: (td, r) =>
-                  td.append(
-                    sceneBtn(
-                      `${multiDoc ? `${r.first_document_title} · ` : ""}Scene ${r.first_scene_number} (p. ${r.first_page})`,
-                      r.first_document_id,
-                      r.first_scene_id,
-                    ),
-                  ),
+                cell: (td, r) => {
+                  if (r.scene_links && r.scene_links.length > 0) {
+                    r.scene_links.forEach((s, idx) => {
+                      if (idx > 0) td.append(document.createTextNode(" "));
+                      const roleSuffix = s.role === "silent" ? " [silent]" : s.role === "both" ? " [speak+tag]" : "";
+                      td.append(
+                        sceneBtn(
+                          `${multiDoc ? `${s.document_title} · ` : ""}Scene ${s.scene_number} (p. ${s.page})${roleSuffix}`,
+                          s.document_id,
+                          s.scene_id,
+                        ),
+                      );
+                    });
+                  } else {
+                    td.append(
+                      sceneBtn(
+                        `${multiDoc ? `${r.first_document_title} · ` : ""}Scene ${r.first_scene_number} (p. ${r.first_page})`,
+                        r.first_document_id,
+                        r.first_scene_id,
+                      ),
+                    );
+                  }
+                },
               },
             ],
             d.characters,
@@ -1051,6 +1348,123 @@ export function createStoryScry(hooks: {
         );
         break;
       }
+      case "tags": {
+        const filterRow = document.createElement("div");
+        filterRow.className = "storyscry-controls";
+        const catLab = document.createElement("label");
+        catLab.textContent = "Category: ";
+        const catSel = document.createElement("select");
+        catSel.id = "storyscry-tag-category";
+        catSel.setAttribute("aria-label", "Breakdown tag category");
+        catSel.append(new Option("All categories", ""));
+        for (const c of d.tag_reports) {
+          catSel.append(new Option(`${c.label} (${c.total_occurrences} occ · ${c.distinct_scenes} sc)`, c.category));
+        }
+        if (selectedTagCategory && !d.tag_reports.some((c) => c.category === selectedTagCategory)) {
+          selectedTagCategory = "";
+        }
+        catSel.value = selectedTagCategory;
+        catSel.addEventListener("change", () => {
+          selectedTagCategory = catSel.value;
+          exportReportSel.value = selectedTagCategory ? `tag:${selectedTagCategory}` : "tags";
+          draw();
+        });
+        catLab.append(catSel);
+        filterRow.append(catLab);
+
+        type FlatTagRow = { catSlug: string; catLabel: string; row: TagItemRow };
+        const flatRows: FlatTagRow[] = [];
+        for (const c of d.tag_reports) {
+          if (selectedTagCategory && c.category !== selectedTagCategory) continue;
+          for (const r of c.rows) flatRows.push({ catSlug: c.category, catLabel: c.label, row: r });
+        }
+        const activeCat = d.tag_reports.find((c) => c.category === selectedTagCategory);
+        const chartTitle = activeCat
+          ? `${activeCat.label} — occurrences vs distinct scenes`
+          : "All breakdown tags — occurrences vs distinct scenes";
+        body.append(
+          filterRow,
+          tagBreakdownChart(
+            chartTitle,
+            flatRows.map((f) => ({ label: f.row.name, occurrences: f.row.occurrences, scenes: f.row.scenes })),
+          ),
+          makeSortableTable<FlatTagRow>(
+            "storyscry-tags-table",
+            [
+              ...(selectedTagCategory
+                ? []
+                : [
+                    {
+                      key: "category",
+                      label: "Category",
+                      val: (r: FlatTagRow) => r.catLabel,
+                      cell: (td: HTMLTableCellElement, r: FlatTagRow) => (td.textContent = r.catLabel),
+                    },
+                  ]),
+              {
+                key: "name",
+                label: "Item",
+                val: (r) => r.row.name,
+                cell: (td, r) => (td.textContent = r.row.aliases.length ? `${r.row.name} (${r.row.aliases.join(", ")})` : r.row.name),
+              },
+              {
+                key: "occurrences",
+                label: "Occurrences",
+                val: (r) => r.row.occurrences,
+                cell: (td, r) => (td.textContent = String(r.row.occurrences)),
+              },
+              {
+                key: "scenes",
+                label: "Distinct scenes",
+                val: (r) => r.row.scenes,
+                cell: (td, r) => (td.textContent = String(r.row.scenes)),
+              },
+              {
+                key: "eighths",
+                label: "Length (est.)",
+                val: (r) => r.row.eighths,
+                cell: (td, r) => (td.textContent = `${eighths(r.row.eighths)} p`),
+              },
+              {
+                key: "scene_links",
+                label: "Scenes",
+                val: (r) => r.row.scene_links.map((s) => s.scene_number).join(" "),
+                cell: (td, r) => {
+                  r.row.scene_links.forEach((s, idx) => {
+                    if (idx > 0) td.append(document.createTextNode(" "));
+                    td.append(
+                      sceneBtn(
+                        `${multiDoc ? `${s.document_title} · ` : ""}Scene ${s.scene_number} (p. ${s.page}, ${s.occurrences}×)`,
+                        s.document_id,
+                        s.scene_id,
+                      ),
+                    );
+                  });
+                },
+              },
+              {
+                key: "notes",
+                label: "Notes",
+                val: (r) => r.row.notes.join("; "),
+                cell: (td, r) => (td.textContent = r.row.notes.join("; ") || "—"),
+              },
+            ],
+            flatRows,
+            (r, q) =>
+              [
+                r.catLabel,
+                r.row.name,
+                ...r.row.aliases,
+                ...r.row.notes,
+                ...r.row.scene_links.map((s) => `${s.scene_number} ${s.heading}`),
+              ]
+                .join(" ")
+                .toLowerCase()
+                .includes(q),
+          ),
+        );
+        break;
+      }
     }
   }
 
@@ -1077,6 +1491,10 @@ export function createStoryScry(hooks: {
     const bundle = await hooks.fetch(currentScope());
     if (seq !== loadingSeq) return;
     data = bundle;
+    syncExportOptions(bundle);
+    if (tab === "tags" && selectedTagCategory) {
+      exportReportSel.value = `tag:${selectedTagCategory}`;
+    }
     if (scopeSel.value === "episodes" && !chosenDocs.size) {
       for (const d of bundle.documents) chosenDocs.add(d.id);
     }
@@ -1112,7 +1530,7 @@ export function createStoryScry(hooks: {
   return {
     async open(initialTab: ReportTab = "dashboard") {
       tab = initialTab;
-      exportReportSel.value = tab === "dashboard" ? "all" : tab;
+      exportReportSel.value = tab === "dashboard" ? "all" : tab === "tags" && selectedTagCategory ? `tag:${selectedTagCategory}` : tab;
       exportStatus.textContent = "";
       for (const [id, b] of tabButtons) {
         const on = id === tab;

@@ -3215,7 +3215,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(d0.scenes.length === scenes0.length - 1 && d0.omitted_in_scope === 1, `omitted scene excluded by default: ${d0.scenes.length} shown, ${d0.omitted_in_scope} omitted`);
     const stamp0 = await app.evaluate("document.getElementById('storyscry-stamp').textContent");
     assert(stamp0.includes(`v${d0.source_version}`) && /1 omitted scene excluded/.test(stamp0) && /estimate/.test(stamp0), `stamp states scope, version and estimate: ${stamp0}`);
-    assert((await app.evaluate("document.querySelectorAll('#storyscry-body .storyscry-card').length")) === 7, "seven report cards on the dashboard");
+    assert((await app.evaluate("document.querySelectorAll('#storyscry-body .storyscry-card').length")) === 8, "eight report cards on the dashboard");
     assert((await app.evaluate("document.querySelectorAll('#storyscry-body svg.storyscry-svg').length")) >= 6, "SVG charts rendered");
     // Every Nightingale slice has a stroke-dasharray and every legend item has a symbol + text so colour is never the only signal.
     const a11ySignals = await app.evaluate(`(() => {
@@ -3227,7 +3227,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
     // E8: "Show charts as tables" renders tables from the exact same report rows.
     await app.evaluate("(document.getElementById('storyscry-tables-toggle').click(), true)");
-    await waitFor(app, "document.querySelectorAll('#storyscry-body table.storyscry-mini-table').length === 7", "seven mini tables shown");
+    await waitFor(app, "document.querySelectorAll('#storyscry-body table.storyscry-mini-table').length === 8", "eight mini tables shown");
     const miniSceneRows = await app.evaluate("document.querySelectorAll('#storyscry-body [data-report=\"scenes\"] tbody tr').length");
     assert(miniSceneRows === d0.scenes.length, `dashboard table rows (${miniSceneRows}) match report scenes (${d0.scenes.length})`);
     await app.evaluate("(document.getElementById('storyscry-tables-toggle').click(), true)");
@@ -3485,6 +3485,207 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     ts = await app.evaluate("window.__TAURI_INTERNALS__.invoke('tags_state').then(s => s.tags)");
     const recoveredTag = ts.find((t) => t.quote === "the red ledger");
     assert(recoveredTag && recoveredTag.orphaned === false && recoveredTag.start === 13 && recoveredTag.end === 27, `script undo auto-recovers the orphaned tag: ${JSON.stringify(recoveredTag)}`);
+  });
+
+  await test("Tag reports and character participation (E1, E2, E6, E7, E8): occurrences vs distinct scenes, single-category export, V.O./O.S./dual speeches, silent cast tags and overlapping participation estimates", async () => {
+    await openFixture("page-boundaries");
+
+    // Add (V.O.) to PELL in Scene 2 and (O.S.) to MARGIT in Scene 3 so speaking extensions are exercised alongside dual dialogue.
+    const b0 = await blocks();
+    const pellIdx = b0.findIndex((b) => b.kind === "character" && text(b) === "PELL");
+    await caretAtEndOf(pellIdx);
+    await typeText(" (V.O.)");
+    const margitIdx = (await blocks()).findIndex((b) => b.kind === "character" && text(b) === "MARGIT");
+    await caretAtEndOf(margitIdx);
+    await typeText(" (O.S.)");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    const bs = await blocks();
+    const docId = await app.evaluate("__cirth.lastOpen.document_id");
+    const sc1Action = bs.find((b) => b.kind === "action" && text(b).startsWith("INES has been talking"));
+    const sc2Action = bs.find((b) => b.kind === "action" && text(b).startsWith("filler000"));
+    const sc3Action = bs.find((b) => b.kind === "action" && text(b).startsWith("The lamp turns amber."));
+    const sc4Action = bs.find((b) => b.kind === "action" && text(b).startsWith("Action after a wrapped heading."));
+    assert(sc1Action && sc2Action && sc3Action && sc4Action, "found action blocks in all 4 scenes");
+
+    const applyPlanning = async (op) => {
+      const base = (await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now')")).version;
+      await app.evaluate(`window.__TAURI_INTERNALS__.invoke('planning_command', { op: ${JSON.stringify(op)}, base: ${base} })`);
+    };
+
+    // Bible entities: INES (alias TOBIAS), SILENT CLERK (cast), and Amber Lamp (props).
+    await applyPlanning({
+      PutEntity: { id: "ent-ines", kind: "character", name: "INES", aliases: ["TOBIAS"], description: "", tags: [] },
+    });
+    await applyPlanning({
+      PutEntity: { id: "ent-clerk", kind: "cast", name: "SILENT CLERK", aliases: [], description: "Non-speaking clerk", tags: [] },
+    });
+    await applyPlanning({
+      PutEntity: { id: "ent-lamp", kind: "props", name: "Amber Lamp", aliases: ["amber"], description: "Signal lamp", tags: [] },
+    });
+
+    // E2: Tag "Amber Lamp" twice in Scene 3 ("The lamp" and "amber again") and once in Scene 4 ("wrapped") -> 3 occurrences, 2 distinct scenes.
+    await applyPlanning({
+      PutTag: {
+        id: "tag-lamp-1",
+        document_id: docId,
+        block_id: sc3Action.id,
+        start: 0,
+        end: 8,
+        quote: "The lamp",
+        category: "props",
+        entity_id: "ent-lamp",
+        note: "First flash",
+        orphaned: false,
+      },
+    });
+    await applyPlanning({
+      PutTag: {
+        id: "tag-lamp-2",
+        document_id: docId,
+        block_id: sc3Action.id,
+        start: 39,
+        end: 50,
+        quote: "amber again",
+        category: "props",
+        entity_id: "ent-lamp",
+        note: "Second flash in same scene",
+        orphaned: false,
+      },
+    });
+    await applyPlanning({
+      PutTag: {
+        id: "tag-lamp-3",
+        document_id: docId,
+        block_id: sc4Action.id,
+        start: 15,
+        end: 22,
+        quote: "wrapped",
+        category: "props",
+        entity_id: "ent-lamp",
+        note: "Carried into bakery",
+        orphaned: false,
+      },
+    });
+
+    // E6 & E7: Tag INES as present-but-silent in Scene 2, and SILENT CLERK as present-but-silent in Scene 1.
+    await applyPlanning({
+      PutTag: {
+        id: "tag-ines-silent",
+        document_id: docId,
+        block_id: sc2Action.id,
+        start: 0,
+        end: 9,
+        quote: "filler000",
+        category: "cast",
+        entity_id: "ent-ines",
+        note: "Listening silently",
+        orphaned: false,
+      },
+    });
+    await applyPlanning({
+      PutTag: {
+        id: "tag-clerk-silent",
+        document_id: docId,
+        block_id: sc1Action.id,
+        start: 14,
+        end: 21,
+        quote: "talking",
+        category: "cast",
+        entity_id: "ent-clerk",
+        note: "At the desk",
+        orphaned: false,
+      },
+    });
+    await app.evaluate("__cirth.reloadPlanning()");
+
+    // Open StoryScry and inspect the Breakdown Tags report (E1, E2, E8).
+    await app.evaluate("(__cirth.menu('storyscry'), true)");
+    await waitFor(app, "document.getElementById('storyscry-dialog')?.open === true && !!__cirth.storyScry.data", "StoryScry opens");
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"tags\"]').click(), true)");
+    await waitFor(app, "!!document.getElementById('storyscry-tags-table')", "Breakdown Tags report table rendered");
+    await audit("StoryScry breakdown tags report");
+    await screenshot(app, "storyscry-tags");
+
+    // E2 & E8: Table row and SVG chart agree that Amber Lamp has 3 total occurrences across 2 distinct scenes.
+    const lampReport = await app.evaluate(`(() => {
+      const cat = __cirth.storyScry.data.tag_reports.find(c => c.category === 'props');
+      const row = cat?.rows.find(r => r.name === 'Amber Lamp');
+      const svgRect = document.querySelector('#storyscry-body svg.storyscry-svg rect[data-tag-label="Amber Lamp"]');
+      const tr = [...document.querySelectorAll('#storyscry-tags-table tbody tr')].find(r => r.textContent.includes('Amber Lamp'));
+      return {
+        row,
+        svgOcc: Number(svgRect?.getAttribute('data-occurrences')),
+        svgScenes: Number(svgRect?.getAttribute('data-scenes')),
+        trCells: tr ? [...tr.cells].map(c => c.textContent.trim()) : [],
+      };
+    })()`);
+    assert(lampReport.row && lampReport.row.occurrences === 3 && lampReport.row.scenes === 2, `E2: 3 occurrences vs 2 distinct scenes: ${JSON.stringify(lampReport.row)}`);
+    assert(lampReport.svgOcc === 3 && lampReport.svgScenes === 2, `E8: SVG chart matches table (3 occ, 2 sc): ${JSON.stringify(lampReport)}`);
+    assert(lampReport.trCells[2] === "3" && lampReport.trCells[3] === "2", `table columns show 3 occurrences and 2 distinct scenes: ${JSON.stringify(lampReport.trCells)}`);
+
+    // Filter to a single category ("props") and export ONLY the Props report without exporting any other report (E1).
+    await app.evaluate(`(() => {
+      const sel = document.getElementById('storyscry-tag-category');
+      sel.value = 'props';
+      sel.dispatchEvent(new Event('change'));
+      return true;
+    })()`);
+    assert((await app.evaluate("document.getElementById('storyscry-export-report').value")) === "tag:props", "selecting Props category sets export selector to tag:props");
+    const propsCsvPath = join(dataDir, "report-props-only.csv");
+    const rPropsCsv = await app.evaluate(`__cirth.storyScry.export(${JSON.stringify(propsCsvPath)}, 'tag:props', 'csv')`);
+    assert(rPropsCsv && rPropsCsv.report === "tag:props" && rPropsCsv.title === "Props Report", `single-category export: ${JSON.stringify(rPropsCsv)}`);
+    const propsCsv = readFileSync(propsCsvPath, "utf8");
+    assert(propsCsv.includes("Report,Props Report") && propsCsv.includes("Amber Lamp,amber,3,2"), `Props CSV has 3 occurrences and 2 distinct scenes: ${propsCsv}`);
+    assert(propsCsv.includes("Sc 3 (2×)") && propsCsv.includes("Sc 4 (1×)") && !propsCsv.includes("SILENT CLERK"), "Props CSV links to Scenes 3 and 4 and excludes Cast items");
+
+    // Inspect the Characters report for V.O./O.S./dual speeches, silent cast tags, and overlapping participation estimates (E6, E7, E8).
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"characters\"]').click(), true)");
+    await waitFor(app, "!!document.getElementById('storyscry-characters-table')", "Characters report table rendered");
+    await audit("StoryScry character participation report");
+    await screenshot(app, "storyscry-character-participation");
+
+    const charCheck = await app.evaluate(`(() => {
+      const d = __cirth.storyScry.data;
+      const ines = d.characters.find(c => c.name === 'INES');
+      const pell = d.characters.find(c => c.name === 'PELL');
+      const margit = d.characters.find(c => c.name === 'MARGIT');
+      const clerk = d.characters.find(c => c.name === 'SILENT CLERK');
+      const sumPart = d.characters.reduce((acc, c) => acc + c.participation_eighths, 0);
+      const svgInes = document.querySelector('#storyscry-body svg.storyscry-svg rect[data-character="INES"]');
+      const noteText = document.getElementById('storyscry-characters-estimate-note')?.textContent ?? '';
+      const dialogText = document.getElementById('storyscry-dialog')?.textContent?.toLowerCase() ?? '';
+      return {
+        ines,
+        pell,
+        margit,
+        clerk,
+        sumPart,
+        totalEighths: d.total_eighths,
+        scene1Eighths: d.scenes[0].eighths,
+        svgInesPart: Number(svgInes?.getAttribute('data-participation-eighths')),
+        svgInesSilent: Number(svgInes?.getAttribute('data-silent-scenes')),
+        noteText,
+        mentionsActualScreenTime: dialogText.includes('actual screen time'),
+      };
+    })()`);
+    assert(charCheck.ines && charCheck.ines.speeches === 2 && charCheck.ines.dual_speeches === 1, `INES merges TOBIAS dual speech: ${JSON.stringify(charCheck.ines)}`);
+    assert(charCheck.ines.scenes === 2 && charCheck.ines.silent_scenes === 1 && charCheck.ines.total_scenes === 3, `E6: INES separates speaking scenes (2) from silent cast-tagged scenes (1): ${JSON.stringify(charCheck.ines)}`);
+    assert(charCheck.ines.dialogue_minutes_est > 0 && charCheck.ines.participation_minutes_est > 0 && charCheck.ines.dialogue_minutes_est !== charCheck.ines.participation_minutes_est, `E6: dialogue speaking time and scene participation time are distinct estimates: ${JSON.stringify(charCheck.ines)}`);
+    assert(charCheck.pell && charCheck.pell.vo_speeches === 1 && charCheck.pell.os_speeches === 0, `E6: PELL counts 1 V.O. speech: ${JSON.stringify(charCheck.pell)}`);
+    assert(charCheck.margit && charCheck.margit.os_speeches === 1 && charCheck.margit.vo_speeches === 0, `E6: MARGIT counts 1 O.S. speech: ${JSON.stringify(charCheck.margit)}`);
+    assert(charCheck.clerk && charCheck.clerk.speeches === 0 && charCheck.clerk.scenes === 0 && charCheck.clerk.silent_scenes === 1 && charCheck.clerk.participation_eighths === charCheck.scene1Eighths, `E6: SILENT CLERK has 0 speeches, 1 silent scene and full Scene 1 participation: ${JSON.stringify(charCheck.clerk)}`);
+    assert(charCheck.sumPart > charCheck.totalEighths, `E7: overlapping character participation (${charCheck.sumPart} eighths) exceeds total script length (${charCheck.totalEighths} eighths) and is not forced to 100%`);
+    assert(charCheck.svgInesPart === charCheck.ines.participation_eighths && charCheck.svgInesSilent === 1, `E8: Character participation SVG chart matches table data`);
+    assert(charCheck.noteText.includes("Estimate method:") && !charCheck.mentionsActualScreenTime, `E6: estimate method documented and never labelled actual screen time`);
+
+    // E1: Clicking a scene link in the Breakdown Tags table jumps to that scene and closes StoryScry.
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"tags\"]').click(), true)");
+    await waitFor(app, "!!document.getElementById('storyscry-tags-table')", "back on Breakdown Tags tab");
+    const sc4Id = (await app.evaluate("__cirth.scenes()"))[3].sceneId;
+    await app.evaluate("(document.querySelectorAll('#storyscry-tags-table .storyscry-go')[1].click(), true)");
+    await waitFor(app, `!document.getElementById('storyscry-dialog').open && (() => { const at = __cirth.view.state.selection.from; const s = __cirth.scenes().find(x => at >= x.from && at < x.to); return s?.sceneId === ${JSON.stringify(sc4Id)}; })()`, "clicking a tag scene link jumps to that scene");
   });
 
   await app.close();

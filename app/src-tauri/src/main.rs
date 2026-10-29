@@ -517,6 +517,8 @@ async fn export_report(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
+    let report_id = kind.id();
+    let report_title = kind.title();
     let out = cirth_core::report_export::export(&bundle, kind, fmt, &prof, date_unix, &project_id)?;
     let target = normalize(Path::new(&path));
     if let Some(parent) = target.parent() {
@@ -528,8 +530,8 @@ async fn export_report(
     cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)?;
     Ok(ReportExported {
         path: target.display().to_string(),
-        report: kind.id().to_string(),
-        title: kind.title().to_string(),
+        report: report_id,
+        title: report_title,
         format: fmt.extension().to_string(),
         scope_label: bundle.scope_label,
         source_version: bundle.source_version,
