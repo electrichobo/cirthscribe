@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 12;
+pub const SCHEMA_VERSION: i64 = 13;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -356,6 +356,28 @@ fn migrate_v12(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v12 -> v13: non-destructive block alternatives (M5 step 2, alternatives.rs).
+/// `blocks` table retains the active take; `block_alternatives` preserves all takes.
+/// Projects start with no alternatives.
+fn migrate_v13(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE block_alternatives (
+          id TEXT PRIMARY KEY,
+          document_id TEXT NOT NULL,
+          block_id TEXT NOT NULL,
+          take_index INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          label TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX block_alternatives_doc_block ON block_alternatives(document_id, block_id);
+        CREATE UNIQUE INDEX block_alternatives_doc_block_take ON block_alternatives(document_id, block_id, take_index);",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -371,6 +393,7 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (10, migrate_v10),
     (11, migrate_v11),
     (12, migrate_v12),
+    (13, migrate_v13),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
@@ -1298,6 +1321,241 @@ impl Store {
         self.mark_unsaved()
     }
 
+    // --- Alternatives (M5 step 2, ROADMAP M5, alternatives.rs) ----------------
+
+    pub fn block_alternatives(&self, document_id: &str, block_id: &str) -> Result<Vec<crate::alternatives::BlockAlternative>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, document_id, block_id, take_index, text, label, author, created_at, is_active
+             FROM block_alternatives
+             WHERE document_id = ?1 AND block_id = ?2
+             ORDER BY take_index ASC",
+        )?;
+        let rows = stmt.query_map(params![document_id, block_id], |row| {
+            Ok(crate::alternatives::BlockAlternative {
+                id: row.get(0)?,
+                document_id: row.get(1)?,
+                block_id: row.get(2)?,
+                take_index: row.get::<_, i64>(3)? as u32,
+                text: row.get(4)?,
+                label: row.get(5)?,
+                author: row.get(6)?,
+                created_at: row.get(7)?,
+                is_active: row.get::<_, i64>(8)? != 0,
+            })
+        })?;
+        let mut alts = Vec::new();
+        for r in rows {
+            alts.push(r?);
+        }
+        Ok(alts)
+    }
+
+    pub fn all_block_alternatives(&self, document_id: &str) -> Result<Vec<crate::alternatives::BlockAlternative>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, document_id, block_id, take_index, text, label, author, created_at, is_active
+             FROM block_alternatives
+             WHERE document_id = ?1
+             ORDER BY block_id, take_index ASC",
+        )?;
+        let rows = stmt.query_map(params![document_id], |row| {
+            Ok(crate::alternatives::BlockAlternative {
+                id: row.get(0)?,
+                document_id: row.get(1)?,
+                block_id: row.get(2)?,
+                take_index: row.get::<_, i64>(3)? as u32,
+                text: row.get(4)?,
+                label: row.get(5)?,
+                author: row.get(6)?,
+                created_at: row.get(7)?,
+                is_active: row.get::<_, i64>(8)? != 0,
+            })
+        })?;
+        let mut alts = Vec::new();
+        for r in rows {
+            alts.push(r?);
+        }
+        Ok(alts)
+    }
+
+    pub fn block_takes_view(&self, document_id: &str, block_id: &str) -> Result<crate::alternatives::BlockTakesView> {
+        let takes = self.block_alternatives(document_id, block_id)?;
+        let active = takes.iter().find(|t| t.is_active).map(|t| t.take_index).unwrap_or(0);
+        let total = takes.len() as u32;
+        Ok(crate::alternatives::BlockTakesView {
+            document_id: document_id.to_string(),
+            block_id: block_id.to_string(),
+            active_take_index: active,
+            total_takes: total,
+            takes,
+        })
+    }
+
+    pub fn block_text(&self, block_id: &str) -> Result<Option<String>> {
+        let runs_json: Option<String> = self.conn.query_row(
+            "SELECT runs FROM blocks WHERE id = ?1",
+            [block_id],
+            |r| r.get(0),
+        ).optional()?;
+        if let Some(json) = runs_json {
+            let runs: Vec<crate::model::Run> = serde_json::from_str(&json).map_err(|e| StoreError::Invalid(e.to_string()))?;
+            let text: String = runs.iter().map(|r| r.text.as_str()).collect();
+            Ok(Some(text))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn put_alternative_raw(&self, alt: &crate::alternatives::BlockAlternative) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO block_alternatives (id, document_id, block_id, take_index, text, label, author, created_at, is_active)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(id) DO UPDATE SET
+               take_index = excluded.take_index,
+               text = excluded.text,
+               label = excluded.label,
+               author = excluded.author,
+               is_active = excluded.is_active",
+            params![
+                alt.id,
+                alt.document_id,
+                alt.block_id,
+                alt.take_index as i64,
+                alt.text,
+                alt.label,
+                alt.author,
+                alt.created_at,
+                if alt.is_active { 1 } else { 0 },
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn add_alternative(
+        &self,
+        document_id: &str,
+        block_id: &str,
+        text: &str,
+        label: &str,
+        author: &str,
+        created_at: &str,
+    ) -> Result<(Option<crate::alternatives::BlockAlternative>, crate::alternatives::BlockAlternative)> {
+        let existing = self.block_alternatives(document_id, block_id)?;
+        let mut base_take = None;
+        if existing.is_empty() {
+            let current_block_text = self.block_text(block_id)?.unwrap_or_default();
+            let b0 = crate::alternatives::BlockAlternative {
+                id: crate::model::new_id(),
+                document_id: document_id.to_string(),
+                block_id: block_id.to_string(),
+                take_index: 0,
+                text: current_block_text,
+                label: "Take 1 (Original)".to_string(),
+                author: author.to_string(),
+                created_at: created_at.to_string(),
+                is_active: true,
+            };
+            self.put_alternative_raw(&b0)?;
+            base_take = Some(b0);
+        }
+
+        let next_idx = self.block_alternatives(document_id, block_id)?
+            .iter()
+            .map(|t| t.take_index)
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(0);
+
+        let alt_label = if label.trim().is_empty() {
+            format!("Take {}", next_idx + 1)
+        } else {
+            label.trim().to_string()
+        };
+
+        let alt = crate::alternatives::BlockAlternative {
+            id: crate::model::new_id(),
+            document_id: document_id.to_string(),
+            block_id: block_id.to_string(),
+            take_index: next_idx,
+            text: text.to_string(),
+            label: alt_label,
+            author: author.to_string(),
+            created_at: created_at.to_string(),
+            is_active: false,
+        };
+
+        self.put_alternative_raw(&alt)?;
+        self.mark_unsaved()?;
+        Ok((base_take, alt))
+    }
+
+    pub fn set_active_take(
+        &self,
+        document_id: &str,
+        block_id: &str,
+        target_take_index: u32,
+    ) -> Result<(crate::alternatives::BlockAlternative, crate::alternatives::BlockAlternative)> {
+        let takes = self.block_alternatives(document_id, block_id)?;
+        let prev = takes.iter().find(|t| t.is_active).cloned().ok_or_else(|| {
+            StoreError::Invalid(format!("block {block_id} has no active take"))
+        })?;
+        let next = takes.iter().find(|t| t.take_index == target_take_index).cloned().ok_or_else(|| {
+            StoreError::Invalid(format!("block {block_id} has no take index {target_take_index}"))
+        })?;
+
+        if prev.take_index == next.take_index {
+            return Ok((prev.clone(), prev));
+        }
+
+        self.conn.execute(
+            "UPDATE block_alternatives SET is_active = 0 WHERE document_id = ?1 AND block_id = ?2",
+            params![document_id, block_id],
+        )?;
+        self.conn.execute(
+            "UPDATE block_alternatives SET is_active = 1 WHERE id = ?1",
+            params![next.id],
+        )?;
+
+        let new_runs = vec![crate::model::Run::plain(&next.text)];
+        let runs_json = serde_json::to_string(&new_runs).unwrap_or_default();
+        self.conn.execute(
+            "UPDATE blocks SET runs = ?1 WHERE id = ?2",
+            params![runs_json, block_id],
+        )?;
+
+        self.mark_unsaved()?;
+        let mut prev_res = prev;
+        prev_res.is_active = false;
+        let mut next_res = next;
+        next_res.is_active = true;
+        Ok((prev_res, next_res))
+    }
+
+    pub fn delete_alternative(
+        &self,
+        document_id: &str,
+        block_id: &str,
+        take_index: u32,
+    ) -> Result<(crate::alternatives::BlockAlternative, Option<crate::alternatives::BlockAlternative>)> {
+        let takes = self.block_alternatives(document_id, block_id)?;
+        let alt = takes.iter().find(|t| t.take_index == take_index).cloned().ok_or_else(|| {
+            StoreError::Invalid(format!("take {take_index} not found on block {block_id}"))
+        })?;
+        if alt.is_active {
+            return Err(StoreError::Invalid(format!("cannot delete currently active take {take_index}")));
+        }
+        self.conn.execute("DELETE FROM block_alternatives WHERE id = ?1", params![alt.id])?;
+
+        let remaining = self.block_alternatives(document_id, block_id)?;
+        let mut cleaned_base = None;
+        if remaining.len() == 1 {
+            let last = &remaining[0];
+            cleaned_base = Some(last.clone());
+            self.conn.execute("DELETE FROM block_alternatives WHERE id = ?1", params![last.id])?;
+        }
+        self.mark_unsaved()?;
+        Ok((alt, cleaned_base))
+    }
+
     /// Names the writer said are not entries ("kind", "NAME").
     pub fn rejected(&self) -> Result<std::collections::HashSet<(String, String)>> {
         let mut stmt = self.conn.prepare("SELECT kind, name FROM bible_rejected")?;
@@ -1846,6 +2104,37 @@ impl Store {
                     orphaned: old.thread.orphaned,
                 }
             }
+            PlanningOp::AddAlternative { alt, base_take_created } => {
+                if let Some(base) = base_take_created {
+                    self.put_alternative_raw(base)?;
+                }
+                self.put_alternative_raw(alt)?;
+                self.mark_unsaved()?;
+                PlanningOp::DeleteAlternative {
+                    alt: alt.clone(),
+                    base_take_deleted: base_take_created.clone(),
+                }
+            }
+            PlanningOp::DeleteAlternative { alt, base_take_deleted } => {
+                self.conn.execute("DELETE FROM block_alternatives WHERE id = ?1", params![alt.id])?;
+                if let Some(base) = base_take_deleted {
+                    self.conn.execute("DELETE FROM block_alternatives WHERE id = ?1", params![base.id])?;
+                }
+                self.mark_unsaved()?;
+                PlanningOp::AddAlternative {
+                    alt: alt.clone(),
+                    base_take_created: base_take_deleted.clone(),
+                }
+            }
+            PlanningOp::SetActiveTake { document_id, block_id, from_take, to_take } => {
+                let _ = self.set_active_take(document_id, block_id, *to_take)?;
+                PlanningOp::SetActiveTake {
+                    document_id: document_id.clone(),
+                    block_id: block_id.clone(),
+                    from_take: *to_take,
+                    to_take: *from_take,
+                }
+            }
             PlanningOp::DeleteBeat(id) => {
                 let Some(old) = self.beat(id)? else {
                     return Err(StoreError::Invalid(format!("no card {id}")));
@@ -2131,6 +2420,10 @@ fn write_block(tx: &Connection, doc: &str, b: &Block, ord: f64, version: u64) ->
         }
         _ => StoreError::from(e),
     })?;
+    tx.execute(
+        "UPDATE block_alternatives SET text = ?1 WHERE block_id = ?2 AND is_active = 1",
+        params![b.text(), &b.id],
+    )?;
     Ok(())
 }
 
@@ -2164,6 +2457,7 @@ fn apply_op(tx: &Connection, doc: &str, op: &Op, version: u64) -> Result<()> {
             if let Some(sid) = scene {
                 tx.execute("UPDATE scenes SET active = 0 WHERE id = ?1", [sid])?;
             }
+            tx.execute("DELETE FROM block_alternatives WHERE block_id = ?1", [id])?;
             tx.execute("DELETE FROM blocks WHERE id = ?1", [id])?;
             Ok(())
         }

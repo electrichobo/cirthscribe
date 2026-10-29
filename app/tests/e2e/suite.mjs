@@ -2344,7 +2344,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
     const ids = new Set(items.map((i) => i.id));
     const want = ["new", "open", "import", "save", "save_as", "export", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
-      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "tags", "comments", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
+      "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "tags", "comments", "alt_take", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
       "goto_page", "goto_scene", "win_minimize", "win_zoom", "focus_next",
       "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "latency", "updates", "licences", "about",
       ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
@@ -2355,7 +2355,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
     // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
     const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
-    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", comments: "View > Tools > Comments…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
+    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", comments: "View > Tools > Comments…", alt_take: "View > Tools > Alternate Takes…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
       goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
       font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
     for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
@@ -4080,6 +4080,72 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
     // Close comments dialog
     await app.evaluate("(__cirth.comments.close(), true)");
+  });
+
+  await test("Block alternatives and takes (ADR 0005, F4, E5): multiple takes, take badge, dynamic word counts, StoryScry inactive alternative label, and planning undo", async () => {
+    await openFixture("page-boundaries");
+
+    const b0 = await blocks();
+    const actionBlock = b0.find((b) => b.kind === "action" && text(b).length >= 10);
+    assert(actionBlock, "Found action block");
+    const originalText = text(actionBlock);
+    const docId = await app.evaluate("window.__cirth.lastOpen?.document_id || null");
+
+    // Word count before
+    const wordsBefore = (await blocks()).map((b) => text(b).split(/\s+/).filter(Boolean).length).reduce((a, b) => a + b, 0);
+
+    // 1. Add an alternative take
+    const altText = "A completely different, vastly longer dramatic action beat that changes the pacing entirely.";
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('alternatives_add_take', {
+      documentId: ${JSON.stringify(docId)},
+      blockId: ${JSON.stringify(actionBlock.id)},
+      text: ${JSON.stringify(altText)},
+      label: 'Take 2 (Dramatic)',
+      author: 'Writer'
+    })`);
+    await app.evaluate("(__cirth.alternatives.refresh(), true)");
+
+    // 2. Take badge appears on the block with Take 1/2 ▾
+    await waitFor(app, "document.querySelectorAll('.cirth-take-badge').length > 0", "Take badge rendered on block with alts");
+    const badgeText0 = await app.evaluate("document.querySelector('.cirth-take-badge')?.textContent");
+    assert(badgeText0 && badgeText0.includes("1/2"), `Badge reflects initial take 1/2: ${badgeText0}`);
+    await screenshot(app, "take-badge");
+
+    // 3. F4: Activate alternate take
+    await app.evaluate(`window.__cirth.alternatives.setActiveTake(${JSON.stringify(actionBlock.id)}, 1)`);
+    await waitFor(app, "document.querySelector('.cirth-take-badge')?.textContent.includes('2/2')", "Badge updated to 2/2");
+
+    // Script text immediately reflects the active alternative
+    const bAfter = await blocks();
+    const actAfter = bAfter.find((b) => b.id === actionBlock.id);
+    assert(text(actAfter) === altText, `Block text updated to alternative: "${text(actAfter)}"`);
+
+    // Document word counts immediately reflect active take
+    const wordsAfter = (await blocks()).map((b) => text(b).split(/\s+/).filter(Boolean).length).reduce((a, b) => a + b, 0);
+    assert(wordsAfter > wordsBefore, `Word count increased with longer active take: ${wordsBefore} -> ${wordsAfter}`);
+
+    // 4. E5: StoryScry report includes inactive alternative with unambiguous display label
+    const rep = await app.evaluate(`window.__TAURI_INTERNALS__.invoke('storyscry_reports', {
+      scope: { mode: 'document', documents: [window.__cirth.lastOpen.document_id], include_omitted: false }
+    })`);
+    assert(rep.alternatives && rep.alternatives.length >= 2, "StoryScry report bundle carries alternatives");
+    const inactiveAlt = rep.alternatives.find((a) => !a.is_active);
+    assert(inactiveAlt, "Found inactive alternative row");
+    assert(inactiveAlt.display_label.includes("Inactive alternative"), `E5: Inactive alternative has unambiguous label: "${inactiveAlt.display_label}"`);
+
+    // 5. Switching back restores original content and word count
+    await app.evaluate(`window.__cirth.alternatives.setActiveTake(${JSON.stringify(actionBlock.id)}, 0)`);
+    await waitFor(app, "document.querySelector('.cirth-take-badge')?.textContent.includes('1/2')", "Badge returned to 1/2");
+    const bRestored = await blocks();
+    const actRestored = bRestored.find((b) => b.id === actionBlock.id);
+    assert(text(actRestored) === originalText, `Block text restored to original: "${text(actRestored)}"`);
+    const wordsRestored = (await blocks()).map((b) => text(b).split(/\s+/).filter(Boolean).length).reduce((a, b) => a + b, 0);
+    assert(wordsRestored === wordsBefore, `Original word count restored: ${wordsRestored} === ${wordsBefore}`);
+
+    // 6. Planning undo restores the alternative switch
+    await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_undo', { redo: false })");
+    await app.evaluate("(__cirth.alternatives.refresh(), true)");
+    await waitFor(app, "document.querySelector('.cirth-take-badge')?.textContent.includes('2/2')", "Planning undo restored active Take 2");
   });
 
   await app.close();

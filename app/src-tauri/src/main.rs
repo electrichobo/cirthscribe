@@ -712,6 +712,103 @@ async fn comments_delete_message(
     })
 }
 
+// --- Alternatives (M5 step 2, ROADMAP M5, alternatives.rs) ----------------
+
+#[tauri::command]
+async fn alternatives_for_block(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    block_id: String,
+) -> Result<cirth_core::alternatives::BlockTakesView, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        s.store.block_takes_view(&doc_id, &block_id).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn alternatives_for_document(
+    app: State<'_, App>,
+    document_id: Option<String>,
+) -> Result<Vec<cirth_core::alternatives::BlockAlternative>, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        s.store.all_block_alternatives(&doc_id).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn alternatives_add_take(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    block_id: String,
+    text: String,
+    label: String,
+    author: String,
+) -> Result<cirth_core::alternatives::BlockTakesView, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let created_at = comment_now_iso();
+        let (base_take_created, alt) = s.store.add_alternative(&doc_id, &block_id, &text, &label, &author, &created_at).map_err(err)?;
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::AddAlternative { alt, base_take_created }, pv).map_err(err)?;
+        s.store.block_takes_view(&doc_id, &block_id).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn alternatives_set_active_take(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    block_id: String,
+    take_index: u32,
+) -> Result<cirth_core::alternatives::BlockTakesView, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let current_view = s.store.block_takes_view(&doc_id, &block_id).map_err(err)?;
+        let from_take = current_view.active_take_index;
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::SetActiveTake {
+            document_id: doc_id.clone(),
+            block_id: block_id.clone(),
+            from_take,
+            to_take: take_index,
+        }, pv).map_err(err)?;
+        s.store.block_takes_view(&doc_id, &block_id).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn alternatives_delete_take(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    block_id: String,
+    take_index: u32,
+) -> Result<cirth_core::alternatives::BlockTakesView, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let (alt, base_take_deleted) = s.store.delete_alternative(&doc_id, &block_id, take_index).map_err(err)?;
+        let pv = s.store.planning_version().map_err(err)?;
+        s.planning.apply(&s.store, cirth_core::planning::PlanningOp::DeleteAlternative { alt, base_take_deleted }, pv).map_err(err)?;
+        s.store.block_takes_view(&doc_id, &block_id).map_err(err)
+    })
+}
+
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
 
 #[tauri::command]
@@ -2710,6 +2807,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("sides", "Character Sides…")
         .text("tags", "Breakdown Tags…")
         .text("comments", "Comments…")
+        .text("alt_take", "Alternate Takes…")
         .text("bible", "Bible…")
         .text("timeline", "Timeline…")
         .text("evidence", "Evidence Board…")
@@ -3040,6 +3138,11 @@ fn main() {
             comments_reattach,
             comments_delete_thread,
             comments_delete_message,
+            alternatives_for_block,
+            alternatives_for_document,
+            alternatives_add_take,
+            alternatives_set_active_take,
+            alternatives_delete_take,
             bible_state,
             timeline_state,
             evidence_state,

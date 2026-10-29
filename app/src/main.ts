@@ -48,6 +48,7 @@ import { createStripboard } from "./stripboard";
 import { createCharacterSides } from "./sides";
 import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
 import { createCommentsDialog, commentsPlugin } from "./comments";
+import { createAlternativesManager, alternativesPlugin, type AlternativesManager } from "./alternatives";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -726,6 +727,12 @@ const commentsDialog = createCommentsDialog({
   getDocumentId: () => lastOpen?.document_id ?? null,
   jumpToBlock: (blockId) => void goToTagSpan(lastOpen?.document_id ?? "", blockId, 0, 0),
 });
+const alternativesMgrRef = { current: null as AlternativesManager | null };
+const alternativesMgr = createAlternativesManager({
+  getView: () => view ?? null,
+  getDocumentId: () => lastOpen?.document_id ?? null,
+});
+alternativesMgrRef.current = alternativesMgr;
 const bookmarks = createBookmarks({
   list: async () => {
     const st = await invoke<{ bookmarks: { id: string; name: string; document_id: string; block_id: string }[] }>("evidence_state");
@@ -880,6 +887,7 @@ function makeState(blocks: Block[]) {
       revisionsPlugin(),
       tagsPlugin(),
       commentsPlugin(),
+      alternativesPlugin(alternativesMgrRef),
     ],
   });
 }
@@ -944,9 +952,11 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
     scheduleCounts(true);
     void refreshTagDecorations();
     void commentsDialog.refresh();
+    void alternativesMgr.refresh();
   };
   void refreshTagDecorations();
   void commentsDialog.refresh();
+  void alternativesMgr.refresh();
   docCounts = null;
   scheduleCounts(true);
   void spell.onOpen($("spelling") as HTMLSelectElement).then(syncMenuChecks);
@@ -1597,6 +1607,9 @@ async function runMenu(id: string): Promise<void> {
     case "comments":
       if (lastOpen) await commentsDialog.open();
       break;
+    case "alt_take":
+      if (lastOpen) await alternativesMgr.addTakePrompt();
+      break;
     case "project_tree":
       if (lastOpen) await projectTree.open();
       break;
@@ -2039,6 +2052,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   characterSides,
   tags: breakdownTags,
   comments: commentsDialog,
+  alternatives: alternativesMgr,
   bible,
   timeline,
   evidence,

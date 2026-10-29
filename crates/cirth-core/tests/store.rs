@@ -1083,6 +1083,93 @@ fn comment_threads_follow_anchors_across_edits_moves_splits_and_orphans() {
 }
 
 #[test]
+fn block_alternatives_active_take_projection_word_counts_and_reports() {
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+
+    let d = tmpdir("alts-test");
+    let mut s = Store::open(&d.join("w.db")).unwrap();
+    let doc_id = s.default_document().unwrap();
+
+    let h = Block { id: "h1".into(), scene_id: Some("sc-1".into()), ..Block::new(BlockKind::Heading, "INT. STUDY - NIGHT") };
+    let c = Block { id: "c1".into(), ..Block::new(BlockKind::Character, "MARA") };
+    let d1 = Block { id: "d1".into(), ..Block::new(BlockKind::Dialogue, "I never expected you to come back.") };
+    s.seed(&cirth_core::model::Document { version: 0, title: "Test".into(), blocks: vec![h, c, d1] }).unwrap();
+
+    let before_wc = s.load().unwrap().blocks.iter().map(|b| cirth_core::words::count(&b.text())).sum::<u64>();
+
+    // 1. Add alternative take (Acceptance F4)
+    let (base_take, alt_take) = s.add_alternative(
+        &doc_id,
+        "d1",
+        "You shouldn't be here. Not after what happened in Prague.",
+        "Take 2 (Dramatic)",
+        "Writer",
+        "2026-10-29T16:15:00Z",
+    ).unwrap();
+    assert!(base_take.is_some());
+    let b0 = base_take.unwrap();
+    assert_eq!((b0.take_index, b0.is_active, b0.text.as_str()), (0, true, "I never expected you to come back."));
+    assert_eq!((alt_take.take_index, alt_take.is_active, alt_take.text.as_str()), (1, false, "You shouldn't be here. Not after what happened in Prague."));
+
+    // Takes view shows 2 total takes, active index 0
+    let view0 = s.block_takes_view(&doc_id, "d1").unwrap();
+    assert_eq!((view0.total_takes, view0.active_take_index), (2, 0));
+
+    // 2. Activate alternate dialogue: word counts and loaded model immediately reflect the active take
+    let (prev, curr) = s.set_active_take(&doc_id, "d1", 1).unwrap();
+    assert_eq!((prev.take_index, prev.is_active), (0, false));
+    assert_eq!((curr.take_index, curr.is_active), (1, true));
+
+    let loaded1 = s.load().unwrap();
+    let d1_active = loaded1.blocks.iter().find(|b| b.id == "d1").unwrap();
+    assert_eq!(d1_active.text(), "You shouldn't be here. Not after what happened in Prague.");
+
+    let after_wc = loaded1.blocks.iter().map(|b| cirth_core::words::count(&b.text())).sum::<u64>();
+    assert!(after_wc > before_wc, "Word count immediately reflects active alternate take");
+
+    // 3. Export immediately reflects active alternative
+    let ftn = cirth_core::fountain::export(&s.load().unwrap().blocks, &cirth_core::title::TitlePage::default(), &std::collections::HashMap::new());
+    assert!(ftn.text.contains("You shouldn't be here. Not after what happened in Prague."));
+    assert!(!ftn.text.contains("I never expected you to come back."));
+
+    // 4. Switching back restores original content and original word count
+    let (p2, c2) = s.set_active_take(&doc_id, "d1", 0).unwrap();
+    assert_eq!((p2.take_index, c2.take_index), (1, 0));
+    let loaded0 = s.load().unwrap();
+    let d1_restored = loaded0.blocks.iter().find(|b| b.id == "d1").unwrap();
+    assert_eq!(d1_restored.text(), "I never expected you to come back.");
+    let restored_wc = loaded0.blocks.iter().map(|b| cirth_core::words::count(&b.text())).sum::<u64>();
+    assert_eq!(restored_wc, before_wc, "Restoring base take restores original word count");
+
+    // 5. Planning undo / redo
+    let mut ph = PlanningHistory::default();
+    let pv = s.planning_version().unwrap();
+    ph.apply(&s, PlanningOp::SetActiveTake {
+        document_id: doc_id.clone(),
+        block_id: "d1".into(),
+        from_take: 0,
+        to_take: 1,
+    }, pv).unwrap();
+    assert_eq!(s.load().unwrap().blocks.iter().find(|b| b.id == "d1").unwrap().text(), "You shouldn't be here. Not after what happened in Prague.");
+
+    ph.undo(&s).unwrap();
+    assert_eq!(s.load().unwrap().blocks.iter().find(|b| b.id == "d1").unwrap().text(), "I never expected you to come back.");
+
+    ph.redo(&s).unwrap();
+    assert_eq!(s.load().unwrap().blocks.iter().find(|b| b.id == "d1").unwrap().text(), "You shouldn't be here. Not after what happened in Prague.");
+
+    // 6. Cannot delete active take (must switch first)
+    assert!(s.delete_alternative(&doc_id, "d1", 1).is_err());
+
+    // Switch to 0, then delete take 1
+    s.set_active_take(&doc_id, "d1", 0).unwrap();
+    let (deleted_alt, cleaned_base) = s.delete_alternative(&doc_id, "d1", 1).unwrap();
+    assert_eq!(deleted_alt.take_index, 1);
+    assert!(cleaned_base.is_some(), "deleting only alt cleans up Take 0 as well");
+    assert!(s.block_alternatives(&doc_id, "d1").unwrap().is_empty());
+}
+
+#[test]
 fn stripboard_scheduling_order_is_independent_and_omitted_scenes_are_flagged() {
     use cirth_core::planning::{PlanningHistory, PlanningOp};
     use cirth_core::reports::ReportScope;

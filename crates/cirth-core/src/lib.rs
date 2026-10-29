@@ -1,3 +1,4 @@
+pub mod alternatives;
 pub mod backup;
 pub mod bible;
 pub mod comments;

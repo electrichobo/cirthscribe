@@ -311,6 +311,20 @@ pub struct ReportBundle {
     pub day_night: Vec<BucketRow>,
     pub revisions: Vec<RevisionRow>,
     pub tag_reports: Vec<TagCategoryReport>,
+    #[serde(default)]
+    pub alternatives: Vec<AlternativeRow>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AlternativeRow {
+    pub document_id: String,
+    pub block_id: String,
+    pub take_index: u32,
+    pub text: String,
+    pub label: String,
+    pub is_active: bool,
+    /// Unambiguous display label for StoryScry and reports (Acceptance E5).
+    pub display_label: String,
 }
 
 /// Parsed parts of a scene heading: `("INT.", "COUNTING HOUSE", "NIGHT")`.
@@ -1123,6 +1137,7 @@ pub fn compute_with_tags(
         day_night: day_night_out,
         revisions: revisions_out,
         tag_reports,
+        alternatives: Vec::new(),
     }
 }
 
@@ -1177,7 +1192,7 @@ pub fn from_store(store: &Store, scope: &ReportScope) -> StoreResult<ReportBundl
         include_omitted: scope.include_omitted,
     };
 
-    Ok(compute_with_tags(
+    let mut bundle = compute_with_tags(
         &docs,
         all_documents,
         &entities,
@@ -1185,7 +1200,30 @@ pub fn from_store(store: &Store, scope: &ReportScope) -> StoreResult<ReportBundl
         normalized_scope,
         source_version,
         planning_version,
-    ))
+    );
+
+    let mut alts_out = Vec::new();
+    for id in &bundle.scope.documents {
+        for alt in store.all_block_alternatives(id)? {
+            let display_label = if alt.is_active {
+                format!("Take {} (Active)", alt.take_index + 1)
+            } else {
+                format!("(Inactive alternative: Take {} - {})", alt.take_index + 1, alt.label)
+            };
+            alts_out.push(AlternativeRow {
+                document_id: alt.document_id,
+                block_id: alt.block_id,
+                take_index: alt.take_index,
+                text: alt.text,
+                label: alt.label,
+                is_active: alt.is_active,
+                display_label,
+            });
+        }
+    }
+    bundle.alternatives = alts_out;
+
+    Ok(bundle)
 }
 
 #[cfg(test)]

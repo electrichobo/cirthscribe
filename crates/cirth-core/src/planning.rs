@@ -52,6 +52,21 @@ pub enum PlanningOp {
     DeleteCommentMessage(String),
     SetCommentThreadResolved { thread_id: String, resolved: bool },
     ReattachCommentThread { thread_id: String, block_id: String, start: usize, end: usize, quote: String, orphaned: bool },
+    /// Block alternatives and takes (M5 step 2, ROADMAP M5, ACCEPTANCE F4, E5).
+    AddAlternative {
+        alt: crate::alternatives::BlockAlternative,
+        base_take_created: Option<crate::alternatives::BlockAlternative>,
+    },
+    SetActiveTake {
+        document_id: String,
+        block_id: String,
+        from_take: u32,
+        to_take: u32,
+    },
+    DeleteAlternative {
+        alt: crate::alternatives::BlockAlternative,
+        base_take_deleted: Option<crate::alternatives::BlockAlternative>,
+    },
 }
 
 #[derive(Clone, Debug)]

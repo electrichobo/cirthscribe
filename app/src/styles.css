@@ -794,3 +794,82 @@ dialog.sides { width: min(840px, 94vw); height: min(700px, 90vh); display: flex;
 .sides-export-status { margin: 0; font-size: 12px; }
 .sides-footer-actions { display: inline-flex; align-items: center; gap: 8px; }
 
+/* Block alternatives & takes (M5 step 2) */
+.cirth-take-widget {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+  user-select: none;
+}
+.cirth-take-badge {
+  background: var(--cirth-accent-subtle, #e0e7ff);
+  color: var(--cirth-accent, #3730a3);
+  border: 1px solid var(--cirth-accent-border, #a5b4fc);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cirth-take-badge:hover,
+.cirth-take-badge:focus-visible {
+  background: #c7d2fe;
+  border-color: #6366f1;
+}
+.cirth-take-dropdown {
+  background: var(--cirth-bg, #ffffff);
+  color: var(--cirth-fg, #111827);
+  border: 1px solid var(--cirth-border, #d1d5db);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  max-width: 320px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cirth-take-dropdown-head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  padding: 4px 8px;
+}
+.cirth-take-item {
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.cirth-take-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+.cirth-take-item.active {
+  background: rgba(99, 102, 241, 0.15);
+  font-weight: 600;
+}
+.cirth-take-preview {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cirth-take-add-btn,
+.cirth-take-del-btn {
+  margin: 2px 4px;
+  font-size: 11px;
+  text-align: center;
+}
+

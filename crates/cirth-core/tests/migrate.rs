@@ -683,3 +683,83 @@ fn opening_a_v11_project_adds_empty_comment_threads_and_maps_anchors_through_edi
     }
 }
 
+#[test]
+fn opening_a_v12_project_adds_empty_block_alternatives_and_swaps_takes_cleanly() {
+    use cirth_core::planning::{PlanningHistory, PlanningOp};
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v12-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v12-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 12, "fixture must be schema v12");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(12));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v12 copy kept");
+        let mut s = o.store;
+        let doc_id = s.current_document().unwrap();
+        assert!(s.all_block_alternatives(&doc_id).unwrap().is_empty(), "upgraded projects start with no alternatives");
+
+        let before = s.load().unwrap();
+        let target = before.blocks.iter().find(|b| b.text().chars().count() >= 5).unwrap().clone();
+        let original_text = target.text();
+
+        // 1. Add an alternative take
+        let (base, alt) = s.add_alternative(
+            &doc_id,
+            &target.id,
+            "Alternative take line text",
+            "Take 2 (Alt)",
+            "Writer",
+            "2026-10-29T16:00:00Z",
+        ).unwrap();
+        assert!(base.is_some(), "first alternative automatically captures baseline Take 0");
+        let b0 = base.unwrap();
+        assert_eq!((b0.take_index, b0.text.as_str(), b0.is_active), (0, original_text.as_str(), true));
+        assert_eq!((alt.take_index, alt.text.as_str(), alt.is_active), (1, "Alternative take line text", false));
+
+        // 2. Set active take to 1 -> swaps into blocks table
+        let (prev, cur) = s.set_active_take(&doc_id, &target.id, 1).unwrap();
+        assert_eq!((prev.take_index, prev.is_active), (0, false));
+        assert_eq!((cur.take_index, cur.is_active), (1, true));
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "Alternative take line text");
+
+        // 3. User edits active take in editor -> updates active take text in block_alternatives
+        let mut edited = target.clone();
+        edited.runs = vec![cirth_core::model::Run::plain("Alternative take line text - polished")];
+        let sv = s.version().unwrap();
+        s.apply(&Batch { tx_id: "edit-alt-take".into(), base_version: sv, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: edited }] }).unwrap();
+        let alts = s.block_alternatives(&doc_id, &target.id).unwrap();
+        assert_eq!(alts[1].text, "Alternative take line text - polished");
+
+        // 4. Switch back to Take 0 -> restores original content
+        let (p2, c2) = s.set_active_take(&doc_id, &target.id, 0).unwrap();
+        assert_eq!((p2.take_index, c2.take_index), (1, 0));
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), original_text);
+
+        // 5. Test planning op undo/redo for SetActiveTake
+        let mut h = PlanningHistory::default();
+        let pv = s.planning_version().unwrap();
+        h.apply(&s, PlanningOp::SetActiveTake {
+            document_id: doc_id.clone(),
+            block_id: target.id.clone(),
+            from_take: 0,
+            to_take: 1,
+        }, pv).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "Alternative take line text - polished");
+
+        // Undo switches back to 0
+        h.undo(&s).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), original_text);
+
+        // Redo switches back to 1
+        h.redo(&s).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "Alternative take line text - polished");
+
+        // Switch back to 0 before saving
+        s.set_active_take(&doc_id, &target.id, 0).unwrap();
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}
+
