@@ -176,7 +176,7 @@ Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1
 | - | - |
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
-| [docs/M3_PLAN.md](docs/M3_PLAN.md) | Stage 3 plan (accepted) and what each step builds |
+| [docs/M3_PLAN.md](docs/M3_PLAN.md) and [docs/m3/EXIT_REVIEW.md](docs/m3/EXIT_REVIEW.md) | Stage 3 plan, what each step built, and its exit review |
 | [docs/M2_PLAN.md](docs/M2_PLAN.md) and [docs/m2/EXIT_REVIEW.md](docs/m2/EXIT_REVIEW.md) | Stage 2 plan, what each step built, and its exit review |
 | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Which formats have been tested in which other apps, and how to test |
 | [docs/M1_PLAN.md](docs/M1_PLAN.md) and [docs/m1/EXIT_REVIEW.md](docs/m1/EXIT_REVIEW.md) | Stage 1 plan and its exit review |

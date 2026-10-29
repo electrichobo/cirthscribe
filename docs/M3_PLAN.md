@@ -128,7 +128,7 @@ Episodes come second (decision D: "whichever allows for the most interconnectivi
      - Not yet: pictures no card uses are kept in the project file until a later clean-up; notes inside the outline (the board and the notes panel cover them).
      - Tests: core (picture types and links, base64; v9 upgrade: picture packaged once with no path, refused SVG and file links, strings, a card move with the script unchanged, delete and undo with strings, a bookmark, all kept through a save); e2e "Evidence board (C4)" on both drivers; checked by eye from the screenshot (which found the edit panel pushed off-screen and strings hidden between close cards; both fixed).
 
-**All nine M3 steps are built (2026-10-28).** The exit review is next.
+**All nine M3 steps are built (2026-10-28).** Exit review: docs/m3/EXIT_REVIEW.md (everything built and tested; B6 belongs to M4, C5 to M5; the Mac run N31 and checks N29–N30 open; owner decisions A and B).
 
 The exit review comes after 9. Steps 5 and 6 can swap.
 
