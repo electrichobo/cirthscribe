@@ -944,6 +944,42 @@ async fn merge_apply(
     })
 }
 
+// --- Portable review packages (.cirth-review, M5 step 6) -----------------------
+
+#[tauri::command]
+async fn review_export(
+    app: State<'_, App>,
+    path: String,
+    reviewer: Option<String>,
+) -> Result<cirth_core::review::ReviewExportResult, String> {
+    with_session(&app, |s| {
+        let target = normalize(Path::new(&path));
+        s.store.export_review_package(&target, reviewer.as_deref()).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn review_inspect(
+    app: State<'_, App>,
+    path: String,
+) -> Result<cirth_core::review::ReviewPackageSummary, String> {
+    with_session(&app, |s| {
+        let src = normalize(Path::new(&path));
+        s.store.inspect_review_package(&src).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn review_apply(
+    app: State<'_, App>,
+    path: String,
+) -> Result<cirth_core::review::ReviewImportReport, String> {
+    with_session(&app, |s| {
+        let src = normalize(Path::new(&path));
+        s.store.import_review_package(&src).map_err(err)
+    })
+}
+
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
 
 #[tauri::command]
@@ -3293,6 +3329,9 @@ fn main() {
             branches_current,
             merge_preview,
             merge_apply,
+            review_export,
+            review_inspect,
+            review_apply,
             bible_state,
             timeline_state,
             evidence_state,

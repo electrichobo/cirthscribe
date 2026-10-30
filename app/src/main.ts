@@ -52,6 +52,7 @@ import { createAlternativesManager, alternativesPlugin, type AlternativesManager
 import { createSnapshotsDialog } from "./snapshots";
 import { createBranchesDialog } from "./branches";
 import { createMergeDialog } from "./merge";
+import { createReviewDialog, type ReviewImportReport, type ReviewExportResult, type ReviewPackageSummary } from "./review";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -767,6 +768,14 @@ const branchesDialog = createBranchesDialog({
   },
   onMergeBranch: (branchId) => {
     void mergeDialog.open(branchId);
+  },
+});
+const reviewDialog = createReviewDialog({
+  onImported: async (report) => {
+    showBanner(`Review package imported: ${report.threads_imported} threads, ${report.alternatives_imported} alternate takes.`);
+    if (lastOpen) {
+      await openWith("open_document", { id: lastOpen.document_id });
+    }
   },
 });
 if (branchIndicator) {
@@ -1726,6 +1735,12 @@ async function runMenu(id: string): Promise<void> {
     case "export_txt":
       await exportText();
       break;
+    case "export_review":
+      await exportReviewPackage();
+      break;
+    case "import_review":
+      await importReviewPackage();
+      break;
     case "home":
       await goHome();
       break;
@@ -2093,6 +2108,32 @@ async function exportText(path?: string, changedOnly = false): Promise<boolean> 
     return false;
   }
 }
+
+/** Export a self-contained portable review package (.cirth-review, M5 Step 6). */
+async function exportReviewPackage(path?: string, reviewer?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target = path ?? (await saveDialog({ defaultPath: exportPath(".cirth-review"), filters: [{ name: "Review Package", extensions: ["cirth-review"] }] }));
+  if (!target) return false;
+  await syncer.flush();
+  try {
+    const r = await invoke<ReviewExportResult>("review_export", { path: target, reviewer: reviewer ?? null });
+    showBanner(`Review package exported: ${r.comment_thread_count} threads and ${r.alternative_count} alternate takes.`);
+    announce(`Review package exported to ${r.path}`);
+    return true;
+  } catch (e) {
+    showBanner(`Review package export failed: ${e}`);
+    return false;
+  }
+}
+
+/** Import a portable review package (.cirth-review, M5 Step 6). */
+async function importReviewPackage(path?: string): Promise<boolean> {
+  if (!lastOpen) return false;
+  const target = path ?? (await openDialog({ filters: [{ name: "Review Package", extensions: ["cirth-review"] }] }));
+  if (!target || typeof target !== "string") return false;
+  const s = await reviewDialog.open(target);
+  return !!s;
+}
 $("zoom").addEventListener("input", (e) => {
   editorEl.style.zoom = `${(e.target as HTMLInputElement).value}%`;
   layoutMode.apply();
@@ -2117,6 +2158,13 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   snapshots: snapshotsDialog,
   branches: branchesDialog,
   merge: mergeDialog,
+  reviewPackage: {
+    dialog: reviewDialog,
+    export: exportReviewPackage,
+    import: importReviewPackage,
+    inspect: (path: string) => invoke<ReviewPackageSummary>("review_inspect", { path }),
+    apply: (path: string) => invoke<ReviewImportReport>("review_apply", { path }),
+  },
   bible,
   timeline,
   evidence,

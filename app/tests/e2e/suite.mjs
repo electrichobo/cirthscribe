@@ -4430,5 +4430,147 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.getElementById('merge-dialog')?.classList.contains('hidden')", "Merge dialog closed after baseline resolution");
   });
 
+  await test("Portable review package (.cirth-review): export self-contained bundle without machine paths or credentials; inspect package; import outside comments and alternatives with provenance; reject malicious payloads (M5 step 6, Acceptance F7, G5)", async () => {
+    await openFixture("page-boundaries");
+
+    // 1. Add comment thread to first dialogue block
+    const b0 = await blocks();
+    const dlgIdx = b0.findIndex((b) => b.kind === "dialogue" && text(b).length >= 10);
+    assert(dlgIdx >= 0, "Found dialogue block for review test");
+    const targetBlock = b0[dlgIdx];
+    const targetText = text(targetBlock);
+    const quote = targetText.slice(0, 5);
+
+    const docId = await app.evaluate("window.__cirth.lastOpen.document_id");
+    const threadId = "th-review-test-1";
+    await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('comments_add_thread', {
+        documentId: '${docId}',
+        blockId: '${targetBlock.id}',
+        start: 0,
+        end: 5,
+        quote: '${quote}',
+        author: 'Lead Author',
+        text: 'Initial review comment'
+      })`
+    );
+
+    // 2. Add an alternative take
+    await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('alternatives_add_take', {
+        documentId: '${docId}',
+        blockId: '${targetBlock.id}',
+        text: 'PORTABLE ALTERNATIVE DIALOGUE',
+        label: 'Alt Take for Review',
+        author: 'Lead Author'
+      })`
+    );
+
+    // 3. Export portable .cirth-review package
+    const reviewPkgPath = join(dataDir, "portable-script.cirth-review");
+    const exportResult = await app.evaluate(
+      `window.__cirth.reviewPackage.export(${JSON.stringify(reviewPkgPath)}, 'External Reviewer')`
+    );
+    assert(exportResult, "Review package exported successfully");
+
+    // Verify file content on disk (Acceptance F7)
+    assert(existsSync(reviewPkgPath), "Exported file exists on disk");
+    const rawContent = readFileSync(reviewPkgPath, "utf8");
+    const parsed = JSON.parse(rawContent);
+    assert(parsed.format === "cirth-review-v1", `Format header matches: ${parsed.format}`);
+    assert(parsed.reviewer === "External Reviewer", "Reviewer recorded");
+    assert(parsed.comments.length >= 1, "Comments included in package");
+    assert(parsed.alternatives.length >= 1, "Alternatives included in package");
+
+    // Verify absence of machine paths or credentials (Acceptance F7)
+    assert(!rawContent.includes(dataDir), "No host filesystem machine paths present in review package");
+    assert(!rawContent.includes("api_key") && !rawContent.includes("token"), "No credentials or secrets in package");
+
+    // 4. Test Inspection & UI Import into a fresh document instance
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+
+    // Inspect package via API
+    const summary = await app.evaluate(
+      `window.__cirth.reviewPackage.inspect(${JSON.stringify(reviewPkgPath)})`
+    );
+    assert(summary && summary.reviewer === "External Reviewer", "Inspected reviewer matches");
+    assert(summary.comment_thread_count >= 1, "Inspection shows comment threads");
+    assert(summary.alternative_count >= 1, "Inspection shows alternatives");
+
+    // Open import dialog UI
+    await app.evaluate(`window.__cirth.reviewPackage.import(${JSON.stringify(reviewPkgPath)})`);
+    await waitFor(app, "!document.getElementById('review-dialog')?.classList.contains('hidden')", "Review import dialog opened");
+    await audit();
+    await screenshot(app, "review-dialog");
+
+    // Click Import button in UI
+    await app.evaluate("document.getElementById('review-import-btn')?.click()");
+    await waitFor(app, "document.getElementById('review-dialog')?.classList.contains('hidden')", "Review dialog closed after import");
+
+    // Verify imported comment thread with provenance
+    const importedState = await app.evaluate("window.__TAURI_INTERNALS__.invoke('comments_state', { documentId: null })");
+    const foundThread = importedState.threads.find((t) => t.quote === quote);
+    assert(foundThread, `Imported comment thread found for quote "${quote}"`);
+
+    // Verify imported alternative with provenance
+    const curDocId = await app.evaluate("window.__cirth.lastOpen?.document_id || null");
+    const importedTakesView = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('alternatives_for_block', { documentId: ${JSON.stringify(curDocId)}, blockId: '${targetBlock.id}' })`
+    );
+    const foundAlt = importedTakesView.takes.find((a) => a.text === "PORTABLE ALTERNATIVE DIALOGUE");
+    assert(foundAlt, "Imported alternative take found on block");
+    assert(!foundAlt.is_active, "Imported alternative is inactive by default (author take preserved)");
+
+    // 5. Security & Sanitization Rejection (Acceptance G5)
+    // Traversal rejection
+    const badPkgPath = join(dataDir, "malicious.cirth-review");
+    writeFileSync(
+      badPkgPath,
+      JSON.stringify({
+        format: "cirth-review-v1",
+        project_id: "../../traversal-attack",
+        project_title: "Evil",
+        document_id: "doc-1",
+        document_title: "Evil",
+        exported_at: "2026-10-29T00:00:00Z",
+        reviewer: "Attacker",
+        blocks: [],
+        comments: [],
+        alternatives: []
+      })
+    );
+
+    const rejected = await app.evaluate(
+      `window.__cirth.reviewPackage.inspect(${JSON.stringify(badPkgPath)}).then(() => false).catch(() => true)`
+    );
+    assert(rejected, "Malicious path traversal package rejected (Acceptance G5)");
+
+    // Formula & Script tag sanitization verification
+    const sanitizedPkgPath = join(dataDir, "sanitized.cirth-review");
+    writeFileSync(
+      sanitizedPkgPath,
+      JSON.stringify({
+        format: "cirth-review-v1",
+        project_id: "safe-project",
+        project_title: "=CMD('calc')",
+        document_id: "safe-doc",
+        document_title: "<script>alert('xss')</script>",
+        exported_at: "2026-10-29T00:00:00Z",
+        reviewer: "+EXCEL_FORMULA",
+        blocks: [],
+        comments: [],
+        alternatives: []
+      })
+    );
+
+    const safeSummary = await app.evaluate(
+      `window.__cirth.reviewPackage.inspect(${JSON.stringify(sanitizedPkgPath)})`
+    );
+    assert(safeSummary.project_title.startsWith("'="), `Formula prefix neutralized: ${safeSummary.project_title}`);
+    assert(!safeSummary.document_title.includes("<script>"), `Script tag neutralized: ${safeSummary.document_title}`);
+  });
+
   await app.close();
 }

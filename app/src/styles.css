@@ -1299,6 +1299,68 @@ dialog.merge-dialog:not([open]) {
   color: var(--accent);
 }
 
+/* Review Package Import/Export Dialog (M5 Step 6) */
+dialog.review-dialog {
+  width: min(600px, 92vw);
+  max-height: min(600px, 85vh);
+  display: flex;
+  flex-direction: column;
+}
+dialog.review-dialog:not([open]) {
+  display: none !important;
+}
+.review-dialog-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.review-summary-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.review-summary-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.review-meta-row strong {
+  color: var(--muted);
+  margin-right: 6px;
+}
+.review-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.review-stat-box {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.review-stat-box .stat-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.review-stat-box .stat-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 
 
 

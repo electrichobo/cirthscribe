@@ -26,6 +26,7 @@ pub mod planning;
 pub mod printdoc;
 pub mod report_export;
 pub mod reports;
+pub mod review;
 pub mod revisions;
 pub mod rtf;
 pub mod sides;
