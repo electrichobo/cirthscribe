@@ -4,18 +4,19 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestone 6 (additional formats and language tools)** in progress (`docs/M6_PLAN.md`). Step 1 complete. Next: M6 Step 2 (comic book & graphic novel scripting).
+**Milestone 6 (additional formats and language tools)** in progress (`docs/M6_PLAN.md`). Steps 1 & 2 complete. Next: M6 Step 3 (stage play & TV multi-camera profiles).
 
 ## Completed & Verified
 
-- **Milestones 0–5 complete; M6 Step 1 complete:**
-  - Step 1: Document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model`, layout engine profile geometries in `cirth_core::layout::Profile`, duplicate-and-convert preservation, frozen `schema-v15-*.cirth` upgrade tests).
+- **Milestones 0–5 complete; M6 Steps 1 & 2 complete:**
+  - Step 1: Document formats & profiles model (schema v16, `DocumentProfile`, layout profiles, duplicate-and-convert).
+  - Step 2: Comic book & graphic novel scripting (`cirth_core::comic` explicit page/panel parsing, speech balloons, captions, SFX, continuity warnings, panel renumbering reconciliation, Plain Text & HTML exports, comic Tab/Enter keyboard cycles, comic analysis dialog).
 - **Verified:**
-  - `cargo test -p cirth-core` (145/145 passed: 85 unit, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
+  - `cargo test -p cirth-core` (149/149 passed: 89 unit including 4 comic, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
   - `npm --prefix app run test:contract` (4/4 passed).
   - `node app/scripts/third-party-notices.mjs --check` (355 components passed).
-  - `npm --prefix app run e2e:cdp` (76/76 passed, 0 skipped, clean audit).
-  - `npm --prefix app run e2e:webdriver` (75/75 passed, 1 skipped: simulated IME).
+  - `npm --prefix app run e2e:cdp` (77/77 passed, 0 skipped, clean audit).
+  - `npm --prefix app run e2e:webdriver` (76/76 passed, 1 skipped: simulated IME).
 - **Not verified (carried into M6):**
   - M5 manual checks N37–N40 (comments, alternatives, branches, review packages);
   - M4 manual checks N32–N36 (external spreadsheet and viewer verification);
@@ -24,9 +25,9 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- Clean working tree with M6 Step 1 built and verified across all test suites, ready for commit.
+- Clean working tree with M6 Step 2 built and verified across all test suites, ready for commit.
 
 ## Next Immediate Step
 
-1. Commit and push M6 Step 1: Document formats and profiles model (schema v16 & layout engine extensions).
-2. Proceed to M6 Step 2: Comic book & graphic novel scripting (`docs/M6_PLAN.md`).
+1. Commit and push M6 Step 2: Comic book & graphic novel scripting.
+2. Proceed to M6 Step 3: Stage play & TV multi-camera profiles (`docs/M6_PLAN.md`).

@@ -36,6 +36,50 @@ export const defaultKeyConfig: KeyConfig = {
   enterOnEmpty: { character: "action", dialogue: "action", parenthetical: "dialogue" },
 };
 
+export const comicKeyConfig: KeyConfig = {
+  tab: {
+    action: "character",
+    character: "transition",
+    transition: "lyric",
+    lyric: "shot",
+    shot: "heading",
+    heading: "action",
+    dialogue: "parenthetical",
+    parenthetical: "dialogue",
+    section: "heading",
+  },
+  shiftTab: {
+    action: "heading",
+    heading: "shot",
+    shot: "lyric",
+    lyric: "transition",
+    transition: "character",
+    character: "action",
+    parenthetical: "dialogue",
+    dialogue: "character",
+    section: "heading",
+  },
+  tabEmpty: {},
+  shiftTabEmpty: {},
+  enterNext: {
+    heading: "shot",
+    shot: "action",
+    action: "action",
+    character: "dialogue",
+    parenthetical: "dialogue",
+    dialogue: "character",
+    transition: "action",
+    lyric: "action",
+    section: "heading",
+  },
+  enterOnEmpty: {
+    character: "shot",
+    dialogue: "action",
+    parenthetical: "dialogue",
+    shot: "heading",
+  },
+};
+
 let config: KeyConfig = defaultKeyConfig;
 export const setKeyConfig = (c: KeyConfig) => (config = c);
 export const getKeyConfig = () => config;

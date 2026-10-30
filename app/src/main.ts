@@ -10,7 +10,7 @@ import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialo
 import { listen, emitTo } from "@tauri-apps/api/event";
 import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, newId, type Beat, type Block, type Kind } from "./schema";
 import { idsPlugin } from "./ids";
-import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig } from "./keys";
+import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig, comicKeyConfig } from "./keys";
 import { Syncer, diff, type SyncStatus } from "./sync";
 import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks, parsePlainText } from "./paste";
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
@@ -53,6 +53,7 @@ import { createSnapshotsDialog } from "./snapshots";
 import { createBranchesDialog } from "./branches";
 import { createMergeDialog } from "./merge";
 import { createReviewDialog, type ReviewImportReport, type ReviewExportResult, type ReviewPackageSummary } from "./review";
+import { createComicDialog, type ComicScriptAnalysis } from "./comicdlg";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -779,6 +780,13 @@ const reviewDialog = createReviewDialog({
     }
   },
 });
+const comicDialog = createComicDialog({
+  onRenumber: async () => {
+    if (lastOpen) {
+      await openWith("open_document", { id: lastOpen.document_id });
+    }
+  },
+});
 if (branchIndicator) {
   branchIndicator.onclick = () => {
     if (lastOpen) void branchesDialog.open();
@@ -1045,6 +1053,7 @@ async function applyOpened(o: Opened, t0: number = performance.now()): Promise<v
   fileSavedVersion = o.saved_version;
   fileSavedAt = null;
   scheduleAutosave();
+  setKeyConfig(o.format_profile === "comic" ? comicKeyConfig : defaultKeyConfig);
   await notesPanel.load(true);
   lastOpen = o; // set last: tests treat it as "open finished"
   showFileStatus();
@@ -1742,6 +1751,9 @@ async function runMenu(id: string): Promise<void> {
     case "import_review":
       await importReviewPackage();
       break;
+    case "comic_tools":
+      if (lastOpen) await comicDialog.open();
+      break;
     case "home":
       await goHome();
       break;
@@ -2165,6 +2177,13 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
     import: importReviewPackage,
     inspect: (path: string) => invoke<ReviewPackageSummary>("review_inspect", { path }),
     apply: (path: string) => invoke<ReviewImportReport>("review_apply", { path }),
+  },
+  comic: {
+    dialog: comicDialog,
+    analyze: (documentId?: string) => invoke<ComicScriptAnalysis>("comic_analyze", { documentId }),
+    renumber: (documentId?: string) => invoke<ComicScriptAnalysis>("comic_renumber", { documentId }),
+    exportText: (documentId?: string, title?: string) => invoke<string>("comic_export_text", { documentId, title }),
+    exportHtml: (documentId?: string, title?: string) => invoke<string>("comic_export_html", { documentId, title }),
   },
   bible,
   timeline,

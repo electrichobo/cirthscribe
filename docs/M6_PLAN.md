@@ -32,6 +32,7 @@ Milestone 6 expands Kolbítar from single-camera US feature screenplays into a v
    - Automatic panel counting per page and renumbering validation.
    - Tab/Enter cycles tailored for comic book writing.
    - Format-specific PDF, Plain Text, and HTML exports.
+   - **Built 2026-10-29:** `crates/cirth-core/src/comic.rs` with `parse_comic_script`, `renumber_comic_panels`, `export_comic_text`, and `export_comic_html`; comic Tab/Enter keyboard cycles in `app/src/keys.ts` (`comicKeyConfig`); comic dialog in `app/src/comicdlg.ts` with 6 metric summary cards, continuity warning list, panel renumbering, and text/HTML exports; Tauri IPC commands `comic_analyze`, `comic_renumber`, `comic_export_text`, and `comic_export_html`; automated E2E Test 77 in `app/tests/e2e/suite.mjs` verifying panel sequencing, continuity warnings, renumbering reconciliation, format exports, and dialog interactions passing on CDP (77/77) and WebDriver (76/76, 1 skipped) drivers.
 
 3. **Stage Play & TV Multi-Camera Profiles.**
    - Theatrical stage play profile: Act/Scene markers (`ACT I, SCENE 1`), centered character cues, indented dialogue, bracketed stage directions, cast lists.

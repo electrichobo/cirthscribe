@@ -1373,6 +1373,102 @@ async fn duplicate_and_convert_document(
 }
 
 #[tauri::command]
+async fn comic_analyze(
+    app: State<'_, App>,
+    document_id: Option<String>,
+) -> Result<cirth_core::comic::ComicScriptAnalysis, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        Ok(cirth_core::comic::parse_comic_script(&doc.blocks))
+    })
+}
+
+#[tauri::command]
+async fn comic_renumber(
+    app: State<'_, App>,
+    document_id: Option<String>,
+) -> Result<cirth_core::comic::ComicScriptAnalysis, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let renumbered = cirth_core::comic::renumber_comic_panels(&doc.blocks);
+        let mut ops = Vec::new();
+        for (old, new) in doc.blocks.iter().zip(renumbered.iter()) {
+            if old.text() != new.text() {
+                ops.push(cirth_core::ops::Op::Update { block: new.clone() });
+            }
+        }
+        if !ops.is_empty() {
+            let version = s.store.version().map_err(err)?;
+            let batch = cirth_core::ops::Batch {
+                tx_id: cirth_core::model::new_id(),
+                base_version: version,
+                document_id: Some(doc_id.clone()),
+                ops,
+            };
+            s.store.apply(&batch).map_err(err)?;
+        }
+        let updated_doc = s.store.load_document(&doc_id).map_err(err)?;
+        Ok(cirth_core::comic::parse_comic_script(&updated_doc.blocks))
+    })
+}
+
+#[tauri::command]
+async fn comic_export_text(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let analysis = cirth_core::comic::parse_comic_script(&doc.blocks);
+        let t = title.unwrap_or_else(|| {
+            s.package
+                .file_stem()
+                .and_then(|st| st.to_str())
+                .unwrap_or("Comic Script")
+                .to_string()
+        });
+        Ok(cirth_core::comic::export_comic_text(&analysis, &t))
+    })
+}
+
+#[tauri::command]
+async fn comic_export_html(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let analysis = cirth_core::comic::parse_comic_script(&doc.blocks);
+        let t = title.unwrap_or_else(|| {
+            s.package
+                .file_stem()
+                .and_then(|st| st.to_str())
+                .unwrap_or("Comic Script")
+                .to_string()
+        });
+        Ok(cirth_core::comic::export_comic_html(&analysis, &t))
+    })
+}
+
+#[tauri::command]
 async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
     with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
 }
@@ -3344,6 +3440,10 @@ fn main() {
             create_document_with_profile,
             get_document_profile,
             duplicate_and_convert_document,
+            comic_analyze,
+            comic_renumber,
+            comic_export_text,
+            comic_export_html,
             storyscry_reports,
             stripboard_state,
             save_stripboard,

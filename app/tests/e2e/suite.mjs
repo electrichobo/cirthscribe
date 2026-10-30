@@ -4641,5 +4641,97 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(origProfileAfter === "screenplay_us", "Original document retained untouched as screenplay_us");
   });
 
+  await test("Comic book and graphic novel scripting: Page and panel breakdown, balloon/caption/SFX lettering elements, panel counting/renumbering, and format exports (M6 step 2)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+
+    // 1. Create a comic document
+    const comicDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('create_document_with_profile', {
+        title: 'Heroic Chronicles Issue 1',
+        profile: 'comic',
+        folder: null
+      })`
+    );
+    assert(comicDocId, "Created comic document");
+
+    // Open the comic document
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(comicDocId)})`);
+    await waitFor(app, `window.__cirth.lastOpen?.document_id === ${JSON.stringify(comicDocId)}`, "Comic document opened");
+    assert(await app.evaluate("window.__cirth.lastOpen?.format_profile") === "comic", "Active profile is comic");
+
+    // 2. Insert comic script blocks with a disordered panel sequence to trigger continuity warnings
+    const initialBlocks = [
+      { id: "c_page1", kind: "heading", scene_id: "sc_page1", runs: [{ text: "PAGE 1" }] },
+      { id: "c_p1", kind: "shot", runs: [{ text: "PANEL 1" }] },
+      { id: "c_a1", kind: "action", runs: [{ text: "Rain lashes against the neon-drenched city skyline." }] },
+      { id: "c_cap1", kind: "character", runs: [{ text: "CAPTION: Neo-Verona. Midnight." }] },
+      { id: "c_sfx1", kind: "character", runs: [{ text: "SFX: BOOM!" }] },
+      { id: "c_p3", kind: "shot", runs: [{ text: "PANEL 3" }] }, // Intentionally skipped panel 2
+      { id: "c_a2", kind: "action", runs: [{ text: "VORTEX stands on the ledge, cape billowing." }] },
+      { id: "c_ch1", kind: "character", runs: [{ text: "VORTEX" }] },
+      { id: "c_d1", kind: "dialogue", runs: [{ text: "The signal is lit." }] },
+    ];
+
+    const applyResult = await app.evaluate(`
+      window.__TAURI_INTERNALS__.invoke('apply_batch', {
+        batch: {
+          tx_id: 'tx_init_comic',
+          base_version: window.__cirth.lastOpen.doc.version,
+          document_id: ${JSON.stringify(comicDocId)},
+          ops: ${JSON.stringify(initialBlocks.map((b, i) => ({ op: "put", block: b, after: i === 0 ? null : initialBlocks[i - 1].id })))}
+        }
+      }).catch(e => ({ error: String(e) }))
+    `);
+    assert(!applyResult?.error, `apply_batch succeeded: ${applyResult?.error}`);
+
+    // Reload document to sync view
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(comicDocId)})`);
+    await waitFor(app, "window.__cirth.lastOpen?.doc?.blocks?.length >= 9", "Blocks loaded in comic document");
+
+    // 3. Analyze comic script
+    const analysis = await app.evaluate(`window.__cirth.comic.analyze(${JSON.stringify(comicDocId)})`);
+    assert(analysis.total_pages === 1, `Total pages is 1: ${analysis.total_pages}`);
+    assert(analysis.total_panels === 2, `Total panels is 2: ${analysis.total_panels}`);
+    assert(analysis.total_balloons === 1, `Total balloons is 1: ${analysis.total_balloons}`);
+    assert(analysis.total_captions === 1, `Total captions is 1: ${analysis.total_captions}`);
+    assert(analysis.total_sfx === 1, `Total SFX is 1: ${analysis.total_sfx}`);
+    assert(analysis.warnings.length > 0, `Continuity warnings detected skipped panel 2: ${JSON.stringify(analysis.warnings)}`);
+
+    // 4. Renumber comic panels
+    const renumberedAnalysis = await app.evaluate(`window.__cirth.comic.renumber(${JSON.stringify(comicDocId)})`);
+    assert(renumberedAnalysis.warnings.length === 0, `No warnings after renumbering: ${JSON.stringify(renumberedAnalysis.warnings)}`);
+    assert(renumberedAnalysis.pages[0].header_text === "PAGE 1 (2 PANELS)", `Reconciled page heading: ${renumberedAnalysis.pages[0].header_text}`);
+    assert(renumberedAnalysis.pages[0].panels[1].header_text === "PANEL 2", `Disordered panel 3 was renumbered to PANEL 2: ${renumberedAnalysis.pages[0].panels[1].header_text}`);
+
+    // 5. Plain text export
+    const txtExport = await app.evaluate(`window.__cirth.comic.exportText(${JSON.stringify(comicDocId)})`);
+    assert(txtExport.includes("PAGE 1 (2 PANELS)"), "Text export contains page header");
+    assert(txtExport.includes("PANEL 1"), "Text export contains PANEL 1");
+    assert(txtExport.includes("PANEL 2"), "Text export contains PANEL 2");
+    assert(txtExport.includes("CAPTION: Neo-Verona. Midnight."), "Text export contains CAPTION");
+    assert(txtExport.includes("SFX: BOOM!"), "Text export contains SFX");
+    assert(txtExport.includes("VORTEX"), "Text export contains speaker");
+    assert(txtExport.includes("The signal is lit."), "Text export contains balloon dialogue");
+
+    // 6. HTML export
+    const htmlExport = await app.evaluate(`window.__cirth.comic.exportHtml(${JSON.stringify(comicDocId)}, 'Heroic Chronicles')`);
+    assert(htmlExport.includes("<title>Heroic Chronicles - Comic Script</title>"), "HTML export includes title");
+    assert(htmlExport.includes("class=\"comic-page\""), "HTML export includes comic-page");
+    assert(htmlExport.includes("class=\"comic-panel\""), "HTML export includes comic-panel");
+    assert(htmlExport.includes("class=\"comic-caption\""), "HTML export includes comic-caption");
+    assert(htmlExport.includes("class=\"comic-sfx\""), "HTML export includes comic-sfx");
+    assert(htmlExport.includes("class=\"comic-balloon\""), "HTML export includes comic-balloon");
+
+    // 7. Test Comic Dialog
+    await app.evaluate("__cirth.comic.dialog.open()");
+    await waitFor(app, "document.getElementById('comic-dialog')?.open === true", "Comic dialog opened");
+    const metricCards = await app.evaluate("document.querySelectorAll('#comic-dialog .comic-metric-card').length");
+    assert(metricCards === 6, `Six metric summary cards displayed: ${metricCards}`);
+    await app.evaluate("__cirth.comic.dialog.close()");
+    await waitFor(app, "!document.getElementById('comic-dialog')?.open", "Comic dialog closed");
+  });
+
   await app.close();
 }
