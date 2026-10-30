@@ -46,6 +46,7 @@ Milestone 6 expands Kolbítar from single-camera US feature screenplays into a v
    - Both inline bracket syntax (`[[Choice label -> TargetPassageID]]`) and structured UI choice cards/inspectors.
    - Graph integrity validator: Detects dangling choice references, dead-end passages, and unreachable orphan passages.
    - Exports: Twine/Twee 3 format (`.twee`), standalone self-contained playable interactive HTML runner, and JSON graph export.
+   - **Built 2026-10-30:** `crates/cirth-core/src/interactive.rs` with `parse_interactive_script`, choice extraction (`[[Label -> Target]]`, `[[Target <- Label]]`, `[[Label|Target]]`, conditions inside/trailing), graph validation (`validate_graph` detecting dangling links, dead ends, unreachable passages via BFS), Twee 3 export (`export_twee`), standalone playable offline HTML export (`export_interactive_html`), and JSON graph export (`export_interactive_json`); Tauri IPC commands `interactive_analyze`, `interactive_export_twee`, `interactive_export_html`, `interactive_export_json`; interactive inspector and offline playtester dialog in `app/src/interactivedlg.ts`; automated E2E Test 79 in `app/tests/e2e/suite.mjs` passing on CDP (79/79) and WebDriver (78/78, 1 skipped) drivers.
 
 5. **General Rich-Text / Treatment Documents & Bible Integration.**
    - Prose profile: Headings (H1–H3), body paragraphs, bullet/numbered lists, blockquotes.

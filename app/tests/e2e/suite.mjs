@@ -4806,5 +4806,174 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(origBlocksAfter[0].runs[0].text === origBlocks[0].runs[0].text, "Original scene heading untouched");
   });
 
+  await test("Interactive Branching Storytelling: passages, inline choice syntax, graph integrity validation, offline playtester, Twee 3, Playable HTML, and JSON exports (M6 step 4)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+
+    // 1. Create a new document with profile interactive
+    const docId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('create_document_with_profile', {
+        title: 'The Whispering Labyrinth',
+        profile: 'interactive',
+        folder: null
+      })`
+    );
+    assert(docId, "Created interactive story document");
+
+    // Open the document
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(docId)})`);
+    await waitFor(app, `window.__cirth.lastOpen?.document_id === ${JSON.stringify(docId)}`, "Interactive document opened");
+    assert((await app.evaluate("window.__cirth.lastOpen?.format_profile")) === "interactive", "Document profile is interactive");
+
+    // 2. Populate interactive branching story blocks with choices, conditions, and endings
+    const interactiveBlocks = [
+      {
+        id: "p_crossroads",
+        kind: "heading",
+        scene_id: "sc_crossroads",
+        runs: [{ text: ":: The Crossroads [start eerie]" }],
+      },
+      {
+        id: "b_cross_act",
+        kind: "action",
+        runs: [
+          {
+            text: "You stand before two twisting subterranean arches. One is engulfed in frost, the other smells of sulfur.\n\n[[Enter the frozen arch -> FrozenChamber]]\n[[Venture down the fiery passage -> MagmaDepths]]\n[[Attempt the sealed crypt gate -> SealedCrypt [if has_skeleton_key]]]",
+          },
+        ],
+      },
+      {
+        id: "p_frozen",
+        kind: "heading",
+        scene_id: "sc_frozen",
+        runs: [{ text: ":: FrozenChamber [ice]" }],
+      },
+      {
+        id: "b_froz_act",
+        kind: "action",
+        runs: [
+          {
+            text: "Icicles hang like daggers from the obsidian ceiling.\n\n[[Touch the frozen mirror -> SanctuaryEnd]]\n[[Retreat to the crossroads -> The Crossroads]]",
+          },
+        ],
+      },
+      {
+        id: "p_magma",
+        kind: "heading",
+        scene_id: "sc_magma",
+        runs: [{ text: ":: MagmaDepths [fire]" }],
+      },
+      {
+        id: "b_magma_act",
+        kind: "action",
+        runs: [
+          {
+            text: "Molten rock surges beneath a crumbling basalt bridge.\n\n[[Cross the narrow bridge -> SanctuaryEnd]]",
+          },
+        ],
+      },
+      {
+        id: "p_crypt",
+        kind: "heading",
+        scene_id: "sc_crypt",
+        runs: [{ text: ":: SealedCrypt [dungeon]" }],
+      },
+      {
+        id: "b_crypt_act",
+        kind: "action",
+        runs: [
+          {
+            text: "Dusty sarcophagi line the tomb walls. An emerald talisman glimmers on an altar.\n\n[[Take the talisman and return -> The Crossroads]]",
+          },
+        ],
+      },
+      {
+        id: "p_end",
+        kind: "heading",
+        scene_id: "sc_end",
+        runs: [{ text: ":: SanctuaryEnd [end victory]" }],
+      },
+      {
+        id: "b_end_act",
+        kind: "action",
+        runs: [
+          {
+            text: "You step out into daylight and breathe the fresh mountain air.\n\n[THE END]",
+          },
+        ],
+      },
+    ];
+
+    // Apply blocks to store
+    const applyResult = await app.evaluate(`
+      window.__TAURI_INTERNALS__.invoke('apply_batch', {
+        batch: {
+          tx_id: 'tx_init_interactive',
+          base_version: window.__cirth.lastOpen.doc.version,
+          document_id: ${JSON.stringify(docId)},
+          ops: ${JSON.stringify(interactiveBlocks.map((b, i) => ({ op: "put", block: b, after: i === 0 ? null : interactiveBlocks[i - 1].id })))}
+        }
+      }).catch(e => ({ error: String(e) }))
+    `);
+    assert(!applyResult?.error, `apply_batch succeeded: ${applyResult?.error}`);
+
+    // Reload document to reflect applied batch
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(docId)})`);
+    await waitFor(app, "window.__cirth.lastOpen.doc.blocks.length >= 10", "Interactive blocks loaded");
+
+    // 3. Interactive Analysis
+    const graph = await app.evaluate(`window.__cirth.interactive.analyze(${JSON.stringify(docId)})`);
+    assert(graph.total_passages === 5, `Total passages is 5: ${graph.total_passages}`);
+    assert(graph.total_choices === 7, `Total choices is 7: ${graph.total_choices}`);
+    assert(graph.total_endings === 1, `Total endings is 1: ${graph.total_endings}`);
+    assert(graph.validation.is_valid, `Graph validation is valid: ${JSON.stringify(graph.validation)}`);
+    assert(graph.validation.dangling_count === 0, "No dangling choice targets");
+    assert(graph.validation.dead_end_count === 0, "No dead ends");
+    assert(graph.validation.unreachable_count === 0, "No unreachable passages");
+
+    // Verify condition parsed
+    const startP = graph.passages.find((p) => p.is_start);
+    assert(startP && startP.title === "The Crossroads", "Start passage is The Crossroads");
+    const condChoice = startP.choices.find((c) => c.condition === "has_skeleton_key");
+    assert(condChoice, "Choice condition has_skeleton_key correctly extracted");
+
+    // 4. Export Twee 3 (.twee)
+    const twee = await app.evaluate(`window.__cirth.interactive.exportTwee(${JSON.stringify(docId)})`);
+    assert(twee.includes(":: StoryTitle"), "Twee contains StoryTitle");
+    assert(twee.includes(":: StoryData"), "Twee contains StoryData");
+    assert(twee.includes(":: The Crossroads [start eerie]"), "Twee contains Start passage heading");
+    assert(twee.includes(":: SanctuaryEnd [end victory]"), "Twee contains Ending passage");
+
+    // 5. Export Playable Offline HTML
+    const html = await app.evaluate(`window.__cirth.interactive.exportHtml(${JSON.stringify(docId)})`);
+    assert(html.includes("<!DOCTYPE html>"), "HTML export contains doctype");
+    assert(html.includes("const STORY_DATA = {"), "HTML export contains embedded story data");
+    assert(html.includes("function renderCurrentPassage()"), "HTML export contains renderCurrentPassage");
+    assert(!html.includes("http://") && !html.includes("https://"), "HTML export is strictly offline with zero external CDNs");
+
+    // 6. Export JSON Story Graph
+    const jsonStr = await app.evaluate(`window.__cirth.interactive.exportJson(${JSON.stringify(docId)})`);
+    const parsed = JSON.parse(jsonStr);
+    assert(parsed.total_passages === 5, "JSON export has 5 passages");
+    assert(parsed.validation.is_valid === true, "JSON export validation is valid");
+
+    // 7. Interactive Dialog and Live Playtester UI
+    await app.evaluate("window.__cirth.interactive.dialog.open()");
+    await waitFor(app, "document.getElementById('interactive-dialog')?.open === true", "Interactive dialog opened");
+
+    const cards = await app.evaluate("document.querySelectorAll('#interactive-dialog .comic-metric-card').length");
+    assert(cards === 5, `Five metric summary cards displayed in dialog: ${cards}`);
+
+    const playtestTitle = await app.evaluate("document.querySelector('#interactive-dialog .interactive-playtest-box h3')?.textContent");
+    assert(playtestTitle === "The Crossroads", `Playtester initialized on Start passage: ${playtestTitle}`);
+
+    const choiceBtns = await app.evaluate("document.querySelectorAll('#interactive-dialog .interactive-playtest-box button.btn').length");
+    assert(choiceBtns >= 3, `Choice buttons rendered in playtester: ${choiceBtns}`);
+
+    await app.evaluate("window.__cirth.interactive.dialog.close()");
+    await waitFor(app, "!document.getElementById('interactive-dialog')?.open", "Interactive dialog closed");
+  });
+
   await app.close();
 }

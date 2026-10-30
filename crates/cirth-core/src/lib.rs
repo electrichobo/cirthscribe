@@ -15,6 +15,7 @@ pub mod fontcheck;
 pub mod fountain;
 pub mod freewrite;
 pub mod html;
+pub mod interactive;
 pub mod layout;
 pub mod locked;
 pub mod merge;

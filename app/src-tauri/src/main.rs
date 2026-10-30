@@ -1503,6 +1503,81 @@ async fn export_teleplay_text(
 }
 
 #[tauri::command]
+async fn interactive_analyze(
+    app: State<'_, App>,
+    document_id: Option<String>,
+) -> Result<cirth_core::interactive::InteractiveGraph, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = s
+            .package
+            .file_stem()
+            .and_then(|st| st.to_str())
+            .unwrap_or(&doc.title)
+            .to_string();
+        Ok(cirth_core::interactive::parse_interactive_script(&doc.blocks, &t))
+    })
+}
+
+#[tauri::command]
+async fn interactive_export_twee(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        let graph = cirth_core::interactive::parse_interactive_script(&doc.blocks, &t);
+        Ok(cirth_core::interactive::export_twee(&graph))
+    })
+}
+
+#[tauri::command]
+async fn interactive_export_html(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        let graph = cirth_core::interactive::parse_interactive_script(&doc.blocks, &t);
+        Ok(cirth_core::interactive::export_interactive_html(&graph))
+    })
+}
+
+#[tauri::command]
+async fn interactive_export_json(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        let graph = cirth_core::interactive::parse_interactive_script(&doc.blocks, &t);
+        Ok(cirth_core::interactive::export_interactive_json(&graph))
+    })
+}
+
+#[tauri::command]
 async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
     with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
 }
@@ -3488,6 +3563,10 @@ fn main() {
             comic_export_html,
             export_stageplay_text,
             export_teleplay_text,
+            interactive_analyze,
+            interactive_export_twee,
+            interactive_export_html,
+            interactive_export_json,
             storyscry_reports,
             stripboard_state,
             save_stripboard,
