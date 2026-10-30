@@ -60,6 +60,7 @@ Each step is a working vertical slice tested across core tests, contract tests, 
    - Verify native schema round-trips preserve comments, alternatives, and branches (`Acceptance F7`).
    - Run full automated test suites (core, contract, e2e CDP, e2e WebDriver).
    - Update `docs/COMPATIBILITY.md`, `docs/testing/MANUAL_CHECKS.md`, and author `docs/m5/EXIT_REVIEW.md`.
+   - **Built 2026-10-29:** Verified native schema round-trips preserving comments (v12), alternatives (v13), snapshots (v14), and branches (v15); full test suites passing cleanly (142 core unit/integration tests, 4 contract tests, 355 third-party notices, 75 CDP E2E tests, and 74 WebDriver E2E tests); updated `docs/COMPATIBILITY.md` with `.cirth-review` entry; added manual checks N37–N40 to `docs/testing/MANUAL_CHECKS.md`; authored `docs/m5/EXIT_REVIEW.md` closing Milestone 5.
 
 ## Decisions (owner, 2026-10-29)
 

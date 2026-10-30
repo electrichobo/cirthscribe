@@ -130,7 +130,7 @@ Carried forward:
 - [ ] Results from external spreadsheet apps (Excel, Google Sheets, LibreOffice) for StoryScry and stripboard files
 - [ ] Visual checks in external PDF viewers for stripboards and sides
 
-### ⏳ Stage 5: Notes, alternatives and versions (in progress)
+### ✅ Stage 5: Notes, alternatives and versions (done)
 
 Done:
 - [x] Comments attached to the text, with inline decorations, replies, resolution tracking, orphan recovery, and accessible review dialog (View > Tools > Comments…)
@@ -139,11 +139,12 @@ Done:
 - [x] Visual branch history and independent branch canon with branch-isolated snapshots in SQLite, fork/switch/delete management, and status bar branch pill (File > Branches…)
 - [x] Base/source/target 3-way conflict integration and locked-page baseline guard with 3-column diff view, conflict resolution choices, and baseline divergence protection (File > Branches… > Merge into Current…)
 - [x] Portable review package (`.cirth-review`) bundle export and import with anchored comments, alternate takes, provenance tracking, and defenses against path traversal, script tags, and formula injection
+- [x] Compatibility, regression verification, and exit review (Step 7)
 
-In progress / planned:
-- [ ] Compatibility, regression verification, and exit review (Step 7)
+Carried forward:
+- [ ] Desktop manual checks for review, alternatives, branches, and review packages (N37–N40)
 
-### Stage 6: More formats and language tools
+### ⏳ Stage 6: More formats and language tools (in progress / next)
 
 - [ ] TV and UK formats, stage plays, comics and graphic novels
 - [ ] Interactive and branching stories
