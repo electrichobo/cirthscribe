@@ -14,6 +14,79 @@ pub fn new_id() -> Id {
     uuid::Uuid::new_v4().to_string()
 }
 
+/// Document format and profile conventions (M6, ROADMAP M6).
+///
+/// Controls layout geometry, default paper size, indentation rules, and
+/// format-specific structural semantics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DocumentProfile {
+    ScreenplayUs,
+    ScreenplayUk,
+    TeleplayMultiCam,
+    StagePlay,
+    ComicScript,
+    InteractiveStory,
+    TreatmentProse,
+}
+
+impl DocumentProfile {
+    pub const ALL: [DocumentProfile; 7] = [
+        DocumentProfile::ScreenplayUs,
+        DocumentProfile::ScreenplayUk,
+        DocumentProfile::TeleplayMultiCam,
+        DocumentProfile::StagePlay,
+        DocumentProfile::ComicScript,
+        DocumentProfile::InteractiveStory,
+        DocumentProfile::TreatmentProse,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DocumentProfile::ScreenplayUs => "screenplay_us",
+            DocumentProfile::ScreenplayUk => "screenplay_uk",
+            DocumentProfile::TeleplayMultiCam => "teleplay_multicam",
+            DocumentProfile::StagePlay => "stageplay",
+            DocumentProfile::ComicScript => "comic",
+            DocumentProfile::InteractiveStory => "interactive",
+            DocumentProfile::TreatmentProse => "treatment",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<DocumentProfile> {
+        match s.to_ascii_lowercase().replace('-', "_").as_str() {
+            "screenplay_us" | "screenplay" | "us_letter" => Some(DocumentProfile::ScreenplayUs),
+            "screenplay_uk" | "a4" | "uk" => Some(DocumentProfile::ScreenplayUk),
+            "teleplay_multicam" | "multicam" | "sitcom" => Some(DocumentProfile::TeleplayMultiCam),
+            "stageplay" | "stage_play" | "theatre" | "theater" => Some(DocumentProfile::StagePlay),
+            "comic" | "comic_script" | "graphic_novel" => Some(DocumentProfile::ComicScript),
+            "interactive" | "interactive_story" | "branching" => Some(DocumentProfile::InteractiveStory),
+            "treatment" | "treatment_prose" | "prose" => Some(DocumentProfile::TreatmentProse),
+            _ => None,
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            DocumentProfile::ScreenplayUs => "Screenplay (US Feature)",
+            DocumentProfile::ScreenplayUk => "Screenplay (UK / BBC)",
+            DocumentProfile::TeleplayMultiCam => "Teleplay (Multi-Camera Sitcom)",
+            DocumentProfile::StagePlay => "Stage Play (Theatrical)",
+            DocumentProfile::ComicScript => "Comic Book / Graphic Novel",
+            DocumentProfile::InteractiveStory => "Interactive Branching Story",
+            DocumentProfile::TreatmentProse => "Treatment / Prose",
+        }
+    }
+
+    /// Default page size profile for this document profile.
+    pub fn default_page_size(self) -> &'static str {
+        match self {
+            DocumentProfile::ScreenplayUk => "a4",
+            _ => "us-letter",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockKind {
@@ -228,5 +301,38 @@ impl Document {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_profiles_roundtrip_and_parse_aliases() {
+        for profile in DocumentProfile::ALL {
+            let s = profile.as_str();
+            assert_eq!(DocumentProfile::parse(s), Some(profile));
+            assert!(!profile.display_name().is_empty());
+        }
+
+        assert_eq!(DocumentProfile::parse("screenplay"), Some(DocumentProfile::ScreenplayUs));
+        assert_eq!(DocumentProfile::parse("us-letter"), Some(DocumentProfile::ScreenplayUs));
+        assert_eq!(DocumentProfile::parse("a4"), Some(DocumentProfile::ScreenplayUk));
+        assert_eq!(DocumentProfile::parse("sitcom"), Some(DocumentProfile::TeleplayMultiCam));
+        assert_eq!(DocumentProfile::parse("multicam"), Some(DocumentProfile::TeleplayMultiCam));
+        assert_eq!(DocumentProfile::parse("stage_play"), Some(DocumentProfile::StagePlay));
+        assert_eq!(DocumentProfile::parse("theatre"), Some(DocumentProfile::StagePlay));
+        assert_eq!(DocumentProfile::parse("comic_script"), Some(DocumentProfile::ComicScript));
+        assert_eq!(DocumentProfile::parse("graphic-novel"), Some(DocumentProfile::ComicScript));
+        assert_eq!(DocumentProfile::parse("branching"), Some(DocumentProfile::InteractiveStory));
+        assert_eq!(DocumentProfile::parse("treatment_prose"), Some(DocumentProfile::TreatmentProse));
+        assert_eq!(DocumentProfile::parse("unknown_xyz"), None);
+
+        assert_eq!(DocumentProfile::ScreenplayUk.default_page_size(), "a4");
+        assert_eq!(DocumentProfile::ScreenplayUs.default_page_size(), "us-letter");
+        assert_eq!(DocumentProfile::TeleplayMultiCam.default_page_size(), "us-letter");
+        assert_eq!(DocumentProfile::StagePlay.default_page_size(), "us-letter");
+        assert_eq!(DocumentProfile::ComicScript.default_page_size(), "us-letter");
     }
 }

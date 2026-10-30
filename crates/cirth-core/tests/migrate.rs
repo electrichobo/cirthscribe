@@ -928,3 +928,47 @@ fn opening_a_v14_project_adds_branches_and_maintains_independent_canon() {
     }
 }
 
+#[test]
+fn opening_a_v15_project_adds_format_profiles_and_supports_duplicate_convert() {
+    use cirth_core::model::DocumentProfile;
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v15-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v15-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 15, "fixture must be schema v15");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(15));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v15 copy kept");
+        let s = o.store;
+        let doc_id = s.current_document().unwrap();
+
+        // 1. Existing default document upgraded to ScreenplayUs format profile
+        assert_eq!(s.document_format_profile(&doc_id).unwrap(), DocumentProfile::ScreenplayUs);
+
+        // 2. Create documents with explicit format profiles (M6, Decision A)
+        let uk_doc = s.create_document_with_profile("UK Series Script", DocumentProfile::ScreenplayUk).unwrap();
+        assert_eq!(s.document_format_profile(&uk_doc).unwrap(), DocumentProfile::ScreenplayUk);
+
+        let comic_doc = s.create_document_with_profile("Graphic Novel Spinoff", DocumentProfile::ComicScript).unwrap();
+        assert_eq!(s.document_format_profile(&comic_doc).unwrap(), DocumentProfile::ComicScript);
+
+        // 3. Duplicate and convert: preserves original document while creating new converted document (Decision A)
+        let converted_doc = s.duplicate_and_convert_document(&doc_id, "Stage Adaptation", DocumentProfile::StagePlay).unwrap();
+        assert_eq!(s.document_format_profile(&converted_doc).unwrap(), DocumentProfile::StagePlay);
+        assert_eq!(s.document_format_profile(&doc_id).unwrap(), DocumentProfile::ScreenplayUs, "original document retained untouched");
+
+        // Verify project tree carries format profiles
+        let tree = s.project_tree().unwrap();
+        let uk_item = tree.iter().find(|i| i.id == uk_doc).unwrap();
+        assert_eq!(uk_item.format_profile.as_deref(), Some("screenplay_uk"));
+
+        let comic_item = tree.iter().find(|i| i.id == comic_doc).unwrap();
+        assert_eq!(comic_item.format_profile.as_deref(), Some("comic"));
+
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}
+

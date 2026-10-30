@@ -144,11 +144,17 @@ Done:
 Carried forward:
 - [ ] Desktop manual checks for review, alternatives, branches, and review packages (N37–N40)
 
-### ⏳ Stage 6: More formats and language tools (in progress / next)
+### ⏳ Stage 6: More formats and language tools (in progress)
 
-- [ ] TV and UK formats, stage plays, comics and graphic novels
-- [ ] Interactive and branching stories
-- [ ] Offline grammar checking and more dictionaries
+Done:
+- [x] Document formats and profiles model (schema v16): support for US/UK screenplays, multi-cam sitcoms, stage plays, comics, interactive stories, and treatments; format assignment at creation and duplicate-and-convert script preservation
+
+In progress / planned:
+- [ ] Comic books and graphic novels (page/panel hierarchy, speech balloons, captions, SFX)
+- [ ] Stage plays and multi-camera teleplays
+- [ ] Interactive and branching stories (passages, choices, conditions, Twee/HTML export)
+- [ ] General rich-text treatment documents sharing the canonical project bible
+- [ ] 100% offline rule-based grammar and style checker
 
 ### Stage 7: Optional extras
 

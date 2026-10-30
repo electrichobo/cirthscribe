@@ -69,6 +69,9 @@ struct Opened {
     work_path: String,
     package_path: String,
     open_ms: f64,
+    /// Format profile for this document (M6: screenplay_us, screenplay_uk, teleplay_multicam, etc.)
+    #[serde(default)]
+    format_profile: String,
     /// What an import changed or could not keep (shown after opening).
     #[serde(default)]
     import_notes: Vec<String>,
@@ -209,6 +212,7 @@ async fn forget_recent(app: State<'_, App>, path: String) -> Result<(), String> 
 
 fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migration_backup: Option<PathBuf>, t0: Instant) -> Result<Opened, String> {
     let document_id = s.store.current_document().map_err(err)?;
+    let format_profile = s.store.document_format_profile(&document_id).map_err(err)?.as_str().to_string();
     Ok(Opened {
         name: s.key.clone(),
         project_title: s.store.load_document(&s.store.default_document().map_err(err)?).map_err(err)?.title,
@@ -224,6 +228,7 @@ fn opened(s: &Session, recovered: bool, migrated_from: Option<i64>, pre_migratio
         work_path: s.store.path().display().to_string(),
         package_path: s.package.display().to_string(),
         open_ms: t0.elapsed().as_secs_f64() * 1e3,
+        format_profile,
     })
 }
 
@@ -1323,6 +1328,48 @@ async fn create_folder(app: State<'_, App>, title: String, parent: Option<String
 #[tauri::command]
 async fn create_episode(app: State<'_, App>, title: String, folder: Option<String>) -> Result<String, String> {
     with_session(&app, |s| s.store.create_episode(&title, folder.as_deref()).map_err(err))
+}
+
+#[tauri::command]
+async fn create_document_with_profile(
+    app: State<'_, App>,
+    title: String,
+    profile: String,
+    folder: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let p = cirth_core::model::DocumentProfile::parse(&profile)
+            .ok_or_else(|| format!("Unknown profile {profile}"))?;
+        let doc_id = s.store.create_document_with_profile(&title, p).map_err(err)?;
+        if let Some(f) = folder.as_deref() {
+            let tree = s.store.project_tree().map_err(err)?;
+            let siblings: Vec<_> = tree.iter().filter(|i| i.parent.as_deref() == Some(f)).collect();
+            s.store.move_item(&doc_id, Some(f), siblings.len()).map_err(err)?;
+        }
+        Ok(doc_id)
+    })
+}
+
+#[tauri::command]
+async fn get_document_profile(app: State<'_, App>, id: String) -> Result<String, String> {
+    with_session(&app, |s| {
+        let p = s.store.document_format_profile(&id).map_err(err)?;
+        Ok(p.as_str().to_string())
+    })
+}
+
+#[tauri::command]
+async fn duplicate_and_convert_document(
+    app: State<'_, App>,
+    id: String,
+    title: String,
+    target_profile: String,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let p = cirth_core::model::DocumentProfile::parse(&target_profile)
+            .ok_or_else(|| format!("Unknown profile {target_profile}"))?;
+        s.store.duplicate_and_convert_document(&id, &title, p).map_err(err)
+    })
 }
 
 #[tauri::command]
@@ -3294,6 +3341,9 @@ fn main() {
             load_document,
             planning_state_now,
             project_tree,
+            create_document_with_profile,
+            get_document_profile,
+            duplicate_and_convert_document,
             storyscry_reports,
             stripboard_state,
             save_stripboard,

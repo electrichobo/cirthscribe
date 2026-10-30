@@ -4572,5 +4572,74 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!safeSummary.document_title.includes("<script>"), `Script tag neutralized: ${safeSummary.document_title}`);
   });
 
+  await test("Document formats and profiles model: format assignment at creation, schema v16 migration, and duplicate-and-convert preservation (M6 step 1, Decision A)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+
+    // 1. Verify default document format profile
+    const defaultProfile = await app.evaluate("window.__cirth.lastOpen?.format_profile || 'screenplay_us'");
+    assert(defaultProfile === "screenplay_us", `Default document profile is screenplay_us: ${defaultProfile}`);
+
+    const origDocId = await app.evaluate("window.__cirth.lastOpen?.document_id");
+
+    // 2. Create document with explicit profile (ScreenplayUk)
+    const ukDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('create_document_with_profile', {
+        title: 'BBC Radio & Television Drama',
+        profile: 'screenplay_uk',
+        folder: null
+      })`
+    );
+    assert(ukDocId, "Created UK screenplay document");
+
+    // Verify profile via API
+    const ukProfile = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('get_document_profile', { id: ${JSON.stringify(ukDocId)} })`
+    );
+    assert(ukProfile === "screenplay_uk", `UK document profile matches: ${ukProfile}`);
+
+    // Create a comic script document
+    const comicDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('create_document_with_profile', {
+        title: 'Graphic Novel Spinoff',
+        profile: 'comic',
+        folder: null
+      })`
+    );
+    const comicProfile = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('get_document_profile', { id: ${JSON.stringify(comicDocId)} })`
+    );
+    assert(comicProfile === "comic", `Comic document profile matches: ${comicProfile}`);
+
+    // Verify project_tree carries format_profile metadata
+    const tree = await app.evaluate("window.__TAURI_INTERNALS__.invoke('project_tree')");
+    const foundUk = tree.find((t) => t.id === ukDocId);
+    assert(foundUk && foundUk.format_profile === "screenplay_uk", "Tree item carries screenplay_uk profile");
+    const foundComic = tree.find((t) => t.id === comicDocId);
+    assert(foundComic && foundComic.format_profile === "comic", "Tree item carries comic profile");
+
+    // 3. Duplicate and convert (Decision A: retain original untouched while creating new converted document)
+    const stageDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('duplicate_and_convert_document', {
+        id: ${JSON.stringify(origDocId)},
+        title: 'Theatrical Stage Adaptation',
+        targetProfile: 'stageplay'
+      })`
+    );
+    assert(stageDocId, "Converted document created");
+
+    const stageProfile = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('get_document_profile', { id: ${JSON.stringify(stageDocId)} })`
+    );
+    assert(stageProfile === "stageplay", `Converted document profile is stageplay: ${stageProfile}`);
+
+    // Verify original document remains untouched with its original profile
+    const origProfileAfter = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('get_document_profile', { id: ${JSON.stringify(origDocId)} })`
+    );
+    assert(origProfileAfter === "screenplay_us", "Original document retained untouched as screenplay_us");
+  });
+
   await app.close();
 }

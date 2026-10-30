@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 15;
+pub const SCHEMA_VERSION: i64 = 16;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -101,6 +101,8 @@ pub struct TreeItem {
     pub pos: f64,
     /// Scenes in a document (0 for a folder).
     pub scenes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format_profile: Option<String>,
 }
 
 pub struct Store {
@@ -451,6 +453,15 @@ fn migrate_v15(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v15 -> v16: documents get an explicit format_profile (defaulting to
+/// 'screenplay_us' for standard US feature screenplay).
+fn migrate_v16(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "ALTER TABLE documents ADD COLUMN format_profile TEXT NOT NULL DEFAULT 'screenplay_us';",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -469,6 +480,7 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (13, migrate_v13),
     (14, migrate_v14),
     (15, migrate_v15),
+    (16, migrate_v16),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
@@ -587,13 +599,21 @@ impl Store {
     pub fn project_tree(&self) -> Result<Vec<TreeItem>> {
         let mut out = Vec::new();
         let mut stmt = self.conn.prepare("SELECT id, title, parent_id, pos FROM containers ORDER BY pos")?;
-        for r in stmt.query_map([], |r| Ok(TreeItem { id: r.get(0)?, kind: "folder".into(), title: r.get(1)?, parent: r.get(2)?, pos: r.get(3)?, scenes: 0 }))? {
+        for r in stmt.query_map([], |r| Ok(TreeItem { id: r.get(0)?, kind: "folder".into(), title: r.get(1)?, parent: r.get(2)?, pos: r.get(3)?, scenes: 0, format_profile: None }))? {
             out.push(r?);
         }
         let mut stmt = self.conn.prepare(
-            "SELECT d.id, d.kind, d.title, d.container_id, d.pos, (SELECT COUNT(*) FROM blocks b WHERE b.document_id = d.id AND b.scene_id IS NOT NULL) FROM documents d ORDER BY d.pos",
+            "SELECT d.id, d.kind, d.title, d.container_id, d.pos, (SELECT COUNT(*) FROM blocks b WHERE b.document_id = d.id AND b.scene_id IS NOT NULL), d.format_profile FROM documents d ORDER BY d.pos",
         )?;
-        for r in stmt.query_map([], |r| Ok(TreeItem { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, parent: r.get(3)?, pos: r.get(4)?, scenes: r.get::<_, i64>(5)? as u64 }))? {
+        for r in stmt.query_map([], |r| Ok(TreeItem {
+            id: r.get(0)?,
+            kind: r.get(1)?,
+            title: r.get(2)?,
+            parent: r.get(3)?,
+            pos: r.get(4)?,
+            scenes: r.get::<_, i64>(5)? as u64,
+            format_profile: r.get(6).ok(),
+        }))? {
             out.push(r?);
         }
         out.sort_by(|a, b| a.pos.total_cmp(&b.pos));
@@ -687,10 +707,108 @@ impl Store {
     pub fn create_document(&self, title: &str) -> Result<Id> {
         let id = crate::model::new_id();
         self.conn.execute(
-            "INSERT INTO documents(id, kind, title, profile, container_id, pos) VALUES (?1, 'screenplay', ?2, 'us-letter', NULL, (SELECT COALESCE(MAX(pos), 0) + 1 FROM documents))",
+            "INSERT INTO documents(id, kind, title, profile, format_profile, container_id, pos) VALUES (?1, 'screenplay', ?2, 'us-letter', 'screenplay_us', NULL, (SELECT COALESCE(MAX(pos), 0) + 1 FROM documents))",
             params![id, title],
         )?;
         Ok(id)
+    }
+
+    /// Add an empty document with an explicit format profile (M6, Decision A).
+    pub fn create_document_with_profile(&self, title: &str, profile: crate::model::DocumentProfile) -> Result<Id> {
+        let id = crate::model::new_id();
+        let page_size = profile.default_page_size();
+        self.conn.execute(
+            "INSERT INTO documents(id, kind, title, profile, format_profile, container_id, pos) VALUES (?1, 'screenplay', ?2, ?3, ?4, NULL, (SELECT COALESCE(MAX(pos), 0) + 1 FROM documents))",
+            params![id, title, page_size, profile.as_str()],
+        )?;
+        Ok(id)
+    }
+
+    /// Get the format profile of a document.
+    pub fn document_format_profile(&self, document_id: &str) -> Result<crate::model::DocumentProfile> {
+        let raw: Option<String> = self.conn.query_row(
+            "SELECT format_profile FROM documents WHERE id = ?1",
+            [document_id],
+            |r| r.get(0),
+        ).optional()?;
+        Ok(raw.as_deref().and_then(crate::model::DocumentProfile::parse).unwrap_or(crate::model::DocumentProfile::ScreenplayUs))
+    }
+
+    /// Set the format profile of a document.
+    pub fn set_document_format_profile(&self, document_id: &str, profile: crate::model::DocumentProfile) -> Result<()> {
+        self.conn.execute(
+            "UPDATE documents SET format_profile = ?2 WHERE id = ?1",
+            params![document_id, profile.as_str()],
+        )?;
+        Ok(())
+    }
+
+    /// Duplicate and convert an existing document into a new document with a different
+    /// format profile, preserving the original document untouched (M6, Decision A).
+    pub fn duplicate_and_convert_document(
+        &self,
+        source_doc_id: &str,
+        new_title: &str,
+        new_profile: crate::model::DocumentProfile,
+    ) -> Result<Id> {
+        let new_id = crate::model::new_id();
+        let page_size = new_profile.default_page_size();
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO documents(id, kind, title, profile, format_profile, container_id, pos)
+             SELECT ?1, kind, ?2, ?3, ?4, container_id, (SELECT COALESCE(MAX(pos), 0) + 1 FROM documents)
+             FROM documents WHERE id = ?5",
+            params![new_id, new_title, page_size, new_profile.as_str(), source_doc_id],
+        )?;
+
+        // Duplicate blocks
+        let rows = {
+            let mut stmt = tx.prepare("SELECT ord, kind, runs, dual, break_before FROM blocks WHERE document_id = ?1 ORDER BY ord")?;
+            stmt.query_map([source_doc_id], |r| {
+                Ok((
+                    r.get::<_, f64>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, i64>(3)?,
+                    r.get::<_, i64>(4)?,
+                ))
+            })?.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        for (ord, kind, runs, dual, break_before) in rows {
+            let block_id = crate::model::new_id();
+            tx.execute(
+                "INSERT INTO blocks(id, ord, kind, runs, scene_id, dual, break_before, document_id)
+                 VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7)",
+                params![block_id, ord, kind, runs, dual, break_before, new_id],
+            )?;
+        }
+
+        // Duplicate beats
+        let beat_rows = {
+            let mut beat_stmt = tx.prepare("SELECT summary, pos, kind, logline FROM beats WHERE document_id = ?1 ORDER BY pos")?;
+            beat_stmt.query_map([source_doc_id], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, f64>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
+                ))
+            })?.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        for (summary, pos, kind, logline) in beat_rows {
+            let beat_id = crate::model::new_id();
+            tx.execute(
+                "INSERT INTO beats(id, summary, scene_id, pos, document_id, kind, logline)
+                 VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6)",
+                params![beat_id, summary, pos, new_id, kind, logline],
+            )?;
+        }
+
+        tx.commit()?;
+        self.mark_unsaved()?;
+        Ok(new_id)
     }
 
     pub fn documents(&self) -> Result<Vec<(Id, String)>> {

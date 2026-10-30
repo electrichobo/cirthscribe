@@ -93,6 +93,169 @@ impl Profile {
         Profile { name: "us-feature-a4-draft", page_w_in: 8.27, page_h_in: 11.69, ..Profile::us_letter() }
     }
 
+    pub fn screenplay_us() -> Profile {
+        Profile::us_letter()
+    }
+
+    pub fn screenplay_uk() -> Profile {
+        Profile {
+            name: "uk-feature-a4",
+            page_w_in: 8.27,
+            page_h_in: 11.69,
+            top_in: 1.0,
+            bottom_in: 1.0,
+            lines_per_inch: 6.0,
+            chars_per_inch: 10.0,
+            font_pt: 12.0,
+            heading: g(1.5, 58, 1, true),
+            action: g(1.5, 58, 1, false),
+            character: g(3.5, 36, 1, true),
+            parenthetical: g(2.9, 24, 0, false),
+            dialogue: g(2.5, 36, 0, false),
+            transition: Geometry { left_in: 5.2, width_ch: 20, align: Align::Right, space_before: 1, uppercase: true },
+            dual_left: [g(2.0, 24, 1, true), g(1.7, 19, 0, false), g(1.4, 26, 0, false)],
+            dual_right: [g(4.9, 22, 1, true), g(4.6, 19, 0, false), g(4.3, 26, 0, false)],
+            more: "(MORE)",
+            contd: " (CONT'D)",
+            min_split: 2,
+        }
+    }
+
+    pub fn teleplay_multicam() -> Profile {
+        Profile {
+            name: "teleplay-multicam-sitcom",
+            page_w_in: 8.5,
+            page_h_in: 11.0,
+            top_in: 1.0,
+            bottom_in: 1.0,
+            lines_per_inch: 6.0,
+            chars_per_inch: 10.0,
+            font_pt: 12.0,
+            heading: g(1.5, 60, 2, true),
+            action: g(1.5, 60, 1, true),
+            character: g(4.0, 32, 1, true),
+            parenthetical: g(3.3, 22, 0, false),
+            dialogue: g(2.5, 38, 0, true),
+            transition: Geometry { left_in: 5.5, width_ch: 20, align: Align::Right, space_before: 1, uppercase: true },
+            dual_left: [g(2.2, 25, 1, true), g(1.8, 20, 0, false), g(1.5, 28, 0, true)],
+            dual_right: [g(5.2, 23, 1, true), g(4.8, 20, 0, false), g(4.5, 28, 0, true)],
+            more: "(MORE)",
+            contd: " (CONT'D)",
+            min_split: 2,
+        }
+    }
+
+    pub fn stageplay() -> Profile {
+        Profile {
+            name: "theatrical-stageplay",
+            page_w_in: 8.5,
+            page_h_in: 11.0,
+            top_in: 1.0,
+            bottom_in: 1.0,
+            lines_per_inch: 6.0,
+            chars_per_inch: 10.0,
+            font_pt: 12.0,
+            heading: g(1.5, 60, 2, true),
+            action: g(1.5, 60, 1, false),
+            character: g(3.8, 35, 1, true),
+            parenthetical: g(2.8, 30, 0, false),
+            dialogue: g(2.2, 42, 0, false),
+            transition: Geometry { left_in: 5.5, width_ch: 20, align: Align::Right, space_before: 1, uppercase: true },
+            dual_left: [g(2.0, 25, 1, true), g(1.8, 20, 0, false), g(1.5, 28, 0, false)],
+            dual_right: [g(5.0, 23, 1, true), g(4.8, 20, 0, false), g(4.5, 28, 0, false)],
+            more: "(MORE)",
+            contd: " (CONT'D)",
+            min_split: 2,
+        }
+    }
+
+    pub fn comic() -> Profile {
+        Profile {
+            name: "comic-graphic-novel",
+            page_w_in: 8.5,
+            page_h_in: 11.0,
+            top_in: 1.0,
+            bottom_in: 1.0,
+            lines_per_inch: 6.0,
+            chars_per_inch: 10.0,
+            font_pt: 12.0,
+            heading: g(1.25, 65, 2, true),
+            action: g(1.25, 65, 1, false),
+            character: g(2.5, 45, 1, true),
+            parenthetical: g(2.5, 40, 0, false),
+            dialogue: g(2.5, 45, 0, false),
+            transition: Geometry { left_in: 1.25, width_ch: 65, align: Align::Left, space_before: 1, uppercase: true },
+            dual_left: [g(1.5, 28, 1, true), g(1.5, 25, 0, false), g(1.5, 30, 0, false)],
+            dual_right: [g(4.8, 28, 1, true), g(4.8, 25, 0, false), g(4.8, 30, 0, false)],
+            more: "(MORE)",
+            contd: " (CONT'D)",
+            min_split: 2,
+        }
+    }
+
+    pub fn interactive() -> Profile {
+        Profile {
+            name: "interactive-branching",
+            page_w_in: 8.5,
+            page_h_in: 11.0,
+            top_in: 1.0,
+            bottom_in: 1.0,
+            lines_per_inch: 6.0,
+            chars_per_inch: 10.0,
+            font_pt: 12.0,
+            heading: g(1.25, 65, 2, true),
+            action: g(1.25, 65, 1, false),
+            character: g(2.0, 50, 1, true),
+            parenthetical: g(2.0, 50, 0, false),
+            dialogue: g(2.0, 55, 0, false),
+            transition: Geometry { left_in: 1.25, width_ch: 65, align: Align::Left, space_before: 1, uppercase: true },
+            dual_left: [g(1.5, 28, 1, true), g(1.5, 25, 0, false), g(1.5, 30, 0, false)],
+            dual_right: [g(4.8, 28, 1, true), g(4.8, 25, 0, false), g(4.8, 30, 0, false)],
+            more: "(MORE)",
+            contd: " (CONT'D)",
+            min_split: 2,
+        }
+    }
+
+    pub fn treatment() -> Profile {
+        Profile {
+            name: "treatment-prose",
+            page_w_in: 8.5,
+            page_h_in: 11.0,
+            top_in: 1.0,
+            bottom_in: 1.0,
+            lines_per_inch: 6.0,
+            chars_per_inch: 10.0,
+            font_pt: 12.0,
+            heading: g(1.0, 65, 2, true),
+            action: g(1.0, 65, 1, false),
+            character: g(1.5, 55, 1, true),
+            parenthetical: g(1.5, 55, 0, false),
+            dialogue: g(1.5, 55, 0, false),
+            transition: Geometry { left_in: 1.0, width_ch: 65, align: Align::Left, space_before: 1, uppercase: true },
+            dual_left: [g(1.2, 28, 1, true), g(1.2, 25, 0, false), g(1.2, 30, 0, false)],
+            dual_right: [g(4.5, 28, 1, true), g(4.5, 25, 0, false), g(4.5, 30, 0, false)],
+            more: "(MORE)",
+            contd: " (CONT'D)",
+            min_split: 2,
+        }
+    }
+
+    pub fn for_document_profile(profile: crate::model::DocumentProfile, page_size: Option<&str>) -> Profile {
+        match profile {
+            crate::model::DocumentProfile::ScreenplayUs => match page_size {
+                Some("a4") => Profile::a4(),
+                _ => Profile::us_letter(),
+            },
+            crate::model::DocumentProfile::ScreenplayUk => Profile::screenplay_uk(),
+            crate::model::DocumentProfile::TeleplayMultiCam => Profile::teleplay_multicam(),
+            crate::model::DocumentProfile::StagePlay => Profile::stageplay(),
+            crate::model::DocumentProfile::ComicScript => Profile::comic(),
+            crate::model::DocumentProfile::InteractiveStory => Profile::interactive(),
+            crate::model::DocumentProfile::TreatmentProse => Profile::treatment(),
+        }
+    }
+
     pub fn body_lines(&self) -> usize {
         ((self.page_h_in - self.top_in - self.bottom_in) * self.lines_per_inch).floor() as usize
     }
@@ -739,5 +902,33 @@ mod tests {
         let r = wrap(s, 4);
         assert_eq!(r.len(), 2);
         assert_eq!(r[0], (0, 4)); // two graphemes of two scalars each
+    }
+
+    #[test]
+    fn layout_profiles_provide_distinct_and_valid_geometries() {
+        use crate::model::DocumentProfile;
+        for dp in DocumentProfile::ALL {
+            let p = Profile::for_document_profile(dp, None);
+            assert!(p.page_w_in > 7.0 && p.page_w_in < 9.0);
+            assert!(p.page_h_in > 10.0 && p.page_h_in < 13.0);
+            assert!(p.body_lines() > 40);
+            assert!(p.heading.width_ch > 0);
+            assert!(p.action.width_ch > 0);
+            assert!(p.dialogue.width_ch > 0);
+        }
+
+        let us = Profile::screenplay_us();
+        let uk = Profile::screenplay_uk();
+        let multicam = Profile::teleplay_multicam();
+        let stage = Profile::stageplay();
+        let comic = Profile::comic();
+
+        assert_eq!(uk.page_w_in, 8.27);
+        assert_eq!(uk.page_h_in, 11.69);
+        assert_eq!(us.page_w_in, 8.5);
+        assert!(multicam.dialogue.uppercase);
+        assert!(!us.dialogue.uppercase);
+        assert_eq!(comic.heading.width_ch, 65);
+        assert_eq!(stage.dialogue.width_ch, 42);
     }
 }

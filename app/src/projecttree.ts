@@ -17,6 +17,7 @@ export interface TreeItem {
   parent: string | null;
   pos: number;
   scenes: number;
+  format_profile?: string;
 }
 
 export function createProjectTree(hooks: { current: () => string | null; openDocument: (id: string) => Promise<boolean>; changed: () => void }) {

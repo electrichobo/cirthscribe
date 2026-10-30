@@ -80,6 +80,7 @@ interface Opened {
   work_path: string;
   package_path: string;
   open_ms: number;
+  format_profile?: string;
   /** What an import changed or could not keep. */
   import_notes: string[];
 }
