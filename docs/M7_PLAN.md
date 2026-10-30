@@ -79,6 +79,25 @@ Milestone 7 introduces optional integrations for Kolbítar while strictly preser
    - Automated test suite execution (`cargo test -p cirth-core`, contract tests, license notices, CDP and WebDriver E2E suites).
    - Update `docs/COMPATIBILITY.md`, `docs/testing/MANUAL_CHECKS.md`, author `docs/m7/EXIT_REVIEW.md`.
 
+### Built (Steps 5 & 6, 2026-10-30)
+
+- Domain model & capability analyzer in `crates/cirth-core/src/export_capability.rs`:
+  - `TargetFormat`: `DocxGoogleDocs`, `XlsxGoogleSheets`, `CsvGoogleSheets`, `Fdx`, `Pdf`, `PlainText`, `Html`, `Twee`, `Json`.
+  - `FidelityGrade`: `Authoritative`, `HighFidelity`, `LossyStructural`, `Incompatible`.
+  - `analyze_export_capability`: evaluates document profile, target format, dual dialogue, and locked pages to return supported features, loss warnings (line wrap drift, sequential dual dialogue, dynamic A-page reflow, non-tabular script text), and cloud workflow guidance.
+  - 4 unit tests in `cirth_core::export_capability::tests`.
+- Tauri IPC command in `app/src-tauri/src/main.rs`:
+  - `export_capability_analyze`: queries active document profile, checks dual dialogue and page locks, and evaluates capability report.
+- UI Export Dialog integration in `app/src/exportdlg.ts`:
+  - Real-time capability information box displaying fidelity grade badge, workflow guidance, and loss warnings whenever an export format is focused or clicked.
+- Comprehensive cloud collaboration documentation in `docs/INTEROPERABILITY.md`:
+  - Dedicated Google Docs and Google Sheets collaboration guides with Suggesting mode recommendations, formula sanitization, and lossless roundtrip principles.
+- Automated E2E Test 83 in `app/tests/e2e/suite.mjs`:
+  - Verifies capability reporting for Google Docs (.docx), incompatible warnings for Google Sheets on script text, and dynamic export dialog guidance for PDF, DOCX, and Reports.
+- Milestone 7 Exit Review authored in `docs/m7/EXIT_REVIEW.md`:
+  - All 6 steps complete; automated suites passing (188 core tests, 4 contract tests, 355 notices, 83 CDP tests, 82 WebDriver tests).
+  - Manual checks N47 and N48 logged in `docs/testing/MANUAL_CHECKS.md`.
+
 ## Decisions Needed from the Owner
 
 - **A. AI Network Client in Core vs App-Shell:**

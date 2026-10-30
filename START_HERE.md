@@ -1,13 +1,13 @@
 # Start here
 
-Kolbítar is a free, open-source, offline-first desktop screenplay and production app. It is built in Rust, Tauri 2, TypeScript and ProseMirror, and its project files are SQLite `.cirth` files. It is a working application, not yet released. Milestones 0–6 are closed (`docs/m6/EXIT_REVIEW.md`); milestone 7 (optional extras) is in progress (`docs/M7_PLAN.md`).
+Kolbítar is a free, open-source, offline-first desktop screenplay and production app. It is built in Rust, Tauri 2, TypeScript and ProseMirror, and its project files are SQLite `.cirth` files. It is a working application, not yet released. Milestones 0–7 are closed (`docs/m7/EXIT_REVIEW.md`); core product roadmap is complete.
 
 For any AI coding agent taking over a session, in this order:
 
 1. **AGENTS.md:** the rules, the current stage, the repository map, the commands, and the Session Continuity & Constrained Takeover Protocol. Follow its startup sequence before changing anything.
 2. **HANDOFF.md:** where the last session stopped and the next immediate step.
 3. **STATUS.md:** milestone status and open defects.
-4. **The current milestone plan:** docs/M7_PLAN.md (docs/M6_PLAN.md records what M6 built).
+4. **The current milestone plan:** docs/M7_PLAN.md (docs/m7/EXIT_REVIEW.md records what M7 built).
 
 Product brief and acceptance criteria: docs/PRODUCT_SPEC.md, docs/ARCHITECTURE.md, docs/ROADMAP.md, docs/ACCEPTANCE.md, docs/INTEROPERABILITY.md. Decisions: docs/DECISIONS.md and docs/adr/.
 

@@ -40,6 +40,8 @@ Statuses: not implemented · implemented, unverified · verified within profile 
 | .twee / .html / .json (interactive story) | Verified within profile (automated) | Interactive branching story: Twee 3 export, offline standalone playable HTML runner with history and restart, JSON graph export | Automated `interactive::tests`, BFS graph validation, and e2e Test 79 on CDP and WebDriver |
 | .docx / .html / .txt (treatment prose) | Verified within profile (automated) | Series treatment & pitch bibles: H1–H3 hierarchy, reading time metrics, Project Bible entity cross-referencing, semantic HTML, and WordprocessingML DOCX | Automated `treatment::tests`, fixtures tests, and e2e Test 80 on CDP and WebDriver |
 | Grammar analysis report | Verified within profile (automated) | 100% offline rule-based grammar and style analyzer: duplicate words, passive voice, quotes, parentheticals, cliches, spacing, and one-click replacement fix | Automated `grammar::tests`, UI review dialog, and e2e Test 81 on CDP and WebDriver |
+| AI Assistant & Non-Destructive Diffs | Verified within profile (automated) | Opt-in, off-by-default assistant: local runner (Ollama/LM Studio) or cloud endpoints, transparent scope disclosure and token estimator, side-by-side non-destructive block diffs, and accepted batch diff application | Automated `ai::tests`, IPC commands, UI assistant dialog, and e2e Test 82 on CDP and WebDriver |
+| Export capability & Google workflow adapter | Verified within profile (automated) | Export capability analyzer for Google Docs (.docx) and Google Sheets (.xlsx/.csv): fidelity grading, loss warnings, and dynamic export dialog guidance | Automated `export_capability::tests`, UI export dialog integration, and e2e Test 83 on CDP and WebDriver |
 
 ## Deferred
 

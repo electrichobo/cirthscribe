@@ -50,9 +50,22 @@ export function createExportDialog(hooks: { hasActiveRevision: () => boolean; ru
     note.textContent = f.note;
     text.append(name, note);
     row.append(r, text);
+    r.addEventListener("change", () => {
+      void updateCapability(f.id);
+    });
     list.append(row);
     radios.set(f.id, r);
   }
+  const capabilityBox = document.createElement("div");
+  capabilityBox.id = "export-capability-box";
+  capabilityBox.className = "form-note";
+  capabilityBox.style.marginTop = "8px";
+  capabilityBox.style.padding = "6px 10px";
+  capabilityBox.style.background = "var(--bg-muted, #f4f4f4)";
+  capabilityBox.style.borderRadius = "4px";
+  capabilityBox.style.fontSize = "0.85rem";
+  capabilityBox.style.display = "none";
+
   const cancel = document.createElement("button");
   cancel.type = "button";
   cancel.id = "export-cancel";
@@ -65,8 +78,41 @@ export function createExportDialog(hooks: { hasActiveRevision: () => boolean; ru
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   actions.append(cancel, go);
-  dialog.append(h, list, actions);
+  dialog.append(h, list, capabilityBox, actions);
   document.body.append(dialog);
+
+  async function updateCapability(formatId: ExportFormat) {
+    let target = "docx_google_docs";
+    if (formatId === "pdf" || formatId === "pdf_changed") target = "pdf";
+    else if (formatId === "txt") target = "plain_text";
+    else if (formatId === "fdx") target = "fdx";
+    else if (formatId === "docx") target = "docx_google_docs";
+    else if (formatId === "html") target = "html";
+    else if (formatId === "reports" || formatId === "stripboard") target = "xlsx_google_sheets";
+    else {
+      capabilityBox.style.display = "none";
+      return;
+    }
+
+    try {
+      const rep = await (window as any).__cirth?.exportCapability?.(target);
+      if (rep) {
+        capabilityBox.style.display = "block";
+        const gradeText =
+          rep.fidelity_grade === "authoritative"
+            ? "Authoritative Fidelity"
+            : rep.fidelity_grade === "high_fidelity"
+            ? "High Fidelity"
+            : rep.fidelity_grade === "lossy_structural"
+            ? "Structural Flattening"
+            : "Incompatible";
+        const warnings = rep.loss_warnings.length > 0 ? `<br><span style="color: #c50;">⚠ ${rep.loss_warnings[0]}</span>` : "";
+        capabilityBox.innerHTML = `<strong>${gradeText}</strong>: ${rep.cloud_workflow_guidance}${warnings}`;
+      }
+    } catch {
+      capabilityBox.style.display = "none";
+    }
+  }
 
   const chosen = () => [...radios.values()].find((r) => r.checked)?.value as ExportFormat | undefined;
   cancel.addEventListener("click", () => dialog.close());
@@ -86,6 +132,7 @@ export function createExportDialog(hooks: { hasActiveRevision: () => boolean; ru
     changed.disabled = !hooks.hasActiveRevision();
     changed.closest("label")!.title = changed.disabled ? "Choose a revision set first (Format > Revisions)" : "";
     if (!chosen() || chosen() === "pdf_changed") radios.get("pdf")!.checked = true;
+    if (chosen()) void updateCapability(chosen()!);
     if (!dialog.open) dialog.showModal();
     [...radios.values()].find((r) => r.checked)!.focus();
     announce("Export: choose a format");

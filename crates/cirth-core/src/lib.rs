@@ -9,6 +9,7 @@ pub mod compat;
 pub mod compat_m4;
 pub mod docx;
 pub mod evidence;
+pub mod export_capability;
 pub mod fdx;
 pub mod fixtures;
 pub mod fsutil;

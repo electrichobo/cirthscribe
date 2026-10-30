@@ -2296,6 +2296,8 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   },
   exportStageplayText: (documentId?: string, title?: string) => invoke<string>("export_stageplay_text", { documentId, title }),
   exportTeleplayText: (documentId?: string, title?: string) => invoke<string>("export_teleplay_text", { documentId, title }),
+  exportCapability: (targetFormat: string, documentId?: string) =>
+    invoke<any>("export_capability_analyze", { targetFormat, documentId }),
   bible,
   timeline,
   evidence,

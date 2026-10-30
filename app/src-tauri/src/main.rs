@@ -1503,6 +1503,30 @@ async fn export_teleplay_text(
 }
 
 #[tauri::command]
+async fn export_capability_analyze(
+    app: State<'_, App>,
+    target_format: cirth_core::export_capability::TargetFormat,
+    document_id: Option<String>,
+) -> Result<cirth_core::export_capability::ExportCapabilityReport, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let profile = s.store.document_format_profile(&doc_id).unwrap_or(cirth_core::model::DocumentProfile::ScreenplayUs);
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let has_dual = doc.blocks.iter().any(|b| b.dual);
+        let has_locked_pages = s.store.page_lock(&doc_id).map(|p| p.is_some()).unwrap_or(false);
+        Ok(cirth_core::export_capability::analyze_export_capability(
+            profile,
+            target_format,
+            has_dual,
+            has_locked_pages,
+        ))
+    })
+}
+
+#[tauri::command]
 async fn interactive_analyze(
     app: State<'_, App>,
     document_id: Option<String>,
@@ -3867,6 +3891,7 @@ fn main() {
             comic_export_html,
             export_stageplay_text,
             export_teleplay_text,
+            export_capability_analyze,
             interactive_analyze,
             interactive_export_twee,
             interactive_export_html,

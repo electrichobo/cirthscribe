@@ -158,13 +158,15 @@ Done:
 Carried forward:
 - [ ] Desktop manual checks for additional formats, language tools, and format conversion (N41–N46)
 
-### 🟡 Stage 7: Optional extras (in progress)
+### ✅ Stage 7: Optional extras (done)
 
 Done:
 - [x] Bring-your-own AI architecture and writing assistant: off by default, zero unsolicited network requests; support for local Ollama / LM Studio or cloud providers; transparent scope disclosure and token estimation; non-destructive block diffs and accepted batch application (`cirth_core::ai`, `app/src/aidlg.ts`, E2E Test 82)
+- [x] Cloud sharing & Google Docs/Sheets workflow adapter: export capability analyzer, fidelity grading, explicit loss warnings, dynamic export dialog guidance, and interoperability guide (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, `app/src/exportdlg.ts`, E2E Test 83)
+- [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
 
-In progress:
-- [ ] Optional Google Docs and Sheets sharing workflows & interoperability guide
+Carried forward:
+- [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
 
 ---
 

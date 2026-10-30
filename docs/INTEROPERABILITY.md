@@ -63,6 +63,40 @@ Test import, row/column counts, Unicode, booleans/numbers, duration units, and t
 
 Editing an exported spreadsheet does not automatically edit the screenplay or schedule. Any future re-import requires stable-ID reconciliation, conflict review, and a dry-run preview.
 
+## Google Docs & Sheets Collaboration Workflows (M7)
+
+### 1. Google Docs (.docx) Export & Collaboration Workflow
+
+Kolbítar provides a dedicated WordprocessingML (.docx) exporter designed specifically for clean import into Google Docs and Microsoft Word:
+
+- **Generating the Export:** Choose `File > Export… > Word (.docx)`. The dialog presents an instant fidelity analysis badge and loss warnings.
+- **Uploading to Google Drive:** Drag the `.docx` file into Google Drive and select "Open with Google Docs".
+- **Collaborator Mode:** Recommend external readers and co-writers use **"Suggesting" mode** in Google Docs. This prevents accidental disruption of screenplay margins or element indentation styles.
+- **Preserved Semantics:**
+  - Standard screenplay elements (Scene Heading, Action, Character Cue, Parenthetical, Dialogue, Transition) map directly to dedicated named Word styles.
+  - Page dimensions (US Letter or A4) and precise margin offsets (1.5" left margin, standard character/dialogue indents) are explicitly encoded in twips.
+  - Bold, italic, underline, and non-ASCII Unicode characters survive intact.
+  - Title page metadata is placed in an isolated front-matter section.
+- **Documented Conversion Losses:**
+  - *Pagination:* Google Docs uses its own browser layout engine and local font rasterization; exact 55-line pagination may drift by several lines compared to Kolbítar's authoritative Courier Prime 12pt layout engine. Always distribute `.pdf` when exact production page numbers are legally required.
+  - *Dual Dialogue:* Google Docs does not support multi-column screenplay layouts within flowing paragraphs; dual dialogue speeches are serialized sequentially.
+  - *Locked Production Pages:* Dynamic word processor flow cannot retain locked A/B production page divisions.
+  - *Private Metadata:* Inactive alternative takes, private project notes, and anchored comment threads are excluded by default to protect writer privacy.
+- **Reconciliation back to Kolbítar:** To merge feedback without losing structural integrity, import outside comments via `.cirth-review` packages or copy revised text into a dedicated comparison branch using `File > Branches…`.
+
+### 2. Google Sheets (.xlsx / .csv) Tabular Workflow
+
+Kolbítar strictly refuses to flatten dramatic screenplay prose into spreadsheet grids. Instead, tabular cloud workflows operate on script-derived production metadata:
+
+- **Generating the Export:** Choose `File > Export… > Reports (StoryScry)…` or `Stripboard & schedule…` and select `.xlsx` or `.csv`.
+- **Opening in Google Sheets:** Upload to Google Drive and open with Google Sheets.
+- **Preserved Structure:**
+  - Stable internal IDs (`sc_...`) are included in dedicated identifier columns to support deterministic reconciliation.
+  - Explicit header row with typed columns: Scene Number, INT/EXT, Day/Night, Eighths Length, Estimated Duration (seconds), Speaking Characters, Tagged Cast, Props, and Wardrobe.
+  - Formula safety: Cells starting with `=`, `+`, `-`, or `@` are sanitized with leading apostrophes to protect against spreadsheet formula injection attacks.
+  - Stripboards retain scheduled shooting order, company moves, banners, and day-break totals.
+- **Preserving Canonical Truth:** Modifying an exported spreadsheet never silently alters the canonical `.cirth` database. Spreadsheets remain read-only production derivatives.
+
 ## Supported interchange versus native fidelity
 
 These features may not survive external conversion and must be assessed separately:

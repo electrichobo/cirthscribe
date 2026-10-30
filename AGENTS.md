@@ -4,9 +4,9 @@ Kolbítar is a free, open-source, offline-first desktop writing and production a
 
 ## Current stage (2026-10-30)
 
-A working application, not yet released, plus its product brief. M0–M6 are closed by the owner (`docs/m6/EXIT_REVIEW.md`). **Active: M7** (`docs/M7_PLAN.md`, ROADMAP.md).
-- M7 in progress: optional integrations, bring-your-own AI writing assistant (off by default), transparent scope disclosure, non-destructive diff engine, Google Docs/Sheets export workflows.
-- Carried (docs/m6/EXIT_REVIEW.md): manual checks N41–N47, N37–N40, N32–N36, the Mac run, external app tests.
+A working application, not yet released, plus its product brief. M0–M7 are closed (`docs/m7/EXIT_REVIEW.md`).
+- M7 built optional extras: bring-your-own AI writing assistant (off by default), transparent scope disclosure, non-destructive diff engine, Google Docs/Sheets export workflows (`docs/M7_PLAN.md`).
+- Carried (docs/m7/EXIT_REVIEW.md): manual checks N41–N48, N37–N40, N32–N36, the Mac run, external app tests.
 
 Later milestones (ROADMAP.md) are only planned. Never present a planned feature as working. Open items are listed in STATUS.md and docs/testing/MANUAL_CHECKS.md.
 

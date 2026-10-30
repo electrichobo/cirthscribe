@@ -4,34 +4,31 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestone 7 (Optional Integrations) in progress (`docs/M7_PLAN.md`).** Goal: Steps 1–4 built; proceed to Step 5 (Cloud Sharing & Google Workflow Compatibility Adapter).
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`).** Core application roadmap complete. Next: manual checks and owner release review.
 
 ## Completed & Verified
 
-- **Milestone 7 Steps 1–4 built:**
-  - `cirth_core::ai`: optional bring-your-own AI architecture (`AiProviderType`, `AiConfig`, `AiScopeKind`, `AiTask`, `AiPayload`, `AiDiffBlock`, `DiffStatus`).
-  - Transparent scope disclosure, rule-of-thumb token estimator, prompt generators with Kolbítar formatting conventions.
-  - Non-destructive block diff comparison engine (`compute_block_diffs`) and transaction-safe batch diff application preserving heading `scene_id`.
-  - Tauri IPC commands: `ai_get_config`, `ai_set_config`, `ai_prepare_payload`, `ai_compute_diffs`, `ai_apply_diffs`.
-  - Frontend assistant dialog (`app/src/aidlg.ts`) with provider configuration, task selection, scope banner, diff preview, and accept/reject actions.
-  - Automated E2E Test 82 in `app/tests/e2e/suite.mjs`.
+- **Milestone 7 Steps 1–6 complete:**
+  - Steps 1–4: Optional AI Assistant & diff engine (`cirth_core::ai`, `app/src/aidlg.ts`, e2e Test 82). Off by default, zero unsolicited network traffic, transparent scope disclosure, non-destructive block diffs.
+  - Step 5: Export capability analysis & Google Docs/Sheets adapter (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, dynamic export dialog guidance in `app/src/exportdlg.ts`, e2e Test 83).
+  - Step 6: Compatibility matrix update, manual checks N47–N48, exit review (`docs/m7/EXIT_REVIEW.md`).
 - **Verified:**
-  - `cargo test -p cirth-core` (184/184 passed: 124 unit including 4 AI tests, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
+  - `cargo test -p cirth-core` (188/188 passed: 128 unit including 4 capability and 4 AI tests, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
   - `npm --prefix app run build` (clean without errors).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
   - `node app/scripts/third-party-notices.mjs --check` (355 components passed).
-  - `npm --prefix app run e2e:cdp` (82/82 passed, 0 skipped).
-  - `npm --prefix app run e2e:webdriver` (81/81 passed, 1 skipped: simulated IME).
+  - `npm --prefix app run e2e:cdp` (83/83 passed, 0 skipped).
+  - `npm --prefix app run e2e:webdriver` (82/82 passed, 1 skipped: simulated IME).
 - **Not verified (carried):**
-  - M7 manual check N47 (AI assistant & scope disclosure);
+  - M7 manual checks N47 (AI assistant) and N48 (Google Docs/Sheets);
   - M6 manual checks N41–N46, M5 checks N37–N40, M4 checks N32–N36, Mac run (N31), N29, N30.
 
 ## In-Progress / Uncommitted State
 
-- Steps 1–4 complete and fully verified across all test gates. Ready for commit and push.
+- M7 Steps 5–6 complete and fully verified. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push M7 Steps 1–4: Optional AI Assistant, transparent scope disclosure, non-destructive diff engine, and E2E Test 82.
-2. Proceed to M7 Step 5: Cloud Sharing & Google Workflow Compatibility Adapter (`docs/M7_PLAN.md`).
+1. Commit and push M7 Steps 5–6: Export capability analyzer, Google Docs/Sheets workflow adapter, and Milestone 7 exit review.
+2. Align with owner on release review and manual checks execution (`docs/testing/MANUAL_CHECKS.md`).

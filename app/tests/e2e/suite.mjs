@@ -5163,10 +5163,10 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
   });
 
   await test("Offline Grammar, Style & Dialogue Analysis Engine: duplicate words, passive voice, quotes, parentheticals, cliches, spacing, and one-click fixes", async () => {
-    // 1. Open a clean fixture
+    // 1. Open a clean fixture with reset
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);
-    await openFixture("page-boundaries", false);
+    await openFixture("page-boundaries", true);
     await waitFor(app, "window.__cirth.lastOpen", "Project open");
 
     // 2. Insert blocks with intentional grammar, punctuation, and style issues
@@ -5297,10 +5297,10 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
   });
 
   await test("Optional AI Assistant: off-by-default configuration, transparent scope disclosure, non-destructive block diffs, and accepted batch diff application", async () => {
-    // 1. Open a clean fixture
+    // 1. Open a clean fixture with reset
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);
-    await openFixture("page-boundaries", false);
+    await openFixture("page-boundaries", true);
     await waitFor(app, "window.__cirth.lastOpen", "Project open");
 
     // 2. Verify AI is disabled by default
@@ -5389,6 +5389,57 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     `);
     const finalConfig = await app.evaluate("window.__cirth.ai.getConfig()");
     assert(finalConfig.enabled === false, "AI returned to disabled state");
+  });
+
+  await test("Export Capability Analysis & Google Docs/Sheets Workflow Adapter: fidelity grading, loss warnings, and dynamic export dialog guidance (M7 Step 5)", async () => {
+    // 1. Open a clean fixture with reset
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", true);
+    await waitFor(app, "window.__cirth.lastOpen", "Project open");
+
+    // 2. Analyze capability for Google Docs (.docx)
+    const docxReport = await app.evaluate("window.__cirth.exportCapability('docx_google_docs')");
+    assert(docxReport, "Docx report returned");
+    assert(docxReport.is_supported === true, "Google Docs export supported for screenplays");
+    assert(docxReport.fidelity_grade === "high_fidelity", "Google Docs graded as high_fidelity");
+    assert(docxReport.supported_features.some((f) => f.includes("Semantic screenplay paragraph styles")), "Supported features list semantic styles");
+    assert(docxReport.loss_warnings.some((w) => w.includes("Google Docs reflows lines")), "Loss warning describes line wrap / pagination differences");
+    assert(docxReport.cloud_workflow_guidance.includes("Google Drive") && docxReport.cloud_workflow_guidance.includes("Suggesting"), "Guidance suggests Google Drive and Suggesting mode");
+
+    // 3. Analyze capability for Google Sheets (.xlsx) on dramatic script
+    const sheetsReport = await app.evaluate("window.__cirth.exportCapability('xlsx_google_sheets')");
+    assert(sheetsReport, "Sheets report returned");
+    assert(sheetsReport.is_supported === false, "Screenplay prose text marked incompatible with direct spreadsheet conversion");
+    assert(sheetsReport.fidelity_grade === "incompatible", "Graded incompatible");
+    assert(sheetsReport.loss_warnings.some((w) => w.includes("Script prose is dramatic narrative")), "Loss warning clarifies narrative vs tabular");
+    assert(sheetsReport.cloud_workflow_guidance.includes("StoryScry") || sheetsReport.cloud_workflow_guidance.includes("Stripboard"), "Guidance points to StoryScry and Stripboard reports");
+
+    // 4. UI Export Dialog integration
+    await app.evaluate("window.__cirth.menu('export')");
+    await waitFor(app, "document.getElementById('export-dialog')?.open === true", "Export dialog open");
+
+    // Click PDF radio -> Authoritative fidelity
+    await app.evaluate("document.getElementById('export-pdf')?.click()");
+    await waitFor(app, "document.getElementById('export-capability-box')?.textContent.includes('Authoritative Fidelity')", "Capability box shows Authoritative Fidelity");
+    const pdfBoxText = await app.evaluate("document.getElementById('export-capability-box')?.textContent");
+    assert(pdfBoxText.includes("Authoritative Fidelity"), `PDF capability shows authoritative: ${pdfBoxText}`);
+
+    // Click Word (.docx) radio -> High Fidelity with Google Docs guidance
+    await app.evaluate("document.getElementById('export-docx')?.click()");
+    await waitFor(app, "document.getElementById('export-capability-box')?.textContent.includes('High Fidelity')", "Capability box updated to High Fidelity");
+    const docxBoxText = await app.evaluate("document.getElementById('export-capability-box')?.textContent");
+    assert(docxBoxText.includes("Google Drive"), `Capability box includes Google Docs workflow guidance: ${docxBoxText}`);
+
+    // Click Reports radio -> Incompatible warning with Google Sheets guidance
+    await app.evaluate("document.getElementById('export-reports')?.click()");
+    await waitFor(app, "document.getElementById('export-capability-box')?.textContent.includes('Incompatible')", "Capability box updated to Incompatible");
+    const reportsBoxText = await app.evaluate("document.getElementById('export-capability-box')?.textContent");
+    assert(reportsBoxText.includes("Google Sheets"), `Reports box includes Google Sheets guidance: ${reportsBoxText}`);
+
+    // Click cancel
+    await app.evaluate("document.getElementById('export-cancel')?.click()");
+    await waitFor(app, "!document.getElementById('export-dialog')?.open", "Export dialog closed");
   });
 
   await app.close();
