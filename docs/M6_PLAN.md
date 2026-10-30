@@ -52,6 +52,7 @@ Milestone 6 expands Kolbítar from single-camera US feature screenplays into a v
    - Prose profile: Headings (H1–H3), body paragraphs, bullet/numbered lists, blockquotes.
    - Shared project bible: Unified character cues, locations, aliases, and tags shared across screenplay and treatment documents in the series tree.
    - Exports: Clean HTML, PDF, DOCX, and TXT for treatment and pitch bibles.
+   - **Built 2026-10-30:** `crates/cirth-core/src/treatment.rs` with `parse_treatment_doc` (structural hierarchy H1–H3, paragraphs, quotes, bullet lists, character spotlights, word counts, reading time estimates), Project Bible cross-referencing (`matches_entity_name` scanning treatment prose against canonical characters, locations, and aliases), semantic HTML export (`export_treatment_html`), formatted Plain Text export (`export_treatment_text`), and WordprocessingML binary export (`export_treatment_docx`); Tauri IPC commands `treatment_analyze`, `treatment_export_html`, `treatment_export_text`, `treatment_export_docx`; Treatment & Pitch Bible Inspector dialog in `app/src/treatmentdlg.ts`; automated E2E Test 80 in `app/tests/e2e/suite.mjs` passing on CDP (80/80) and WebDriver (79/79, 1 skipped) drivers.
 
 6. **Offline Grammar, Style & Dialogue Analysis Engine.**
    - Pure local, rule-based engine in `cirth_core::grammar`:

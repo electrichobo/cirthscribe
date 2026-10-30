@@ -55,6 +55,7 @@ import { createMergeDialog } from "./merge";
 import { createReviewDialog, type ReviewImportReport, type ReviewExportResult, type ReviewPackageSummary } from "./review";
 import { createComicDialog, type ComicScriptAnalysis } from "./comicdlg";
 import { createInteractiveDialog, type InteractiveGraph } from "./interactivedlg";
+import { createTreatmentDialog, type TreatmentDoc } from "./treatmentdlg";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -789,6 +790,7 @@ const comicDialog = createComicDialog({
   },
 });
 const interactiveDialog = createInteractiveDialog({});
+const treatmentDialog = createTreatmentDialog({});
 if (branchIndicator) {
   branchIndicator.onclick = () => {
     if (lastOpen) void branchesDialog.open();
@@ -1759,6 +1761,9 @@ async function runMenu(id: string): Promise<void> {
     case "interactive_tools":
       if (lastOpen) await interactiveDialog.open();
       break;
+    case "treatment_tools":
+      if (lastOpen) await treatmentDialog.open();
+      break;
     case "home":
       await goHome();
       break;
@@ -2196,6 +2201,13 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
     exportTwee: (documentId?: string, title?: string) => invoke<string>("interactive_export_twee", { documentId, title }),
     exportHtml: (documentId?: string, title?: string) => invoke<string>("interactive_export_html", { documentId, title }),
     exportJson: (documentId?: string, title?: string) => invoke<string>("interactive_export_json", { documentId, title }),
+  },
+  treatment: {
+    dialog: treatmentDialog,
+    analyze: (documentId?: string) => invoke<TreatmentDoc>("treatment_analyze", { documentId }),
+    exportHtml: (documentId?: string, title?: string) => invoke<string>("treatment_export_html", { documentId, title }),
+    exportText: (documentId?: string, title?: string) => invoke<string>("treatment_export_text", { documentId, title }),
+    exportDocx: (documentId?: string, title?: string) => invoke<number[]>("treatment_export_docx", { documentId, title }),
   },
   exportStageplayText: (documentId?: string, title?: string) => invoke<string>("export_stageplay_text", { documentId, title }),
   exportTeleplayText: (documentId?: string, title?: string) => invoke<string>("export_teleplay_text", { documentId, title }),

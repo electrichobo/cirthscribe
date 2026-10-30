@@ -1578,6 +1578,83 @@ async fn interactive_export_json(
 }
 
 #[tauri::command]
+async fn treatment_analyze(
+    app: State<'_, App>,
+    document_id: Option<String>,
+) -> Result<cirth_core::treatment::TreatmentDoc, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let entities = s.store.entities().map_err(err)?;
+        let t = s
+            .package
+            .file_stem()
+            .and_then(|st| st.to_str())
+            .unwrap_or(&doc.title)
+            .to_string();
+        Ok(cirth_core::treatment::parse_treatment_doc(&doc.blocks, &t, None, &entities))
+    })
+}
+
+#[tauri::command]
+async fn treatment_export_html(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let entities = s.store.entities().map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        let treatment_doc = cirth_core::treatment::parse_treatment_doc(&doc.blocks, &t, None, &entities);
+        Ok(cirth_core::treatment::export_treatment_html(&treatment_doc))
+    })
+}
+
+#[tauri::command]
+async fn treatment_export_text(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let entities = s.store.entities().map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        let treatment_doc = cirth_core::treatment::parse_treatment_doc(&doc.blocks, &t, None, &entities);
+        Ok(cirth_core::treatment::export_treatment_text(&treatment_doc))
+    })
+}
+
+#[tauri::command]
+async fn treatment_export_docx(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<Vec<u8>, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        cirth_core::treatment::export_treatment_docx(&doc.blocks, &t)
+    })
+}
+
+#[tauri::command]
 async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
     with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
 }
@@ -3567,6 +3644,10 @@ fn main() {
             interactive_export_twee,
             interactive_export_html,
             interactive_export_json,
+            treatment_analyze,
+            treatment_export_html,
+            treatment_export_text,
+            treatment_export_docx,
             storyscry_reports,
             stripboard_state,
             save_stripboard,

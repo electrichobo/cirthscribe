@@ -4975,5 +4975,192 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.getElementById('interactive-dialog')?.open", "Interactive dialog closed");
   });
 
+  await test("General Rich-Text / Treatment Documents & Bible Integration: prose profile, headings hierarchy, blockquotes, bullet lists, reading time estimates, bible cross-referencing, and HTML/TXT/DOCX exports (M6 step 5)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+
+    // 1. Author Project Bible entries to verify cross-referencing in treatment prose
+    await app.evaluate(`
+      (async () => {
+        const st1 = await window.__TAURI_INTERNALS__.invoke('planning_state_now');
+        const st2 = await window.__TAURI_INTERNALS__.invoke('planning_command', {
+          op: {
+            PutEntity: {
+              id: 'e_vance',
+              kind: 'character',
+              name: 'Commander Vance',
+              aliases: ['Vance'],
+              description: 'Frontier commander of the arctic expedition.',
+              fields: [],
+              scope: null
+            }
+          },
+          base: st1.version
+        });
+        await window.__TAURI_INTERNALS__.invoke('planning_command', {
+          op: {
+            PutEntity: {
+              id: 'e_avalon',
+              kind: 'location',
+              name: 'Avalon',
+              aliases: ['Sunken Cathedral'],
+              description: 'Subterranean arctic ruins.',
+              fields: [],
+              scope: null
+            }
+          },
+          base: st2.version
+        });
+      })()
+    `);
+
+    // 2. Create a treatment document
+    const treatDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('create_document_with_profile', {
+        title: 'The Obsidian Shore Treatment',
+        profile: 'treatment',
+        folder: null
+      })`
+    );
+    assert(treatDocId, "Created treatment document");
+
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(treatDocId)})`);
+    await waitFor(app, `window.__cirth.lastOpen?.document_id === ${JSON.stringify(treatDocId)}`, "Treatment document opened");
+    assert((await app.evaluate("window.__cirth.lastOpen?.format_profile")) === "treatment", "Document profile is treatment");
+
+    // 3. Populate rich-text treatment blocks
+    const treatmentBlocks = [
+      {
+        id: "t_h1",
+        kind: "heading",
+        scene_id: "sc_t_h1",
+        runs: [{ text: "PART ONE: THE OBSIDIAN SHORE" }],
+      },
+      {
+        id: "t_p1",
+        kind: "action",
+        runs: [
+          {
+            text: "The northern coastline stretches under an unrelenting arctic squall. Here, Commander Vance established the frontier garrison three winters ago to guard against incursions.",
+          },
+        ],
+      },
+      {
+        id: "t_q1",
+        kind: "action",
+        runs: [
+          {
+            text: "> \"We do not build castles to defy the storms, but to outlast the men who send them.\"",
+          },
+        ],
+      },
+      {
+        id: "t_h2",
+        kind: "section",
+        runs: [{ text: "THE RUINS OF AVALON" }],
+      },
+      {
+        id: "t_p2",
+        kind: "action",
+        runs: [
+          {
+            text: "Beneath three hundred meters of glacial ice lies the subterranean vault known as the Sunken Cathedral. Archaeological scans confirm ancient energy signatures.",
+          },
+        ],
+      },
+      {
+        id: "t_l1",
+        kind: "lyric",
+        runs: [{ text: "- High atmospheric interference prevents satellite reconnaissance" }],
+      },
+      {
+        id: "t_l2",
+        kind: "lyric",
+        runs: [{ text: "- Geothermal vents sustain sub-surface liquid oceans" }],
+      },
+      {
+        id: "t_char",
+        kind: "character",
+        runs: [{ text: "COMMANDER VANCE" }],
+      },
+      {
+        id: "t_p3",
+        kind: "action",
+        runs: [
+          {
+            text: "A decorated veteran who conceals a deteriorating neural condition while driving the expedition forward.",
+          },
+        ],
+      },
+    ];
+
+    const applyResult = await app.evaluate(`
+      window.__TAURI_INTERNALS__.invoke('apply_batch', {
+        batch: {
+          tx_id: 'tx_init_treatment',
+          base_version: window.__cirth.lastOpen.doc.version,
+          document_id: ${JSON.stringify(treatDocId)},
+          ops: ${JSON.stringify(treatmentBlocks.map((b, i) => ({ op: "put", block: b, after: i === 0 ? null : treatmentBlocks[i - 1].id })))}
+        }
+      }).catch(e => ({ error: String(e) }))
+    `);
+    assert(!applyResult?.error, `apply_batch succeeded: ${applyResult?.error}`);
+
+    // Reload document to reflect applied blocks
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(treatDocId)})`);
+    await waitFor(app, "window.__cirth.lastOpen.doc.blocks.length >= 9", "Treatment blocks loaded");
+
+    // 4. Treatment Analysis & Project Bible Cross-referencing
+    const analysis = await app.evaluate(`window.__cirth.treatment.analyze(${JSON.stringify(treatDocId)})`);
+    assert(analysis.total_headings === 3, `Total headings is 3: ${analysis.total_headings}`);
+    assert(analysis.total_paragraphs === 3, `Total paragraphs is 3: ${analysis.total_paragraphs}`);
+    assert(analysis.total_quotes === 1, `Total quotes is 1: ${analysis.total_quotes}`);
+    assert(analysis.total_lists === 2, `Total lists is 2: ${analysis.total_lists}`);
+    assert(analysis.total_words > 60, `Total words > 60: ${analysis.total_words}`);
+    assert(analysis.reading_time_mins >= 1, `Reading time estimate >= 1: ${analysis.reading_time_mins}`);
+
+    // Verify cross-referenced Project Bible entities in treatment prose
+    assert(analysis.mentions.length === 2, `Two bible entities detected in treatment: ${analysis.mentions.length}`);
+    const vanceMention = analysis.mentions.find((m) => m.entity_name === "Commander Vance");
+    assert(vanceMention && vanceMention.count === 2, "Commander Vance detected twice (prose and character heading)");
+    const avalonMention = analysis.mentions.find((m) => m.entity_name === "Avalon");
+    assert(avalonMention && avalonMention.count === 2, "Avalon detected twice (heading and Sunken Cathedral alias)");
+
+    // 5. Plain Text Export
+    const txt = await app.evaluate(`window.__cirth.treatment.exportText(${JSON.stringify(treatDocId)})`);
+    assert(txt.includes("PART ONE: THE OBSIDIAN SHORE"), "Text export includes H1");
+    assert(txt.includes("## THE RUINS OF AVALON"), "Text export includes H2");
+    assert(txt.includes("PROJECT BIBLE ENTITIES REFERENCED:"), "Text export includes bible references header");
+    assert(txt.includes("Commander Vance"), "Text export includes Commander Vance");
+
+    // 6. Semantic HTML Export
+    const html = await app.evaluate(`window.__cirth.treatment.exportHtml(${JSON.stringify(treatDocId)})`);
+    assert(html.includes("<!DOCTYPE html>"), "HTML export includes doctype");
+    assert(html.includes("<h1 class=\"treatment-h1\">PART ONE: THE OBSIDIAN SHORE</h1>"), "HTML export has H1");
+    assert(html.includes("<h2 class=\"treatment-h2\">THE RUINS OF AVALON</h2>"), "HTML export has H2");
+    assert(html.includes("<blockquote class=\"treatment-quote\">"), "HTML export has blockquote");
+    assert(html.includes("<ul class=\"treatment-ul\">"), "HTML export has list");
+    assert(html.includes("Project Bible Entities in this Treatment"), "HTML export has bible entity cloud");
+
+    // 7. Word (.docx) Export
+    const docxBytes = await app.evaluate(`window.__cirth.treatment.exportDocx(${JSON.stringify(treatDocId)})`);
+    assert(docxBytes && docxBytes.length > 1000, `DOCX export generated valid non-empty byte buffer: ${docxBytes?.length}`);
+    assert(docxBytes[0] === 80 && docxBytes[1] === 75 && docxBytes[2] === 3 && docxBytes[3] === 4, "DOCX starts with PK zip signature");
+
+    // 8. Treatment Inspector Dialog UI
+    await app.evaluate("window.__cirth.treatment.dialog.open()");
+    await waitFor(app, "document.getElementById('treatment-dialog')?.open === true", "Treatment dialog opened");
+
+    const cards = await app.evaluate("document.querySelectorAll('#treatment-dialog .comic-metric-card').length");
+    assert(cards === 5, `Five metric cards displayed: ${cards}`);
+
+    const badges = await app.evaluate("document.querySelectorAll('#treatment-dialog .treatment-bible-mentions-box span').length");
+    assert(badges === 2, `Two bible entity badges displayed in dialog: ${badges}`);
+
+    await app.evaluate("window.__cirth.treatment.dialog.close()");
+    await waitFor(app, "!document.getElementById('treatment-dialog')?.open", "Treatment dialog closed");
+  });
+
   await app.close();
 }

@@ -39,6 +39,7 @@ pub mod stripboard;
 pub mod tags;
 pub mod timeline;
 pub mod title;
+pub mod treatment;
 pub mod txt;
 pub mod store;
 pub mod words;
