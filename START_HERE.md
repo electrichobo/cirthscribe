@@ -1,6 +1,6 @@
 # Start here
 
-Kolbítar is a free, open-source, offline-first desktop screenplay and production app. It is built in Rust, Tauri 2, TypeScript and ProseMirror, and its project files are SQLite `.cirth` files. It is a working application, not yet released. Milestones 0–5 are closed; milestone 6 (additional formats and language tools) is in progress; its plan is in docs/M6_PLAN.md.
+Kolbítar is a free, open-source, offline-first desktop screenplay and production app. It is built in Rust, Tauri 2, TypeScript and ProseMirror, and its project files are SQLite `.cirth` files. It is a working application, not yet released. Milestones 0–6 are closed (`docs/m6/EXIT_REVIEW.md`); milestone 7 (optional extras) is planned.
 
 For any AI coding agent taking over a session, in this order:
 

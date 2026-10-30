@@ -252,3 +252,166 @@ pub fn unicode_marks() -> Fixture {
         blocks: b,
     }
 }
+
+pub fn uk_screenplay() -> Fixture {
+    Fixture {
+        title: "The Solway Firth (UK Screenplay)".into(),
+        note: "Original synthetic fixture for UK/BBC screenplay formatting (A4 default, metric margins).".into(),
+        blocks: vec![
+            fb("heading", "EXT. SOLWAY FIRTH - DAWN"),
+            fb("action", "Grey mist rolls off the Irish Sea. Cold water laps against the salt marshes."),
+            fb("character", "ALISTAIR"),
+            fb("dialogue", "The tide is coming in faster than the timetable honours."),
+            fb("character", "FIONA"),
+            fb("dialogue", "Then we should take the causeway before the signals turn red."),
+        ],
+    }
+}
+
+pub fn multicam_teleplay() -> Fixture {
+    Fixture {
+        title: "Apartment 4B (Multi-Camera Teleplay)".into(),
+        note: "Original synthetic fixture for TV multi-camera sitcoms (lettered scenes, uppercase dialogue).".into(),
+        blocks: vec![
+            fb("heading", "SCENE A - INT. LIVING ROOM - NIGHT"),
+            fb("action", "MARCUS and CHLOE unpack groceries onto the crowded counter."),
+            fb("character", "MARCUS"),
+            fb("dialogue", "DID YOU REMEMBER THE CILANTRO OR ARE WE DESTINED FOR BLAND GUACAMOLE?"),
+            fb("character", "CHLOE"),
+            fb("parenthetical", "(holding up a bundle of parsley)"),
+            fb("dialogue", "DEPENDS ON HOW CONFIDENT YOU FEEL ABOUT BOTANY."),
+        ],
+    }
+}
+
+pub fn theatrical_stageplay() -> Fixture {
+    Fixture {
+        title: "The Glassmaker of Murano (Stage Play)".into(),
+        note: "Original synthetic fixture for theatrical stage plays (Act/Scene headings, bracketed stage directions).".into(),
+        blocks: vec![
+            fb("heading", "ACT I, SCENE 1"),
+            fb("action", "At rise: A 16th-century furnace glows dull orange stage right. Glassblowing pipes and iron pontils lean against brick."),
+            fb("character", "ELENA"),
+            fb("parenthetical", "(examining the pontil)"),
+            fb("dialogue", "The silica must remain pure. Any salt from the lagoon clouds the crystal."),
+            fb("character", "GIACOMO"),
+            fb("dialogue", "The Council of Ten cares only that the secret never crosses the water."),
+        ],
+    }
+}
+
+pub fn comic_script() -> Fixture {
+    Fixture {
+        title: "Signal Flare: Issue 1 (Comic Script)".into(),
+        note: "Original synthetic fixture for comic book scripting (pages, panels, balloons, captions, SFX).".into(),
+        blocks: vec![
+            fb("heading", "PAGE ONE (4 Panels)"),
+            fb("shot", "PANEL 1"),
+            fb("action", "Wide establishing shot of the sea wall under driving rain. A single lantern swings in the wind."),
+            fb("character", "CAPTION"),
+            fb("dialogue", "Low tide brings the scavengers. High tide brings the truth."),
+            fb("shot", "PANEL 2"),
+            fb("action", "Close up on a leather glove prying open a bronze valve."),
+            fb("character", "SFX"),
+            fb("dialogue", "KR-R-RACK!"),
+            fb("shot", "PANEL 3"),
+            fb("action", "A hooded figure looks over her shoulder toward the beacon."),
+            fb("character", "MIRA"),
+            fb("dialogue", "Almost through. Keep your eyes on the road."),
+            fb("shot", "PANEL 4"),
+            fb("action", "A motorcycle headlight cuts through the rain in the far distance."),
+            fb("character", "CAPTION"),
+            fb("dialogue", "Too late."),
+        ],
+    }
+}
+
+pub fn interactive_story() -> Fixture {
+    Fixture {
+        title: "The Sunken Citadel (Interactive Story)".into(),
+        note: "Original synthetic fixture for interactive branching stories (passages, choices, conditions).".into(),
+        blocks: vec![
+            fb("heading", "Start"),
+            fb("action", "You stand before the obsidian archway of the Sunken Citadel. Sea foam coats the mossy flagstones.\n\n[[Enter through the Grand Portico -> Portico]]\n[[Scramble along the Sea Wall -> SeaWall]]"),
+            fb("heading", "Portico"),
+            fb("action", "Massive bronze doors hang half-open, encrusted with barnacles. A glowing pedestal stands in the foyer.\n\n[[Inspect the pedestal -> Pedestal]]\n[[Return to the entrance -> Start]]"),
+            fb("heading", "SeaWall"),
+            fb("action", "Salt spray blinds you as waves batter the rocky footing. You spot a narrow drainage conduit leading inward.\n\n[[Crawl through the conduit -> CitadelDepths]]\n[[Return to the entrance -> Start]]"),
+            fb("heading", "Pedestal"),
+            fb("action", "A silver ring rests in a pool of clear water atop the marble pedestal.\n\n[[Take the ring and proceed -> CitadelDepths [if ring_taken]]]\n[[Leave the ring and turn back -> Portico]]"),
+            fb("heading", "CitadelDepths"),
+            fb("action", "You reach the heart of the ancient citadel. Bioluminescent coral illuminates the submerged throne room.\n\n[THE END]"),
+        ],
+    }
+}
+
+pub fn series_treatment() -> Fixture {
+    Fixture {
+        title: "The Tide Ledger: Series Bible & Treatment".into(),
+        note: "Original synthetic fixture for series treatments and pitch bibles (H1-H3 hierarchy, character spotlights).".into(),
+        blocks: vec![
+            fb("heading", "THE TIDE LEDGER"),
+            fb("action", "A six-part dramatic series examining memory, trade, and betrayal in a declining maritime borough."),
+            fb("section", "SERIES LOGLINE"),
+            fb("action", "When an unrecorded cargo manifests in a quarantined salt marsh, a disgraced harbormaster must choose between clearing his family name or preserving the fragile truce that keeps the harbor alive."),
+            fb("section", "CENTRAL CHARACTERS"),
+            fb("character", "MARGIT VANCE"),
+            fb("action", "A stubborn municipal ledger-keeper who measures morality in metric tons."),
+            fb("character", "TOBIAS PELL"),
+            fb("action", "A retired ferry pilot with an encyclopedic memory of sandbar movements."),
+            fb("section", "SEASON ONE OVERVIEW"),
+            fb("action", "Episode 1 begins with the arrival of the empty barge. Over the course of twelve days, tidal anomalies reveal long-buried structural fraud in the harbor foundations."),
+        ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_fixtures_generate_valid_documents() {
+        for f in [
+            uk_screenplay(),
+            multicam_teleplay(),
+            theatrical_stageplay(),
+            comic_script(),
+            interactive_story(),
+            series_treatment(),
+        ] {
+            let doc = f.to_document().expect("fixture converts to document");
+            assert!(!doc.blocks.is_empty(), "fixture {} has blocks", f.title);
+        }
+    }
+
+    #[test]
+    fn test_comic_fixture_analysis() {
+        let f = comic_script();
+        let doc = f.to_document().unwrap();
+        let analysis = crate::comic::parse_comic_script(&doc.blocks);
+        assert_eq!(analysis.total_pages, 1);
+        assert_eq!(analysis.total_panels, 4);
+        assert_eq!(analysis.total_balloons, 1);
+        assert_eq!(analysis.total_captions, 2);
+        assert_eq!(analysis.total_sfx, 1);
+    }
+
+    #[test]
+    fn test_interactive_fixture_validation() {
+        let f = interactive_story();
+        let doc = f.to_document().unwrap();
+        let graph = crate::interactive::parse_interactive_script(&doc.blocks, &f.title);
+        assert_eq!(graph.total_passages, 5);
+        assert_eq!(graph.total_choices, 8);
+        assert!(graph.validation.is_valid);
+    }
+
+    #[test]
+    fn test_treatment_fixture_parsing() {
+        let f = series_treatment();
+        let doc = f.to_document().unwrap();
+        let treatment = crate::treatment::parse_treatment_doc(&doc.blocks, &f.title, None, &[]);
+        assert!(treatment.total_headings >= 1);
+        assert!(treatment.total_paragraphs >= 4);
+    }
+}

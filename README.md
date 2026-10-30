@@ -144,7 +144,7 @@ Done:
 Carried forward:
 - [ ] Desktop manual checks for review, alternatives, branches, and review packages (N37–N40)
 
-### ⏳ Stage 6: More formats and language tools (in progress)
+### ✅ Stage 6: More formats and language tools (done)
 
 Done:
 - [x] Document formats and profiles model (schema v16): support for US/UK screenplays, multi-cam sitcoms, stage plays, comics, interactive stories, and treatments; format assignment at creation and duplicate-and-convert script preservation
@@ -153,9 +153,10 @@ Done:
 - [x] Interactive and branching stories: passages with stable IDs, inline choice syntax (`[[Label -> Target]]`), conditions, BFS graph integrity validation (dangling links, dead ends, unreachable nodes), Twee 3, standalone offline playable HTML runner, JSON graph exports, and live playtester
 - [x] General rich-text treatment documents: headings hierarchy (H1–H3), body paragraphs, blockquotes, bullet lists, character spotlights, reading time metrics, Project Bible entity cross-referencing, and semantic HTML, TXT, and DOCX exports
 - [x] 100% offline rule-based grammar and style checker: duplicate words, passive voice in action lines, screenplay dialogue quotation rules, parenthetical formatting, cliches and fillers, spacing anomalies, and one-click fix
+- [x] Compatibility matrix, format fixtures, manual checks and Milestone 6 exit review (docs/m6/EXIT_REVIEW.md)
 
-In progress / planned:
-- [ ] Compatibility matrix, format fixtures, manual checks and Milestone 6 exit review
+Carried forward:
+- [ ] Desktop manual checks for additional formats, language tools, and format conversion (N41–N46)
 
 ### Stage 7: Optional extras
 

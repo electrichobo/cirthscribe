@@ -70,6 +70,7 @@ Milestone 6 expands Kolbítar from single-camera US feature screenplays into a v
    - Original synthetic test fixtures for each format: UK screenplay, multi-cam sitcom, stage play, comic script, interactive branching story, series treatment.
    - Automated test verification: core tests, contract tests, license notices, CDP E2E suite, and WebDriver E2E suite.
    - Update `docs/COMPATIBILITY.md`, `docs/testing/MANUAL_CHECKS.md`, and author `docs/m6/EXIT_REVIEW.md`.
+   - **Built 2026-10-30:** Synthetic format fixtures created in `crates/cirth-core/src/fixtures.rs` and emitted to `fixtures/` via `cirth-cli gen-fixtures` (`uk-screenplay.json`, `multicam-teleplay.json`, `theatrical-stageplay.json`, `comic-script.json`, `interactive-branching.json`, `series-treatment.json`); unit tests in `fixtures::tests` verifying format document conversion and analysis; updated `docs/COMPATIBILITY.md` with status, profiles, and automated test basis for all M6 formats; added manual checks N41–N46 in `docs/testing/MANUAL_CHECKS.md`; authored `docs/m6/EXIT_REVIEW.md` closing Milestone 6 with all automated gates green.
 
 ## Decisions (owner, 2026-10-29)
 

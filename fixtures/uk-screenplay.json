@@ -1,0 +1,30 @@
+{
+  "title": "The Solway Firth (UK Screenplay)",
+  "note": "Original synthetic fixture for UK/BBC screenplay formatting (A4 default, metric margins).",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "EXT. SOLWAY FIRTH - DAWN"
+    },
+    {
+      "t": "action",
+      "x": "Grey mist rolls off the Irish Sea. Cold water laps against the salt marshes."
+    },
+    {
+      "t": "character",
+      "x": "ALISTAIR"
+    },
+    {
+      "t": "dialogue",
+      "x": "The tide is coming in faster than the timetable honours."
+    },
+    {
+      "t": "character",
+      "x": "FIONA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Then we should take the causeway before the signals turn red."
+    }
+  ]
+}

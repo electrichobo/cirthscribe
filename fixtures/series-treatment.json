@@ -1,0 +1,50 @@
+{
+  "title": "The Tide Ledger: Series Bible & Treatment",
+  "note": "Original synthetic fixture for series treatments and pitch bibles (H1-H3 hierarchy, character spotlights).",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "THE TIDE LEDGER"
+    },
+    {
+      "t": "action",
+      "x": "A six-part dramatic series examining memory, trade, and betrayal in a declining maritime borough."
+    },
+    {
+      "t": "section",
+      "x": "SERIES LOGLINE"
+    },
+    {
+      "t": "action",
+      "x": "When an unrecorded cargo manifests in a quarantined salt marsh, a disgraced harbormaster must choose between clearing his family name or preserving the fragile truce that keeps the harbor alive."
+    },
+    {
+      "t": "section",
+      "x": "CENTRAL CHARACTERS"
+    },
+    {
+      "t": "character",
+      "x": "MARGIT VANCE"
+    },
+    {
+      "t": "action",
+      "x": "A stubborn municipal ledger-keeper who measures morality in metric tons."
+    },
+    {
+      "t": "character",
+      "x": "TOBIAS PELL"
+    },
+    {
+      "t": "action",
+      "x": "A retired ferry pilot with an encyclopedic memory of sandbar movements."
+    },
+    {
+      "t": "section",
+      "x": "SEASON ONE OVERVIEW"
+    },
+    {
+      "t": "action",
+      "x": "Episode 1 begins with the arrival of the empty barge. Over the course of twelve days, tidal anomalies reveal long-buried structural fraud in the harbor foundations."
+    }
+  ]
+}

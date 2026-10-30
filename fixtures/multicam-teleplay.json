@@ -1,0 +1,34 @@
+{
+  "title": "Apartment 4B (Multi-Camera Teleplay)",
+  "note": "Original synthetic fixture for TV multi-camera sitcoms (lettered scenes, uppercase dialogue).",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "SCENE A - INT. LIVING ROOM - NIGHT"
+    },
+    {
+      "t": "action",
+      "x": "MARCUS and CHLOE unpack groceries onto the crowded counter."
+    },
+    {
+      "t": "character",
+      "x": "MARCUS"
+    },
+    {
+      "t": "dialogue",
+      "x": "DID YOU REMEMBER THE CILANTRO OR ARE WE DESTINED FOR BLAND GUACAMOLE?"
+    },
+    {
+      "t": "character",
+      "x": "CHLOE"
+    },
+    {
+      "t": "parenthetical",
+      "x": "(holding up a bundle of parsley)"
+    },
+    {
+      "t": "dialogue",
+      "x": "DEPENDS ON HOW CONFIDENT YOU FEEL ABOUT BOTANY."
+    }
+  ]
+}

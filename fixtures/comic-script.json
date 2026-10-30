@@ -1,0 +1,74 @@
+{
+  "title": "Signal Flare: Issue 1 (Comic Script)",
+  "note": "Original synthetic fixture for comic book scripting (pages, panels, balloons, captions, SFX).",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "PAGE ONE (4 Panels)"
+    },
+    {
+      "t": "shot",
+      "x": "PANEL 1"
+    },
+    {
+      "t": "action",
+      "x": "Wide establishing shot of the sea wall under driving rain. A single lantern swings in the wind."
+    },
+    {
+      "t": "character",
+      "x": "CAPTION"
+    },
+    {
+      "t": "dialogue",
+      "x": "Low tide brings the scavengers. High tide brings the truth."
+    },
+    {
+      "t": "shot",
+      "x": "PANEL 2"
+    },
+    {
+      "t": "action",
+      "x": "Close up on a leather glove prying open a bronze valve."
+    },
+    {
+      "t": "character",
+      "x": "SFX"
+    },
+    {
+      "t": "dialogue",
+      "x": "KR-R-RACK!"
+    },
+    {
+      "t": "shot",
+      "x": "PANEL 3"
+    },
+    {
+      "t": "action",
+      "x": "A hooded figure looks over her shoulder toward the beacon."
+    },
+    {
+      "t": "character",
+      "x": "MIRA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Almost through. Keep your eyes on the road."
+    },
+    {
+      "t": "shot",
+      "x": "PANEL 4"
+    },
+    {
+      "t": "action",
+      "x": "A motorcycle headlight cuts through the rain in the far distance."
+    },
+    {
+      "t": "character",
+      "x": "CAPTION"
+    },
+    {
+      "t": "dialogue",
+      "x": "Too late."
+    }
+  ]
+}

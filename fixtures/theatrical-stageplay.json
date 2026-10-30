@@ -1,0 +1,34 @@
+{
+  "title": "The Glassmaker of Murano (Stage Play)",
+  "note": "Original synthetic fixture for theatrical stage plays (Act/Scene headings, bracketed stage directions).",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "ACT I, SCENE 1"
+    },
+    {
+      "t": "action",
+      "x": "At rise: A 16th-century furnace glows dull orange stage right. Glassblowing pipes and iron pontils lean against brick."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "parenthetical",
+      "x": "(examining the pontil)"
+    },
+    {
+      "t": "dialogue",
+      "x": "The silica must remain pure. Any salt from the lagoon clouds the crystal."
+    },
+    {
+      "t": "character",
+      "x": "GIACOMO"
+    },
+    {
+      "t": "dialogue",
+      "x": "The Council of Ten cares only that the secret never crosses the water."
+    }
+  ]
+}

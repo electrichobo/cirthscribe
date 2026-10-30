@@ -32,6 +32,12 @@ fn main() {
                 ("long-120.json", fixtures::long_script(120)),
                 ("page-boundaries.json", fixtures::page_boundaries()),
                 ("unicode-marks.json", fixtures::unicode_marks()),
+                ("uk-screenplay.json", fixtures::uk_screenplay()),
+                ("multicam-teleplay.json", fixtures::multicam_teleplay()),
+                ("theatrical-stageplay.json", fixtures::theatrical_stageplay()),
+                ("comic-script.json", fixtures::comic_script()),
+                ("interactive-branching.json", fixtures::interactive_story()),
+                ("series-treatment.json", fixtures::series_treatment()),
             ] {
                 std::fs::write(dir.join(name), serde_json::to_string_pretty(&f).unwrap()).unwrap();
                 let doc = f.to_document().unwrap();

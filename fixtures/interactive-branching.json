@@ -1,0 +1,46 @@
+{
+  "title": "The Sunken Citadel (Interactive Story)",
+  "note": "Original synthetic fixture for interactive branching stories (passages, choices, conditions).",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "Start"
+    },
+    {
+      "t": "action",
+      "x": "You stand before the obsidian archway of the Sunken Citadel. Sea foam coats the mossy flagstones.\n\n[[Enter through the Grand Portico -> Portico]]\n[[Scramble along the Sea Wall -> SeaWall]]"
+    },
+    {
+      "t": "heading",
+      "x": "Portico"
+    },
+    {
+      "t": "action",
+      "x": "Massive bronze doors hang half-open, encrusted with barnacles. A glowing pedestal stands in the foyer.\n\n[[Inspect the pedestal -> Pedestal]]\n[[Return to the entrance -> Start]]"
+    },
+    {
+      "t": "heading",
+      "x": "SeaWall"
+    },
+    {
+      "t": "action",
+      "x": "Salt spray blinds you as waves batter the rocky footing. You spot a narrow drainage conduit leading inward.\n\n[[Crawl through the conduit -> CitadelDepths]]\n[[Return to the entrance -> Start]]"
+    },
+    {
+      "t": "heading",
+      "x": "Pedestal"
+    },
+    {
+      "t": "action",
+      "x": "A silver ring rests in a pool of clear water atop the marble pedestal.\n\n[[Take the ring and proceed -> CitadelDepths [if ring_taken]]]\n[[Leave the ring and turn back -> Portico]]"
+    },
+    {
+      "t": "heading",
+      "x": "CitadelDepths"
+    },
+    {
+      "t": "action",
+      "x": "You reach the heart of the ancient citadel. Bioluminescent coral illuminates the submerged throne room.\n\n[THE END]"
+    }
+  ]
+}
