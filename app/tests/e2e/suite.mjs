@@ -4326,5 +4326,109 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(bibleMainRestored.includes("EXCLUSIVE MAIN CHARACTER"), "Main bible character preserved");
   });
 
+  await test("Base/source/target 3-way conflict integration and locked-page baseline guard (M5 step 5, Acceptance F5, F6)", async () => {
+    await openFixture("page-boundaries");
+
+    // 1. Find a dialogue speech block
+    const allBlocks = await blocks();
+    const dialogueIdx = allBlocks.findIndex((b) => b.kind === "dialogue" && text(b).length >= 10);
+    assert(dialogueIdx >= 0, "Found dialogue block for 3-way conflict test");
+    const origDialogue = allBlocks[dialogueIdx];
+    const origText = text(origDialogue);
+
+    // 2. Create checkpoint / snapshot as common base ancestor
+    const snap = await app.evaluate(
+      "window.__TAURI_INTERNALS__.invoke('snapshots_create', { label: 'Checkpoint M5', description: 'Base for 3-way merge', author: 'Author' })"
+    );
+    assert(snap && snap.id, "Snapshot created");
+
+    // 3. Fork alt-branch from that snapshot
+    const altBranch = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('branches_create', { name: 'alt-merge-branch', description: 'Branch for 3-way merge', fromSnapshotId: '${snap.id}' })`
+    );
+    assert(altBranch && altBranch.id, "alt-merge-branch created from snapshot");
+
+    // 4. On main (ours): modify speech to "MODIFIED ON MAIN BRANCH."
+    await setCaret(`[ps[${dialogueIdx}][0] + 1]`);
+    await typeText("MODIFIED ON MAIN BRANCH. ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    const mainBlocks = await blocks();
+    const mainText = text(mainBlocks[dialogueIdx]);
+    assert(mainText.startsWith("MODIFIED ON MAIN BRANCH. "), `Speech modified on main: "${mainText}"`);
+
+    // 5. Switch to alt-merge-branch (theirs)
+    await app.evaluate(`__cirth.branches.switch('${altBranch.id}')`);
+    await waitFor(app, "document.getElementById('branch-indicator')?.textContent.includes('alt-merge-branch')", "Switched to alt branch");
+
+    // Modify same speech differently to "MODIFIED ON ALT BRANCH."
+    await setCaret(`[ps[${dialogueIdx}][0] + 1]`);
+    await typeText("MODIFIED ON ALT BRANCH. ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    const altBlocks = await blocks();
+    const altText = text(altBlocks[dialogueIdx]);
+    assert(altText.startsWith("MODIFIED ON ALT BRANCH. "), `Speech modified on alt branch: "${altText}"`);
+
+    // 6. Switch back to main
+    await app.evaluate("__cirth.branches.switch('main')");
+    await waitFor(app, "document.getElementById('branch-indicator')?.textContent.includes('main')", "Switched back to main");
+
+    // 7. Open 3-way merge review dialog (Acceptance F5)
+    await app.evaluate(`__cirth.merge.open('${altBranch.id}', '${snap.id}')`);
+    await waitFor(app, "!document.getElementById('merge-dialog')?.classList.contains('hidden')", "Merge review dialog open");
+    await audit();
+    await screenshot(app, "merge-dialog");
+
+    // Verify preview detected the conflict with Base, Ours, and Theirs side-by-side
+    const preview = await app.evaluate("__cirth.merge.getPreview()");
+    assert(preview && preview.conflicts.length === 1, `1 conflict detected: ${JSON.stringify(preview)}`);
+    const conf = preview.conflicts[0];
+    assert(conf.base_text === origText, `Base text matches original: "${conf.base_text}"`);
+    assert(conf.ours_text === mainText, `Ours text matches main edit: "${conf.ours_text}"`);
+    assert(conf.theirs_text === altText, `Theirs text matches alt edit: "${conf.theirs_text}"`);
+
+    // 8. Select "Take Incoming ("Theirs")" resolution and apply
+    await app.evaluate(`__cirth.merge.setResolution('${conf.id}', 'take_theirs')`);
+    await app.evaluate("__cirth.merge.apply()");
+    await waitFor(app, "document.getElementById('merge-dialog')?.classList.contains('hidden')", "Merge dialog closed after apply");
+
+    // Verify merged speech in ProseMirror has the incoming branch's text (not lost, not concatenated)
+    const afterMergeBlocks = await blocks();
+    const mergedText = text(afterMergeBlocks[dialogueIdx]);
+    assert(mergedText === altText, `Take incoming resolved speech cleanly: "${mergedText}"`);
+
+    // 9. Test Locked-Page Baseline Guard (Acceptance F6)
+    // Fork a branch 'branch-divergent-pages' while main is unlocked
+    const divBranch = await app.evaluate(
+      "window.__TAURI_INTERNALS__.invoke('branches_create', { name: 'branch-divergent-pages', description: 'Divergent locked pages', fromSnapshotId: null })"
+    );
+    assert(divBranch && divBranch.id, "branch-divergent-pages created while unlocked");
+
+    // Lock pages on main
+    await app.evaluate("__cirth.menu('pages_lock')");
+    await waitAnnounced("Pages locked", "lock announced");
+
+    // Open merge preview: divergent baseline MUST be detected
+    await app.evaluate(`__cirth.merge.open('${divBranch.id}')`);
+    await waitFor(app, "!document.getElementById('merge-dialog')?.classList.contains('hidden')", "Merge dialog open for baseline divergence");
+    const divPreview = await app.evaluate("__cirth.merge.getPreview()");
+    assert(divPreview && divPreview.locked_page_divergence, "Locked page baseline divergence detected");
+    assert(divPreview.locked_page_divergence.ours_locked && !divPreview.locked_page_divergence.theirs_locked, "Ours locked, theirs unlocked");
+
+    // Verify warning is displayed on screen
+    const warningVisible = await app.evaluate("!document.getElementById('merge-baseline-warning')?.classList.contains('hidden')");
+    assert(warningVisible, "Baseline warning visible on screen");
+
+    // Resolve locked-page baseline with "Keep Current Baseline"
+    const lockConf = divPreview.conflicts.find((c) => c.kind === "locked_pages");
+    assert(lockConf, "Found locked-pages conflict");
+    await app.evaluate(`__cirth.merge.setResolution('${lockConf.id}', 'keep_ours')`);
+    await app.evaluate("__cirth.merge.apply()");
+    await waitFor(app, "document.getElementById('merge-dialog')?.classList.contains('hidden')", "Merge dialog closed after baseline resolution");
+  });
+
   await app.close();
 }

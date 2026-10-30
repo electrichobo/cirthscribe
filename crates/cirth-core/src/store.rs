@@ -1730,7 +1730,7 @@ impl Store {
         Ok(self.conn.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?)
     }
 
-    fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    pub(crate) fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<()> {
         conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?1, ?2)", params![key, value])?;
         Ok(())
     }

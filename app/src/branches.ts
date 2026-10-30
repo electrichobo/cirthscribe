@@ -22,6 +22,7 @@ export interface BranchSummary {
 export function createBranchesDialog(hooks: {
   onSwitched: (opened: any) => Promise<void>;
   onBranchChanged?: (name: string) => void;
+  onMergeBranch?: (branchId: string) => void;
 }) {
   const dialog = document.createElement("dialog");
   dialog.id = "branches-dialog";
@@ -219,6 +220,19 @@ export function createBranchesDialog(hooks: {
         };
         actions.append(switchBtn);
 
+        const mergeBtn = document.createElement("button");
+        mergeBtn.type = "button";
+        mergeBtn.className = "btn btn-merge";
+        mergeBtn.textContent = "Merge into Current…";
+        mergeBtn.setAttribute("aria-label", `Merge branch ${branch.name} into current branch`);
+        mergeBtn.onclick = () => {
+          dialog.close();
+          if (hooks.onMergeBranch) {
+            hooks.onMergeBranch(branch.id);
+          }
+        };
+        actions.append(mergeBtn);
+
         if (branch.id !== "main" && branch.name.toLowerCase() !== "main") {
           const deleteBtn = document.createElement("button");
           deleteBtn.type = "button";
@@ -289,6 +303,15 @@ export function createBranchesDialog(hooks: {
         description,
         fromSnapshotId: fromSnapshotId ?? null,
       }),
+    switch: async (id: string) => {
+      const opened = await invoke<any>("branches_switch", { id });
+      const branches = await invoke<BranchSummary[]>("branches_list");
+      const b = branches.find((x) => x.id === id);
+      const name = b ? b.name : id;
+      if (hooks.onBranchChanged) hooks.onBranchChanged(name);
+      await hooks.onSwitched(opened);
+      return opened;
+    },
     switchBranch: async (id: string) => {
       const opened = await invoke<any>("branches_switch", { id });
       if (hooks.onBranchChanged) {

@@ -16,6 +16,7 @@ pub mod freewrite;
 pub mod html;
 pub mod layout;
 pub mod locked;
+pub mod merge;
 pub mod model;
 pub mod navigator;
 pub mod numbering;

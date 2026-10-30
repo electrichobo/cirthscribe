@@ -905,7 +905,43 @@ async fn branches_update(
 
 #[tauri::command]
 async fn branches_current(app: State<'_, App>) -> Result<String, String> {
-    with_session(&app, |s| s.store.current_branch().map_err(err))
+    with_session(&app, |s| s.store.current_branch_name().map_err(err))
+}
+
+// --- 3-way merge and conflict integration (M5 step 5) -------------------------
+
+#[tauri::command]
+async fn merge_preview(
+    app: State<'_, App>,
+    incoming_branch_id: String,
+    base_snapshot_id: Option<String>,
+) -> Result<cirth_core::merge::MergePreview, String> {
+    with_session(&app, |s| {
+        s.store
+            .merge_preview(&incoming_branch_id, base_snapshot_id.as_deref())
+            .map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn merge_apply(
+    app: State<'_, App>,
+    incoming_branch_id: String,
+    base_snapshot_id: Option<String>,
+    resolutions: Vec<cirth_core::merge::ConflictResolution>,
+) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    with_session(&app, |s| {
+        s.store
+            .apply_merge(
+                &incoming_branch_id,
+                base_snapshot_id.as_deref(),
+                &resolutions,
+            )
+            .map_err(err)?;
+        s.planning = Default::default();
+        opened(s, false, None, None, t0)
+    })
 }
 
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
@@ -3255,6 +3291,8 @@ fn main() {
             branches_delete,
             branches_update,
             branches_current,
+            merge_preview,
+            merge_apply,
             bible_state,
             timeline_state,
             evidence_state,

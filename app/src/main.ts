@@ -51,6 +51,7 @@ import { createCommentsDialog, commentsPlugin } from "./comments";
 import { createAlternativesManager, alternativesPlugin, type AlternativesManager } from "./alternatives";
 import { createSnapshotsDialog } from "./snapshots";
 import { createBranchesDialog } from "./branches";
+import { createMergeDialog } from "./merge";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -736,16 +737,26 @@ const alternativesMgr = createAlternativesManager({
 });
 alternativesMgrRef.current = alternativesMgr;
 const snapshotsDialog = createSnapshotsDialog({
-  onRestored: async () => {
-    if (lastOpen) {
+  onRestored: async (opened) => {
+    if (opened) {
+      await applyOpened(opened);
+    } else if (lastOpen) {
       await openWith("open_document", { id: lastOpen.document_id });
     }
   },
 });
 const branchIndicator = $("branch-indicator") as HTMLButtonElement | null;
+const mergeDialog = createMergeDialog(document.body, {
+  invoke,
+  onMerged: async (opened) => {
+    await applyOpened(opened);
+    showBanner(`Branch merged successfully (version ${opened.doc.version}).`);
+  },
+  announce: (msg) => announce(msg),
+});
 const branchesDialog = createBranchesDialog({
   onSwitched: async (opened) => {
-    await openWith("open_document", { id: opened.document_id });
+    await applyOpened(opened);
   },
   onBranchChanged: (name) => {
     if (branchIndicator) {
@@ -753,6 +764,9 @@ const branchesDialog = createBranchesDialog({
       branchIndicator.setAttribute("aria-label", `Current Branch: ${name} (click to switch or manage branches)`);
       branchIndicator.hidden = false;
     }
+  },
+  onMergeBranch: (branchId) => {
+    void mergeDialog.open(branchId);
   },
 });
 if (branchIndicator) {
@@ -944,6 +958,12 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
     statusEl.textContent = "No project open";
     return false;
   }
+  await applyOpened(o, t0);
+  return true;
+}
+
+/** Directly apply a loaded `Opened` project state into the editor view without re-flushing stale changes. */
+async function applyOpened(o: Opened, t0: number = performance.now()): Promise<void> {
   const t1 = performance.now();
   setView("editor");
   $("find-bar").hidden = true; // a new editor state has no search
@@ -1021,7 +1041,6 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   rerenderSide();
   void repaginate();
   view.focus();
-  return true;
 }
 
 function setView(v: "home" | "editor" | "free") {
@@ -2097,6 +2116,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   alternatives: alternativesMgr,
   snapshots: snapshotsDialog,
   branches: branchesDialog,
+  merge: mergeDialog,
   bible,
   timeline,
   evidence,

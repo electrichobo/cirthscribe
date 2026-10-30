@@ -137,9 +137,9 @@ Done:
 - [x] Alternative takes on blocks with take badge switcher (`Take 1/2 ▾`), active take projection across all views and word counts, and StoryScry inactive alternative reporting (View > Tools > Alternate Takes…)
 - [x] Named snapshots and checkpoints with full point-in-time package state in SQLite, non-destructive restore, and automatic pre-restore checkpoints (File > Snapshots…)
 - [x] Visual branch history and independent branch canon with branch-isolated snapshots in SQLite, fork/switch/delete management, and status bar branch pill (File > Branches…)
+- [x] Base/source/target 3-way conflict integration and locked-page baseline guard with 3-column diff view, conflict resolution choices, and baseline divergence protection (File > Branches… > Merge into Current…)
 
 In progress / planned:
-- [ ] Base/source/target 3-way conflict integration
 - [ ] Portable review package (`.cirth-review`) import and export
 
 ### Stage 6: More formats and language tools

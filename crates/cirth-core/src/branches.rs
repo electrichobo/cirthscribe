@@ -73,6 +73,19 @@ impl Store {
             .unwrap_or_else(|| "main".to_string()))
     }
 
+    /// Return the human-readable name of the currently active branch.
+    pub fn current_branch_name(&self) -> Result<String> {
+        let id = self.current_branch()?;
+        if id == "main" {
+            return Ok("main".to_string());
+        }
+        let name: Option<String> = self
+            .conn
+            .query_row("SELECT name FROM branches WHERE id = ?1", [&id], |r| r.get(0))
+            .optional()?;
+        Ok(name.unwrap_or(id))
+    }
+
     /// Return active scene count.
     pub fn active_scene_count(&self) -> Result<u64> {
         let sc: i64 = self
