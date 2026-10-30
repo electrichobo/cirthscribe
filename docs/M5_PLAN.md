@@ -37,6 +37,7 @@ Each step is a working vertical slice tested across core tests, contract tests, 
      - Create snapshot from current project state; list snapshots with timestamp, version, and scene/word count summary.
      - Restore snapshot into a new working head (non-destructive; preserves previous history).
    - UI: `File > Snapshots…` dialog to create, inspect, preview, and restore snapshots.
+   - **Built 2026-10-29:** schema v14 migration with frozen v13 fixtures; `cirth_core::snapshots` model with `snapshots` table in SQLite; `create_snapshot` with automatic scene/word counting, deduplicated self-contained vacuumed package blobs, and metadata tracking; non-destructive atomic `restore_snapshot` with automatic pre-restore checkpoint creation, head-version increment, and full project rollback; 5 Tauri IPC commands and native menu item File > Snapshots…; accessible Snapshots modal dialog (`app/src/snapshots.ts`) with inline creation form, snapshot metadata badges, readable formatting, and interactive Restore/Delete actions; automated tests in core (`migrate.rs`), contract, and e2e (`suite.mjs` Test 72) passing on both CDP (72/72) and WebDriver (71/71) drivers.
 4. **Visual branch history and independent branch canon.**
    - Core branching (`crates/cirth-core/src/branches.rs`):
      - Fork a new branch from current state or any snapshot (`branches(id, name, parent_branch_id, fork_version, description, created_at)`).

@@ -809,6 +809,56 @@ async fn alternatives_delete_take(
     })
 }
 
+// --- Snapshots and checkpoints (M5 step 3) -----------------------------------
+
+#[tauri::command]
+async fn snapshots_list(app: State<'_, App>) -> Result<Vec<cirth_core::snapshots::SnapshotSummary>, String> {
+    with_session(&app, |s| s.store.list_snapshots().map_err(err))
+}
+
+#[tauri::command]
+async fn snapshots_create(
+    app: State<'_, App>,
+    label: String,
+    description: String,
+    author: Option<String>,
+) -> Result<cirth_core::snapshots::SnapshotSummary, String> {
+    with_session(&app, |s| {
+        let auth = author.unwrap_or_default();
+        s.store.create_snapshot(&label, &description, &auth).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn snapshots_delete(app: State<'_, App>, id: String) -> Result<(), String> {
+    with_session(&app, |s| s.store.delete_snapshot(&id).map_err(err))
+}
+
+#[tauri::command]
+async fn snapshots_update(
+    app: State<'_, App>,
+    id: String,
+    label: String,
+    description: String,
+) -> Result<(), String> {
+    with_session(&app, |s| s.store.update_snapshot(&id, &label, &description).map_err(err))
+}
+
+#[tauri::command]
+async fn snapshots_restore(
+    app: State<'_, App>,
+    id: String,
+    create_checkpoint: bool,
+    checkpoint_label: Option<String>,
+) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    with_session(&app, |s| {
+        s.store.restore_snapshot(&id, create_checkpoint, checkpoint_label.as_deref()).map_err(err)?;
+        s.planning = Default::default();
+        opened(s, false, None, None, t0)
+    })
+}
+
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
 
 #[tauri::command]
@@ -2759,6 +2809,7 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .separator()
         .text("save", keyed("Save", "S"))
         .text("save_as", keyed("Save As…", "Shift+S"))
+        .text("snapshots", "Snapshots…")
         .text("export", keyed("Export…", "E"))
         .separator()
         .text("home", "Close Project");
@@ -3143,6 +3194,11 @@ fn main() {
             alternatives_add_take,
             alternatives_set_active_take,
             alternatives_delete_take,
+            snapshots_list,
+            snapshots_create,
+            snapshots_delete,
+            snapshots_update,
+            snapshots_restore,
             bible_state,
             timeline_state,
             evidence_state,

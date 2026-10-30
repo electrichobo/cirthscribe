@@ -4148,5 +4148,73 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.querySelector('.cirth-take-badge')?.textContent.includes('2/2')", "Planning undo restored active Take 2");
   });
 
+  await test("Named snapshots and checkpoints (M5 step 3): create snapshot from UI, inspect metadata, edit text, restore snapshot with pre-restore checkpoint, and verify restored script state", async () => {
+    await openFixture("page-boundaries");
+
+    // 1. Open Snapshots dialog via menu or __cirth
+    await app.evaluate("(__cirth.menu('snapshots'), true)");
+    await waitFor(app, "document.getElementById('snapshots-dialog')?.open", "Snapshots dialog opened");
+    await audit();
+
+    // 2. Fill snapshot form and create new snapshot
+    await app.evaluate(`(() => {
+      document.getElementById('snap-label-input').value = 'Checkpoint Act I';
+      document.getElementById('snap-desc-input').value = 'Baseline before structural changes';
+      document.getElementById('snap-create-btn').click();
+      return true;
+    })()`);
+
+    await waitFor(app, "document.querySelectorAll('#snap-list-wrap .snap-card').length >= 1", "Snapshot card rendered in list");
+    const snapTitle = await app.evaluate("document.querySelector('#snap-list-wrap .snap-title')?.textContent");
+    assert(snapTitle === "Checkpoint Act I", `Snapshot title matches: "${snapTitle}"`);
+    const snapDesc = await app.evaluate("document.querySelector('#snap-list-wrap .snap-desc')?.textContent");
+    assert(snapDesc === "Baseline before structural changes", `Snapshot desc matches: "${snapDesc}"`);
+    await screenshot(app, "snapshots-dialog");
+
+    // Close snapshots dialog
+    await app.evaluate("(__cirth.snapshots.close(), true)");
+
+    // 3. Make an edit to the script text in the editor
+    const bBefore = await blocks();
+    const actionBlock = bBefore.find((b) => b.kind === "action" && text(b).length >= 10);
+    assert(actionBlock, "Found action block to edit");
+    const originalText = text(actionBlock);
+    const actIdx = bBefore.findIndex((b) => b.id === actionBlock.id);
+
+    // Type new text into the action block
+    await setCaret(`[ps[${actIdx}][0] + 1]`);
+    await typeText("Fresh additions at the start. ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    // Verify script text was modified
+    const bModified = await blocks();
+    const actModified = bModified.find((b) => b.id === actionBlock.id);
+    assert(text(actModified).startsWith("Fresh additions at the start. "), `Text modified: "${text(actModified)}"`);
+
+    // 4. Open Snapshots dialog again and click Restore
+    await app.evaluate("(__cirth.menu('snapshots'), true)");
+    await waitFor(app, "document.getElementById('snapshots-dialog')?.open", "Snapshots dialog opened for restore");
+
+    const restoreBtn = await app.evaluate("document.querySelector('#snap-list-wrap .btn-restore')?.className");
+    assert(restoreBtn, "Found restore button");
+
+    await app.evaluate("(() => { document.querySelector('#snap-list-wrap .btn-restore').click(); return true; })()");
+    await sleep(600);
+
+    // 5. Verify script text has returned to original state!
+    const bRestored = await blocks();
+    const actRestored = bRestored.find((b) => b.id === actionBlock.id);
+    assert(text(actRestored) === originalText, `Script block restored to original: "${text(actRestored)}"`);
+
+    // 6. Verify pre-restore checkpoint was created in the snapshot list
+    await waitFor(app, "document.querySelectorAll('#snap-list-wrap .snap-card').length >= 2", "Pre-restore checkpoint created");
+    const cards = await app.evaluate("[...document.querySelectorAll('#snap-list-wrap .snap-title')].map(el => el.textContent)");
+    assert(cards.some(c => c.includes("Checkpoint before restoring 'Checkpoint Act I'")), `Found pre-restore checkpoint in: ${JSON.stringify(cards)}`);
+
+    // Close dialog
+    await app.evaluate("(__cirth.snapshots.close(), true)");
+  });
+
   await app.close();
 }

@@ -49,6 +49,7 @@ import { createCharacterSides } from "./sides";
 import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
 import { createCommentsDialog, commentsPlugin } from "./comments";
 import { createAlternativesManager, alternativesPlugin, type AlternativesManager } from "./alternatives";
+import { createSnapshotsDialog } from "./snapshots";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -733,6 +734,13 @@ const alternativesMgr = createAlternativesManager({
   getDocumentId: () => lastOpen?.document_id ?? null,
 });
 alternativesMgrRef.current = alternativesMgr;
+const snapshotsDialog = createSnapshotsDialog({
+  onRestored: async () => {
+    if (lastOpen) {
+      await openWith("open_document", { id: lastOpen.document_id });
+    }
+  },
+});
 const bookmarks = createBookmarks({
   list: async () => {
     const st = await invoke<{ bookmarks: { id: string; name: string; document_id: string; block_id: string }[] }>("evidence_state");
@@ -1613,6 +1621,9 @@ async function runMenu(id: string): Promise<void> {
     case "project_tree":
       if (lastOpen) await projectTree.open();
       break;
+    case "snapshots":
+      if (lastOpen) await snapshotsDialog.open();
+      break;
     case "export":
       if (lastOpen) exportDialog.open();
       break;
@@ -2053,6 +2064,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   tags: breakdownTags,
   comments: commentsDialog,
   alternatives: alternativesMgr,
+  snapshots: snapshotsDialog,
   bible,
   timeline,
   evidence,

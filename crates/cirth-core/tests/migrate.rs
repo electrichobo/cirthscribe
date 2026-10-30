@@ -763,3 +763,70 @@ fn opening_a_v12_project_adds_empty_block_alternatives_and_swaps_takes_cleanly()
     }
 }
 
+#[test]
+fn opening_a_v13_project_adds_empty_snapshots_and_creates_restores_snapshots_cleanly() {
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v13-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v13-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 13, "fixture must be schema v13");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(13));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v13 copy kept");
+        let mut s = o.store;
+        let doc_id = s.current_document().unwrap();
+        assert!(s.list_snapshots().unwrap().is_empty(), "upgraded projects start with no snapshots");
+
+        let before = s.load().unwrap();
+        let target = before.blocks.iter().find(|b| b.text().chars().count() >= 5).unwrap().clone();
+        let original_text = target.text();
+
+        // 1. Create initial snapshot
+        let snap1 = s.create_snapshot("Initial Snapshot", "First draft checkpoint", "Author").unwrap();
+        assert_eq!(snap1.label, "Initial Snapshot");
+        assert_eq!(snap1.description, "First draft checkpoint");
+        assert!(snap1.scene_count > 0, "snapshot captures scene count");
+        assert!(snap1.word_count > 0, "snapshot captures word count");
+        assert!(snap1.byte_size > 0, "snapshot captures non-empty package blob");
+        assert_eq!(s.list_snapshots().unwrap().len(), 1);
+
+        // 2. Modify script text in editor
+        let mut edited = target.clone();
+        edited.runs = vec![cirth_core::model::Run::plain("MODIFIED ACTION TEXT FOR RESTORE TEST")];
+        let sv = s.version().unwrap();
+        s.apply(&Batch { tx_id: "edit-for-snap".into(), base_version: sv, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: edited }] }).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "MODIFIED ACTION TEXT FOR RESTORE TEST");
+
+        // 3. Create second snapshot
+        let snap2 = s.create_snapshot("Second Snapshot", "After modifications", "Author").unwrap();
+        assert_eq!(snap2.label, "Second Snapshot");
+        assert_eq!(s.list_snapshots().unwrap().len(), 2);
+
+        // 4. Restore initial snapshot with automatic pre-restore checkpoint
+        let restored = s.restore_snapshot(&snap1.id, true, None).unwrap();
+        assert_eq!(restored.id, snap1.id);
+        // Script text is restored to original text
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), original_text);
+
+        // Pre-restore checkpoint was created
+        let list = s.list_snapshots().unwrap();
+        assert_eq!(list.len(), 3, "initial + second + pre-restore checkpoint");
+        assert!(list[0].label.contains("Checkpoint before restoring 'Initial Snapshot'"));
+
+        // 5. Test update snapshot metadata and delete snapshot
+        s.update_snapshot(&snap2.id, "Second Snapshot (Renamed)", "Updated description").unwrap();
+        let updated = s.snapshot(&snap2.id).unwrap().unwrap();
+        assert_eq!(updated.label, "Second Snapshot (Renamed)");
+        assert_eq!(updated.description, "Updated description");
+
+        s.delete_snapshot(&snap2.id).unwrap();
+        assert_eq!(s.list_snapshots().unwrap().len(), 2);
+        assert!(s.snapshot(&snap2.id).unwrap().is_none());
+
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}
+

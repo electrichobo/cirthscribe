@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 13;
+pub const SCHEMA_VERSION: i64 = 14;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -378,6 +378,27 @@ fn migrate_v13(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v13 -> v14: named snapshots and checkpoints (M5 step 3, snapshots.rs).
+/// Immutable point-in-time state packages stored in SQLite.
+/// Projects start with no snapshots.
+fn migrate_v14(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE snapshots (
+          id TEXT PRIMARY KEY,
+          label TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT '',
+          head_version INTEGER NOT NULL,
+          scene_count INTEGER NOT NULL DEFAULT 0,
+          word_count INTEGER NOT NULL DEFAULT 0,
+          package_blob BLOB NOT NULL
+        );
+        CREATE INDEX snapshots_created ON snapshots(created_at);",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -394,10 +415,11 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (11, migrate_v11),
     (12, migrate_v12),
     (13, migrate_v13),
+    (14, migrate_v14),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
-fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
+pub(crate) fn migrate(conn: &mut Connection, from: i64) -> Result<()> {
     let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     for (to, step) in MIGRATIONS.iter().filter(|(to, _)| *to > from) {
         step(&tx)?;
@@ -1638,7 +1660,7 @@ impl Store {
 
     /// Count a change that is not a script commit (a setting, a planning
     /// edit), so `has_unsaved_work` sees it. The meta key keeps its first name.
-    fn mark_unsaved(&self) -> Result<()> {
+    pub(crate) fn mark_unsaved(&self) -> Result<()> {
         let n = self.meta_count("settings_changes")? + 1;
         Self::set_meta(&self.conn, "settings_changes", &n.to_string())
     }

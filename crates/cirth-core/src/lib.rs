@@ -27,6 +27,7 @@ pub mod reports;
 pub mod revisions;
 pub mod rtf;
 pub mod sides;
+pub mod snapshots;
 pub mod spell;
 pub mod stripboard;
 pub mod tags;
