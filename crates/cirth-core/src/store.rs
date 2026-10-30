@@ -753,6 +753,21 @@ impl Store {
     ) -> Result<Id> {
         let new_id = crate::model::new_id();
         let page_size = new_profile.default_page_size();
+        let source_doc = self.load_document(source_doc_id)?;
+
+        let converted_blocks = match new_profile {
+            crate::model::DocumentProfile::TeleplayMultiCam => {
+                crate::stage_teleplay::convert_to_teleplay_multicam(&source_doc.blocks)
+            }
+            crate::model::DocumentProfile::StagePlay => {
+                crate::stage_teleplay::convert_to_stageplay(&source_doc.blocks)
+            }
+            crate::model::DocumentProfile::ComicScript => {
+                crate::comic::renumber_comic_panels(&source_doc.blocks)
+            }
+            _ => source_doc.blocks.clone(),
+        };
+
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO documents(id, kind, title, profile, format_profile, container_id, pos)
@@ -761,26 +776,23 @@ impl Store {
             params![new_id, new_title, page_size, new_profile.as_str(), source_doc_id],
         )?;
 
-        // Duplicate blocks
-        let rows = {
-            let mut stmt = tx.prepare("SELECT ord, kind, runs, dual, break_before FROM blocks WHERE document_id = ?1 ORDER BY ord")?;
-            stmt.query_map([source_doc_id], |r| {
-                Ok((
-                    r.get::<_, f64>(0)?,
-                    r.get::<_, String>(1)?,
-                    r.get::<_, String>(2)?,
-                    r.get::<_, i64>(3)?,
-                    r.get::<_, i64>(4)?,
-                ))
-            })?.collect::<std::result::Result<Vec<_>, _>>()?
-        };
-
-        for (ord, kind, runs, dual, break_before) in rows {
+        // Duplicate and insert converted blocks
+        for (i, b) in converted_blocks.into_iter().enumerate() {
             let block_id = crate::model::new_id();
+            let ord = (i + 1) as f64;
+            let kind = b.kind.as_str();
+            let runs_json = serde_json::to_string(&b.runs).unwrap_or_else(|_| "[]".into());
+            let scene_id = if b.kind == crate::model::BlockKind::Heading {
+                Some(crate::model::new_id())
+            } else {
+                None
+            };
+            let dual = if b.dual { 1i64 } else { 0i64 };
+            let break_before = if b.break_before { 1i64 } else { 0i64 };
             tx.execute(
                 "INSERT INTO blocks(id, ord, kind, runs, scene_id, dual, break_before, document_id)
-                 VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7)",
-                params![block_id, ord, kind, runs, dual, break_before, new_id],
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![block_id, ord, kind, runs_json, scene_id, dual, break_before, new_id],
             )?;
         }
 

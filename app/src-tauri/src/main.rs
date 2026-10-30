@@ -1469,6 +1469,40 @@ async fn comic_export_html(
 }
 
 #[tauri::command]
+async fn export_stageplay_text(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        Ok(cirth_core::stage_teleplay::export_stageplay_text(&doc.blocks, &t))
+    })
+}
+
+#[tauri::command]
+async fn export_teleplay_text(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    title: Option<String>,
+) -> Result<String, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let t = title.unwrap_or_else(|| doc.title.clone());
+        Ok(cirth_core::stage_teleplay::export_teleplay_text(&doc.blocks, &t))
+    })
+}
+
+#[tauri::command]
 async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
     with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
 }
@@ -2140,7 +2174,7 @@ struct Paginated {
 fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Document), String> {
     let t0 = Instant::now();
     // Hold the lock only while reading the canonical document.
-    let (doc, numbers, locked, revision, page_lock) = with_session(app, |s| {
+    let (doc, numbers, locked, revision, page_lock, fmt_prof) = with_session(app, |s| {
         let main = s.store.current_document().map_err(err)?;
         Ok((
             s.store.load().map_err(err)?,
@@ -2148,10 +2182,12 @@ fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Documen
             s.store.scene_numbers_locked(&main).map_err(err)?,
             s.store.active_revision(&main).map_err(err)?,
             s.store.page_lock(&main).map_err(err)?,
+            s.store.document_format_profile(&main).map_err(err)?,
         ))
     })?;
     let t1 = Instant::now();
-    let mut map = layout::paginate_production(&doc.blocks, &profile(profile_name), doc.version, &numbers, page_lock.as_ref());
+    let prof = layout::Profile::for_document_profile(fmt_prof, Some(profile_name));
+    let mut map = layout::paginate_production(&doc.blocks, &prof, doc.version, &numbers, page_lock.as_ref());
     let revised_pages = revision.as_ref().map_or(0, |set| revisions::mark_pages(&mut map, &doc.blocks, set));
     let t2 = Instant::now();
     let font = fontcheck::FontInfo::parse(pdf::REGULAR).ok_or("bundled font unreadable")?;
@@ -2234,7 +2270,8 @@ async fn export_pdf(app: State<'_, App>, profile_name: String, path: Option<Stri
     if changed_only {
         changed_pages_only(&mut p)?;
     }
-    let prof = profile(&profile_name);
+    let fmt_prof = with_session(&app, |s| s.store.document_format_profile(&s.store.current_document().map_err(err)?).map_err(err))?;
+    let prof = layout::Profile::for_document_profile(fmt_prof, Some(&profile_name));
     let t0 = Instant::now();
     let (tp, furniture, project_id) = with_session(&app, |s| Ok((s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?, s.store.project_id().map_err(err)?)))?;
     let opts = pdf::PdfOptions {
@@ -2341,9 +2378,14 @@ async fn export_txt(app: State<'_, App>, path: String, changed_only: Option<bool
     if changed_only {
         changed_pages_only(&mut p)?;
     }
-    let (tp, furniture) = with_session(&app, |s| Ok((s.store.title_page(&s.store.current_document().map_err(err)?).map_err(err)?, page_furniture_of(s)?)))?;
+    let (tp, furniture, fmt_prof) = with_session(&app, |s| {
+        let main = s.store.current_document().map_err(err)?;
+        Ok((s.store.title_page(&main).map_err(err)?, page_furniture_of(s)?, s.store.document_format_profile(&main).map_err(err)?))
+    })?;
     let rev = p.revision.as_ref().map(revisions::header).unwrap_or_default();
-    let t = cirth_core::txt::render_document(&p.map, &profile(name), if changed_only { None } else { Some(&tp) }, &pdf::expand_tokens(&furniture.header, &tp), &pdf::expand_tokens(&furniture.footer, &tp), &rev);
+    // Render with the same profile `paginate_current` laid the pages out with.
+    let prof = layout::Profile::for_document_profile(fmt_prof, Some(name));
+    let t = cirth_core::txt::render_document(&p.map, &prof, if changed_only { None } else { Some(&tp) }, &pdf::expand_tokens(&furniture.header, &tp), &pdf::expand_tokens(&furniture.footer, &tp), &rev);
     let target = normalize(Path::new(&path));
     let tmp = target.with_extension("txt.tmp");
     std::fs::write(&tmp, &t.text).map_err(io_err)?;
@@ -3444,6 +3486,8 @@ fn main() {
             comic_renumber,
             comic_export_text,
             comic_export_html,
+            export_stageplay_text,
+            export_teleplay_text,
             storyscry_reports,
             stripboard_state,
             save_stripboard,

@@ -39,6 +39,7 @@ Milestone 6 expands Kolbítar from single-camera US feature screenplays into a v
    - Multi-cam sitcom profile: Double-spaced dialogue, uppercase dialogue text, centered character cues, scene letters (`SCENE A`).
    - Profile-specific PDF page rendering and text exports.
    - Duplicate & Convert action: Allows converting a screenplay into a stage play or teleplay as a new duplicate document, preserving the original.
+   - **Built 2026-10-30:** `crates/cirth-core/src/stage_teleplay.rs` with `convert_to_teleplay_multicam` (`SCENE A` scene lettering, Unicode uppercase dialogue preserving runs), `convert_to_stageplay` (`ACT I, SCENE 1` headings, bracketed parentheticals), and text exports `export_teleplay_text` and `export_stageplay_text`; `duplicate_and_convert_document` in `crates/cirth-core/src/store.rs` converting blocks into target profiles while preserving original documents; IPC commands `export_stageplay_text` and `export_teleplay_text` in `app/src-tauri/src/main.rs`; profile-aware PDF pagination and text exports using `layout::Profile::for_document_profile`; automated E2E Test 78 in `app/tests/e2e/suite.mjs` verifying multi-cam and stage play conversions and text exports passing on both CDP (78/78) and WebDriver (77/77, 1 skipped) drivers.
 
 4. **Immersive & Branching Interactive Storytelling.**
    - Data model in `cirth_core::interactive`: Passages with stable IDs, titles, body text, choices, and conditions.

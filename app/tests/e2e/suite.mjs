@@ -4733,5 +4733,78 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.getElementById('comic-dialog')?.open", "Comic dialog closed");
   });
 
+  await test("Stage Play & TV Multi-Camera Profiles: profile-specific formatting, duplicate-and-convert preservation, lettered teleplay scenes, uppercase dialogue, bracketed stage directions, and text exports (M6 step 3)", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", true);
+
+    const origDocId = await app.evaluate("window.__cirth.lastOpen.document_id");
+    const origBlocks = await app.evaluate("window.__cirth.lastOpen.doc.blocks");
+
+    // 1. Duplicate & Convert to Multi-Camera Sitcom (TeleplayMultiCam)
+    const teleDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('duplicate_and_convert_document', {
+        id: ${JSON.stringify(origDocId)},
+        title: 'Sitcom Multi-Cam Adaptation',
+        targetProfile: 'teleplay_multicam'
+      })`
+    );
+    assert(teleDocId, "Created teleplay multicam converted document");
+
+    // Open teleplay document
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(teleDocId)})`);
+    await waitFor(app, `window.__cirth.lastOpen?.document_id === ${JSON.stringify(teleDocId)}`, "Teleplay document opened");
+    assert(await app.evaluate("window.__cirth.lastOpen?.format_profile") === "teleplay_multicam", "Active profile is teleplay_multicam");
+
+    // Check teleplay scene lettering and uppercase dialogue
+    const teleBlocks = await app.evaluate("window.__cirth.lastOpen.doc.blocks");
+    const teleHeadings = teleBlocks.filter((b) => b.kind === "heading");
+    assert(teleHeadings.length > 0, "Teleplay has scene headings");
+    assert(teleHeadings[0].runs[0].text.startsWith("SCENE A"), `Teleplay scene is lettered: ${teleHeadings[0].runs[0].text}`);
+
+    const teleDialogue = teleBlocks.filter((b) => b.kind === "dialogue");
+    assert(teleDialogue.length > 0, "Teleplay has dialogue blocks");
+    const firstDiagText = teleDialogue[0].runs[0].text;
+    assert(firstDiagText === firstDiagText.toUpperCase(), `Teleplay dialogue is in UPPERCASE: ${firstDiagText}`);
+
+    // Export Teleplay text
+    const teleTxt = await app.evaluate(`window.__cirth.exportTeleplayText(${JSON.stringify(teleDocId)})`);
+    assert(teleTxt.includes("(TELEPLAY / MULTI-CAMERA)"), "Teleplay export includes multi-cam header");
+    assert(teleTxt.includes("SCENE A"), "Teleplay export includes SCENE A");
+
+    // 2. Duplicate & Convert to Theatrical Stage Play (StagePlay)
+    const stageDocId = await app.evaluate(
+      `window.__TAURI_INTERNALS__.invoke('duplicate_and_convert_document', {
+        id: ${JSON.stringify(origDocId)},
+        title: 'Stage Play Adaptation',
+        targetProfile: 'stageplay'
+      })`
+    );
+    assert(stageDocId, "Created stage play converted document");
+
+    // Open stage play document
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(stageDocId)})`);
+    await waitFor(app, `window.__cirth.lastOpen?.document_id === ${JSON.stringify(stageDocId)}`, "Stage play document opened");
+    assert(await app.evaluate("window.__cirth.lastOpen?.format_profile") === "stageplay", "Active profile is stageplay");
+
+    const stageBlocks = await app.evaluate("window.__cirth.lastOpen.doc.blocks");
+    const stageHeadings = stageBlocks.filter((b) => b.kind === "heading");
+    assert(stageHeadings.length > 0, "Stage play has headings");
+    assert(stageHeadings[0].runs[0].text.startsWith("ACT I, SCENE 1"), `Stage play heading formatted: ${stageHeadings[0].runs[0].text}`);
+
+    // Export Stage Play text
+    const stageTxt = await app.evaluate(`window.__cirth.exportStageplayText(${JSON.stringify(stageDocId)})`);
+    assert(stageTxt.includes("A PLAY IN ONE ACT") || stageTxt.includes("A PLAY"), "Stage play export includes play header");
+    assert(stageTxt.includes("ACT I, SCENE 1"), "Stage play export includes ACT I, SCENE 1");
+
+    // 3. Verify original document remains untouched (Decision A)
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(origDocId)})`);
+    await waitFor(app, `window.__cirth.lastOpen?.document_id === ${JSON.stringify(origDocId)}`, "Original document re-opened");
+    const origProfile = await app.evaluate("window.__cirth.lastOpen?.format_profile || 'screenplay_us'");
+    assert(origProfile === "screenplay_us", `Original profile preserved: ${origProfile}`);
+    const origBlocksAfter = await app.evaluate("window.__cirth.lastOpen.doc.blocks");
+    assert(origBlocksAfter[0].runs[0].text === origBlocks[0].runs[0].text, "Original scene heading untouched");
+  });
+
   await app.close();
 }

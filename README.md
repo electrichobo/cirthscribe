@@ -149,9 +149,9 @@ Carried forward:
 Done:
 - [x] Document formats and profiles model (schema v16): support for US/UK screenplays, multi-cam sitcoms, stage plays, comics, interactive stories, and treatments; format assignment at creation and duplicate-and-convert script preservation
 - [x] Comic books and graphic novels: page/panel hierarchy, speech balloons, captions, sound effects, automatic panel counting, continuity validation, panel renumbering reconciliation, and Plain Text / HTML exports
+- [x] Stage plays and multi-camera teleplays: lettered scenes, uppercase dialogue, Act/Scene headings, bracketed stage directions, profile layout pagination, and text exports
 
 In progress / planned:
-- [ ] Stage plays and multi-camera teleplays
 - [ ] Interactive and branching stories (passages, choices, conditions, Twee/HTML export)
 - [ ] General rich-text treatment documents sharing the canonical project bible
 - [ ] 100% offline rule-based grammar and style checker

@@ -33,6 +33,7 @@ pub mod rtf;
 pub mod sides;
 pub mod snapshots;
 pub mod spell;
+pub mod stage_teleplay;
 pub mod stripboard;
 pub mod tags;
 pub mod timeline;
