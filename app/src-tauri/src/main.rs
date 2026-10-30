@@ -859,6 +859,55 @@ async fn snapshots_restore(
     })
 }
 
+// --- Visual branch history and independent branch canon (M5 step 4) ----------
+
+#[tauri::command]
+async fn branches_list(app: State<'_, App>) -> Result<Vec<cirth_core::branches::BranchSummary>, String> {
+    with_session(&app, |s| s.store.list_branches().map_err(err))
+}
+
+#[tauri::command]
+async fn branches_create(
+    app: State<'_, App>,
+    name: String,
+    description: String,
+    from_snapshot_id: Option<String>,
+) -> Result<cirth_core::branches::BranchSummary, String> {
+    with_session(&app, |s| {
+        s.store.create_branch(&name, &description, from_snapshot_id.as_deref()).map_err(err)
+    })
+}
+
+#[tauri::command]
+async fn branches_switch(app: State<'_, App>, id: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    with_session(&app, |s| {
+        s.store.switch_branch(&id).map_err(err)?;
+        s.planning = Default::default();
+        opened(s, false, None, None, t0)
+    })
+}
+
+#[tauri::command]
+async fn branches_delete(app: State<'_, App>, id: String) -> Result<(), String> {
+    with_session(&app, |s| s.store.delete_branch(&id).map_err(err))
+}
+
+#[tauri::command]
+async fn branches_update(
+    app: State<'_, App>,
+    id: String,
+    name: String,
+    description: String,
+) -> Result<(), String> {
+    with_session(&app, |s| s.store.update_branch(&id, &name, &description).map_err(err))
+}
+
+#[tauri::command]
+async fn branches_current(app: State<'_, App>) -> Result<String, String> {
+    with_session(&app, |s| s.store.current_branch().map_err(err))
+}
+
 // --- StoryScry and reports (M4 step 1 & step 2) -----------------------------------
 
 #[tauri::command]
@@ -2810,6 +2859,7 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("save", keyed("Save", "S"))
         .text("save_as", keyed("Save As…", "Shift+S"))
         .text("snapshots", "Snapshots…")
+        .text("branches", "Branches…")
         .text("export", keyed("Export…", "E"))
         .separator()
         .text("home", "Close Project");
@@ -3199,6 +3249,12 @@ fn main() {
             snapshots_delete,
             snapshots_update,
             snapshots_restore,
+            branches_list,
+            branches_create,
+            branches_switch,
+            branches_delete,
+            branches_update,
+            branches_current,
             bible_state,
             timeline_state,
             evidence_state,

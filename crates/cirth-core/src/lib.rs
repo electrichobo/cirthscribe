@@ -1,6 +1,7 @@
 pub mod alternatives;
 pub mod backup;
 pub mod bible;
+pub mod branches;
 pub mod comments;
 pub mod compat;
 pub mod compat_m4;

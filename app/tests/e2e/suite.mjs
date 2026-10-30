@@ -4216,5 +4216,115 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(__cirth.snapshots.close(), true)");
   });
 
+  await test("Visual branch history and independent branch canon (M5 step 4): fork branch, verify branch indicator, edit script on main, switch to branch with independent canon (Acceptance C5), edit branch, switch back and verify canon isolation", async () => {
+    await openFixture("page-boundaries");
+
+    // 1. Verify branch indicator in footer shows 'main'
+    await waitFor(app, "!document.getElementById('branch-indicator')?.hidden", "Branch indicator visible");
+    const initBranch = await app.evaluate("document.getElementById('branch-indicator')?.textContent");
+    assert(initBranch.includes("main"), `Initial branch is main: "${initBranch}"`);
+
+    // 2. Open Branches dialog via menu
+    await app.evaluate("(__cirth.menu('branches'), true)");
+    await waitFor(app, "document.getElementById('branches-dialog')?.open", "Branches dialog opened");
+    await audit();
+
+    // Verify main branch is listed as active
+    const brList = await app.evaluate("[...document.querySelectorAll('#branches-list .branch-card')].map(c => ({ name: c.querySelector('.branch-name')?.textContent, active: c.classList.contains('active') }))");
+    assert(brList.length >= 1 && brList[0].name.includes("main") && brList[0].active, `Main branch is active: ${JSON.stringify(brList)}`);
+
+    // 3. Fork a new branch 'alt-timeline'
+    await app.evaluate(`(() => {
+      document.getElementById('branch-name-input').value = 'alt-timeline';
+      document.getElementById('branch-desc-input').value = 'Parallel revision experiment';
+      document.getElementById('branch-create-btn').click();
+      return true;
+    })()`);
+
+    await waitFor(app, "document.querySelectorAll('#branches-list .branch-card').length >= 2", "New branch card rendered in list");
+    const cards = await app.evaluate("[...document.querySelectorAll('#branches-list .branch-name')].map(el => el.textContent)");
+    assert(cards.some(c => c.includes("alt-timeline")), `Found alt-timeline in: ${JSON.stringify(cards)}`);
+    await screenshot(app, "branches-dialog");
+
+    // Close branches dialog
+    await app.evaluate("(__cirth.branches.close(), true)");
+
+    // 4. Modify script text in 'main'
+    const bBefore = await blocks();
+    const actionBlock = bBefore.find((b) => b.kind === "action" && text(b).length >= 10);
+    assert(actionBlock, "Found action block to edit");
+    const originalText = text(actionBlock);
+    const actIdx = bBefore.findIndex((b) => b.id === actionBlock.id);
+
+    await setCaret(`[ps[${actIdx}][0] + 1]`);
+    await typeText("ONLY ON MAIN BRANCH. ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    const bMainModified = await blocks();
+    const actMainModified = bMainModified.find((b) => b.id === actionBlock.id);
+    assert(text(actMainModified).startsWith("ONLY ON MAIN BRANCH. "), `Text modified on main: "${text(actMainModified)}"`);
+
+    // Add a world fact in bible on 'main'
+    const pBase = (await app.evaluate("window.__TAURI_INTERNALS__.invoke('planning_state_now')")).version;
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('planning_command', { op: { PutEntity: { id: 'entity-main-canon', kind: 'character', name: 'EXCLUSIVE MAIN CHARACTER', aliases: [], description: 'Canon character only on main branch', fields: [], scope: null } }, base: ${pBase} })`);
+
+    // Verify character is present in bible on main
+    const bibleMain = await app.evaluate("window.__TAURI_INTERNALS__.invoke('bible_state').then(s => s.entries.map(e => e.name))");
+    assert(bibleMain.includes("EXCLUSIVE MAIN CHARACTER"), "Character in main bible");
+
+    // 5. Open branches dialog and switch to 'alt-timeline'
+    await app.evaluate("(__cirth.menu('branches'), true)");
+    await waitFor(app, "document.getElementById('branches-dialog')?.open", "Branches dialog opened to switch");
+
+    const altCard = await app.evaluate("document.querySelector('#branches-list .branch-card[data-branch-id]:not(.active) .btn-switch')?.className");
+    assert(altCard, "Found switch button for inactive branch");
+
+    await app.evaluate("(() => { document.querySelector('#branches-list .branch-card[data-branch-id]:not(.active) .btn-switch').click(); return true; })()");
+    await sleep(700);
+
+    // 6. Verify branch indicator shows 'alt-timeline'
+    await waitFor(app, "document.getElementById('branch-indicator')?.textContent.includes('alt-timeline')", "Branch indicator switched to alt-timeline");
+    await app.evaluate("(__cirth.branches.close(), true)");
+
+    // 7. Verify independent branch canon (Acceptance C5):
+    // In 'alt-timeline', the script does NOT have the main edits!
+    const bAlt = await blocks();
+    const actAlt = bAlt.find((b) => b.id === actionBlock.id);
+    assert(text(actAlt) === originalText, `alt-timeline has original script without main edit: "${text(actAlt)}"`);
+
+    // In 'alt-timeline', the bible does NOT have the character added on main!
+    const bibleAlt = await app.evaluate("window.__TAURI_INTERNALS__.invoke('bible_state').then(s => s.entries.map(e => e.name))");
+    assert(!bibleAlt.includes("EXCLUSIVE MAIN CHARACTER"), `alt-timeline bible is isolated from main canon: ${JSON.stringify(bibleAlt)}`);
+
+    // 8. Edit script on 'alt-timeline'
+    await setCaret(`[ps[${actIdx}][0] + 1]`);
+    await typeText("ONLY ON ALT TIMELINE. ");
+    await app.evaluate("__cirth.flush()");
+    await waitSynced();
+
+    const bAltModified = await blocks();
+    const actAltModified = bAltModified.find((b) => b.id === actionBlock.id);
+    assert(text(actAltModified).startsWith("ONLY ON ALT TIMELINE. "), `Text modified on alt-timeline: "${text(actAltModified)}"`);
+
+    // 9. Switch back to 'main'
+    await app.evaluate("(__cirth.menu('branches'), true)");
+    await waitFor(app, "document.getElementById('branches-dialog')?.open", "Branches dialog reopened");
+
+    await app.evaluate("(() => { document.querySelector('#branches-list .branch-card[data-branch-id=\"main\"] .btn-switch').click(); return true; })()");
+    await sleep(700);
+
+    await waitFor(app, "document.getElementById('branch-indicator')?.textContent.includes('main')", "Branch indicator switched back to main");
+    await app.evaluate("(__cirth.branches.close(), true)");
+
+    // Verify main has its text and its bible character back!
+    const bMainRestored = await blocks();
+    const actMainRestored = bMainRestored.find((b) => b.id === actionBlock.id);
+    assert(text(actMainRestored).startsWith("ONLY ON MAIN BRANCH. "), `Main script preserved: "${text(actMainRestored)}"`);
+
+    const bibleMainRestored = await app.evaluate("window.__TAURI_INTERNALS__.invoke('bible_state').then(s => s.entries.map(e => e.name))");
+    assert(bibleMainRestored.includes("EXCLUSIVE MAIN CHARACTER"), "Main bible character preserved");
+  });
+
   await app.close();
 }

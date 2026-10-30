@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 14;
+pub const SCHEMA_VERSION: i64 = 15;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -399,6 +399,58 @@ fn migrate_v14(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v14 -> v15: visual branch history and independent branch canon (M5 step 4, branches.rs).
+/// Inactive branches are stored as verified, compressed SQLite state packages.
+/// Projects start with a default 'main' branch set as current_branch_id.
+fn migrate_v15(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE branches (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          parent_branch_id TEXT,
+          fork_version INTEGER NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          head_version INTEGER NOT NULL,
+          scene_count INTEGER NOT NULL DEFAULT 0,
+          word_count INTEGER NOT NULL DEFAULT 0,
+          package_blob BLOB
+        );
+        CREATE INDEX branches_created ON branches(created_at);",
+    )?;
+    let curr_v: i64 = tx
+        .query_row("SELECT value FROM meta WHERE key='version'", [], |r| r.get(0))
+        .map(|s: String| s.parse().unwrap_or(0))
+        .unwrap_or(0);
+    let sc: i64 = tx
+        .query_row("SELECT COUNT(*) FROM scenes WHERE active = 1", [], |r| r.get(0))
+        .unwrap_or(0);
+    let mut word_count: u64 = 0;
+    {
+        let mut stmt = tx.prepare("SELECT runs FROM blocks")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        for r in rows {
+            if let Ok(runs_json) = r {
+                if let Ok(runs) = serde_json::from_str::<Vec<crate::model::Run>>(&runs_json) {
+                    let t: String = runs.iter().map(|rn| rn.text.as_str()).collect();
+                    word_count += crate::words::count(&t);
+                }
+            }
+        }
+    }
+    let now = "2026-10-29T00:00:00Z";
+    tx.execute(
+        "INSERT OR IGNORE INTO branches (id, name, parent_branch_id, fork_version, description, created_at, head_version, scene_count, word_count, package_blob)
+         VALUES ('main', 'main', NULL, 0, 'Main production branch', ?1, ?2, ?3, ?4, NULL)",
+        params![now, curr_v, sc, word_count as i64],
+    )?;
+    tx.execute(
+        "INSERT OR IGNORE INTO meta(key, value) VALUES ('current_branch_id', 'main')",
+        [],
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -416,6 +468,7 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (12, migrate_v12),
     (13, migrate_v13),
     (14, migrate_v14),
+    (15, migrate_v15),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
@@ -1673,7 +1726,7 @@ impl Store {
         &self.path
     }
 
-    fn meta(&self, key: &str) -> Result<Option<String>> {
+    pub(crate) fn meta(&self, key: &str) -> Result<Option<String>> {
         Ok(self.conn.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?)
     }
 

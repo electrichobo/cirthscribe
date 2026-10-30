@@ -80,12 +80,13 @@ impl Store {
         }
         self.conn.execute("VACUUM INTO ?1", [tmp.to_string_lossy()])?;
 
-        // Clean runtime meta and clear snapshots table inside the snapshot blob
+        // Clean runtime meta and clear snapshots and branches tables inside the snapshot blob
         // so snapshots do not nest recursively
         {
             let pkg = Connection::open(&tmp)?;
             pkg.execute("DELETE FROM meta WHERE key = 'opened_at'", [])?;
             pkg.execute("DELETE FROM snapshots", [])?;
+            pkg.execute("DELETE FROM branches", [])?;
             let ok: String = pkg.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
             if ok != "ok" {
                 let _ = std::fs::remove_file(&tmp);
@@ -270,6 +271,9 @@ impl Store {
                     "DELETE FROM {table}; INSERT INTO {table} SELECT * FROM snap_db.{table};"
                 ))?;
             }
+            tx.execute_batch(
+                "DELETE FROM settings; INSERT INTO settings SELECT * FROM snap_db.settings;",
+            )?;
             // Restore meta properties while bumping head version and marking unsaved
             tx.execute_batch(
                 "DELETE FROM meta WHERE key NOT IN ('opened_at');

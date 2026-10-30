@@ -969,4 +969,135 @@ dialog.snapshots-dialog {
   text-align: center;
 }
 
+/* Branches and narrative history (M5 step 4) */
+dialog.branches-dialog {
+  width: min(860px, 94vw);
+  max-height: min(780px, 88vh);
+  display: flex;
+  flex-direction: column;
+}
+.branch-create-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 14px;
+  align-items: center;
+}
+.branch-name-input {
+  flex: 2;
+}
+.branch-desc-input {
+  flex: 3;
+}
+.branch-from-select {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  flex: 2;
+}
+.branch-status {
+  min-height: 18px;
+  margin-bottom: 6px;
+}
+.branches-list {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 200px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.branch-card {
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.branch-card.active {
+  border-color: var(--accent);
+  background: var(--card-active-bg, rgba(255, 255, 255, 0.07));
+}
+.branch-card:hover {
+  border-color: var(--accent);
+}
+.branch-main {
+  flex: 1;
+  min-width: 0;
+}
+.branch-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.branch-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.branch-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.branch-badge.badge-active {
+  background: var(--accent);
+  color: #fff;
+}
+.branch-badge.badge-inactive {
+  background: var(--line);
+  color: var(--muted);
+}
+.branch-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.branch-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.branch-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.branch-current-label {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 4px 8px;
+}
+.branch-pill {
+  background: var(--line);
+  color: var(--ink);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.branch-pill:hover,
+.branch-pill:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+
 

@@ -50,6 +50,7 @@ import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, ta
 import { createCommentsDialog, commentsPlugin } from "./comments";
 import { createAlternativesManager, alternativesPlugin, type AlternativesManager } from "./alternatives";
 import { createSnapshotsDialog } from "./snapshots";
+import { createBranchesDialog } from "./branches";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -741,6 +742,24 @@ const snapshotsDialog = createSnapshotsDialog({
     }
   },
 });
+const branchIndicator = $("branch-indicator") as HTMLButtonElement | null;
+const branchesDialog = createBranchesDialog({
+  onSwitched: async (opened) => {
+    await openWith("open_document", { id: opened.document_id });
+  },
+  onBranchChanged: (name) => {
+    if (branchIndicator) {
+      branchIndicator.textContent = `⑂ ${name}`;
+      branchIndicator.setAttribute("aria-label", `Current Branch: ${name} (click to switch or manage branches)`);
+      branchIndicator.hidden = false;
+    }
+  },
+});
+if (branchIndicator) {
+  branchIndicator.onclick = () => {
+    if (lastOpen) void branchesDialog.open();
+  };
+}
 const bookmarks = createBookmarks({
   list: async () => {
     const st = await invoke<{ bookmarks: { id: string; name: string; document_id: string; block_id: string }[] }>("evidence_state");
@@ -929,6 +948,14 @@ async function openWith(command: string, args: Record<string, unknown>): Promise
   setView("editor");
   $("find-bar").hidden = true; // a new editor state has no search
   $("project-title").textContent = o.is_default ? o.doc.title || o.name : `${o.project_title || o.name} › ${o.doc.title}`;
+  try {
+    const curBranch = await branchesDialog.current();
+    if (branchIndicator) {
+      branchIndicator.textContent = `⑂ ${curBranch}`;
+      branchIndicator.setAttribute("aria-label", `Current Branch: ${curBranch} (click to switch or manage branches)`);
+      branchIndicator.hidden = false;
+    }
+  } catch {}
   board.beats = o.beats;
   await refreshPlanning();
   void refreshBibleNames();
@@ -1156,6 +1183,7 @@ async function goHome() {
       return;
     }
     lastOpen = null;
+    if (branchIndicator) branchIndicator.hidden = true;
     await notesPanel.load(false);
     window.clearTimeout(pageTimer);
     window.clearInterval(autosaveTimer);
@@ -1624,6 +1652,9 @@ async function runMenu(id: string): Promise<void> {
     case "snapshots":
       if (lastOpen) await snapshotsDialog.open();
       break;
+    case "branches":
+      if (lastOpen) await branchesDialog.open();
+      break;
     case "export":
       if (lastOpen) exportDialog.open();
       break;
@@ -2065,6 +2096,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   comments: commentsDialog,
   alternatives: alternativesMgr,
   snapshots: snapshotsDialog,
+  branches: branchesDialog,
   bible,
   timeline,
   evidence,

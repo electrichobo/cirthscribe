@@ -830,3 +830,101 @@ fn opening_a_v13_project_adds_empty_snapshots_and_creates_restores_snapshots_cle
     }
 }
 
+#[test]
+fn opening_a_v14_project_adds_branches_and_maintains_independent_canon() {
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v14-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v14-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 14, "fixture must be schema v14");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(14));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v14 copy kept");
+        let mut s = o.store;
+        let doc_id = s.current_document().unwrap();
+
+        // Upgraded project has default 'main' branch set as active
+        assert_eq!(s.current_branch().unwrap(), "main");
+        let branches = s.list_branches().unwrap();
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].id, "main");
+        assert_eq!(branches[0].name, "main");
+        assert!(branches[0].is_active);
+
+        let before = s.load().unwrap();
+        let target = before.blocks.iter().find(|b| b.text().chars().count() >= 5).unwrap().clone();
+        let original_text = target.text();
+
+        // 1. Fork a new branch 'director-cut'
+        let b = s.create_branch("director-cut", "Director's alternate version", None).unwrap();
+        assert_eq!(b.name, "director-cut");
+        assert_eq!(b.parent_branch_id.as_deref(), Some("main"));
+        assert!(!b.is_active);
+        assert_eq!(s.list_branches().unwrap().len(), 2);
+
+        // 2. Modify script text and add a character to bible in 'main'
+        let mut edited = target.clone();
+        edited.runs = vec![cirth_core::model::Run::plain("TEXT MODIFIED ON MAIN BRANCH ONLY")];
+        let sv = s.version().unwrap();
+        s.apply(&Batch { tx_id: "main-edit".into(), base_version: sv, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: edited }] }).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "TEXT MODIFIED ON MAIN BRANCH ONLY");
+
+        // Add a world fact to bible on 'main'
+        let entity_id = cirth_core::model::new_id();
+        s.put_entity(&cirth_core::bible::Entity {
+            id: entity_id.clone(),
+            kind: "character".into(),
+            name: "MAIN EXCLUSIVE CHARACTER".into(),
+            aliases: vec![],
+            description: "Appears only in main branch".into(),
+            fields: vec![],
+            scope: None,
+        }).unwrap();
+        assert!(s.entities().unwrap().iter().any(|e| e.name == "MAIN EXCLUSIVE CHARACTER"));
+
+        // 3. Switch to 'director-cut' branch (Acceptance C5)
+        let switched = s.switch_branch(&b.id).unwrap();
+        assert_eq!(switched.id, b.id);
+        assert_eq!(s.current_branch().unwrap(), b.id);
+
+        // Verify independent canon (Acceptance C5):
+        // 'director-cut' does NOT have the script edit from 'main'
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), original_text);
+        // 'director-cut' does NOT have the character from 'main'
+        assert!(!s.entities().unwrap().iter().any(|e| e.name == "MAIN EXCLUSIVE CHARACTER"));
+
+        // 4. Edit 'director-cut' with its own text
+        let mut dir_edited = target.clone();
+        dir_edited.runs = vec![cirth_core::model::Run::plain("DIRECTOR CUT SPECIAL TEXT")];
+        let dv = s.version().unwrap();
+        s.apply(&Batch { tx_id: "dir-edit".into(), base_version: dv, document_id: Some(doc_id.clone()), ops: vec![Op::Update { block: dir_edited }] }).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "DIRECTOR CUT SPECIAL TEXT");
+
+        // 5. Switch back to 'main'
+        let back_main = s.switch_branch("main").unwrap();
+        assert_eq!(back_main.id, "main");
+        assert_eq!(s.current_branch().unwrap(), "main");
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "TEXT MODIFIED ON MAIN BRANCH ONLY");
+        assert!(s.entities().unwrap().iter().any(|e| e.name == "MAIN EXCLUSIVE CHARACTER"));
+
+        // 6. Switch back to 'director-cut' again to ensure persistent round-trip
+        s.switch_branch(&b.id).unwrap();
+        assert_eq!(s.block_text(&target.id).unwrap().unwrap(), "DIRECTOR CUT SPECIAL TEXT");
+
+        // 7. Verify deletion rules: cannot delete main, cannot delete active branch
+        assert!(s.delete_branch("main").is_err());
+        assert!(s.delete_branch(&b.id).is_err());
+
+        // Switch to main and delete director-cut
+        s.switch_branch("main").unwrap();
+        s.delete_branch(&b.id).unwrap();
+        assert_eq!(s.list_branches().unwrap().len(), 1);
+        assert!(s.branch(&b.id).unwrap().is_none());
+
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+    }
+}
+

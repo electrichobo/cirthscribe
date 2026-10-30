@@ -136,9 +136,9 @@ Done:
 - [x] Comments attached to the text, with inline decorations, replies, resolution tracking, orphan recovery, and accessible review dialog (View > Tools > Comments…)
 - [x] Alternative takes on blocks with take badge switcher (`Take 1/2 ▾`), active take projection across all views and word counts, and StoryScry inactive alternative reporting (View > Tools > Alternate Takes…)
 - [x] Named snapshots and checkpoints with full point-in-time package state in SQLite, non-destructive restore, and automatic pre-restore checkpoints (File > Snapshots…)
+- [x] Visual branch history and independent branch canon with branch-isolated snapshots in SQLite, fork/switch/delete management, and status bar branch pill (File > Branches…)
 
 In progress / planned:
-- [ ] Visual branch history and independent branch canon
 - [ ] Base/source/target 3-way conflict integration
 - [ ] Portable review package (`.cirth-review`) import and export
 
