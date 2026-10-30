@@ -3,6 +3,8 @@
 @font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; }
 @font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; }
 @font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; }
+@font-face { font-family: "Noto Sans"; src: url("../../assets/fonts/noto-sans/NotoSans-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "Noto Serif"; src: url("../../assets/fonts/noto-serif/NotoSerif-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; }
 
 :root {
   --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1f; --muted: #5d5d66; --line: #d6d3cc; --accent: #2b5fb3; --warn: #8a4b00; --bad: #a3141c; --on-accent: #ffffff;

@@ -58,6 +58,7 @@ import { createInteractiveDialog, type InteractiveGraph } from "./interactivedlg
 import { createTreatmentDialog, type TreatmentDoc } from "./treatmentdlg";
 import { createGrammarDialog, type GrammarAnalysisReport } from "./grammardlg";
 import { createAiDialog, type AiConfig, type AiPayload, type AiDiffBlock } from "./aidlg";
+import { createTourDialog } from "./tour";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -824,6 +825,7 @@ const aiDialog = createAiDialog({
     return block?.attrs.scene_id || null;
   },
 });
+const tourDialog = createTourDialog();
 if (branchIndicator) {
   branchIndicator.onclick = () => {
     if (lastOpen) void branchesDialog.open();
@@ -1097,6 +1099,7 @@ async function applyOpened(o: Opened, t0: number = performance.now()): Promise<v
   rerenderSide();
   void repaginate();
   view.focus();
+  tourDialog.maybeAutoOpen();
 }
 
 function setView(v: "home" | "editor" | "free") {
@@ -1827,6 +1830,9 @@ async function runMenu(id: string): Promise<void> {
     case "about":
       await about.open();
       break;
+    case "tour":
+      tourDialog.open(true);
+      break;
     case "latency":
       await latency.open();
       break;
@@ -2298,6 +2304,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   exportTeleplayText: (documentId?: string, title?: string) => invoke<string>("export_teleplay_text", { documentId, title }),
   exportCapability: (targetFormat: string, documentId?: string) =>
     invoke<any>("export_capability_analyze", { targetFormat, documentId }),
+  tour: tourDialog,
   bible,
   timeline,
   evidence,

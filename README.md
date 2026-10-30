@@ -163,10 +163,13 @@ Carried forward:
 Done:
 - [x] Bring-your-own AI architecture and writing assistant: off by default, zero unsolicited network requests; support for local Ollama / LM Studio or cloud providers; transparent scope disclosure and token estimation; non-destructive block diffs and accepted batch application (`cirth_core::ai`, `app/src/aidlg.ts`, E2E Test 82)
 - [x] Cloud sharing & Google Docs/Sheets workflow adapter: export capability analyzer, fidelity grading, explicit loss warnings, dynamic export dialog guidance, and interoperability guide (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, `app/src/exportdlg.ts`, E2E Test 83)
+- [x] Software tour onboarding dialog: 6-step guided walkthrough of core writing, focus modes, story planning, production tools, revision workflows, and format tools; non-blocking, keyboard accessible (Left/Right arrows, Esc), skip/complete options, and re-launchable via Help > Software Tour… (`app/src/tour.ts`, E2E Test 84)
+- [x] Non-Latin script screen font packaging: bundled SIL OFL-1.1 Noto Sans and Noto Serif for full international / non-Western Unicode script coverage (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `docs/m0/LICENSES.md`)
 - [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
 
 Carried forward:
 - [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
+- [ ] Desktop manual checks for software tour and non-Latin script display (N49)
 
 ---
 

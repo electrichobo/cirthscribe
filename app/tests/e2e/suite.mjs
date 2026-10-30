@@ -26,7 +26,10 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     throw new Error(`timed out waiting for ${what}`);
   }
   const waitOpen = (target) => waitFor(target, "!!(window.__cirth && __cirth.view && __cirth.lastOpen)", "a project to open");
-  const waitHome = (target) => waitFor(target, "document.body.dataset.view === 'home' && document.getElementById('home').dataset.loaded === '1'", "Home");
+  const waitHome = async (target) => {
+    await waitFor(target, "document.body.dataset.view === 'home' && document.getElementById('home').dataset.loaded === '1'", "Home");
+    await target.evaluate("(() => { try { localStorage.setItem('cirth_tour_completed', 'true'); } catch {} return true; })()");
+  };
   /** Click a Home button like a user would (a card or a sample). */
   const clickHome = (target, selector) => target.evaluate(`(() => { const b = document.querySelector(${JSON.stringify(selector)}); if (!b) throw new Error('missing ' + ${JSON.stringify(selector)}); b.click(); return true; })()`);
 
@@ -5440,6 +5443,71 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Click cancel
     await app.evaluate("document.getElementById('export-cancel')?.click()");
     await waitFor(app, "!document.getElementById('export-dialog')?.open", "Export dialog closed");
+  });
+
+  await test("Software Tour Onboarding: guided feature tour, keyboard navigation, skip, and re-launch via Help menu", async () => {
+    // 1. Reset tour completion flag in localStorage
+    await app.evaluate("localStorage.removeItem('cirth_tour_completed')");
+
+    // 2. Open tour via menu action (as triggered from Help > Software Tour…)
+    await app.evaluate("window.__cirth.menu('tour')");
+    await waitFor(app, "document.getElementById('tour-dialog')?.open === true", "Tour dialog open");
+
+    // 3. Step 1 initial checks
+    const badge1 = await app.evaluate("document.getElementById('tour-badge')?.textContent");
+    assert(badge1.includes("1. The Writing Canvas"), `Step 1 badge matches: ${badge1}`);
+    const title1 = await app.evaluate("document.getElementById('tour-dialog-title')?.textContent");
+    assert(title1.includes("Distraction-Free Screenplay Writing"), `Step 1 title matches: ${title1}`);
+    const prevDisabled = await app.evaluate("document.getElementById('tour-btn-prev')?.disabled");
+    assert(prevDisabled === true, "Previous button disabled on step 1");
+    const nextText1 = await app.evaluate("document.getElementById('tour-btn-next')?.textContent");
+    assert(nextText1 === "Next", "Next button says Next on step 1");
+
+    // 4. Advance through steps using the Next button
+    for (let i = 2; i <= 6; i++) {
+      await app.evaluate("document.getElementById('tour-btn-next')?.click()");
+      await waitFor(app, `document.getElementById('tour-badge')?.textContent.includes('${i}.')`, `Step ${i} rendered`);
+    }
+
+    // Step 6 checks: Next button becomes "Get Started", Skip button is hidden
+    const badge6 = await app.evaluate("document.getElementById('tour-badge')?.textContent");
+    assert(badge6.includes("6. Formats & Intelligence"), `Step 6 badge matches: ${badge6}`);
+    const nextText6 = await app.evaluate("document.getElementById('tour-btn-next')?.textContent");
+    assert(nextText6 === "Get Started", "Next button says Get Started on final step");
+    const skipHidden = await app.evaluate("document.getElementById('tour-btn-skip')?.style.display === 'none'");
+    assert(skipHidden, "Skip button hidden on final step");
+
+    // 5. Test keyboard navigation: ArrowLeft steps back to step 5, ArrowRight steps to step 6
+    await app.evaluate(`(() => {
+      const d = document.getElementById('tour-dialog');
+      d.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    })()`);
+    await waitFor(app, "document.getElementById('tour-badge')?.textContent.includes('5.')", "ArrowLeft steps back to step 5");
+    const badge5 = await app.evaluate("document.getElementById('tour-badge')?.textContent");
+    assert(badge5.includes("5. Revisions & Takes"), `Step 5 badge matches: ${badge5}`);
+
+    await app.evaluate(`(() => {
+      const d = document.getElementById('tour-dialog');
+      d.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    })()`);
+    await waitFor(app, "document.getElementById('tour-badge')?.textContent.includes('6.')", "ArrowRight steps forward to step 6");
+
+    // 6. Complete tour via Get Started
+    await app.evaluate("document.getElementById('tour-btn-next')?.click()");
+    await waitFor(app, "!document.getElementById('tour-dialog')?.open", "Tour dialog closed after completion");
+
+    const completed = await app.evaluate("localStorage.getItem('cirth_tour_completed')");
+    assert(completed === "true", "localStorage flag cirth_tour_completed set to true");
+
+    // 7. Re-launch via Help menu (re-opening forces reset to step 1)
+    await app.evaluate("window.__cirth.menu('tour')");
+    await waitFor(app, "document.getElementById('tour-dialog')?.open === true", "Tour dialog reopened via menu");
+    const badgeReset = await app.evaluate("document.getElementById('tour-badge')?.textContent");
+    assert(badgeReset.includes("1. The Writing Canvas"), `Re-opened tour resets to step 1: ${badgeReset}`);
+
+    // 8. Test Skip Tour button
+    await app.evaluate("document.getElementById('tour-btn-skip')?.click()");
+    await waitFor(app, "!document.getElementById('tour-dialog')?.open", "Tour dialog closed via Skip button");
   });
 
   await app.close();

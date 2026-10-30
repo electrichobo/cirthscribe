@@ -67,6 +67,8 @@ for (const [path, info] of Object.entries(lock.packages)) {
 // Bundled assets that do not come from a package manager.
 const assets = [
   { name: "Courier Prime (font)", version: "", license: "OFL-1.1", source: "https://github.com/google/fonts/tree/main/ofl/courierprime", files: [join(root, "assets/fonts/courier-prime/OFL.txt")] },
+  { name: "Noto Sans (font)", version: "", license: "OFL-1.1", source: "https://github.com/notofonts/noto-fonts", files: [join(root, "assets/fonts/noto-sans/OFL.txt")] },
+  { name: "Noto Serif (font)", version: "", license: "OFL-1.1", source: "https://github.com/notofonts/noto-fonts", files: [join(root, "assets/fonts/noto-serif/OFL.txt")] },
   ...["en_US-large", "en_GB-large"].map((d) => {
     const dir = join(root, "assets/dictionaries", d);
     return { name: `SCOWL dictionary ${d}`, version: "2026.02.25", license: "SCOWL notice (permissive)", source: "https://github.com/en-wl/wordlist", files: readdirSync(dir).filter((f) => /^README/i.test(f)).map((f) => join(dir, f)) };

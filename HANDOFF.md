@@ -4,31 +4,29 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`).** Core application roadmap complete. Next: manual checks and owner release review.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 Onboarding & Font Packaging complete.** Next: manual checks and owner release review.
 
 ## Completed & Verified
 
-- **Milestone 7 Steps 1–6 complete:**
-  - Steps 1–4: Optional AI Assistant & diff engine (`cirth_core::ai`, `app/src/aidlg.ts`, e2e Test 82). Off by default, zero unsolicited network traffic, transparent scope disclosure, non-destructive block diffs.
-  - Step 5: Export capability analysis & Google Docs/Sheets adapter (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, dynamic export dialog guidance in `app/src/exportdlg.ts`, e2e Test 83).
-  - Step 6: Compatibility matrix update, manual checks N47–N48, exit review (`docs/m7/EXIT_REVIEW.md`).
+- **Software Tour Onboarding (`app/src/tour.ts`, `app/src/main.ts`, `app/src-tauri/src/main.rs`, e2e Test 84):** 6-card interactive tour modal, step-by-step progress, keyboard navigation, skip/complete with localStorage persistence, and re-launchable via `Help > Software Tour…`.
+- **Non-Latin Script Screen Font Packaging (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `app/src/styles.css`, `app/src/a11y.ts`, `docs/m0/LICENSES.md`, `THIRD-PARTY-NOTICES.txt`):** Bundled SIL OFL-1.1 Noto Sans and Noto Serif for full international / non-Western Unicode script coverage across screen fonts.
 - **Verified:**
-  - `cargo test -p cirth-core` (188/188 passed: 128 unit including 4 capability and 4 AI tests, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
-  - `npm --prefix app run build` (clean without errors).
+  - `cargo test -p cirth-core` (188/188 passed: 128 unit, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
+  - `npm --prefix app run build` (clean without errors; Noto Sans & Serif bundled).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
-  - `node app/scripts/third-party-notices.mjs --check` (355 components passed).
-  - `npm --prefix app run e2e:cdp` (83/83 passed, 0 skipped).
-  - `npm --prefix app run e2e:webdriver` (82/82 passed, 1 skipped: simulated IME).
+  - `node app/scripts/third-party-notices.mjs --check` (357 components passed).
+  - `npm --prefix app run e2e:cdp` (84/84 passed, 0 skipped).
+  - `npm --prefix app run e2e:webdriver` (83/83 passed, 1 skipped: simulated IME).
 - **Not verified (carried):**
-  - M7 manual checks N47 (AI assistant) and N48 (Google Docs/Sheets);
-  - M6 manual checks N41–N46, M5 checks N37–N40, M4 checks N32–N36, Mac run (N31), N29, N30.
+  - Manual check N49 (Software tour and non-Latin script display);
+  - M7 checks N47–N48, M6 checks N41–N46, M5 checks N37–N40, M4 checks N32–N36, Mac run (N31), N29, N30.
 
 ## In-Progress / Uncommitted State
 
-- M7 Steps 5–6 complete and fully verified. Ready for commit and push.
+- Software tour onboarding dialog, non-Latin Noto font packaging, and Test 84 complete and fully verified. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push M7 Steps 5–6: Export capability analyzer, Google Docs/Sheets workflow adapter, and Milestone 7 exit review.
+1. Commit and push: Software tour onboarding dialog and non-Latin font packaging.
 2. Align with owner on release review and manual checks execution (`docs/testing/MANUAL_CHECKS.md`).

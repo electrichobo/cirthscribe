@@ -11,6 +11,8 @@ Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dicti
 | Item | License | Shipped? | Notes |
 | - | - | - | - |
 | Courier Prime (4 styles), `assets/fonts/courier-prime/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded in the app and in PDFs) | From github.com/google/fonts `ofl/courierprime`. Font name may not be reused for modified versions. |
+| Noto Sans (Regular), `assets/fonts/noto-sans/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded for non-Latin / sans screen display) | From github.com/notofonts/noto-fonts. Full non-Western / international script coverage. |
+| Noto Serif (Regular), `assets/fonts/noto-serif/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded for non-Latin / serif screen display) | From github.com/notofonts/noto-fonts. Full non-Western / international script coverage. |
 | SCOWL Hunspell dictionaries en_US-large and en_GB-large 2026.02.25, `assets/dictionaries/` | Copyright 2000-2026 Kevin Atkinson; permissive notice: copy, modify, distribute, sell, provided the copyright notice and permission notice appear in copies and supporting documentation. Affix file: BSD-style (Geoff Kuenning; modified versions must be marked). Full text in each `README_*.txt` | Yes (embedded in the app) | From github.com/en-wl/wordlist releases. Keep the README files with the dictionaries and this notice in release documentation. |
 | SQLite (bundled by `libsqlite3-sys`) | Public domain | Yes | |
 | Microsoft Edge WebView2 Runtime | Microsoft proprietary | No (system component on Windows 11) | Required at runtime on Windows |

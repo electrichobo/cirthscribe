@@ -16,6 +16,10 @@ Updated 2026-10-30.
 - Step 6: Compatibility Matrix, Automated Verification & Milestone 7 Exit Review.
   - Full automated suite verification (188 core tests, 4 contract tests, 355 license notices, 83 CDP tests, 82 WebDriver tests).
   - Updated `docs/COMPATIBILITY.md`, manual checks N47 and N48 in `docs/testing/MANUAL_CHECKS.md`, authored `docs/m7/EXIT_REVIEW.md`.
+- Post-M7 Onboarding & Font Packaging (2026-10-30):
+  - Software Tour onboarding dialog (`app/src/tour.ts`, `app/src-tauri/src/main.rs`, `app/src/main.ts`, and E2E Test 84). 6-card illustrated walkthrough (Canvas, Focus, Planning, Production, Versions, Formats), keyboard navigation (Left/Right/Esc), skip/complete with localStorage persistence, and re-launchable via `Help > Software Tour…`.
+  - Non-Latin script screen font packaging (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `app/src/styles.css`, `app/src/a11y.ts`, `docs/m0/LICENSES.md`, `assets/legal/THIRD-PARTY-NOTICES.txt`). SIL OFL 1.1 TrueType fonts covering full international Unicode ranges (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings.
+  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, 84 CDP tests, 83 WebDriver tests (1 skipped). Added manual check N49 in `docs/testing/MANUAL_CHECKS.md`.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).

@@ -3714,6 +3714,7 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
 fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{MenuBuilder, SubmenuBuilder};
     let help = SubmenuBuilder::new(app, "Help")
+        .text("tour", "Software Tour…")
         .text("shortcuts", "Keyboard Shortcuts…")
         .text("latency", "Typing Latency…")
         .separator()

@@ -83,8 +83,8 @@ export type ScreenFont = "courier-prime" | "mono" | "serif" | "sans";
 export const SCREEN_FONTS: Record<ScreenFont, { label: string; stack: string }> = {
   "courier-prime": { label: "Courier Prime (standard)", stack: '"Courier Prime", monospace' },
   mono: { label: "System monospace", stack: 'ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace' },
-  serif: { label: "Serif", stack: 'Georgia, "Times New Roman", "DejaVu Serif", serif' },
-  sans: { label: "Sans serif", stack: 'system-ui, "Segoe UI", Helvetica, Arial, "DejaVu Sans", sans-serif' },
+  serif: { label: "Serif", stack: '"Noto Serif", Georgia, "Times New Roman", "DejaVu Serif", serif' },
+  sans: { label: "Sans serif", stack: '"Noto Sans", system-ui, "Segoe UI", Helvetica, Arial, "DejaVu Sans", sans-serif' },
 };
 
 let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false }, typewriter: false, editor_font: "courier-prime", editor_size: 12, theme: "system", keys: {} };
