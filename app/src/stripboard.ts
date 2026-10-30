@@ -301,7 +301,7 @@ export function createStripboard(host: StripboardHost) {
       el.innerHTML = `
         <div class="day-break-head">
           <div class="day-break-title">
-            <input type="text" class="day-title-input" value="${escapeHtml(title)}" placeholder="Day Title">
+            <input type="text" class="day-title-input" value="${escapeHtml(title)}" placeholder="Day Title" aria-label="Day title">
           </div>
           <div class="day-break-meta">
             <span>${scenes} scene${scenes === 1 ? "" : "s"} · ${pgs} pgs</span>
@@ -313,7 +313,7 @@ export function createStripboard(host: StripboardHost) {
           </div>
         </div>
         <div class="day-break-note-row">
-          <input type="text" class="strip-note-input" value="${escapeHtml(strip.note)}" placeholder="Day call time / staging notes…">
+          <input type="text" class="strip-note-input" value="${escapeHtml(strip.note)}" placeholder="Day call time / staging notes…" aria-label="Day call time or staging notes">
         </div>
       `;
 
@@ -335,7 +335,7 @@ export function createStripboard(host: StripboardHost) {
       el.classList.add("strip-banner");
       el.innerHTML = `
         <div class="banner-head">
-          <input type="text" class="banner-text-input" value="${escapeHtml(strip.banner_text || "COMPANY MOVE")}" placeholder="Banner Text">
+          <input type="text" class="banner-text-input" value="${escapeHtml(strip.banner_text || "COMPANY MOVE")}" placeholder="Banner Text" aria-label="Banner text">
           <div class="strip-actions">
             <button type="button" class="btn-icon btn-move-up" title="Move Up" ${index === 0 ? "disabled" : ""}>↑</button>
             <button type="button" class="btn-icon btn-move-down" title="Move Down">↓</button>
@@ -343,7 +343,7 @@ export function createStripboard(host: StripboardHost) {
           </div>
         </div>
         <div class="banner-note-row">
-          <input type="text" class="strip-note-input" value="${escapeHtml(strip.note)}" placeholder="Banner note / details…">
+          <input type="text" class="strip-note-input" value="${escapeHtml(strip.note)}" placeholder="Banner note / details…" aria-label="Banner note">
         </div>
       `;
 
@@ -414,7 +414,7 @@ export function createStripboard(host: StripboardHost) {
           ${tagsHtml}
 
           <div class="strip-note-row">
-            <input type="text" class="strip-note-input" value="${escapeHtml(strip.note)}" placeholder="Scheduling notes (rigs, cast wrap, etc.)…">
+            <input type="text" class="strip-note-input" value="${escapeHtml(strip.note)}" placeholder="Scheduling notes (rigs, cast wrap, etc.)…" aria-label="Scheduling notes">
           </div>
         </div>
       </div>

@@ -73,7 +73,7 @@ export function createCharacterSides(host: {
             </div>
           </div>
           <div class="sides-filter-wrap">
-            <input type="search" id="sides-char-filter" placeholder="Filter characters…" class="sides-input">
+            <input type="search" id="sides-char-filter" placeholder="Filter characters…" class="sides-input" aria-label="Filter characters">
           </div>
           <div id="sides-char-list" class="sides-char-list" role="group" aria-label="Characters"></div>
         </div>
