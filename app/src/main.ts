@@ -57,6 +57,7 @@ import { createComicDialog, type ComicScriptAnalysis } from "./comicdlg";
 import { createInteractiveDialog, type InteractiveGraph } from "./interactivedlg";
 import { createTreatmentDialog, type TreatmentDoc } from "./treatmentdlg";
 import { createGrammarDialog, type GrammarAnalysisReport } from "./grammardlg";
+import { createAiDialog, type AiConfig, type AiPayload, type AiDiffBlock } from "./aidlg";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -797,6 +798,30 @@ const grammarDialog = createGrammarDialog({
     if (lastOpen) {
       await openWith("open_document", { id: lastOpen.document_id });
     }
+  },
+});
+const aiDialog = createAiDialog({
+  onApplied: async () => {
+    if (lastOpen) {
+      await openWith("open_document", { id: lastOpen.document_id });
+    }
+  },
+  getSelectedBlockIds: () => {
+    if (!view) return [];
+    const ids: string[] = [];
+    const { from, to } = view.state.selection;
+    view.state.doc.nodesBetween(from, to, (node) => {
+      if (node.attrs.id && !ids.includes(node.attrs.id)) {
+        ids.push(node.attrs.id);
+      }
+    });
+    return ids;
+  },
+  getCurrentSceneId: () => {
+    if (!view) return null;
+    const $p = view.state.selection.$from;
+    const block = $p.depth ? $p.node(1) : null;
+    return block?.attrs.scene_id || null;
   },
 });
 if (branchIndicator) {
@@ -1775,6 +1800,9 @@ async function runMenu(id: string): Promise<void> {
     case "grammar_tools":
       if (lastOpen) await grammarDialog.show();
       break;
+    case "ai_tools":
+      if (lastOpen) await aiDialog.show();
+      break;
     case "home":
       await goHome();
       break;
@@ -2242,6 +2270,29 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
         ignoredRules,
         ignoredWords,
       }),
+  },
+  ai: {
+    dialog: aiDialog,
+    getConfig: () => invoke<AiConfig>("ai_get_config"),
+    setConfig: (config: AiConfig) => invoke<void>("ai_set_config", { config }),
+    preparePayload: (options: {
+      scopeKind?: string;
+      task?: { kind: string; instruction?: string };
+      documentId?: string;
+      blockIds?: string[];
+      sceneId?: string;
+    }) =>
+      invoke<AiPayload>("ai_prepare_payload", {
+        documentId: options.documentId,
+        scopeKind: options.scopeKind || "scene",
+        task: options.task || { kind: "summarize_scene" },
+        blockIds: options.blockIds || null,
+        sceneId: options.sceneId || null,
+      }),
+    computeDiffs: (originalBlocks: any[], aiSuggestionText: string) =>
+      invoke<AiDiffBlock[]>("ai_compute_diffs", { originalBlocks, aiSuggestionText }),
+    applyDiffs: (diffs: AiDiffBlock[], documentId?: string) =>
+      invoke<void>("ai_apply_diffs", { diffs, documentId }),
   },
   exportStageplayText: (documentId?: string, title?: string) => invoke<string>("export_stageplay_text", { documentId, title }),
   exportTeleplayText: (documentId?: string, title?: string) => invoke<string>("export_teleplay_text", { documentId, title }),

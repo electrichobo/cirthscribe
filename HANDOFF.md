@@ -4,38 +4,34 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–6 complete (`docs/m6/EXIT_REVIEW.md`).** Next: Milestone 7 (Optional extras: bring-your-own AI, cloud sharing workflows).
+**Milestone 7 (Optional Integrations) in progress (`docs/M7_PLAN.md`).** Goal: Steps 1–4 built; proceed to Step 5 (Cloud Sharing & Google Workflow Compatibility Adapter).
 
 ## Completed & Verified
 
-- **Milestones 0–6 complete; M6 Steps 1–7 complete:**
-  - Step 1: Document formats & profiles model (schema v16, `DocumentProfile`, layout profiles, duplicate-and-convert). Committed `26d0b06`.
-  - Step 2: Comic book & graphic novel scripting (`cirth_core::comic`, comic Tab/Enter cycles, dialog, text/HTML exports, E2E Test 77). Committed `3f3f6f3`.
-  - Step 3: Stage play & TV multi-camera profiles (`cirth_core::stage_teleplay`, lettered scenes, uppercase dialogue, Act/Scene headings, bracketed stage directions, profile layout pagination, text exports, E2E Test 78). Committed `fe2a3e6`.
-  - Step 4: Immersive & branching interactive storytelling (`cirth_core::interactive`, passages, inline choice syntax, conditions, BFS graph validator, Twee 3, standalone HTML player, JSON export, inspector dialog, E2E Test 79). Committed `05dc032`.
-  - Step 5: General rich-text / treatment documents & bible integration (`cirth_core::treatment`, H1–H3 hierarchy, paragraphs, quotes, bullet lists, character spotlights, reading time metrics, Project Bible entity cross-referencing, semantic HTML/TXT/DOCX exports, treatment inspector dialog, E2E Test 80). Committed `cf19120`.
-  - Step 6: Offline grammar, style & dialogue analysis engine (`cirth_core::grammar`, duplicate words, passive voice, quotes, parentheticals, cliches, spacing, one-click replacement fix, dialog, E2E Test 81). Committed `598c161`.
-  - Step 7: Compatibility matrix, format fixtures (`fixtures/*.json`), manual checks N41–N46, exit review (`docs/m6/EXIT_REVIEW.md`).
+- **Milestone 7 Steps 1–4 built:**
+  - `cirth_core::ai`: optional bring-your-own AI architecture (`AiProviderType`, `AiConfig`, `AiScopeKind`, `AiTask`, `AiPayload`, `AiDiffBlock`, `DiffStatus`).
+  - Transparent scope disclosure, rule-of-thumb token estimator, prompt generators with Kolbítar formatting conventions.
+  - Non-destructive block diff comparison engine (`compute_block_diffs`) and transaction-safe batch diff application preserving heading `scene_id`.
+  - Tauri IPC commands: `ai_get_config`, `ai_set_config`, `ai_prepare_payload`, `ai_compute_diffs`, `ai_apply_diffs`.
+  - Frontend assistant dialog (`app/src/aidlg.ts`) with provider configuration, task selection, scope banner, diff preview, and accept/reject actions.
+  - Automated E2E Test 82 in `app/tests/e2e/suite.mjs`.
 - **Verified:**
-  - `cargo test -p cirth-core` (180/180 passed: 120 unit including 7 grammar and 4 fixtures, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
-  - `npm --prefix app run build` (clean).
+  - `cargo test -p cirth-core` (184/184 passed: 124 unit including 4 AI tests, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
+  - `npm --prefix app run build` (clean without errors).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
   - `node app/scripts/third-party-notices.mjs --check` (355 components passed).
-  - `npm --prefix app run e2e:cdp` (81/81 passed, 0 skipped, clean audit).
-  - `npm --prefix app run e2e:webdriver` (80/80 passed, 1 skipped: simulated IME).
-- **Not verified (carried into M7):**
-  - M6 manual checks N41–N46 (comics, stage plays, teleplays, interactive stories, treatments, grammar);
-  - M5 manual checks N37–N40 (comments, alternatives, branches, review packages);
-  - M4 manual checks N32–N36 (external spreadsheet and viewer verification);
-  - from M3: Mac run (N31), N29, N30, limits in `docs/m3/EXIT_REVIEW.md` §1;
-  - from M2/M1: external screenplay interchange, non-Latin PDF glyphs, reference machine latency, Windows e2e on hosted runner.
+  - `npm --prefix app run e2e:cdp` (82/82 passed, 0 skipped).
+  - `npm --prefix app run e2e:webdriver` (81/81 passed, 1 skipped: simulated IME).
+- **Not verified (carried):**
+  - M7 manual check N47 (AI assistant & scope disclosure);
+  - M6 manual checks N41–N46, M5 checks N37–N40, M4 checks N32–N36, Mac run (N31), N29, N30.
 
 ## In-Progress / Uncommitted State
 
-- M6 Step 7 completed, format fixtures generated, documentation and exit review authored, ready for commit and push.
+- Steps 1–4 complete and fully verified across all test gates. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push M6 Step 7: Compatibility matrix, format fixtures, manual checks & milestone 6 exit review.
-2. Align with owner on Milestone 7 planning and priorities (`ROADMAP.md`).
+1. Commit and push M7 Steps 1–4: Optional AI Assistant, transparent scope disclosure, non-destructive diff engine, and E2E Test 82.
+2. Proceed to M7 Step 5: Cloud Sharing & Google Workflow Compatibility Adapter (`docs/M7_PLAN.md`).

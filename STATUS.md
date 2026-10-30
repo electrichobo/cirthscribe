@@ -2,6 +2,15 @@
 
 Updated 2026-10-30.
 
+**M7 (optional integrations) in progress (`docs/M7_PLAN.md`). Steps 1–4 built 2026-10-30:**
+- Steps 1–4: Optional AI Assistant & Non-Destructive Diff Engine (`cirth_core::ai`, `app/src-tauri/src/main.rs`, `app/src/aidlg.ts`, and E2E Test 82).
+  - Off by default; zero unsolicited network requests; complete offline operation preserved when disabled.
+  - Bring-your-own model / endpoint (local Ollama / LM Studio or cloud providers); API keys and settings stored securely in working store.
+  - Transparent scope disclosure and rule-of-thumb token estimator (~4 chars/token in English); scopes cover Selection, Block, Scene, DocumentSummary, and Project Bible.
+  - Non-destructive block diff comparison engine (`compute_block_diffs`) showing added, modified, removed, and unchanged blocks with colored UI status badges.
+  - Batch diff application preserving Heading `scene_id` invariants; UI dialog with generate, diff preview, and accept/reject actions.
+  - Verified with 184 core unit and integration tests, clean UI build, and E2E suite (82/82 on CDP, 81/81 on WebDriver with 1 expected IME skip).
+
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).
 - Step 2: comic book & graphic novel scripting (`cirth_core::comic` with explicit page/panel hierarchy, speech balloons, captions, sound effects, sequential continuity warnings, panel renumbering reconciliation, and format exports in Plain Text and HTML; profile-aware comic Tab/Enter cycles; comic script analysis dialog; automated E2E Test 77 passing on CDP 77/77 and WebDriver 76/76).

@@ -5296,5 +5296,100 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.getElementById('grammar-dialog')?.open", "Grammar dialog closed");
   });
 
+  await test("Optional AI Assistant: off-by-default configuration, transparent scope disclosure, non-destructive block diffs, and accepted batch diff application", async () => {
+    // 1. Open a clean fixture
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, "window.__cirth.lastOpen", "Project open");
+
+    // 2. Verify AI is disabled by default
+    const initialConfig = await app.evaluate("window.__cirth.ai.getConfig()");
+    assert(initialConfig.enabled === false, "AI integrations are disabled by default");
+    assert(initialConfig.provider_type === "local_open_ai_compatible", "Default provider is local OpenAI compatible (Ollama/LM Studio)");
+
+    // 3. Test Scope Disclosure & Token Estimator
+    const payload = await app.evaluate(`
+      window.__cirth.ai.preparePayload({
+        scopeKind: "scene",
+        task: { kind: "summarize_scene" }
+      })
+    `);
+    assert(payload, "Payload generated");
+    assert(payload.system_prompt.includes("Kolbítar"), "System prompt identifies Kolbítar application");
+    assert(payload.estimated_tokens > 10, `Estimated tokens > 10: ${payload.estimated_tokens}`);
+    assert(payload.scope_description.includes("tokens"), `Scope description includes token estimate: ${payload.scope_description}`);
+
+    // 4. Test Non-Destructive Diff Computation
+    const originalBlocks = await app.evaluate("window.__cirth.lastOpen.doc.blocks.slice(0, 2)");
+    const simulatedSuggestion = "INT. REVISED SCENE - NIGHT\nRevised action line with tight dialogue.";
+    const diffs = await app.evaluate(`
+      window.__cirth.ai.computeDiffs(
+        ${JSON.stringify(originalBlocks)},
+        ${JSON.stringify(simulatedSuggestion)}
+      )
+    `);
+    assert(Array.isArray(diffs) && diffs.length === 2, `Diffs computed: length ${diffs?.length}`);
+    assert(diffs[0].status === "modified" || diffs[0].status === "unchanged", `Diff status 0: ${diffs[0].status}`);
+
+    // 5. Configure and Enable AI Provider
+    await app.evaluate(`
+      window.__cirth.ai.setConfig({
+        enabled: true,
+        provider_type: "local_open_ai_compatible",
+        endpoint_url: "http://localhost:11434/v1",
+        model_name: "llama3.2",
+        api_key: null,
+        temperature: 0.7,
+        max_tokens: 1024,
+        timeout_seconds: 30
+      })
+    `);
+    const enabledConfig = await app.evaluate("window.__cirth.ai.getConfig()");
+    assert(enabledConfig.enabled === true, "AI configuration enabled");
+
+    // 6. UI Assistant Dialog: Open, Disclose Scope, Generate Suggestion, Apply Diffs
+    await app.evaluate("window.__cirth.menu('ai_tools')");
+    await waitFor(app, "document.getElementById('ai-dialog')?.open === true", "AI dialog open");
+
+    // Scope banner populated
+    const bannerText = await app.evaluate("document.getElementById('ai-scope-banner')?.textContent");
+    assert(bannerText.includes("Scope Disclosure:"), `Scope banner populated: ${bannerText}`);
+
+    // Click Generate Suggestion
+    await app.evaluate("document.getElementById('ai-generate-btn')?.click()");
+    await waitFor(app, "document.querySelectorAll('#ai-diffs-container .ai-diff-row').length > 0", "Diffs generated and rendered");
+
+    const diffRows = await app.evaluate("document.querySelectorAll('#ai-diffs-container .ai-diff-row').length");
+    assert(diffRows > 0, `Diff rows rendered in container: ${diffRows}`);
+
+    // Accept Changes (Apply diffs)
+    await app.evaluate("document.getElementById('ai-apply-btn')?.click()");
+    await waitFor(app, "document.getElementById('ai-apply-btn')?.disabled === true", "Diffs applied and button disabled");
+
+    const bannerApplied = await app.evaluate("document.getElementById('ai-scope-banner')?.textContent");
+    assert(bannerApplied.includes("committed to manuscript journal") || bannerApplied.includes("accepted"), `Diffs committed reported: ${bannerApplied}`);
+
+    // Close Dialog
+    await app.evaluate("window.__cirth.ai.dialog.close()");
+    await waitFor(app, "!document.getElementById('ai-dialog')?.open", "AI dialog closed");
+
+    // 7. Cleanup & Revert AI to disabled
+    await app.evaluate(`
+      window.__cirth.ai.setConfig({
+        enabled: false,
+        provider_type: "local_open_ai_compatible",
+        endpoint_url: "http://localhost:11434/v1",
+        model_name: "llama3.2",
+        api_key: null,
+        temperature: 0.7,
+        max_tokens: 1024,
+        timeout_seconds: 30
+      })
+    `);
+    const finalConfig = await app.evaluate("window.__cirth.ai.getConfig()");
+    assert(finalConfig.enabled === false, "AI returned to disabled state");
+  });
+
   await app.close();
 }

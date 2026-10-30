@@ -1705,6 +1705,182 @@ async fn grammar_apply_fix(
     })
 }
 
+const AI_SCOPE: &str = "ai";
+
+#[tauri::command]
+async fn ai_get_config(app: State<'_, App>) -> Result<cirth_core::ai::AiConfig, String> {
+    with_session(&app, |s| {
+        if let Some(json_str) = s.store.setting(AI_SCOPE, "config").map_err(err)? {
+            serde_json::from_str(&json_str).map_err(|e| format!("invalid ai config: {e}"))
+        } else {
+            Ok(cirth_core::ai::AiConfig::default())
+        }
+    })
+}
+
+#[tauri::command]
+async fn ai_set_config(app: State<'_, App>, config: cirth_core::ai::AiConfig) -> Result<(), String> {
+    with_session(&app, |s| {
+        let json_str = serde_json::to_string(&config).map_err(|e| format!("serialize ai config: {e}"))?;
+        s.store.set_setting(AI_SCOPE, "config", &json_str).map_err(err)?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+async fn ai_prepare_payload(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    scope_kind: cirth_core::ai::AiScopeKind,
+    task: cirth_core::ai::AiTask,
+    block_ids: Option<Vec<String>>,
+    scene_id: Option<String>,
+) -> Result<cirth_core::ai::AiPayload, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let config: cirth_core::ai::AiConfig = match s.store.setting(AI_SCOPE, "config").map_err(err)? {
+            Some(json_str) => serde_json::from_str(&json_str).unwrap_or_default(),
+            None => cirth_core::ai::AiConfig::default(),
+        };
+
+        let selected_blocks: Vec<cirth_core::model::Block> = if let Some(ids) = block_ids {
+            let id_set: std::collections::HashSet<String> = ids.into_iter().collect();
+            doc.blocks.into_iter().filter(|b| id_set.contains(&b.id)).collect()
+        } else if let Some(sc_id) = &scene_id {
+            let mut in_scene = false;
+            let mut list = Vec::new();
+            for b in doc.blocks {
+                if b.kind == cirth_core::model::BlockKind::Heading {
+                    if b.scene_id.as_ref() == Some(sc_id) {
+                        in_scene = true;
+                        list.push(b);
+                        continue;
+                    } else if in_scene {
+                        break;
+                    }
+                } else if in_scene {
+                    list.push(b);
+                }
+            }
+            list
+        } else {
+            doc.blocks
+        };
+
+        let scene_title = selected_blocks
+            .iter()
+            .find(|b| b.kind == cirth_core::model::BlockKind::Heading)
+            .map(|b| b.text());
+
+        let entities = s.store.entities().unwrap_or_default();
+        let bible_context = if !entities.is_empty() {
+            let names: Vec<String> = entities.iter().map(|e| e.name.clone()).collect();
+            Some(format!("Characters & Locations: {}", names.join(", ")))
+        } else {
+            None
+        };
+
+        Ok(cirth_core::ai::build_ai_payload(
+            &config,
+            &task,
+            scope_kind,
+            &selected_blocks,
+            scene_title.as_deref(),
+            bible_context.as_deref(),
+        ))
+    })
+}
+
+#[tauri::command]
+fn ai_compute_diffs(
+    original_blocks: Vec<cirth_core::model::Block>,
+    ai_suggestion_text: String,
+) -> Vec<cirth_core::ai::AiDiffBlock> {
+    cirth_core::ai::compute_block_diffs(&original_blocks, &ai_suggestion_text)
+}
+
+#[tauri::command]
+async fn ai_apply_diffs(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    diffs: Vec<cirth_core::ai::AiDiffBlock>,
+) -> Result<(), String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let mut ops = Vec::new();
+        for diff in diffs {
+            match diff.status {
+                cirth_core::ai::DiffStatus::Modified => {
+                    if let Some(bid) = diff.block_id {
+                        let orig = doc.blocks.iter().find(|b| b.id == bid);
+                        let scene_id = if let Some(o) = orig {
+                            if diff.block_kind == cirth_core::model::BlockKind::Heading {
+                                o.scene_id.clone().or_else(|| Some(cirth_core::model::new_id()))
+                            } else {
+                                None
+                            }
+                        } else if diff.block_kind == cirth_core::model::BlockKind::Heading {
+                            Some(cirth_core::model::new_id())
+                        } else {
+                            None
+                        };
+                        let updated = cirth_core::model::Block {
+                            id: bid,
+                            kind: diff.block_kind,
+                            runs: vec![cirth_core::model::Run::plain(diff.suggested_text)],
+                            scene_id,
+                            dual: orig.map(|o| o.dual).unwrap_or(false),
+                            break_before: orig.map(|o| o.break_before).unwrap_or(false),
+                        };
+                        ops.push(cirth_core::ops::Op::Update { block: updated });
+                    }
+                }
+                cirth_core::ai::DiffStatus::Removed => {
+                    if let Some(bid) = diff.block_id {
+                        ops.push(cirth_core::ops::Op::Delete { id: bid });
+                    }
+                }
+                cirth_core::ai::DiffStatus::Added => {
+                    let scene_id = if diff.block_kind == cirth_core::model::BlockKind::Heading {
+                        Some(cirth_core::model::new_id())
+                    } else {
+                        None
+                    };
+                    let new_block = cirth_core::model::Block {
+                        id: diff.id,
+                        kind: diff.block_kind,
+                        runs: vec![cirth_core::model::Run::plain(diff.suggested_text)],
+                        scene_id,
+                        dual: false,
+                        break_before: false,
+                    };
+                    ops.push(cirth_core::ops::Op::Put { block: new_block, after: None });
+                }
+                cirth_core::ai::DiffStatus::Unchanged => {}
+            }
+        }
+        if !ops.is_empty() {
+            let version = s.store.version().map_err(err)?;
+            let batch = cirth_core::ops::Batch {
+                tx_id: cirth_core::model::new_id(),
+                base_version: version,
+                document_id: Some(doc_id),
+                ops,
+            };
+            s.store.apply(&batch).map_err(err)?;
+        }
+        Ok(())
+    })
+}
+
 #[tauri::command]
 async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
     with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
@@ -3701,6 +3877,11 @@ fn main() {
             treatment_export_docx,
             grammar_analyze,
             grammar_apply_fix,
+            ai_get_config,
+            ai_set_config,
+            ai_prepare_payload,
+            ai_compute_diffs,
+            ai_apply_diffs,
             storyscry_reports,
             stripboard_state,
             save_stripboard,

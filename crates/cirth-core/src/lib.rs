@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod alternatives;
 pub mod backup;
 pub mod bible;

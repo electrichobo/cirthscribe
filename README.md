@@ -158,10 +158,13 @@ Done:
 Carried forward:
 - [ ] Desktop manual checks for additional formats, language tools, and format conversion (N41–N46)
 
-### Stage 7: Optional extras
+### 🟡 Stage 7: Optional extras (in progress)
 
-- [ ] Bring-your-own AI (a cloud provider or a model running on your computer), off by default
-- [ ] Optional Google Docs and Sheets sharing workflows
+Done:
+- [x] Bring-your-own AI architecture and writing assistant: off by default, zero unsolicited network requests; support for local Ollama / LM Studio or cloud providers; transparent scope disclosure and token estimation; non-destructive block diffs and accepted batch application (`cirth_core::ai`, `app/src/aidlg.ts`, E2E Test 82)
+
+In progress:
+- [ ] Optional Google Docs and Sheets sharing workflows & interoperability guide
 
 ---
 
