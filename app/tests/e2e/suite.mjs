@@ -5162,5 +5162,139 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.getElementById('treatment-dialog')?.open", "Treatment dialog closed");
   });
 
+  await test("Offline Grammar, Style & Dialogue Analysis Engine: duplicate words, passive voice, quotes, parentheticals, cliches, spacing, and one-click fixes", async () => {
+    // 1. Open a clean fixture
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, "window.__cirth.lastOpen", "Project open");
+
+    // 2. Insert blocks with intentional grammar, punctuation, and style issues
+    const grammarBlocks = [
+      {
+        id: "g_h1",
+        kind: "heading",
+        scene_id: "sc_grammar_1",
+        runs: [{ text: "INT. RUINED SANCTUARY - NIGHT" }],
+      },
+      {
+        id: "g_act1",
+        kind: "action",
+        runs: [{ text: "She stepped slowly into the the silent vestibule." }], // duplicate word: "the the"
+      },
+      {
+        id: "g_act2",
+        kind: "action",
+        runs: [
+          {
+            text: "The heavy iron door was opened by Marcus while a flickering shadow is seen against the stone wall.",
+          },
+        ], // passive voice: "was opened by", "is seen"
+      },
+      {
+        id: "g_char",
+        kind: "character",
+        runs: [{ text: "MARCUS" }],
+      },
+      {
+        id: "g_paren",
+        kind: "parenthetical",
+        runs: [{ text: "(Whispering cautiously.)" }], // parenthetical uppercase & period
+      },
+      {
+        id: "g_dia",
+        kind: "dialogue",
+        runs: [{ text: "\"We must leave before the bells toll.\"" }], // dialogue quotes
+      },
+      {
+        id: "g_act3",
+        kind: "action",
+        runs: [
+          {
+            text: "Suddenly, we see a hooded guard who begins to draw his blade.",
+          },
+        ], // cliches: "suddenly", "we see", "begins to"
+      },
+      {
+        id: "g_act4",
+        kind: "action",
+        runs: [
+          {
+            text: "He lunged  forward ,striking without warning .",
+          },
+        ], // spacing: "  ", " ,", ",s", " ."
+      },
+    ];
+
+    const docId = await app.evaluate("window.__cirth.lastOpen.document_id");
+    const applyResult = await app.evaluate(`
+      window.__TAURI_INTERNALS__.invoke('apply_batch', {
+        batch: {
+          tx_id: 'tx_init_grammar',
+          base_version: window.__cirth.lastOpen.doc.version,
+          document_id: ${JSON.stringify(docId)},
+          ops: ${JSON.stringify(grammarBlocks.map((b, i) => ({ op: "put", block: b, after: i === 0 ? null : grammarBlocks[i - 1].id })))}
+        }
+      }).catch(e => ({ error: String(e) }))
+    `);
+    assert(!applyResult?.error, `apply_batch succeeded: ${applyResult?.error}`);
+
+    await app.evaluate(`window.__cirth.openDocument(${JSON.stringify(docId)})`);
+    await waitFor(app, "window.__cirth.lastOpen.doc.blocks.length >= 8", "Grammar test blocks loaded");
+
+    // 3. Grammar Analysis Engine
+    const report = await app.evaluate("window.__cirth.grammar.analyze()");
+    assert(report.total_issues >= 8, `Total issues >= 8: ${report.total_issues}`);
+    assert(report.duplicate_words_count >= 1, `Duplicate words detected: ${report.duplicate_words_count}`);
+    assert(report.passive_voice_count >= 2, `Passive voice detected: ${report.passive_voice_count}`);
+    assert(report.screenplay_punctuation_count >= 2, `Screenplay punctuation issues detected: ${report.screenplay_punctuation_count}`);
+    assert(report.cliches_count >= 3, `Cliches detected: ${report.cliches_count}`);
+    assert(report.spacing_count >= 3, `Spacing issues detected: ${report.spacing_count}`);
+
+    // 4. One-Click Fix Verification
+    const quoteIssue = report.issues.find((i) => i.rule_id === "dialogue_quotes");
+    assert(quoteIssue && quoteIssue.replacement === "We must leave before the bells toll.", "Dialogue quote issue has clean replacement");
+
+    const fixResult = await app.evaluate(`
+      window.__cirth.grammar.applyFix(
+        ${JSON.stringify(quoteIssue.block_id)},
+        ${quoteIssue.offset},
+        ${quoteIssue.length},
+        ${JSON.stringify(quoteIssue.replacement)}
+      )
+    `);
+    assert(fixResult, "applyFix returned refreshed report");
+    const remainingQuotes = fixResult.issues.filter((i) => i.rule_id === "dialogue_quotes");
+    assert(remainingQuotes.length === 0, "Dialogue quotes issue resolved after one-click fix");
+
+    // 5. Ignore Rules and Ignored Words
+    const filteredReport = await app.evaluate(`
+      window.__cirth.grammar.analyze(undefined, ['duplicate_word'], ['is seen'])
+    `);
+    assert(filteredReport.duplicate_words_count === 0, "Duplicate word rule ignored");
+    assert(filteredReport.passive_voice_count < report.passive_voice_count, "Ignored phrase 'is seen' skipped");
+
+    // 6. UI Dialog & Filtering
+    await app.evaluate("window.__cirth.grammar.dialog.show()");
+    await waitFor(app, "document.getElementById('grammar-dialog')?.open === true", "Grammar dialog open");
+
+    const totalVal = await app.evaluate("document.getElementById('metric-grammar-total')?.textContent");
+    assert(Number(totalVal) > 0, `Total issues displayed in dialog: ${totalVal}`);
+
+    // Click filter button
+    await app.evaluate(`
+      (() => {
+        const btns = Array.from(document.querySelectorAll('.grammar-filter-row button'));
+        const clichesBtn = btns.find(b => b.textContent.includes('Cliches'));
+        clichesBtn?.click();
+      })()
+    `);
+    const issueCards = await app.evaluate("document.querySelectorAll('#grammar-dialog .grammar-issue-item').length");
+    assert(issueCards === 3, `Three cliche issue items shown under filter: ${issueCards}`);
+
+    await app.evaluate("window.__cirth.grammar.dialog.close()");
+    await waitFor(app, "!document.getElementById('grammar-dialog')?.open", "Grammar dialog closed");
+  });
+
   await app.close();
 }

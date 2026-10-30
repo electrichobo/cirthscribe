@@ -14,6 +14,7 @@ pub mod fsutil;
 pub mod fontcheck;
 pub mod fountain;
 pub mod freewrite;
+pub mod grammar;
 pub mod html;
 pub mod interactive;
 pub mod layout;

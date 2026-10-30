@@ -1655,6 +1655,57 @@ async fn treatment_export_docx(
 }
 
 #[tauri::command]
+async fn grammar_analyze(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    ignored_rules: Vec<String>,
+    ignored_words: Vec<String>,
+) -> Result<cirth_core::grammar::GrammarAnalysisReport, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        Ok(cirth_core::grammar::analyze_grammar(&doc.blocks, &ignored_rules, &ignored_words))
+    })
+}
+
+#[tauri::command]
+async fn grammar_apply_fix(
+    app: State<'_, App>,
+    document_id: Option<String>,
+    block_id: String,
+    offset: usize,
+    length: usize,
+    replacement: String,
+    ignored_rules: Vec<String>,
+    ignored_words: Vec<String>,
+) -> Result<cirth_core::grammar::GrammarAnalysisReport, String> {
+    with_session(&app, |s| {
+        let doc_id = match document_id {
+            Some(d) => d,
+            None => s.store.current_document().map_err(err)?,
+        };
+        let doc = s.store.load_document(&doc_id).map_err(err)?;
+        let Some(block) = doc.blocks.iter().find(|b| b.id == block_id) else {
+            return Err(format!("block {block_id} not found in document"));
+        };
+        let updated_block = cirth_core::grammar::apply_grammar_fix(block, offset, length, &replacement);
+        let version = s.store.version().map_err(err)?;
+        let batch = cirth_core::ops::Batch {
+            tx_id: cirth_core::model::new_id(),
+            base_version: version,
+            document_id: Some(doc_id.clone()),
+            ops: vec![cirth_core::ops::Op::Update { block: updated_block }],
+        };
+        s.store.apply(&batch).map_err(err)?;
+        let reloaded = s.store.load_document(&doc_id).map_err(err)?;
+        Ok(cirth_core::grammar::analyze_grammar(&reloaded.blocks, &ignored_rules, &ignored_words))
+    })
+}
+
+#[tauri::command]
 async fn rename_item(app: State<'_, App>, id: String, title: String) -> Result<(), String> {
     with_session(&app, |s| s.store.rename_item(&id, &title).map_err(err))
 }
@@ -3648,6 +3699,8 @@ fn main() {
             treatment_export_html,
             treatment_export_text,
             treatment_export_docx,
+            grammar_analyze,
+            grammar_apply_fix,
             storyscry_reports,
             stripboard_state,
             save_stripboard,

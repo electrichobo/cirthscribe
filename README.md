@@ -152,9 +152,10 @@ Done:
 - [x] Stage plays and multi-camera teleplays: lettered scenes, uppercase dialogue, Act/Scene headings, bracketed stage directions, profile layout pagination, and text exports
 - [x] Interactive and branching stories: passages with stable IDs, inline choice syntax (`[[Label -> Target]]`), conditions, BFS graph integrity validation (dangling links, dead ends, unreachable nodes), Twee 3, standalone offline playable HTML runner, JSON graph exports, and live playtester
 - [x] General rich-text treatment documents: headings hierarchy (H1–H3), body paragraphs, blockquotes, bullet lists, character spotlights, reading time metrics, Project Bible entity cross-referencing, and semantic HTML, TXT, and DOCX exports
+- [x] 100% offline rule-based grammar and style checker: duplicate words, passive voice in action lines, screenplay dialogue quotation rules, parenthetical formatting, cliches and fillers, spacing anomalies, and one-click fix
 
 In progress / planned:
-- [ ] 100% offline rule-based grammar and style checker
+- [ ] Compatibility matrix, format fixtures, manual checks and Milestone 6 exit review
 
 ### Stage 7: Optional extras
 

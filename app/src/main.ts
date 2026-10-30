@@ -56,6 +56,7 @@ import { createReviewDialog, type ReviewImportReport, type ReviewExportResult, t
 import { createComicDialog, type ComicScriptAnalysis } from "./comicdlg";
 import { createInteractiveDialog, type InteractiveGraph } from "./interactivedlg";
 import { createTreatmentDialog, type TreatmentDoc } from "./treatmentdlg";
+import { createGrammarDialog, type GrammarAnalysisReport } from "./grammardlg";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -791,6 +792,13 @@ const comicDialog = createComicDialog({
 });
 const interactiveDialog = createInteractiveDialog({});
 const treatmentDialog = createTreatmentDialog({});
+const grammarDialog = createGrammarDialog({
+  onBlockUpdated: async () => {
+    if (lastOpen) {
+      await openWith("open_document", { id: lastOpen.document_id });
+    }
+  },
+});
 if (branchIndicator) {
   branchIndicator.onclick = () => {
     if (lastOpen) void branchesDialog.open();
@@ -1764,6 +1772,9 @@ async function runMenu(id: string): Promise<void> {
     case "treatment_tools":
       if (lastOpen) await treatmentDialog.open();
       break;
+    case "grammar_tools":
+      if (lastOpen) await grammarDialog.show();
+      break;
     case "home":
       await goHome();
       break;
@@ -2208,6 +2219,29 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
     exportHtml: (documentId?: string, title?: string) => invoke<string>("treatment_export_html", { documentId, title }),
     exportText: (documentId?: string, title?: string) => invoke<string>("treatment_export_text", { documentId, title }),
     exportDocx: (documentId?: string, title?: string) => invoke<number[]>("treatment_export_docx", { documentId, title }),
+  },
+  grammar: {
+    dialog: grammarDialog,
+    analyze: (documentId?: string, ignoredRules: string[] = [], ignoredWords: string[] = []) =>
+      invoke<GrammarAnalysisReport>("grammar_analyze", { documentId, ignoredRules, ignoredWords }),
+    applyFix: (
+      blockId: string,
+      offset: number,
+      length: number,
+      replacement: string,
+      documentId?: string,
+      ignoredRules: string[] = [],
+      ignoredWords: string[] = []
+    ) =>
+      invoke<GrammarAnalysisReport>("grammar_apply_fix", {
+        documentId,
+        blockId,
+        offset,
+        length,
+        replacement,
+        ignoredRules,
+        ignoredWords,
+      }),
   },
   exportStageplayText: (documentId?: string, title?: string) => invoke<string>("export_stageplay_text", { documentId, title }),
   exportTeleplayText: (documentId?: string, title?: string) => invoke<string>("export_teleplay_text", { documentId, title }),

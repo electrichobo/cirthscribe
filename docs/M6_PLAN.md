@@ -64,6 +64,7 @@ Milestone 6 expands Kolbítar from single-camera US feature screenplays into a v
    - User dictionary & project dictionary ignore rules.
    - Accessible UI review dialog with side-by-side issue preview, one-click fix/replace, and ignore actions.
    - 100% offline, deterministic, zero network requests, zero AI.
+   - **Built 2026-10-30:** `crates/cirth-core/src/grammar.rs` with `analyze_grammar` and `apply_grammar_fix` covering duplicate word detection (`the the`), passive voice in action lines (`is seen`, `was opened by`), screenplay dialogue quotation rules (`"Speech"` -> `Speech`), parenthetical casing and terminal periods (`(Whispering.)` -> `(whispering)`), parenthetical length warnings, screenplay cliches and filler expressions (`we see`, `we hear`, `suddenly`, `begins to`), and spacing anomalies (double spaces, space before punctuation, missing space after comma); Tauri IPC commands `grammar_analyze` and `grammar_apply_fix` in `app/src-tauri/src/main.rs`; UI review dialog in `app/src/grammardlg.ts` with 6 metric summary cards, category filter buttons, context snippets, ignore rule and word actions, and one-click fix buttons; automated E2E Test 81 in `app/tests/e2e/suite.mjs` passing on CDP (81/81) and WebDriver (80/80, 1 skipped) drivers.
 
 7. **Compatibility Matrix, Format Fixtures, Manual Checks & Exit Review.**
    - Original synthetic test fixtures for each format: UK screenplay, multi-cam sitcom, stage play, comic script, interactive branching story, series treatment.
