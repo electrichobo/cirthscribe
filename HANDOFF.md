@@ -25,11 +25,9 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- Core: `crates/cirth-core/src/snapshots.rs`, `lib.rs`, `store.rs`, `tests/migrate.rs`, `tests/data/schema-v13-*.cirth`.
-- Tauri & UI: `app/src-tauri/src/main.rs`, `app/src/snapshots.ts`, `app/src/main.ts`, `app/src/styles.css`, `app/tests/e2e/suite.mjs`.
-- Docs: `docs/M5_PLAN.md`, `STATUS.md`, `HANDOFF.md`.
+- Docs: `README.md` and `HANDOFF.md` updated with Stage 5 progress.
 
 ## Next Immediate Step
 
-1. Commit M5 Step 3 with message `M5 step 3: named snapshots and checkpoints` and push when requested.
+1. Commit and push docs update (`README.md` and `HANDOFF.md`).
 2. Proceed to M5 Step 4: visual branch history and independent branch canon (`crates/cirth-core/src/branches.rs`).

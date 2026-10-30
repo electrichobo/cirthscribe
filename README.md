@@ -130,11 +130,17 @@ Carried forward:
 - [ ] Results from external spreadsheet apps (Excel, Google Sheets, LibreOffice) for StoryScry and stripboard files
 - [ ] Visual checks in external PDF viewers for stripboards and sides
 
-### 🔜 Stage 5: Notes, alternatives and versions (next)
+### ⏳ Stage 5: Notes, alternatives and versions (in progress)
 
-- [ ] Comments attached to the text, with an add-comment button
-- [ ] Alternative takes on a scene or line
-- [ ] Snapshots and version history, with compare, restore and merge
+Done:
+- [x] Comments attached to the text, with inline decorations, replies, resolution tracking, orphan recovery, and accessible review dialog (View > Tools > Comments…)
+- [x] Alternative takes on blocks with take badge switcher (`Take 1/2 ▾`), active take projection across all views and word counts, and StoryScry inactive alternative reporting (View > Tools > Alternate Takes…)
+- [x] Named snapshots and checkpoints with full point-in-time package state in SQLite, non-destructive restore, and automatic pre-restore checkpoints (File > Snapshots…)
+
+In progress / planned:
+- [ ] Visual branch history and independent branch canon
+- [ ] Base/source/target 3-way conflict integration
+- [ ] Portable review package (`.cirth-review`) import and export
 
 ### Stage 6: More formats and language tools
 
