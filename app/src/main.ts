@@ -2398,6 +2398,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   },
   saveAs: (path: string) => saveAs(path),
   openPath: (path: string) => openWith("open_path", { path }),
+  openOrImport: openOrImportFile,
   checkOutside,
   libraryFolder: () => invoke<string>("library_folder"),
   flush: () => syncer.flush(),
@@ -2409,5 +2410,48 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   keyConfig: { get: getKeyConfig, set: setKeyConfig, defaults: defaultKeyConfig },
 };
 
-// The app starts on Home (project library), like a project manager.
-void goHome();
+/** Open a file path directly (project, review bundle, or external screenplay import). */
+async function openOrImportFile(path: string): Promise<boolean> {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".cirth")) {
+    return openWith("open_path", { path });
+  } else if (lower.endsWith(".cirth-review")) {
+    return importReviewPackage(path);
+  } else if (lower.endsWith(".fountain") || lower.endsWith(".spmd") || lower.endsWith(".fdx") || lower.endsWith(".txt")) {
+    return importAny(path);
+  } else {
+    const opened = await openWith("open_path", { path });
+    return opened ? true : importAny(path);
+  }
+}
+
+// OS open-file events (macOS OpenFiles AppleEvent, drag-and-drop onto main window).
+void listen<string>("open-file", (e) => void openOrImportFile(e.payload));
+
+// HTML5 drag and drop on window
+window.addEventListener("dragover", (e) => {
+  if (e.dataTransfer?.types.includes("Files")) {
+    e.preventDefault();
+  }
+});
+window.addEventListener("drop", (e) => {
+  if (e.dataTransfer?.files.length) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    const path = (file as any).path;
+    if (path) {
+      void openOrImportFile(path);
+    }
+  }
+});
+
+// Startup: if a file path was passed on the CLI or via OS file launch, open it; otherwise go Home.
+void (async () => {
+  const startupPath = await invoke<string | null>("startup_file").catch(() => null);
+  if (startupPath) {
+    const ok = await openOrImportFile(startupPath);
+    if (!ok) void goHome();
+  } else {
+    void goHome();
+  }
+})();

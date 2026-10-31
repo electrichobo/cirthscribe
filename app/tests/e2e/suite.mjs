@@ -5510,5 +5510,54 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "!document.getElementById('tour-dialog')?.open", "Tour dialog closed via Skip button");
   });
 
+  await test("Native OS file opening, CLI argument handling, and drag-and-drop file imports", async () => {
+    // 1. Return to Home, create a project, save it to disk
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await app.evaluate("(() => { const i = document.getElementById('new-title'); i.value = 'Launch Dropped Script'; i.form.requestSubmit(); return true; })()");
+    await waitOpen(app);
+    await waitFor(app, "document.body.dataset.view === 'editor'", "in editor");
+    await typeText("EXT. HARBOR - DUSK");
+    await press("Enter");
+    await typeText("Seagulls cry over the grey salt water.");
+    await sleep(200);
+
+    const savedFile = join(dataDir, "drag-and-drop-test.cirth");
+    await app.evaluate(`__cirth.saveAs(${JSON.stringify(savedFile)})`);
+    await sleep(400);
+    assert(existsSync(savedFile), "project saved to disk");
+
+    // Return to Home screen
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+
+    // 2. Open project via openOrImport (simulating OS double-click or CLI launch)
+    const opened = await app.evaluate(`__cirth.openOrImport(${JSON.stringify(savedFile)})`);
+    assert(opened === true, "openOrImport returned true for .cirth file");
+    await waitOpen(app);
+    await waitFor(app, "document.body.dataset.view === 'editor'", "opened in editor");
+    const docText = await app.evaluate("document.querySelector('.ProseMirror')?.textContent || ''");
+    assert(docText.includes("HARBOR") && docText.includes("Seagulls"), `manuscript content loaded: ${docText}`);
+
+    // 3. Test Fountain import via openOrImport
+    const fountainFile = join(dataDir, "imported-drop.fountain");
+    writeFileSync(
+      fountainFile,
+      "Title: Drop Test\n\nEXT. LIGHTHOUSE - NIGHT\n\nThe beacon pierces the dark.\n\nKEEPER\n(shivering)\nCold tonight.\n",
+      "utf8",
+    );
+
+    const importedFountain = await app.evaluate(`__cirth.openOrImport(${JSON.stringify(fountainFile)})`);
+    assert(importedFountain === true, "openOrImport returned true for .fountain import");
+    await waitOpen(app);
+    await waitFor(app, "document.body.dataset.view === 'editor'", "fountain opened in editor");
+    const fountainDoc = await app.evaluate("document.querySelector('.ProseMirror')?.textContent || ''");
+    assert(fountainDoc.includes("LIGHTHOUSE") && fountainDoc.includes("KEEPER"), `fountain content loaded: ${fountainDoc}`);
+
+    // Return to Home cleanly
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+  });
+
   await app.close();
 }

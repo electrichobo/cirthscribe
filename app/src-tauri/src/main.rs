@@ -46,6 +46,8 @@ struct App {
     data_dir: Mutex<PathBuf>,
     /// Free Writing workspace, opened on first use.
     free: Mutex<Option<cirth_core::freewrite::FreeStore>>,
+    /// File path passed on the command line at startup (e.g. via double-click or CLI).
+    startup_file: Mutex<Option<String>>,
 }
 
 #[derive(Serialize)]
@@ -3404,6 +3406,12 @@ async fn close_panel_window(app: tauri::AppHandle, panel: String) -> Result<(), 
     }
 }
 
+/// Query the file path passed to the application on startup (CLI arg or OS file association launch).
+#[tauri::command]
+fn startup_file(app: tauri::State<App>) -> Option<String> {
+    app.startup_file.lock().unwrap().clone()
+}
+
 /// Labels of the open windows (tests check pop-out windows open and close).
 #[tauri::command]
 fn window_labels(app: tauri::AppHandle) -> Vec<String> {
@@ -3870,23 +3878,51 @@ fn main() {
             };
             std::fs::create_dir_all(dir.join("projects"))?;
             *app.state::<App>().data_dir.lock().unwrap() = dir;
+
+            // Startup file passed on the CLI or via OS file association launch.
+            let startup_arg = std::env::args().skip(1).find(|arg| {
+                if arg.starts_with('-') {
+                    return false;
+                }
+                let lower = arg.to_lowercase();
+                lower.ends_with(".cirth")
+                    || lower.ends_with(".cirth-review")
+                    || lower.ends_with(".fountain")
+                    || lower.ends_with(".spmd")
+                    || lower.ends_with(".fdx")
+                    || lower.ends_with(".txt")
+                    || std::path::Path::new(arg).exists()
+            });
+            if let Some(arg) = startup_arg {
+                *app.state::<App>().startup_file.lock().unwrap() = Some(arg);
+            }
+
             // Pop-out panel windows close with the main window (its close
             // handler has saved by then); otherwise they would keep the app alive.
             if let Some(main) = app.get_webview_window("main") {
                 let handle = app.handle().clone();
                 main.on_window_event(move |ev| {
-                    if let tauri::WindowEvent::Destroyed = ev {
-                        for (label, w) in handle.webview_windows() {
-                            if label.starts_with("panel-") {
-                                let _ = w.destroy();
+                    match ev {
+                        tauri::WindowEvent::Destroyed => {
+                            for (label, w) in handle.webview_windows() {
+                                if label.starts_with("panel-") {
+                                    let _ = w.destroy();
+                                }
                             }
                         }
+                        tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                            if let Some(first) = paths.first() {
+                                let _ = handle.emit_to("main", "open-file", first.to_string_lossy().to_string());
+                            }
+                        }
+                        _ => {}
                     }
                 });
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            startup_file,
             open_fixture,
             list_projects,
             create_project,

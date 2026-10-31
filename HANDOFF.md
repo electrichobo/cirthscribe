@@ -4,33 +4,34 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Cross-platform audit & hardening complete.** Next: manual checks and physical hardware runs.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Packaging, file associations, drag-and-drop & offline audit complete.** Next: manual checks and physical hardware runs.
 
 ## Completed & Verified
 
-- **macOS & Linux Cross-Platform Hardening (`crates/cirth-core/src/fsutil.rs`, `app/src-tauri/src/main.rs`, `app/src/bindings.ts`, `app/src/main.ts`, `app/src/tour.ts`):**
-  - Best-effort Unix parent directory `sync_all` in `replace_file` preventing false I/O errors on APFS, FAT32/exFAT, and network shares.
-  - Dual-pulse refocusing (150 ms + 350 ms safety net) on macOS exit from full screen to guarantee WKWebView first-responder status.
-  - Native menu label and default shortcut for Full Screen (`Cmd+Ctrl+F` on macOS per Apple HIG; `F11` on Windows/Linux).
-  - Robust dual `isMac` detection across `navigator.platform` and `navigator.userAgent`.
-  - Software tour dialog flex container width and WebKitGTK / WKWebView Tab / `ISO_Left_Tab` focus trap.
+- **File Associations, Startup CLI & Drag-and-Drop (`tauri.conf.json`, `main.rs`, `main.ts`, e2e Test 85):**
+  - Native file associations registered for `.cirth` (Editor) and `.cirth-review` (Viewer).
+  - Bundler configured for Windows NSIS, macOS DMG, and Linux Deb/AppImage.
+  - Startup CLI arg parsing and `tauri::WindowEvent::DragDrop` file opening for `.cirth`, `.cirth-review`, `.fountain`, `.fdx`.
+- **Automated Offline & Zero-Telemetry Audit (`app/scripts/offline-audit.mjs`):**
+  - Audits strict CSP, scans dependencies against tracking SDKs, verifies zero unsolicited network calls, and checks runtime OS socket table (0 external sockets).
 - **Verified:**
   - `cargo test -p cirth-core` (188/188 passed).
   - `npm --prefix app run build` (clean without errors).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
+  - `node app/scripts/offline-audit.mjs` (100% passed).
   - `node app/scripts/third-party-notices.mjs --check` (357 components passed).
-  - `npm --prefix app run e2e:cdp` (84/84 passed).
-  - `npm --prefix app run e2e:webdriver` (83/83 passed, 1 skipped: simulated IME).
+  - `npm --prefix app run e2e:cdp` (85/85 passed).
+  - `npm --prefix app run e2e:webdriver` (84/84 passed, 1 skipped: simulated IME).
 - **Not verified (carried):**
   - Physical macOS run (N31, M1–M13, D1–D4, N1–N20) and Linux desktop environment run.
   - Manual check N49 (Software tour and non-Latin font rendering); M7 checks N47–N48.
 
 ## In-Progress / Uncommitted State
 
-- Documentation updated for cross-platform hardening, compatibility matrix, and manual checks. Ready for commit and push.
+- File associations, drag-and-drop, bundler configuration, offline audit script, and Test 85 complete and verified. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push documentation updates.
+1. Commit and push file associations, drag-and-drop, and offline audit script.
 2. Coordinate with owner on hardware test environment setup (macOS and Ubuntu 24.04).

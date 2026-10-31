@@ -23,7 +23,13 @@ Updated 2026-10-30.
     - `cirth_core::fsutil::replace_file`: best-effort parent directory `sync_all` on Unix, preventing false save errors on APFS, FAT32/exFAT, and network shares.
     - macOS focus restoration & full screen (`app/src-tauri/src/main.rs`, `app/src/bindings.ts`): dual-pulse focus restoration (150 ms + 350 ms safety net) on macOS exit from full screen; native menu and shortcut updated to `Cmd+Ctrl+F` (`Mod+Ctrl+F`) on macOS per Apple HIG to prevent system interception of `F11`.
     - Platform detection & focus trapping (`app/src/main.ts`, `app/src/tour.ts`): dual `isMac` check across `navigator.platform` and `navigator.userAgent`; WebKitGTK / WKWebView Tab / `ISO_Left_Tab` focus trap and width layout fix on tour dialog.
-  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, 84 CDP tests, 83 WebDriver tests (1 skipped). Added manual check N49 in `docs/testing/MANUAL_CHECKS.md`.
+  - File Associations, Bundler & Drag-and-Drop (`app/src-tauri/tauri.conf.json`, `app/src-tauri/src/main.rs`, `app/src/main.ts`, and E2E Test 85):
+    - Native OS file associations for `.cirth` (Kolbítar Project) and `.cirth-review` (Review Package).
+    - Bundler configuration across Windows NSIS, macOS DMG, and Linux Deb/AppImage.
+    - CLI argument parsing (`startup_file`) and `tauri::WindowEvent::DragDrop` handler auto-opening dropped project or screenplay import files.
+  - Automated Offline & Zero-Telemetry Audit (`app/scripts/offline-audit.mjs`, `npm --prefix app run test:offline`):
+    - Static CSP validation, dependency audit against telemetry/analytics libraries, codebase network scan, and live process socket table inspection verifying 0 external connections.
+  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 85 CDP tests, 84 WebDriver tests (1 skipped). Added manual check N49 in `docs/testing/MANUAL_CHECKS.md`.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).
