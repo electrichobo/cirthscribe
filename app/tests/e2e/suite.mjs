@@ -5654,5 +5654,88 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitHome(app);
   });
 
+  await test("Command Palette (Ctrl/Cmd+K) and Personal Dictionary management", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+
+    // Verify native menu contains Command Palette under View > Go To and Personal Dictionary under Format > Spelling
+    const menuItems = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
+    const paletteItem = menuItems.find(i => i.id === "command_palette");
+    const dictItem = menuItems.find(i => i.id === "spell_dictionary");
+    assert(paletteItem, "menu contains command_palette item");
+    assert(/\((Ctrl|Cmd)\+K\)$/.test(paletteItem.path), `palette has Mod+K accelerator: ${paletteItem.path}`);
+    assert(dictItem, "menu contains spell_dictionary item");
+
+    // Open sample script
+    await clickHome(app, '[data-sample="high-council"]');
+    await waitOpen(app);
+    await waitFor(app, "document.body.dataset.view === 'editor'", "in editor");
+
+    // 1. Test Personal Dictionary Dialog
+    await app.evaluate("__cirth.dictionary.open()");
+    await waitFor(app, "document.querySelector('dialog.dict-dialog')?.open", "dictionary dialog open");
+
+    // Add a word
+    await app.evaluate(`
+      (() => {
+        const inp = document.getElementById("dict-add-input");
+        inp.value = "Arcanomancy";
+        document.getElementById("dict-add-btn").click();
+      })()
+    `);
+    await waitFor(app, "document.getElementById('dict-words')?.textContent.includes('Arcanomancy')", "word added to list");
+
+    // Filter word
+    await app.evaluate(`
+      (() => {
+        const s = document.getElementById("dict-search");
+        s.value = "Arcano";
+        s.dispatchEvent(new Event("input"));
+      })()
+    `);
+    const countText = await app.evaluate("document.getElementById('dict-count')?.textContent || ''");
+    assert(countText.includes("1 of"), `filtered word count matches: ${countText}`);
+
+    // Remove word
+    await app.evaluate(`
+      (() => {
+        const btn = document.querySelector("#dict-words .dict-remove");
+        if (btn) btn.click();
+      })()
+    `);
+    await waitFor(app, "!document.getElementById('dict-words')?.textContent.includes('Arcanomancy')", "word removed from list");
+
+    // Close dictionary dialog
+    await app.evaluate("document.querySelector('dialog.dict-dialog')?.close()");
+    await waitFor(app, "!document.querySelector('dialog.dict-dialog')?.open", "dictionary dialog closed");
+
+    // 2. Test Command Palette
+    await app.evaluate("__cirth.palette.open()");
+    await waitFor(app, "document.querySelector('dialog.palette-dialog')?.open", "palette dialog open");
+
+    // Search for scene VAULT
+    await app.evaluate(`
+      (() => {
+        const inp = document.querySelector(".palette-input");
+        inp.value = "VAULT";
+        inp.dispatchEvent(new Event("input"));
+      })()
+    `);
+    await waitFor(app, "document.querySelector('.palette-list')?.textContent.includes('GRAND VAULT OF RUNES')", "scene appears in palette");
+
+    // Execute jump to scene by clicking chosen item
+    await app.evaluate(`
+      (() => {
+        const item = document.querySelector(".palette-item.chosen");
+        if (item) item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      })()
+    `);
+    await waitFor(app, "!document.querySelector('dialog.palette-dialog')?.open", "palette closed after selection");
+
+    // Return to Home cleanly
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+  });
+
   await app.close();
 }

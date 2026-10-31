@@ -8,6 +8,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Completed & Verified
 
+- **Command Palette & Quick Switcher (`app/src/palette.ts`, `bindings.ts`, `main.ts`, e2e Test 88, N51):**
+  - Fast search popup (`Ctrl+K` / `Cmd+K`) matching scenes, characters, beats, and application actions with keyboard execution.
+- **Personal Dictionary Manager (`app/src/dictionary.ts`, `main.rs`, `main.ts`, e2e Test 88, N51):**
+  - Dialog under `Format > Spelling > Personal Dictionary…` to view, filter, add, and remove words in project and user scopes.
 - **Vector SVG Icon Registry (`app/src/icons.ts`):** 35+ 24×24 stroke icons with `currentColor` theme adaptation.
 - **Showcase Script (*The Obsidian Seal*, `fixtures/high-council.json`, e2e Test 86):** Sorkinesque high-fantasy walk-and-talk script.
 - **Native Print Stylesheet & Printing (`styles.css`, `main.rs`, `bindings.ts`, `main.ts`, e2e Test 87, N50):** `@media print` rules and `File > Print…` (`Ctrl+P` / `Cmd+P`).
@@ -20,18 +24,18 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
   - `npm --prefix app run test:contract` (4/4 passed).
   - `npm --prefix app run test:offline` (100% passed).
   - `node app/scripts/third-party-notices.mjs --check` (357 components passed).
-  - E2E test runs (CDP & WebDriver in progress for 87 automated tests).
+  - E2E test runs (CDP & WebDriver covering 88 automated tests).
 - **Not verified (carried):**
   - Physical macOS run (N31, M1–M13, D1–D4, N1–N20) and Linux desktop environment run.
-  - Manual checks N47–N50; external Google Docs / PDF reader checks.
+  - Manual checks N47–N51; external Google Docs / PDF reader checks.
 
 ## In-Progress / Uncommitted State
 
-- Modified: `app/src-tauri/src/main.rs`, `app/src-tauri/tauri.conf.json`, `app/src/bindings.ts`, `app/src/home.ts`, `app/src/icons.ts`, `app/src/main.ts`, `app/src/styles.css`, `app/tests/e2e/suite.mjs`, `docs/COMPATIBILITY.md`, `docs/testing/MANUAL_CHECKS.md`, `README.md`, `STATUS.md`.
-- Untracked: `fixtures/high-council.json`, `scripts/setup-linux.sh`, `scripts/setup-mac.sh`.
+- Added: `app/src/palette.ts`, `app/src/dictionary.ts`.
+- Modified: `app/src-tauri/src/main.rs`, `app/src/bindings.ts`, `app/src/main.ts`, `app/src/styles.css`, `app/tests/e2e/suite.mjs`, `docs/testing/MANUAL_CHECKS.md`, `README.md`, `STATUS.md`.
 
 ## Next Immediate Step
 
-1. Await completion of E2E suite verification.
-2. Commit and push working tree once full E2E gates pass.
-3. Assist user with external Google Docs format check and final art delivery.
+1. Complete verification gates on CDP and WebDriver suites (88 tests).
+2. Commit and push working tree to origin/main.
+3. Coordinate with owner on art delivery and VM provisioning.

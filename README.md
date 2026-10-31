@@ -173,12 +173,15 @@ Done:
 - [x] Native print stylesheet and printing: `@media print` rules enforcing physical Letter portrait page dimensions, Courier Prime 12pt, margin-aligned scene numbers, screen color markup suppression, and `File > Print…` / `Ctrl+P` (`Cmd+P`) action (`app/src/styles.css`, E2E Test 87, Manual Check N50)
 - [x] Cross-platform VM provisioning & smoke test scripts: turnkey setup scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS installing dependencies, building release binaries, and executing verification suites (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`)
 - [x] Windows NSIS installer bundle verification: self-contained installer executable with file associations, start menu shortcuts, and uninstaller (`target/release/bundle/nsis/`)
+- [x] Command Palette / Quick Switcher (`Ctrl+K` / `Cmd+K`): fast search and instant keyboard navigation across all scenes, characters, beats, and application actions (`app/src/palette.ts`, E2E Test 88)
+- [x] Personal Dictionary Editor Dialog: dedicated dictionary manager under `Format > Spelling > Personal Dictionary…` to view, filter, add, and remove words in project and personal scopes (`app/src/dictionary.ts`, E2E Test 88)
 - [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
 
 Carried forward:
 - [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
 - [ ] Desktop manual checks for software tour and non-Latin script display (N49)
 - [ ] Desktop manual check for native print preview (N50)
+- [ ] Desktop manual check for Command Palette and Personal Dictionary (N51)
 - [ ] VM / hardware execution of setup scripts on macOS and Linux
 
 ---

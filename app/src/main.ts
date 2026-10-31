@@ -59,6 +59,8 @@ import { createTreatmentDialog, type TreatmentDoc } from "./treatmentdlg";
 import { createGrammarDialog, type GrammarAnalysisReport } from "./grammardlg";
 import { createAiDialog, type AiConfig, type AiPayload, type AiDiffBlock } from "./aidlg";
 import { createTourDialog } from "./tour";
+import { installDictionary } from "./dictionary";
+import { installCommandPalette } from "./palette";
 import { createBible, type BibleOp, type Entity } from "./bible";
 import { setBibleNames } from "./complete";
 import { createTimeline, type TimelineOp } from "./timeline";
@@ -1342,6 +1344,63 @@ const furniture = createFurnitureDialog(() => saveFile(false));
 const exportDialog = createExportDialog({ hasActiveRevision: () => !!revisions.state.active, run: (f) => exportAs(f) });
 const goTo = createGoToDialog({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], numbers: () => sceneNumbers });
 const shortcuts = createShortcutsDialog();
+const dictDialog = installDictionary(showBanner, () => spell.run(true));
+const commandPalette = installCommandPalette(
+  () => (view && lastOpen ? view : undefined),
+  () => [
+    { id: "save", title: "Save Project", category: "Commands", hint: "Ctrl/Cmd+S", run: () => void saveNow() },
+    { id: "save_as", title: "Save As…", category: "Commands", hint: "Ctrl/Cmd+Shift+S", run: () => void runMenu("save_as") },
+    { id: "export", title: "Export…", category: "Commands", hint: "Ctrl/Cmd+E", run: () => void exportDialog.open() },
+    { id: "export_pdf", title: "Export PDF", category: "Commands", run: () => void exportPdf() },
+    { id: "print", title: "Print…", category: "Commands", hint: "Ctrl/Cmd+P", run: () => window.print() },
+    { id: "find", title: "Find and Replace", category: "Commands", hint: "Ctrl/Cmd+F", run: () => findBar.open() },
+    { id: "focus_mode", title: "Toggle Focus Mode", category: "Commands", hint: "Ctrl/Cmd+Shift+F", run: () => void focusMode.toggle() },
+    { id: "typewriter", title: "Toggle Typewriter Mode", category: "Commands", hint: "Ctrl/Cmd+Shift+T", run: () => void runMenu("view_typewriter") },
+    { id: "title_page", title: "Title Page…", category: "Commands", run: () => void titlePage.open() },
+    { id: "headers_footers", title: "Headers and Footers…", category: "Commands", run: () => void furniture.open() },
+    { id: "storyscry", title: "StoryScry (Reports and Charts)…", category: "Commands", run: () => void runMenu("storyscry") },
+    { id: "stripboard", title: "Stripboard and Schedule…", category: "Commands", run: () => void runMenu("stripboard") },
+    { id: "character_sides", title: "Character Sides…", category: "Commands", run: () => void runMenu("sides") },
+    { id: "breakdown_tags", title: "Breakdown Tags…", category: "Commands", run: () => void runMenu("tags") },
+    { id: "comments", title: "Comments…", category: "Commands", run: () => void runMenu("comments") },
+    { id: "alternate_takes", title: "Alternate Takes…", category: "Commands", run: () => void runMenu("alt_take") },
+    { id: "snapshots", title: "Snapshots…", category: "Commands", run: () => void runMenu("snapshots") },
+    { id: "branches", title: "Branches…", category: "Commands", run: () => void runMenu("branches") },
+    { id: "bible", title: "Project Bible…", category: "Commands", run: () => void bible.open() },
+    { id: "timeline", title: "Story Timeline…", category: "Commands", run: () => void timeline.open() },
+    { id: "evidence", title: "Evidence Board…", category: "Commands", run: () => void evidence.open() },
+    { id: "project_tree", title: "Episodes and Documents…", category: "Commands", run: () => void projectTree.open() },
+    { id: "personal_dictionary", title: "Personal Dictionary…", category: "Commands", run: () => void dictDialog.open() },
+    { id: "tour", title: "Software Tour…", category: "Commands", run: () => tourDialog.open(true) },
+    { id: "shortcuts", title: "Keyboard Shortcuts…", category: "Commands", run: () => void shortcuts.open() },
+    { id: "grammar", title: "Grammar & Style Analyzer…", category: "Commands", run: () => void grammarDialog.show() },
+    { id: "ai", title: "AI Assistant…", category: "Commands", run: () => void aiDialog.show() },
+    { id: "home", title: "Close Project (Go to Home)", category: "Commands", run: () => void goHome() },
+  ],
+  () => {
+    if (!view || !lastOpen) return [];
+    const scenes = scenesOf(view.state.doc);
+    return scenes.map((s) => ({
+      number: sceneNumbers.get(s.sceneId)?.number ?? String(s.index),
+      heading: s.heading,
+      pos: s.from,
+    }));
+  },
+  () => {
+    if (!view || !lastOpen) return [];
+    const counts = new Map<string, number>();
+    view.state.doc.forEach((n) => {
+      if (n.attrs.kind === "character") {
+        const raw = n.textContent.replace(/\s*\(.*$/, "").trim().toUpperCase();
+        if (raw) counts.set(raw, (counts.get(raw) || 0) + 1);
+      }
+    });
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  },
+  showBanner
+);
 const projectTree = createProjectTree({
   current: () => lastOpen?.document_id ?? null,
   openDocument: (id) => openWith("open_document", { id }),
@@ -1818,6 +1877,9 @@ async function runMenu(id: string): Promise<void> {
     case "find":
       if (lastOpen) findBar.open();
       break;
+    case "command_palette":
+      commandPalette.open();
+      break;
     case "dual":
       if (view && lastOpen) toggleDual(showBanner)(view.state, view.dispatch);
       break;
@@ -1883,6 +1945,9 @@ async function runMenu(id: string): Promise<void> {
       break;
     case "spell_suggest":
       if (lastOpen) spell.menuAtCaret();
+      break;
+    case "spell_dictionary":
+      if (lastOpen) void dictDialog.open();
       break;
     case "spell_en_US":
     case "spell_en_GB":
@@ -2320,6 +2385,8 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   exportAs,
   goTo,
   shortcuts,
+  palette: commandPalette,
+  dictionary: dictDialog,
   toggleFullScreen,
   exportFountain,
   importFdx,

@@ -3062,6 +3062,39 @@ async fn spell_ignore(app: State<'_, App>, word: String) -> Result<(), String> {
     })
 }
 
+/// Remove a word from the project dictionary ("project") or the personal one ("user").
+#[tauri::command]
+async fn spell_remove(app: State<'_, App>, word: String, scope: String) -> Result<(), String> {
+    let word = word.trim().to_string();
+    if word.is_empty() {
+        return Ok(());
+    }
+    with_session(&app, |s| {
+        match scope.as_str() {
+            "project" => {
+                let mut words = project_words(s);
+                if let Some(pos) = words.iter().position(|w| w == &word) {
+                    words.remove(pos);
+                    s.store.set_setting(SPELL_SCOPE, "dictionary", &serde_json::to_string(&words).unwrap_or_default()).map_err(err)?;
+                }
+            }
+            "user" => {
+                let mut words = user_words(&app);
+                if let Some(pos) = words.iter().position(|w| w == &word) {
+                    words.remove(pos);
+                    let path = user_dictionary(&app);
+                    let tmp = path.with_extension("txt.tmp");
+                    std::fs::write(&tmp, words.join("\n") + "\n").map_err(io_err)?;
+                    cirth_core::fsutil::replace_file(&tmp, &path).map_err(io_err)?;
+                }
+            }
+            _ => return Err(format!("unknown dictionary {scope}")),
+        }
+        s.speller = None;
+        Ok(())
+    })
+}
+
 // --- Backups -----------------------------------------------------------------------------
 
 #[derive(Serialize)]
@@ -3620,6 +3653,8 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("ui_contrast", "High Contrast")
         .build()?;
     let go_to = SubmenuBuilder::new(app, "Go To")
+        .text("command_palette", keyed("Command Palette…", "K"))
+        .separator()
         .text("goto_page", keyed("Page…", "G"))
         .text("goto_scene", keyed("Scene…", "Shift+G"))
         .separator()
@@ -3686,6 +3721,7 @@ fn format_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wr
         .build()?;
     let spelling = SubmenuBuilder::new(app, "Spelling")
         .text("spell_suggest", keyed("Suggestions", "."))
+        .text("spell_dictionary", "Personal Dictionary…")
         .separator()
         .item(&check_item(app, "spell_en_US", "US English", true)?)
         .item(&check_item(app, "spell_en_GB", "UK English", false)?)
@@ -4064,6 +4100,7 @@ fn main() {
             spell_check,
             spell_suggest,
             spell_add,
+            spell_remove,
             spell_ignore,
             fw_list,
             fw_create_folder,

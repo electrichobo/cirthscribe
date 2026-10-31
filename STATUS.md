@@ -39,7 +39,11 @@ Updated 2026-10-30.
     - Turnkey provisioning scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS installing dependencies, building release binaries, and running smoke test suites.
   - Windows NSIS Installer Bundle (`target/release/bundle/nsis/Kolbítar_0.0.1_x64-setup.exe`):
     - Verified single-file installer wizard packaging release binary, icons, file associations, and uninstaller cleanly.
-  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 87 CDP tests, 86 WebDriver tests (1 skipped). Added manual check N50 in `docs/testing/MANUAL_CHECKS.md`.
+  - Command Palette / Quick Switcher (`app/src/palette.ts`, `app/src/bindings.ts`, `app/src/main.ts`, E2E Test 88):
+    - Fast modal search popup (`Ctrl+K` / `Cmd+K`) matching scenes, characters, beats, and application actions with keyboard execution.
+  - Personal Dictionary Editor Dialog (`app/src/dictionary.ts`, `app/src-tauri/src/main.rs`, `app/src/main.ts`, E2E Test 88):
+    - Dictionary management dialog (`Format > Spelling > Personal Dictionary…`) to view, filter, add, and remove words in project and personal dictionaries.
+  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 88 CDP tests, 87 WebDriver tests (1 skipped). Added manual check N51 in `docs/testing/MANUAL_CHECKS.md`.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).
