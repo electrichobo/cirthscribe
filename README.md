@@ -193,7 +193,7 @@ Carried forward:
 [STATUS.md](STATUS.md) lists what works, what was tested on which platform, open defects and what is untested. Highlights:
 
 - Windows: built and tested locally (two end-to-end test drivers plus core tests).
-- Linux: tested in CI (WebKitGTK under Xvfb), including the full end-to-end suite. Not yet tried on a Linux desktop.
+- Linux: tested in CI and headless Docker on Unraid (WebKitGTK under Xvfb, kernel 6.12), passing all core tests and the complete 88-test end-to-end suite (87 passed, 1 skipped IME). Not yet tried on an interactive Linux desktop.
 - macOS: builds and passes core tests in CI, and has had hands-on checks of editing and the writing workspace on macOS 26 (Apple silicon), plus a first round of export checks in Preview, TextEdit and Safari. macOS 11, the oldest supported version, has not been tried.
 
 ### Building from source
