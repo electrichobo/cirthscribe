@@ -10,7 +10,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 - **Docker Linux Runner (`Dockerfile.linux`, `scripts/setup-linux.sh`):**
   - Dedicated Ubuntu 24.04 container definition for Unraid and headless CI.
-  - Hardened `setup-linux.sh` to auto-install Node 20 LTS, support root without sudo, and non-interactive apt.
+  - Hardened `setup-linux.sh` to auto-install Node 24, support root without sudo, and non-interactive apt.
 - **Command Palette & Quick Switcher (`app/src/palette.ts`, `bindings.ts`, `main.ts`, e2e Test 88, N51):** Fast search popup (`Ctrl+K` / `Cmd+K`).
 - **Personal Dictionary Manager (`app/src/dictionary.ts`, `main.rs`, `main.ts`, e2e Test 88, N51):** User and project word manager.
 - **UI Vector SVG Registry & High-Fantasy Showcase Script:** 35+ stroke icons; Sorkinesque sample script.

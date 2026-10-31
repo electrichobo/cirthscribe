@@ -124,20 +124,33 @@ else
 fi
 
 # 3. Check Node.js and npm
-if ! command -v node >/dev/null 2>&1; then
-  log "Node.js not detected. Installing Node.js 20 LTS..."
+install_node() {
+  log "Installing Node.js 24 via NodeSource..."
   if command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO bash -
+    curl -fsSL https://deb.nodesource.com/setup_24.x | $SUDO bash -
     $SUDO apt-get install -y nodejs
   elif command -v dnf >/dev/null 2>&1; then
-    curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
+    curl -fsSL https://rpm.nodesource.com/setup_24.x | $SUDO bash -
     $SUDO dnf install -y nodejs
   elif command -v pacman >/dev/null 2>&1; then
     $SUDO pacman -S --needed --noconfirm nodejs npm
   else
-    err "Node.js is not installed and package manager is unsupported. Please install Node.js 20 or higher."
+    err "Node.js 24 is required. Please install Node.js 24."
     exit 1
+  fi
+}
+
+if ! command -v node >/dev/null 2>&1; then
+  install_node
+else
+  NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
+  if [ "${NODE_MAJOR:-0}" -lt 24 ]; then
+    warn "Detected Node.js $(node -v) is older than Node 24 (Node 24 is required for native TypeScript type stripping)."
+    if [ "${DISTRO:-}" = "ubuntu" ] || [ "${DISTRO:-}" = "debian" ]; then
+      log "Upgrading to Node.js 24..."
+      install_node
+    fi
   fi
 fi
 log "Node.js detected: $(node --version)"
