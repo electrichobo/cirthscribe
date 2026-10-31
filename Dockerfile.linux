@@ -1,0 +1,44 @@
+# ==============================================================================
+# Kolbítar Linux Build & Headless E2E Test Container
+# Suitable for Unraid Docker, local Docker engines, and headless CI.
+# ==============================================================================
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Install system dependencies for Tauri 2, WebKitGTK 4.1, and Xvfb headless runner
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    pkg-config \
+    libwebkit2gtk-4.1-dev \
+    libxdo-dev \
+    libssl-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    webkit2gtk-driver \
+    xvfb \
+    xclip \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Install Node.js 20 LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Install Rust stable toolchain & tauri-driver for WebDriver E2E tests
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
+    && cargo install tauri-driver --locked
+
+# 4. Working directory for mounted Kolbítar repository
+WORKDIR /workspace
+
+# Default: execute core tests, build frontend & release binary, and run headless E2E suite under Xvfb
+CMD ["bash", "scripts/setup-linux.sh", "--skip-deps", "--smoke-e2e"]

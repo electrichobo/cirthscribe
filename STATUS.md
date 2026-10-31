@@ -35,7 +35,7 @@ Updated 2026-10-30.
     - Rapid-fire walk-and-talk rhythm script fixture exercising characters, dialogue, scene transitions, and production beats with zero AI cliches.
   - Native Print Stylesheet & Printing (`app/src/styles.css`, `app/src-tauri/src/main.rs`, `app/src/bindings.ts`, `app/src/main.ts`, E2E Test 87, Manual Check N50):
     - `@media print` rules enforcing physical Letter portrait page dimensions, Courier Prime 12pt, margin-aligned scene numbers, screen color markup suppression, and `File > Print…` / `Ctrl+P` (`Cmd+P`) action.
-  - Cross-Platform VM Setup Scripts (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`):
+  - Cross-Platform VM & Docker Setup Scripts (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`, `Dockerfile.linux`):
     - Turnkey provisioning scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS installing dependencies, building release binaries, and running smoke test suites.
   - Windows NSIS Installer Bundle (`target/release/bundle/nsis/Kolbítar_0.0.1_x64-setup.exe`):
     - Verified single-file installer wizard packaging release binary, icons, file associations, and uninstaller cleanly.

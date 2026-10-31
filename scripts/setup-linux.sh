@@ -16,7 +16,28 @@ log() { echo -e "${BOLD}${GREEN}[kolbitar-setup]${RESET} $*"; }
 warn() { echo -e "${BOLD}${YELLOW}[kolbitar-setup:warning]${RESET} $*"; }
 err() { echo -e "${BOLD}${RED}[kolbitar-setup:error]${RESET} $*" >&2; }
 
+# Parse flags
+SKIP_DEPS=0
+SMOKE_E2E=0
+for arg in "$@"; do
+  case "$arg" in
+    --skip-deps) SKIP_DEPS=1 ;;
+    --smoke-e2e) SMOKE_E2E=1 ;;
+    *) ;;
+  esac
+done
+
 log "Starting Kolbítar Linux environment provisioning..."
+
+# Setup privilege escalation helper (none needed if running as root)
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+  else
+    warn "Running as non-root user without sudo. Package installations may fail if permissions are missing."
+  fi
+fi
 
 # 1. Detect Distribution and Package Manager
 if [ -f /etc/os-release ]; then
@@ -33,8 +54,9 @@ log "Detected Linux distribution: ${DISTRO} (${LIKE})"
 install_system_dependencies() {
   if command -v apt-get >/dev/null 2>&1; then
     log "Using apt-get to install system dependencies..."
-    sudo apt-get update
-    sudo apt-get install -y \
+    export DEBIAN_FRONTEND=noninteractive
+    $SUDO apt-get update
+    $SUDO apt-get install -y \
       build-essential \
       curl \
       git \
@@ -46,10 +68,11 @@ install_system_dependencies() {
       librsvg2-dev \
       webkit2gtk-driver \
       xvfb \
-      xclip
+      xclip \
+      ca-certificates
   elif command -v dnf >/dev/null 2>&1; then
     log "Using dnf to install system dependencies..."
-    sudo dnf install -y \
+    $SUDO dnf install -y \
       gcc \
       gcc-c++ \
       make \
@@ -62,10 +85,11 @@ install_system_dependencies() {
       librsvg2-devel \
       xdotool-devel \
       xclip \
-      xorg-x11-server-Xvfb
+      xorg-x11-server-Xvfb \
+      ca-certificates
   elif command -v pacman >/dev/null 2>&1; then
     log "Using pacman to install system dependencies..."
-    sudo pacman -S --needed --noconfirm \
+    $SUDO pacman -S --needed --noconfirm \
       base-devel \
       curl \
       git \
@@ -75,13 +99,14 @@ install_system_dependencies() {
       librsvg \
       xdotool \
       xclip \
-      xorg-server-xvfb
+      xorg-server-xvfb \
+      ca-certificates
   else
     warn "Unsupported package manager. Please ensure WebKitGTK 4.1, OpenSSL, and build essentials are installed manually."
   fi
 }
 
-if [ "${1:-}" != "--skip-deps" ]; then
+if [ "$SKIP_DEPS" -eq 0 ]; then
   install_system_dependencies
 fi
 
@@ -89,15 +114,31 @@ fi
 if ! command -v cargo >/dev/null 2>&1; then
   log "Rust toolchain not detected. Installing via rustup..."
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  source "${HOME}/.cargo/env"
+  if [ -f "${HOME}/.cargo/env" ]; then
+    . "${HOME}/.cargo/env"
+  else
+    export PATH="${HOME}/.cargo/bin:${PATH}"
+  fi
 else
   log "Rust toolchain detected: $(cargo --version)"
 fi
 
 # 3. Check Node.js and npm
 if ! command -v node >/dev/null 2>&1; then
-  err "Node.js is not installed. Please install Node.js 20 or higher."
-  exit 1
+  log "Node.js not detected. Installing Node.js 20 LTS..."
+  if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO bash -
+    $SUDO apt-get install -y nodejs
+  elif command -v dnf >/dev/null 2>&1; then
+    curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
+    $SUDO dnf install -y nodejs
+  elif command -v pacman >/dev/null 2>&1; then
+    $SUDO pacman -S --needed --noconfirm nodejs npm
+  else
+    err "Node.js is not installed and package manager is unsupported. Please install Node.js 20 or higher."
+    exit 1
+  fi
 fi
 log "Node.js detected: $(node --version)"
 
@@ -128,7 +169,7 @@ cargo build -p cirthscribe --release
 log "Kolbítar Linux build and smoke test verified successfully!"
 log "Release binary available at: target/release/cirthscribe"
 
-if [ "${1:-}" == "--smoke-e2e" ] || [ "${2:-}" == "--smoke-e2e" ]; then
+if [ "$SMOKE_E2E" -eq 1 ]; then
   log "Running headless WebDriver E2E smoke test under Xvfb..."
   mkdir -p out
   cd app

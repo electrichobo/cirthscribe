@@ -4,19 +4,17 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 hardening, print stylesheet, showcase script, NSIS installer & VM provisioning scripts complete.** Next: manual checks, hardware testing, and final art asset integration.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 hardening, print stylesheet, showcase script, NSIS installer, VM/Docker container test runner complete.** Next: manual checks, hardware testing, and final art asset integration.
 
 ## Completed & Verified
 
-- **Command Palette & Quick Switcher (`app/src/palette.ts`, `bindings.ts`, `main.ts`, e2e Test 88, N51):**
-  - Fast search popup (`Ctrl+K` / `Cmd+K`) matching scenes, characters, beats, and application actions with keyboard execution.
-- **Personal Dictionary Manager (`app/src/dictionary.ts`, `main.rs`, `main.ts`, e2e Test 88, N51):**
-  - Dialog under `Format > Spelling > Personal Dictionary…` to view, filter, add, and remove words in project and user scopes.
-- **Vector SVG Icon Registry (`app/src/icons.ts`):** 35+ 24×24 stroke icons with `currentColor` theme adaptation.
-- **Showcase Script (*The Obsidian Seal*, `fixtures/high-council.json`, e2e Test 86):** Sorkinesque high-fantasy walk-and-talk script.
-- **Native Print Stylesheet & Printing (`styles.css`, `main.rs`, `bindings.ts`, `main.ts`, e2e Test 87, N50):** `@media print` rules and `File > Print…` (`Ctrl+P` / `Cmd+P`).
-- **VM Setup Scripts (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`):** Turnkey provisioning and smoke testing for Linux & macOS.
-- **Windows NSIS Installer (`target/release/bundle/nsis/Kolbítar_0.0.1_x64-setup.exe`):** Single-file setup wizard tested and built (8.95 MiB).
+- **Docker Linux Runner (`Dockerfile.linux`, `scripts/setup-linux.sh`):**
+  - Dedicated Ubuntu 24.04 container definition for Unraid and headless CI.
+  - Hardened `setup-linux.sh` to auto-install Node 20 LTS, support root without sudo, and non-interactive apt.
+- **Command Palette & Quick Switcher (`app/src/palette.ts`, `bindings.ts`, `main.ts`, e2e Test 88, N51):** Fast search popup (`Ctrl+K` / `Cmd+K`).
+- **Personal Dictionary Manager (`app/src/dictionary.ts`, `main.rs`, `main.ts`, e2e Test 88, N51):** User and project word manager.
+- **UI Vector SVG Registry & High-Fantasy Showcase Script:** 35+ stroke icons; Sorkinesque sample script.
+- **Native Print Stylesheet & NSIS Windows Installer:** Physical Letter page layout, `@media print`, verified 8.95 MiB installer.
 - **Verified:**
   - `cargo test -p cirth-core` (188/188 passed).
   - `npm --prefix app run build` (clean without errors).
@@ -31,11 +29,11 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- Added: `app/src/palette.ts`, `app/src/dictionary.ts`.
-- Modified: `app/src-tauri/src/main.rs`, `app/src/bindings.ts`, `app/src/main.ts`, `app/src/styles.css`, `app/tests/e2e/suite.mjs`, `docs/testing/MANUAL_CHECKS.md`, `README.md`, `STATUS.md`.
+- Added: `Dockerfile.linux`.
+- Modified: `scripts/setup-linux.sh`, `README.md`, `STATUS.md`, `HANDOFF.md`.
 
 ## Next Immediate Step
 
-1. Complete verification gates on CDP and WebDriver suites (88 tests).
-2. Commit and push working tree to origin/main.
-3. Coordinate with owner on art delivery and VM provisioning.
+1. Commit and push Docker container runner and hardened setup script to origin/main.
+2. Provide owner with exact Unraid container execution instructions.
+3. Coordinate on final art asset delivery.
