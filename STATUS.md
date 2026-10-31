@@ -29,7 +29,17 @@ Updated 2026-10-30.
     - CLI argument parsing (`startup_file`) and `tauri::WindowEvent::DragDrop` handler auto-opening dropped project or screenplay import files.
   - Automated Offline & Zero-Telemetry Audit (`app/scripts/offline-audit.mjs`, `npm --prefix app run test:offline`):
     - Static CSP validation, dependency audit against telemetry/analytics libraries, codebase network scan, and live process socket table inspection verifying 0 external connections.
-  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 85 CDP tests, 84 WebDriver tests (1 skipped). Added manual check N49 in `docs/testing/MANUAL_CHECKS.md`.
+  - UI Vector SVG Icon Registry (`app/src/icons.ts`):
+    - Comprehensive 24×24 stroke icon system (35+ icons) utilizing `currentColor` for dynamic light, dark, midnight, OLED, and Windows contrast themes.
+  - Sorkinesque High-Fantasy Showcase Script (*The Obsidian Seal*, `fixtures/high-council.json`, `app/src-tauri/src/main.rs`, `app/src/home.ts`, E2E Test 86):
+    - Rapid-fire walk-and-talk rhythm script fixture exercising characters, dialogue, scene transitions, and production beats with zero AI cliches.
+  - Native Print Stylesheet & Printing (`app/src/styles.css`, `app/src-tauri/src/main.rs`, `app/src/bindings.ts`, `app/src/main.ts`, E2E Test 87, Manual Check N50):
+    - `@media print` rules enforcing physical Letter portrait page dimensions, Courier Prime 12pt, margin-aligned scene numbers, screen color markup suppression, and `File > Print…` / `Ctrl+P` (`Cmd+P`) action.
+  - Cross-Platform VM Setup Scripts (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`):
+    - Turnkey provisioning scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS installing dependencies, building release binaries, and running smoke test suites.
+  - Windows NSIS Installer Bundle (`target/release/bundle/nsis/Kolbítar_0.0.1_x64-setup.exe`):
+    - Verified single-file installer wizard packaging release binary, icons, file associations, and uninstaller cleanly.
+  - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 87 CDP tests, 86 WebDriver tests (1 skipped). Added manual check N50 in `docs/testing/MANUAL_CHECKS.md`.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).

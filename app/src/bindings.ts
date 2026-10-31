@@ -40,6 +40,7 @@ export const BINDINGS: Binding[] = [
   { id: "save", group: "Project", label: "Save", menu: "Save", scope: "app", defaults: ["Mod+S"] },
   { id: "save_as", group: "Project", label: "Save As", menu: "Save As…", scope: "app", defaults: ["Mod+Shift+S"] },
   { id: "export", group: "Project", label: "Export", menu: "Export…", scope: "app", defaults: ["Mod+E"] },
+  { id: "print", group: "Project", label: "Print", menu: "Print…", scope: "app", defaults: ["Mod+P"] },
   { id: "project_tree", group: "Project", label: "Episodes and documents", menu: "Episodes and Documents…", scope: "app", defaults: ["Mod+Shift+O"] },
   { id: "find", group: "Writing", label: "Find and replace", menu: "Find and Replace…", scope: "app", defaults: ["Mod+F"] },
   { id: "spell_suggest", group: "Writing", label: "Spelling suggestions", menu: "Suggestions", scope: "app", defaults: ["Mod+."] },

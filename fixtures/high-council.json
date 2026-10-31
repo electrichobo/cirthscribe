@@ -1,0 +1,290 @@
+{
+  "title": "The Obsidian Seal",
+  "note": "Showcase sample: A rapid-fire walk-and-talk high-fantasy adventure in the rhythmic cadence of Aaron Sorkin.",
+  "blocks": [
+    {
+      "t": "heading",
+      "x": "INT. CITADEL OF SARKON - HIGH CORRIDOR - DAY"
+    },
+    {
+      "t": "action",
+      "x": "Heavy granite vaults. Torches gutter in wrought-iron sconces. Footsteps ring out against the cold flagstones at a relentless, metronomic cadence."
+    },
+    {
+      "t": "action",
+      "x": "LORD CHANCELLOR VANE (40s, velvet doublet, silver signet) strides with purpose. MISTRESS ELENA (30s, Chief Arcanist, ink-stained cuffs, carrying three brass cylinder scrolls) matches him stride for stride."
+    },
+    {
+      "t": "action",
+      "x": "APPRENTICE TOBIAS (20, disheveled robes, juggling wax tablets) jogs to stay within earshot."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "Tell me about the western ward."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "The western ward is fluctuating."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "Fluctuating isn't a word I like before my second cup of chicory, Elena. Tides fluctuate. Crop yields fluctuate. Seven-hundred-ton kinetic wards guarding sixty thousand civilians do not fluctuate."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "The harmonic decay along the third rune line is three-point-two percent per bell."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "parenthetical",
+      "x": "(without stopping)"
+    },
+    {
+      "t": "dialogue",
+      "x": "Which means?"
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Which means by sunset tomorrow, a determined mountain goat could kick through the outer perimeter, let alone the Frost-Giant infantry currently bivouacked twenty leagues north."
+    },
+    {
+      "t": "character",
+      "x": "TOBIAS"
+    },
+    {
+      "t": "parenthetical",
+      "x": "(panting, offering a scroll)"
+    },
+    {
+      "t": "dialogue",
+      "x": "Chancellor, the Grand Marshal’s courier arrived from the borderlands--"
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "Tobias, if that parchment does not say twenty-four hundred reserve archers have manifested out of thin air, put it back in your sleeve."
+    },
+    {
+      "t": "character",
+      "x": "TOBIAS"
+    },
+    {
+      "t": "dialogue",
+      "x": "It's an invoice for oats."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "Gods preserve me from cavalry requisitions. Elena, why is the ward decaying?"
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Because the Archmage insisted on buying second-grade star-sapphires from the Merchant League of Valen to balance the fourth-quarter treasury report."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "The League gave us a fifteen percent rebate."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "The League sold you powdered calcite with blue glaze on it, Vane!"
+    },
+    {
+      "t": "heading",
+      "x": "INT. GRAND VAULT OF RUNES - CONTINUOUS"
+    },
+    {
+      "t": "action",
+      "x": "Double iron doors swing wide. A subterranean chamber thrums with low, resonant energy. In the center: a hexagonal black obelisk suspended above an abyss of blue light."
+    },
+    {
+      "t": "action",
+      "x": "Four senior magisters kneel in a circle, sweat pouring into their collars as faint cracks spider across the obelisk’s mirrored surface."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "parenthetical",
+      "x": "(glancing at the cracks)"
+    },
+    {
+      "t": "dialogue",
+      "x": "That looks expensive."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "That is the primary compression seal. If it snaps, the thaumaturgical back-draft turns this entire palace into an eighty-foot smoking crater."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "Well, on the bright side, the League of Valen won't be able to collect on the oats."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "I need three hundred ounces of unrefined sunstone, twenty consecrated chisels, and total jurisdictional authority over the High Temple's reliquary."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "The High Priest will file a writ of heresy before your chisel touches the lock."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Then tell the High Priest to go stand on the western battlement and pray the Frost-Giants have taken a sudden theological interest in mercy."
+    },
+    {
+      "t": "heading",
+      "x": "EXT. BATTLEMENTS OF CARAS VAL - MOMENTS LATER"
+    },
+    {
+      "t": "action",
+      "x": "Gale-force wind howls off the jagged peaks. Snow whips across the parapets. Banners snap violently against the stone."
+    },
+    {
+      "t": "action",
+      "x": "CAPTAIN OSGAR (50s, chainmail scarred by wyvern fire, squinting through a brass spyglass) doesn't look back as Vane and Elena step out into the freeze."
+    },
+    {
+      "t": "character",
+      "x": "OSGAR"
+    },
+    {
+      "t": "dialogue",
+      "x": "You brought her."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "I brought her."
+    },
+    {
+      "t": "character",
+      "x": "OSGAR"
+    },
+    {
+      "t": "dialogue",
+      "x": "Did she tell you the wall is going to collapse?"
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "She used the word fluctuating. Then she compared the wall to a mountain goat."
+    },
+    {
+      "t": "character",
+      "x": "OSGAR"
+    },
+    {
+      "t": "dialogue",
+      "x": "Look through the glass, Chancellor."
+    },
+    {
+      "t": "action",
+      "x": "Vane takes the spyglass. Presses it to his eye."
+    },
+    {
+      "t": "action",
+      "x": "THROUGH THE LENS: Beyond the frozen pines, five miles out in the tundra valley, three enormous shadows carve paths through the blizzard. Siege engines made of mammoths and dark iron."
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "parenthetical",
+      "x": "(low, razor-calm)"
+    },
+    {
+      "t": "dialogue",
+      "x": "Elena."
+    },
+    {
+      "t": "character",
+      "x": "ELENA"
+    },
+    {
+      "t": "dialogue",
+      "x": "Yes?"
+    },
+    {
+      "t": "character",
+      "x": "VANE"
+    },
+    {
+      "t": "dialogue",
+      "x": "Get your chisels."
+    },
+    {
+      "t": "transition",
+      "x": "SMASH CUT TO BLACK."
+    }
+  ]
+}

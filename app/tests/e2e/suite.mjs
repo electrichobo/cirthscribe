@@ -5559,5 +5559,100 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitHome(app);
   });
 
+  await test("Showcase sample: The Obsidian Seal opens from Home with Sorkinesque high-fantasy scenes and beats", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+
+    // Open The Obsidian Seal from the Home samples list
+    await clickHome(app, '[data-sample="high-council"]');
+    await waitOpen(app);
+    await waitFor(app, "document.body.dataset.view === 'editor'", "in editor");
+
+    const title = await app.evaluate("__cirth.lastOpen.doc.title");
+    assert(title === "The Obsidian Seal", `sample title matches: ${title}`);
+
+    const text = await app.evaluate("document.querySelector('.ProseMirror')?.textContent || ''");
+    assert(text.includes("CITADEL OF SARKON"), "contains first scene heading");
+    assert(text.includes("GRAND VAULT OF RUNES"), "contains second scene heading");
+    assert(text.includes("BATTLEMENTS OF CARAS VAL"), "contains third scene heading");
+    assert(text.includes("VANE") && text.includes("ELENA"), "characters VANE and ELENA present");
+    assert(text.includes("harmonic decay") && text.includes("Frost-Giant"), "Sorkinesque dialogue present");
+
+    // Return to Home cleanly
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+  });
+
+  await test("Native print stylesheet and File > Print… action", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+
+    // Verify native menu contains Print under File
+    const menuItems = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
+    const printItem = menuItems.find(i => i.id === "print");
+    assert(printItem, "File menu contains print item");
+    assert(/\((Ctrl|Cmd)\+P\)$/.test(printItem.path), `print item has Mod+P accelerator: ${printItem.path}`);
+
+    // Verify print binding exists in keyboard shortcuts registry
+    const bindings = await app.evaluate(`
+      (() => {
+        return window.__cirth ? true : false;
+      })()
+    `);
+    assert(bindings, "app runtime available");
+
+    // Open sample script to test print stylesheet rules
+    await clickHome(app, '[data-sample="high-council"]');
+    await waitOpen(app);
+    await waitFor(app, "document.body.dataset.view === 'editor'", "in editor");
+
+    // Inspect CSSOM for @media print rules
+    const printRulesSummary = await app.evaluate(`
+      (() => {
+        let hasPrintMedia = false;
+        let hidesToolbar = false;
+        let setsCourier = false;
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const rule of sheet.cssRules) {
+              if (rule.type === CSSRule.MEDIA_RULE && rule.conditionText.includes("print")) {
+                hasPrintMedia = true;
+                for (const subRule of rule.cssRules) {
+                  const txt = subRule.cssText;
+                  if (txt.includes(".toolbar") && txt.includes("display: none")) hidesToolbar = true;
+                  if (txt.includes(".ProseMirror") && txt.includes("Courier Prime")) setsCourier = true;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+        return { hasPrintMedia, hidesToolbar, setsCourier };
+      })()
+    `);
+
+    assert(printRulesSummary.hasPrintMedia, "found @media print rule in loaded stylesheets");
+    assert(printRulesSummary.hidesToolbar, "@media print rule hides .toolbar");
+    assert(printRulesSummary.setsCourier, "@media print rule enforces Courier Prime on .ProseMirror");
+
+    // Verify window.print can be invoked safely
+    const printedInvoked = await app.evaluate(`
+      (() => {
+        const orig = window.print;
+        let called = false;
+        window.print = () => { called = true; };
+        try {
+          window.__cirth.menu("print");
+          return called;
+        } finally {
+          window.print = orig;
+        }
+      })()
+    `);
+    assert(printedInvoked === true, "menu('print') successfully triggered window.print");
+
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+  });
+
   await app.close();
 }

@@ -1809,6 +1809,9 @@ async function runMenu(id: string): Promise<void> {
     case "home":
       await goHome();
       break;
+    case "print":
+      window.print();
+      break;
     case "quit":
       await getCurrentWindow().close();
       break;

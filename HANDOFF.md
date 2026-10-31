@@ -4,34 +4,34 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Packaging, file associations, drag-and-drop & offline audit complete.** Next: manual checks and physical hardware runs.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 hardening, print stylesheet, showcase script, NSIS installer & VM provisioning scripts complete.** Next: manual checks, hardware testing, and final art asset integration.
 
 ## Completed & Verified
 
-- **File Associations, Startup CLI & Drag-and-Drop (`tauri.conf.json`, `main.rs`, `main.ts`, e2e Test 85):**
-  - Native file associations registered for `.cirth` (Editor) and `.cirth-review` (Viewer).
-  - Bundler configured for Windows NSIS, macOS DMG, and Linux Deb/AppImage.
-  - Startup CLI arg parsing and `tauri::WindowEvent::DragDrop` file opening for `.cirth`, `.cirth-review`, `.fountain`, `.fdx`.
-- **Automated Offline & Zero-Telemetry Audit (`app/scripts/offline-audit.mjs`):**
-  - Audits strict CSP, scans dependencies against tracking SDKs, verifies zero unsolicited network calls, and checks runtime OS socket table (0 external sockets).
+- **Vector SVG Icon Registry (`app/src/icons.ts`):** 35+ 24×24 stroke icons with `currentColor` theme adaptation.
+- **Showcase Script (*The Obsidian Seal*, `fixtures/high-council.json`, e2e Test 86):** Sorkinesque high-fantasy walk-and-talk script.
+- **Native Print Stylesheet & Printing (`styles.css`, `main.rs`, `bindings.ts`, `main.ts`, e2e Test 87, N50):** `@media print` rules and `File > Print…` (`Ctrl+P` / `Cmd+P`).
+- **VM Setup Scripts (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`):** Turnkey provisioning and smoke testing for Linux & macOS.
+- **Windows NSIS Installer (`target/release/bundle/nsis/Kolbítar_0.0.1_x64-setup.exe`):** Single-file setup wizard tested and built (8.95 MiB).
 - **Verified:**
   - `cargo test -p cirth-core` (188/188 passed).
   - `npm --prefix app run build` (clean without errors).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
-  - `node app/scripts/offline-audit.mjs` (100% passed).
+  - `npm --prefix app run test:offline` (100% passed).
   - `node app/scripts/third-party-notices.mjs --check` (357 components passed).
-  - `npm --prefix app run e2e:cdp` (85/85 passed).
-  - `npm --prefix app run e2e:webdriver` (84/84 passed, 1 skipped: simulated IME).
+  - E2E test runs (CDP & WebDriver in progress for 87 automated tests).
 - **Not verified (carried):**
   - Physical macOS run (N31, M1–M13, D1–D4, N1–N20) and Linux desktop environment run.
-  - Manual check N49 (Software tour and non-Latin font rendering); M7 checks N47–N48.
+  - Manual checks N47–N50; external Google Docs / PDF reader checks.
 
 ## In-Progress / Uncommitted State
 
-- README.md updated to align with M7, font packaging, file associations, drag-and-drop, and offline audit. Ready for commit and push.
+- Modified: `app/src-tauri/src/main.rs`, `app/src-tauri/tauri.conf.json`, `app/src/bindings.ts`, `app/src/home.ts`, `app/src/icons.ts`, `app/src/main.ts`, `app/src/styles.css`, `app/tests/e2e/suite.mjs`, `docs/COMPATIBILITY.md`, `docs/testing/MANUAL_CHECKS.md`, `README.md`, `STATUS.md`.
+- Untracked: `fixtures/high-council.json`, `scripts/setup-linux.sh`, `scripts/setup-mac.sh`.
 
 ## Next Immediate Step
 
-1. Commit and push README.md and documentation alignment.
-2. Coordinate with owner on next tasks before final art assets.
+1. Await completion of E2E suite verification.
+2. Commit and push working tree once full E2E gates pass.
+3. Assist user with external Google Docs format check and final art delivery.

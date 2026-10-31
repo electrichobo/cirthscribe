@@ -168,11 +168,18 @@ Done:
 - [x] Native OS file associations, CLI launching & drag-and-drop: registered file associations for `.cirth` (editor) and `.cirth-review` (viewer); startup argument file opening; window drag-and-drop file opening for projects and imports (`.fountain`, `.fdx`); E2E Test 85 (`tauri.conf.json`, `main.rs`, `main.ts`, E2E Test 85)
 - [x] Automated offline & zero-telemetry audit: script mathematically verifying strict CSP, zero tracking dependencies, codebase network scan, and live OS process socket inspection (`app/scripts/offline-audit.mjs`, `npm run test:offline`)
 - [x] Cross-platform macOS and Linux hardening: Unix atomic file replacement with best-effort directory fsync for APFS/FAT32 resilience, dual-pulse focus restoration after macOS full screen, `Cmd+Ctrl+F` Apple HIG keybinding, and WebKitGTK dialog focus trapping
+- [x] UI Vector SVG Icon Registry: clean, comprehensive 24×24 stroke icon system covering navigation, writing, formatting, story planning, production, and revisions; automatic adaptation to light, dark, midnight, OLED, and Windows contrast themes (`app/src/icons.ts`)
+- [x] Sorkinesque high-fantasy showcase project (*The Obsidian Seal*): rapid-fire, walk-and-talk rhythm script fixture exercising characters, dialogue, scene transitions, and production beats without AI cliches (`fixtures/high-council.json`, E2E Test 86)
+- [x] Native print stylesheet and printing: `@media print` rules enforcing physical Letter portrait page dimensions, Courier Prime 12pt, margin-aligned scene numbers, screen color markup suppression, and `File > Print…` / `Ctrl+P` (`Cmd+P`) action (`app/src/styles.css`, E2E Test 87, Manual Check N50)
+- [x] Cross-platform VM provisioning & smoke test scripts: turnkey setup scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS installing dependencies, building release binaries, and executing verification suites (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`)
+- [x] Windows NSIS installer bundle verification: self-contained installer executable with file associations, start menu shortcuts, and uninstaller (`target/release/bundle/nsis/`)
 - [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
 
 Carried forward:
 - [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
 - [ ] Desktop manual checks for software tour and non-Latin script display (N49)
+- [ ] Desktop manual check for native print preview (N50)
+- [ ] VM / hardware execution of setup scripts on macOS and Linux
 
 ---
 

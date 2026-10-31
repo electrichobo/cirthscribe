@@ -47,6 +47,7 @@ const SAMPLES = [
   { name: "unicode-marks", title: "Unicode and marks", about: "Accents, emoji, CJK and right-to-left text; bold, italic, underline." },
   { name: "page-boundaries", title: "Page boundary cases", about: "Long speeches, MORE and CONT'D, dual dialogue, forced breaks." },
   { name: "long-120", title: "The Tide Ledger", about: "A 127-page synthetic script for speed and pagination checks." },
+  { name: "high-council", title: "The Obsidian Seal", about: "A fast-paced Sorkinesque high-fantasy walk-and-talk adventure." },
 ];
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] => {

@@ -42,6 +42,7 @@ Statuses: not implemented · implemented, unverified · verified within profile 
 | Grammar analysis report | Verified within profile (automated) | 100% offline rule-based grammar and style analyzer: duplicate words, passive voice, quotes, parentheticals, cliches, spacing, and one-click replacement fix | Automated `grammar::tests`, UI review dialog, and e2e Test 81 on CDP and WebDriver |
 | AI Assistant & Non-Destructive Diffs | Verified within profile (automated) | Opt-in, off-by-default assistant: local runner (Ollama/LM Studio) or cloud endpoints, transparent scope disclosure and token estimator, side-by-side non-destructive block diffs, and accepted batch diff application | Automated `ai::tests`, IPC commands, UI assistant dialog, and e2e Test 82 on CDP and WebDriver |
 | Export capability & Google workflow adapter | Verified within profile (automated) | Export capability analyzer for Google Docs (.docx) and Google Sheets (.xlsx/.csv): fidelity grading, loss warnings, and dynamic export dialog guidance | Automated `export_capability::tests`, UI export dialog integration, and e2e Test 83 on CDP and WebDriver |
+| Native Print Stylesheet (@media print) | Verified within profile (automated) | Physical Letter portrait printing with Courier Prime 12pt, margin-aligned scene numbers, zero UI clutter, screen markup suppression, and page-break rules | Automated CSSOM rules verification (`suite.mjs` Test 87) on CDP and WebDriver; manual check N50 |
 
 ## Deferred
 

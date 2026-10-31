@@ -84,6 +84,7 @@ fn fixture_source(name: &str) -> Result<&'static str, String> {
         "long-120" => include_str!("../../../fixtures/long-120.json"),
         "page-boundaries" => include_str!("../../../fixtures/page-boundaries.json"),
         "unicode-marks" => include_str!("../../../fixtures/unicode-marks.json"),
+        "high-council" => include_str!("../../../fixtures/high-council.json"),
         _ => return Err(format!("unknown fixture {name}")),
     })
 }
@@ -1990,7 +1991,7 @@ async fn open_fixture(app: State<'_, App>, name: String, reset: bool) -> Result<
     start_new(&app, pkg, &doc, &beats, t0)
 }
 
-const SAMPLES: [&str; 3] = ["unicode-marks", "page-boundaries", "long-120"];
+const SAMPLES: [&str; 4] = ["unicode-marks", "page-boundaries", "long-120", "high-council"];
 
 fn slug(title: &str) -> String {
     let s: String = title.trim().chars().map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
@@ -3535,6 +3536,7 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("snapshots", "Snapshots…")
         .text("branches", "Branches…")
         .text("export", keyed("Export…", "E"))
+        .text("print", keyed("Print…", "P"))
         .separator()
         .text("home", "Close Project");
     // On macOS Quit lives in the app menu (Cmd+Q), not in File.

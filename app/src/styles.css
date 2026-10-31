@@ -1442,6 +1442,157 @@ dialog.comic-dialog:not([open]) {
   color: var(--muted);
 }
 
+/* =========================================================================
+   Print Stylesheet (@media print) for direct native & browser printing
+   Ensures clean physical Letter pagination, zero UI clutter, black text on
+   white paper, Courier Prime 12pt, standard margins, and scene numbering.
+   ========================================================================= */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0;
+  }
 
+  /* Reset document canvas flow and colors */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
 
+  /* Hide all UI toolbars, panels, sidebars, modals, floating overlays and hints */
+  .toolbar,
+  header,
+  footer,
+  #home,
+  #freewrite,
+  #navigator,
+  #board,
+  .notes-panel,
+  dialog,
+  .find-bar,
+  .format-bar,
+  .format-popup,
+  .island,
+  #banner,
+  .page-mark,
+  .quick-switcher,
+  .take-tray,
+  .comment-pane,
+  .tags-panel,
+  .sr-only,
+  #editor-hint,
+  button,
+  select,
+  input {
+    display: none !important;
+  }
+
+  /* Structural wrappers */
+  .panes {
+    display: block !important;
+    grid-template-columns: none !important;
+    grid-template-areas: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .editor-wrap {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  #editor {
+    width: 8.5in !important;
+    max-width: 8.5in !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* ProseMirror screenplay page styling */
+  .ProseMirror {
+    font-family: "Courier Prime", Courier, monospace !important;
+    font-size: 12pt !important;
+    line-height: 12pt !important;
+    padding: 1in 0 !important;
+    color: #000000 !important;
+    background: transparent !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .ProseMirror p {
+    color: #000000 !important;
+    background: transparent !important;
+    text-shadow: none !important;
+    orphans: 2;
+    widows: 2;
+  }
+
+  /* Strip on-screen color styling and highlights */
+  .tc-red, .tc-orange, .tc-green, .tc-blue, .tc-purple {
+    color: #000000 !important;
+  }
+
+  mark.hl, .hl-yellow, .hl-green, .hl-blue, .hl-pink, .hl-orange {
+    background: transparent !important;
+    color: inherit !important;
+  }
+
+  /* Scene numbers in left and right margins */
+  .scene-num {
+    color: #000000 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Revision marks */
+  .ProseMirror p.revised::after {
+    color: #000000 !important;
+  }
+
+  /* Page breaks & pagination control */
+  .ProseMirror p[data-break] {
+    border-top: none !important;
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .ProseMirror p[data-break]::before {
+    display: none !important;
+  }
+
+  /* Avoid breaking headings and cues across page bottoms */
+  .b-heading,
+  .b-character {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .b-parenthetical {
+    break-before: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .b-dialogue {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  /* Omitted scenes */
+  .ProseMirror p.in-omitted-scene {
+    opacity: 1 !important;
+    color: #555555 !important;
+  }
+}
 
