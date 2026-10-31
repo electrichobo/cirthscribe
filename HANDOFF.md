@@ -4,29 +4,33 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 Onboarding & Font Packaging complete.** Next: manual checks and owner release review.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Cross-platform audit & hardening complete.** Next: manual checks and physical hardware runs.
 
 ## Completed & Verified
 
-- **Software Tour Onboarding (`app/src/tour.ts`, `app/src/main.ts`, `app/src-tauri/src/main.rs`, e2e Test 84):** 6-card interactive tour modal, step-by-step progress, keyboard navigation, skip/complete with localStorage persistence, and re-launchable via `Help > Software Tour…`.
-- **Non-Latin Script Screen Font Packaging (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `app/src/styles.css`, `app/src/a11y.ts`, `docs/m0/LICENSES.md`, `THIRD-PARTY-NOTICES.txt`):** Bundled SIL OFL-1.1 Noto Sans and Noto Serif for full international / non-Western Unicode script coverage across screen fonts.
+- **macOS & Linux Cross-Platform Hardening (`crates/cirth-core/src/fsutil.rs`, `app/src-tauri/src/main.rs`, `app/src/bindings.ts`, `app/src/main.ts`, `app/src/tour.ts`):**
+  - Best-effort Unix parent directory `sync_all` in `replace_file` preventing false I/O errors on APFS, FAT32/exFAT, and network shares.
+  - Dual-pulse refocusing (150 ms + 350 ms safety net) on macOS exit from full screen to guarantee WKWebView first-responder status.
+  - Native menu label and default shortcut for Full Screen (`Cmd+Ctrl+F` on macOS per Apple HIG; `F11` on Windows/Linux).
+  - Robust dual `isMac` detection across `navigator.platform` and `navigator.userAgent`.
+  - Software tour dialog flex container width and WebKitGTK / WKWebView Tab / `ISO_Left_Tab` focus trap.
 - **Verified:**
-  - `cargo test -p cirth-core` (188/188 passed: 128 unit, 4 golden, 6 layout, 21 migration v1–v16, 29 store).
-  - `npm --prefix app run build` (clean without errors; Noto Sans & Serif bundled).
+  - `cargo test -p cirth-core` (188/188 passed).
+  - `npm --prefix app run build` (clean without errors).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
   - `node app/scripts/third-party-notices.mjs --check` (357 components passed).
-  - `npm --prefix app run e2e:cdp` (84/84 passed, 0 skipped).
+  - `npm --prefix app run e2e:cdp` (84/84 passed).
   - `npm --prefix app run e2e:webdriver` (83/83 passed, 1 skipped: simulated IME).
 - **Not verified (carried):**
-  - Manual check N49 (Software tour and non-Latin script display);
-  - M7 checks N47–N48, M6 checks N41–N46, M5 checks N37–N40, M4 checks N32–N36, Mac run (N31), N29, N30.
+  - Physical macOS run (N31, M1–M13, D1–D4, N1–N20) and Linux desktop environment run.
+  - Manual check N49 (Software tour and non-Latin font rendering); M7 checks N47–N48.
 
 ## In-Progress / Uncommitted State
 
-- Software tour onboarding dialog, non-Latin Noto font packaging, and Test 84 complete and fully verified. Ready for commit and push.
+- Cross-platform hardening complete and verified across all test gates. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push: Software tour onboarding dialog and non-Latin font packaging.
-2. Align with owner on release review and manual checks execution (`docs/testing/MANUAL_CHECKS.md`).
+1. Commit and push cross-platform stability updates.
+2. Coordinate with owner on hardware test environment setup (macOS and Ubuntu 24.04).

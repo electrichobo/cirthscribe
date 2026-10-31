@@ -7,7 +7,7 @@
 // Cmd on macOS. Keys are letters (A-Z), digits, F1-F12, Enter, Space or
 // punctuation such as . = -.
 
-export const isMac = navigator.platform.toLowerCase().includes("mac");
+export const isMac = /Mac/i.test(navigator.platform) || /Mac/i.test(navigator.userAgent);
 
 export type Scope = "app" | "script";
 export interface Binding {
@@ -63,7 +63,7 @@ export const BINDINGS: Binding[] = [
   { id: "goto_scene", group: "Moving around", label: "Go to scene", menu: "Scene…", scope: "app", defaults: ["Mod+Shift+G"] },
   { id: "focus_mode", group: "View", label: "Focus mode", menu: "Focus Mode", scope: "app", defaults: ["Mod+Shift+F"] },
   { id: "view_typewriter", group: "View", label: "Typewriter mode", menu: "Typewriter Mode", scope: "app", defaults: ["Mod+Shift+T"] },
-  { id: "full_screen", group: "View", label: "Full screen", menu: "Full Screen", scope: "app", defaults: ["F11"] },
+  { id: "full_screen", group: "View", label: "Full screen", menu: "Full Screen", scope: "app", defaults: isMac ? ["Mod+Ctrl+F", "F11"] : ["F11"] },
   { id: "ui_larger", group: "View", label: "Larger interface", menu: "Larger Interface", scope: "app", defaults: ["Mod+=", "Mod+Shift+="] },
   { id: "ui_smaller", group: "View", label: "Smaller interface", menu: "Smaller Interface", scope: "app", defaults: ["Mod+-"] },
   { id: "ui_reset", group: "View", label: "Actual size", menu: "Actual Size", scope: "app", defaults: ["Mod+0"] },

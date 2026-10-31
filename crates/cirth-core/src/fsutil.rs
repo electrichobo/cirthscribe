@@ -35,7 +35,12 @@ pub fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
 pub fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::rename(from, to)?;
     let dir = to.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    std::fs::File::open(dir)?.sync_all()
+    // Directory fsync is best-effort: macOS APFS, network mounts and non-POSIX
+    // filesystems may return EINVAL or ENOTSUP on directory handles.
+    if let Ok(f) = std::fs::File::open(dir) {
+        let _ = f.sync_all();
+    }
+    Ok(())
 }
 
 /// What a file looked like when we last read or wrote it, to detect changes

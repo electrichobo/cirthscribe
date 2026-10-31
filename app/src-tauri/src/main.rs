@@ -3300,10 +3300,16 @@ fn focus_window(window: tauri::WebviewWindow, on: bool, restore: bool) -> Result
                 window.set_focus().map_err(e)?;
                 // Leaving restores the style mask asynchronously, and tao then
                 // makes its content view first responder again; refocus the
-                // web view once that has run (150 ms worked in every Mac run).
+                // web view once that has run (150 ms baseline, plus a 350 ms safety net
+                // for slower hardware, VMs, or system animations).
                 let webview = AsRef::<tauri::Webview<_>>::as_ref(&window).clone();
+                let win = window.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(150));
+                    let _ = win.set_focus();
+                    let _ = webview.set_focus();
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    let _ = win.set_focus();
                     let _ = webview.set_focus();
                 });
             }
@@ -3554,7 +3560,16 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .separator()
         .item(&check_item(app, "view_typewriter", &keyed("Typewriter Mode", "Shift+T"), false)?)
         .text("focus_mode", keyed("Focus Mode", "Shift+F"))
-        .item(&check_item(app, "full_screen", "Full Screen (F11)", false)?)
+        .item(&check_item(
+            app,
+            "full_screen",
+            if cfg!(target_os = "macos") {
+                "Full Screen (Cmd+Ctrl+F)"
+            } else {
+                "Full Screen (F11)"
+            },
+            false,
+        )?)
         .build()?;
     // Every panel the writer can show or hide. Later panels (outline, bible,
     // timeline, notes) join here as they are built.

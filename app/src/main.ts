@@ -1566,7 +1566,7 @@ async function openViaDialog(): Promise<boolean> {
 
 // Shortcuts: handled here, not as OS menu accelerators, so they work the same
 // on every platform and can be exercised by the test drivers.
-const isMac = /Mac/i.test(navigator.userAgent);
+const isMac = /Mac/i.test(navigator.userAgent) || /Mac/i.test(navigator.platform);
 
 /** Typewriter mode: keep the caret's line at the middle of the script area.
  *  Not after mouse clicks (the text would jump under the pointer). The

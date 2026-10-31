@@ -138,6 +138,7 @@ export function createTourDialog() {
   container.className = "tour-container";
   container.style.display = "flex";
   container.style.flexDirection = "column";
+  container.style.width = "100%";
 
   // Visual header area
   const visualHeader = document.createElement("div");
@@ -319,6 +320,22 @@ export function createTourDialog() {
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
       btnPrev.click();
+    } else if (e.key === "Tab" || e.key === "ISO_Left_Tab" || e.keyCode === 9) {
+      const stops = [btnSkip, btnPrev, btnNext].filter((b) => b.style.display !== "none" && !b.disabled);
+      if (stops.length > 0) {
+        const at = stops.indexOf(document.activeElement as HTMLButtonElement);
+        const back = e.shiftKey || e.key === "ISO_Left_Tab";
+        if (at === -1) {
+          e.preventDefault();
+          stops[back ? stops.length - 1 : 0].focus();
+        } else if (back && at === 0) {
+          e.preventDefault();
+          stops[stops.length - 1].focus();
+        } else if (!back && at === stops.length - 1) {
+          e.preventDefault();
+          stops[0].focus();
+        }
+      }
     }
   });
 
