@@ -28,9 +28,9 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- Cross-platform hardening complete and verified across all test gates. Ready for commit and push.
+- Documentation updated for cross-platform hardening, compatibility matrix, and manual checks. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push cross-platform stability updates.
+1. Commit and push documentation updates.
 2. Coordinate with owner on hardware test environment setup (macOS and Ubuntu 24.04).

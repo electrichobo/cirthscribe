@@ -16,9 +16,13 @@ Updated 2026-10-30.
 - Step 6: Compatibility Matrix, Automated Verification & Milestone 7 Exit Review.
   - Full automated suite verification (188 core tests, 4 contract tests, 355 license notices, 83 CDP tests, 82 WebDriver tests).
   - Updated `docs/COMPATIBILITY.md`, manual checks N47 and N48 in `docs/testing/MANUAL_CHECKS.md`, authored `docs/m7/EXIT_REVIEW.md`.
-- Post-M7 Onboarding & Font Packaging (2026-10-30):
+- Post-M7 Onboarding, Font Packaging & Cross-Platform Hardening (2026-10-30):
   - Software Tour onboarding dialog (`app/src/tour.ts`, `app/src-tauri/src/main.rs`, `app/src/main.ts`, and E2E Test 84). 6-card illustrated walkthrough (Canvas, Focus, Planning, Production, Versions, Formats), keyboard navigation (Left/Right/Esc), skip/complete with localStorage persistence, and re-launchable via `Help > Software Tour…`.
   - Non-Latin script screen font packaging (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `app/src/styles.css`, `app/src/a11y.ts`, `docs/m0/LICENSES.md`, `assets/legal/THIRD-PARTY-NOTICES.txt`). SIL OFL 1.1 TrueType fonts covering full international Unicode ranges (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings.
+  - Cross-platform macOS & Linux audit hardening:
+    - `cirth_core::fsutil::replace_file`: best-effort parent directory `sync_all` on Unix, preventing false save errors on APFS, FAT32/exFAT, and network shares.
+    - macOS focus restoration & full screen (`app/src-tauri/src/main.rs`, `app/src/bindings.ts`): dual-pulse focus restoration (150 ms + 350 ms safety net) on macOS exit from full screen; native menu and shortcut updated to `Cmd+Ctrl+F` (`Mod+Ctrl+F`) on macOS per Apple HIG to prevent system interception of `F11`.
+    - Platform detection & focus trapping (`app/src/main.ts`, `app/src/tour.ts`): dual `isMac` check across `navigator.platform` and `navigator.userAgent`; WebKitGTK / WKWebView Tab / `ISO_Left_Tab` focus trap and width layout fix on tour dialog.
   - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, 84 CDP tests, 83 WebDriver tests (1 skipped). Added manual check N49 in `docs/testing/MANUAL_CHECKS.md`.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**

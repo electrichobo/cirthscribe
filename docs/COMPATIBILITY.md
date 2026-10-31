@@ -23,7 +23,7 @@ Statuses: not implemented · implemented, unverified · verified within profile 
 
 | Format | Status | Profile / scope | Basis |
 | - | - | - | - |
-| .cirth (native) | Verified within profile | Kolbítar reopening its own projects, upgrades from schemas v1–v4 | Automated store, migration and crash tests on Windows, macOS and Linux CI |
+| .cirth (native) | Verified within profile | Kolbítar reopening its own projects, upgrades from schemas v1–v16; Unix atomic replacement with best-effort directory fsync for APFS/network mount resilience | Automated store, migration and crash tests on Windows, macOS and Linux CI |
 | .pdf | Partial with documented losses | US Letter and A4, Courier Prime 12 pt | Preview (macOS) 2026-10-27, on pack v1. Fixed since, pending a recheck on pack v2: page size and metadata text. Known losses: no fallback font for characters Courier Prime lacks. No industry comparison yet (N25) |
 | .txt | Implemented, unverified | Fixed-pitch page text | Byte-identical on Windows and macOS; not opened in another app |
 | .fountain | Implemented, unverified externally | Fountain syntax (fountain.io), within the limits the export report lists | Kolbítar's own round trip (automated) and byte-identical on Windows and macOS. No other app yet (N22) |
