@@ -29,9 +29,9 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- File associations, drag-and-drop, bundler configuration, offline audit script, and Test 85 complete and verified. Ready for commit and push.
+- README.md updated to align with M7, font packaging, file associations, drag-and-drop, and offline audit. Ready for commit and push.
 
 ## Next Immediate Step
 
-1. Commit and push file associations, drag-and-drop, and offline audit script.
-2. Coordinate with owner on hardware test environment setup (macOS and Ubuntu 24.04).
+1. Commit and push README.md and documentation alignment.
+2. Coordinate with owner on next tasks before final art assets.

@@ -165,6 +165,9 @@ Done:
 - [x] Cloud sharing & Google Docs/Sheets workflow adapter: export capability analyzer, fidelity grading, explicit loss warnings, dynamic export dialog guidance, and interoperability guide (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, `app/src/exportdlg.ts`, E2E Test 83)
 - [x] Software tour onboarding dialog: 6-step guided walkthrough of core writing, focus modes, story planning, production tools, revision workflows, and format tools; non-blocking, keyboard accessible (Left/Right arrows, Esc), skip/complete options, and re-launchable via Help > Software Tour… (`app/src/tour.ts`, E2E Test 84)
 - [x] Non-Latin script screen font packaging: bundled SIL OFL-1.1 Noto Sans and Noto Serif for full international / non-Western Unicode script coverage (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `docs/m0/LICENSES.md`)
+- [x] Native OS file associations, CLI launching & drag-and-drop: registered file associations for `.cirth` (editor) and `.cirth-review` (viewer); startup argument file opening; window drag-and-drop file opening for projects and imports (`.fountain`, `.fdx`); E2E Test 85 (`tauri.conf.json`, `main.rs`, `main.ts`, E2E Test 85)
+- [x] Automated offline & zero-telemetry audit: script mathematically verifying strict CSP, zero tracking dependencies, codebase network scan, and live OS process socket inspection (`app/scripts/offline-audit.mjs`, `npm run test:offline`)
+- [x] Cross-platform macOS and Linux hardening: Unix atomic file replacement with best-effort directory fsync for APFS/FAT32 resilience, dual-pulse focus restoration after macOS full screen, `Cmd+Ctrl+F` Apple HIG keybinding, and WebKitGTK dialog focus trapping
 - [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
 
 Carried forward:
@@ -244,6 +247,7 @@ The GPL does not forbid charging for copies; no open-source license can. But any
 Kolbítar ships with these components under their own licenses:
 
 - **Courier Prime** font: SIL Open Font License 1.1 (`assets/fonts/courier-prime/OFL.txt`)
+- **Noto Sans** and **Noto Serif** fonts: SIL Open Font License 1.1 (`assets/fonts/noto-*/OFL.txt`)
 - **SCOWL** English dictionaries: © Kevin Atkinson and others, under permissive notices (`assets/dictionaries/*/README_*.txt`)
 - **spellbook** spell checker: MPL-2.0
 - **SQLite**: public domain
