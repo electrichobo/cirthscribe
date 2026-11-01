@@ -1,10 +1,10 @@
 # Handoff
 
-Working state between agent sessions; see "Session Continuity & Constrained Takeover Protocol" in AGENTS.md. Last updated 2026-10-30.
+Working state between agent sessions; see "Session Continuity & Constrained Takeover Protocol" in AGENTS.md. Last updated 2026-10-31.
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 hardening, print stylesheet, showcase script, NSIS installer, Linux container verification complete.** Next: manual checks, macOS hardware run, and final art asset integration.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 hardening, print stylesheet, showcase script, NSIS installer, Linux container verification complete.** **On hold (owner, 2026-10-31) until the owner delivers the art assets (`docs/ART_ASSETS.md`).** Then: art integration, manual checks, macOS hardware run.
 
 ## Completed & Verified
 
@@ -20,7 +20,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - **UI Vector SVG Registry & High-Fantasy Showcase Script:** 35+ stroke icons; sample script.
 - **Native Print Stylesheet & NSIS Windows Installer:** Physical Letter page layout, 8.95 MiB setup.
 - **Verified:**
-  - `cargo test -p cirth-core` (188/188 passed).
+  - `cargo test -p cirth-core` (191/191 passed; rerun 2026-10-31 on Windows after takeover, clean tree at 1e97c08).
   - `npm --prefix app run build` (clean without errors).
   - `cargo build -p cirthscribe --release` (clean).
   - `npm --prefix app run test:contract` (4/4 passed).
@@ -33,9 +33,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- Modified: `README.md`, `STATUS.md`, `HANDOFF.md`.
+- None. Tree clean at 1e97c08, in sync with origin/main (2026-10-31). This checkpoint edits only `HANDOFF.md` and `README.md`.
 
 ## Next Immediate Step
 
-1. Commit and push documentation updates to origin/main.
-2. Await final art asset delivery from owner.
+1. Wait for the owner's art assets; no feature work during the hold.
+2. On delivery: generate app icons with `tauri icon` from the 1024 master, add logo SVGs to Home/About, NSIS header/sidebar BMPs, DMG background; swap owner icons into `app/src/icons.ts` where they replace agent-drawn ones.
+3. Bring `docs/ART_ASSETS.md` up to date first: its status line (2026-10-26) still says no icons exist, but `app/src/icons.ts` now has a 35+ icon registry, and it still says "About CirthScribe".

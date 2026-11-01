@@ -183,6 +183,7 @@ Carried forward:
 - [ ] Desktop manual check for native print preview (N50)
 - [ ] Desktop manual check for Command Palette and Personal Dictionary (N51)
 - [ ] VM / hardware execution of setup scripts on macOS and Linux
+- [ ] Art assets: app and file icons, logo, installer art (`docs/ART_ASSETS.md`). Work is on hold until these are delivered
 
 ---
 
