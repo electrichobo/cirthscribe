@@ -4,39 +4,31 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`). Post-M7 hardening, print stylesheet, showcase script, NSIS installer, Linux container verification complete.** **On hold (owner, 2026-10-31) until the owner delivers the art assets (`docs/ART_ASSETS.md`).** Then: art integration, manual checks, macOS hardware run.
+**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`).** The art-asset hold ended 2026-11-02: the owner delivered 52 files, now integrated (`docs/ART_ASSETS.md`). Next: owner review of the art in the app, then manual checks and the macOS hardware run.
 
 ## Completed & Verified
 
-- **Linux Container Verification (`e2e-linux-smoke.json`, 2026-10-31):**
-  - Ran under Unraid (Ubuntu 24.04, kernel 6.12, WebKitGTK 4.1 + Xvfb).
-  - 87/88 tests passed (1 skipped IME as documented), 0 failed.
-  - Performance: 127 pages paginated in 13ms, cold open 387ms, 0/500 key stress.
-- **Docker Linux Runner (`Dockerfile.linux`, `scripts/setup-linux.sh`):**
-  - Dedicated Ubuntu 24.04 container definition for Unraid and headless CI.
-  - Node 24 with native type stripping, root handling without sudo, non-interactive apt.
-- **Command Palette & Quick Switcher (`palette.ts`, e2e Test 88, N51):** `Ctrl+K` / `Cmd+K`.
-- **Personal Dictionary Manager (`dictionary.ts`, e2e Test 88, N51):** User/project words.
-- **UI Vector SVG Registry & High-Fantasy Showcase Script:** 35+ stroke icons; sample script.
-- **Native Print Stylesheet & NSIS Windows Installer:** Physical Letter page layout, 8.95 MiB setup.
-- **Verified:**
-  - `cargo test -p cirth-core` (191/191 passed; rerun 2026-10-31 on Windows after takeover, clean tree at 1e97c08).
-  - `npm --prefix app run build` (clean without errors).
-  - `cargo build -p cirthscribe --release` (clean).
-  - `npm --prefix app run test:contract` (4/4 passed).
-  - `npm --prefix app run test:offline` (100% passed).
-  - `node app/scripts/third-party-notices.mjs --check` (357 components passed).
-  - E2E test runs (CDP 88/88 passed; WebDriver 87/88 passed, 1 skipped IME).
-- **Not verified (carried):**
-  - Physical macOS run (N31, M1–M13, D1–D4, N1–N20) and interactive Linux desktop run.
-  - Manual checks N47–N51; external Google Docs / PDF reader checks.
+- **Owner art integration (2026-11-02, `docs/ART_ASSETS.md`):**
+  - Delivered SVGs each wrap one PNG; converted with Windows' built-in .NET imaging, no new tools.
+  - App icon (`tauri icon`): `.ico`, Linux PNGs, `.icns` from the macOS-grid version; masters in `assets/art/`.
+  - NSIS header and sidebar BMPs, DMG background; wired in `tauri.conf.json`.
+  - Wordmark on Home and About: colour (light), white (dark), single-colour (high contrast), text (Windows contrast).
+  - UI icons: owner art on light themes only (owner decision); line icons elsewhere. `ART` in `icons.ts`, rules at the end of `styles.css`.
+  - Wordmark lettering "Kółbítar" is a stylization (owner); the text name stays Kolbítar.
+  - e2e theme test now asserts which art each theme shows and that the files load; adds `theme-day-art` screenshot.
+- **Fixed: closed dialogs drawn over the script.** Nine dialog rules set `display: flex`/`grid`, overriding the hidden state, so closed dialogs stacked at the top of the window (Branches on top, since M5 step 4). One rule now hides any closed dialog.
+- **Verified 2026-11-02 (Windows):** `npm run build`; `cargo build -p cirthscribe --release`; contract 4/4; offline audit passed; notices check (357); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME). `cargo test -p cirth-core` 191/191 on 2026-10-31 (no core change since).
+- **Not verified:**
+  - N52 (art across themes, installer and DMG). The installer and DMG were not built; DMG icon positions are a guess from the art.
+  - Physical macOS run (N31, M1–M13, D1–D4, N1–N20), interactive Linux desktop; manual checks N47–N51.
+  - Not done: file-type icons for `.cirth`/`.cirth-review` (Tauri 2 file associations use the app icon), Retina DMG background.
 
 ## In-Progress / Uncommitted State
 
-- None. Tree clean at 1e97c08, in sync with origin/main (2026-10-31). This checkpoint edits only `HANDOFF.md` and `README.md`.
+- None. Art integration and dialog fix committed and pushed (2026-11-02).
 
 ## Next Immediate Step
 
-1. Wait for the owner's art assets; no feature work during the hold.
-2. On delivery: generate app icons with `tauri icon` from the 1024 master, add logo SVGs to Home/About, NSIS header/sidebar BMPs, DMG background; swap owner icons into `app/src/icons.ts` where they replace agent-drawn ones.
-3. Bring `docs/ART_ASSETS.md` up to date first: its status line (2026-10-26) still says no icons exist, but `app/src/icons.ts` now has a 35+ icon registry, and it still says "About CirthScribe".
+1. Owner reviews the art in the app (Day theme toolbar, Home, About).
+2. Build the NSIS installer (`npx tauri build`) and run N52 on Windows; DMG part on GROGU.
+3. File-type icons need a custom NSIS template and an `Info.plist` entry if the owner wants them.

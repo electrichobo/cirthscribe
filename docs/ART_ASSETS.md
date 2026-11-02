@@ -1,6 +1,35 @@
 # Art assets
 
-What the app needs, with sizes. Status 2026-10-26: none of these exist yet. The app icon is a 64 px placeholder, and every UI control is text or a Unicode arrow. All art must be original (see CLAUDE.md). Keep the editable source files: SVG, or your design tool's file.
+What the app needs, with sizes. All art must be original (see AGENTS.md). Keep the editable source files: SVG, or your design tool's file.
+
+## Delivered (owner, 2026-11-02)
+
+The owner delivered 52 files. Each SVG is a wrapper around one embedded PNG (no vector paths), so the app uses them as images. The full-size originals stay with the owner; the repository keeps the 1024 px icon masters (`assets/art/`) and the sizes the app uses. Converted with Windows' built-in .NET imaging (no new tools or dependencies).
+
+The wordmark lettering reads "Kółbítar". The owner confirmed this is a stylization (2026-11-02); the product's text name stays Kolbítar everywhere.
+
+| Delivered | Used as | Where |
+| - | - | - |
+| `branding/master app logo` | App icon: Windows `.ico`, Linux PNGs (`tauri icon`) | `assets/art/app-icon.png` → `app/src-tauri/icons/` |
+| `branding/macos icon` | macOS `.icns` | `assets/art/app-icon-macos.png` → `app/src-tauri/icons/icon.icns` |
+| `branding/full wordmark light` / `dark` | Home header and About screen: light themes / dark themes | `app/public/art/brand/` |
+| `branding/full wordmark monochrome dark` / `light` | The same under high contrast (white / black background) | `app/public/art/brand/` |
+| `windows nsis header`, `windows nsis sidebar welcome` | NSIS installer, 150×57 and 164×314 BMP | `app/src-tauri/installer/` |
+| `maxOS retina` | macOS disk image background, 660×400 | `app/src-tauri/installer/dmg-background.png` |
+| `toolbar/*`, `production_review/*`, `review_newformats/*` | UI icons, 48×48 PNG | `app/public/art/icons/` |
+| `branding/project file icon`, `review file icon` | Kept as 1024 px masters, not used yet | `assets/art/` |
+| `branding/full wordmark * vertical`, `toolbar/color source` | Not used (no slot yet; `color source` is the brand mark, kept as a colour reference) | owner's copy only |
+
+**UI icons are shown on light themes only** (owner decision, 2026-11-02). They are full-colour pictures drawn for a light background, so the Day theme and the OS light default show them; Night, Midnight, OLED, high contrast and Windows contrast themes keep the one-colour line drawings in `app/src/icons.ts`, which follow the theme's text colour. The art registry is `ART` in `app/src/icons.ts`; the theme rules are at the end of `app/src/styles.css`.
+
+Wired to a visible control today: home, undo, redo, scenes, board, find, focus, more, font, highlight, comment. Registered for when a control uses them: timeline, bible, storyscry, stripboard, tags, branch, snapshot, grammar, ai. Delivered with no control that shows an icon yet: bookmarks, characters, evidence, lock/unlock pages, lock/unlock scenes, outline, overview, revisions, sides, alternatives, comic, interactive, merge, review package, treatment, typewriter. The text colour menu has no delivered art and keeps its line icon.
+
+**Not done:**
+- File type icons for `.cirth` and `.cirth-review`. Tauri 2's file associations use the app icon; a separate document icon needs a custom installer template on Windows and an `Info.plist` entry on macOS.
+- A Retina (2x) DMG background. Tauri takes one background image.
+- Light and dark (or one-colour vector) versions of the UI icons, which would let dark and high-contrast themes show the art too.
+
+## Original request (2026-10-26)
 
 ## 1. App identity
 
@@ -70,7 +99,7 @@ Names below are suggested file names. Shared icons are listed once, with every p
 | `older-format.svg` | Card badge: older file format, upgraded on open |
 | `missing-file.svg` | Recent file not found |
 | `backups.svg` | Backups list / restore as a copy |
-| `info.svg` | About CirthScribe and licences |
+| `info.svg` | About Kolbítar and licences |
 
 ### Free Writing
 | File | Action |

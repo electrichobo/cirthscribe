@@ -37,6 +37,7 @@ export function createAbout() {
     return el(
       "div",
       { className: "about-main" },
+      el("p", { className: "wordmark about-wordmark" }, "Kolbítar"),
       el("p", { className: "about-attribution" }, "Based on Kolbítar by Jared Hoy"),
       el("p", {}, "Copyright © 2026 Jared Hoy (electrichobo)"),
       el("p", {}, "Source code: ", el("span", { className: "about-url" }, "https://github.com/electrichobo/cirthscribe")),

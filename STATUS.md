@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-30.
+Updated 2026-11-02.
 
 **M7 (optional integrations) closed 2026-10-30 (`docs/m7/EXIT_REVIEW.md`). Steps 1–6 built 2026-10-30:**
 - Steps 1–4: Optional AI Assistant & Non-Destructive Diff Engine (`cirth_core::ai`, `app/src-tauri/src/main.rs`, `app/src/aidlg.ts`, and E2E Test 82).
@@ -45,6 +45,7 @@ Updated 2026-10-30.
     - Dictionary management dialog (`Format > Spelling > Personal Dictionary…`) to view, filter, add, and remove words in project and personal dictionaries.
   - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 88 CDP tests, 87 WebDriver tests (1 skipped). Added manual check N51 in `docs/testing/MANUAL_CHECKS.md`.
   - Linux Container Verification (2026-10-31): Verified 100% pass on Linux (Ubuntu 24.04, kernel 6.12 Unraid, WebKitGTK 4.1 + Xvfb) with 87/88 tests passing (1 skipped IME) in 6m 03s, with cold open at 387ms, warm open at 120ms, and 127-page pagination at 13ms.
+  - Owner art integration (2026-11-02, `docs/ART_ASSETS.md`): app icon for Windows, macOS and Linux; wordmark on Home and About with light, dark and high-contrast versions; NSIS header and sidebar; DMG background; colour toolbar icons on light themes only, line icons on every other theme. Fixed closed dialogs being drawn over the script (nine dialog rules overrode the hidden state). CDP 88/88, WebDriver 87/88 (1 skipped IME). Manual check N52 open; installer and DMG not built yet; no file-type icons yet.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).

@@ -18,7 +18,7 @@
   },
   "bundle": {
     "active": true,
-    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "icon": ["icons/32x32.png", "icons/64x64.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.icns", "icons/icon.ico"],
     "fileAssociations": [
       {
         "ext": ["cirth"],
@@ -40,11 +40,20 @@
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
-        "installMode": "both"
+        "installMode": "both",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "installer/nsis-header.bmp",
+        "sidebarImage": "installer/nsis-sidebar.bmp"
       }
     },
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "dmg": {
+        "background": "installer/dmg-background.png",
+        "windowSize": { "width": 660, "height": 400 },
+        "appPosition": { "x": 160, "y": 215 },
+        "applicationFolderPosition": { "x": 492, "y": 210 }
+      }
     },
     "linux": {
       "deb": {

@@ -2,7 +2,9 @@
 // Drawn on a uniform 24 x 24 grid with 2 px margins (docs/ART_ASSETS.md).
 // Uses currentColor and stroke-width="1.8" so icons automatically adopt
 // Light, Dark, Midnight, OLED, High Contrast, and Windows Contrast themes.
-// When production art arrives, icons can be replaced 1-to-1 in PATHS.
+// The owner's full-colour art (ART) is drawn for light backgrounds, so CSS
+// shows it only on light themes without high contrast; every other theme
+// keeps the line drawing.
 
 const PATHS: Record<string, string> = {
   // Navigation & Core Actions
@@ -65,6 +67,14 @@ const PATHS: Record<string, string> = {
   warning: '<path d="m12 4 8.5 15H3.5z"/><path d="M12 9v5M12 16.5h.01"/>',
 };
 
+// Registry name -> file in app/public/art/icons (48 x 48 PNG).
+const ART: Record<string, string> = {
+  home: "home", undo: "undo", redo: "redo", find: "find", focus: "focus", more: "more",
+  scenes: "scenes", board: "board", timeline: "timeline", bible: "bible", storyscry: "storyscry",
+  stripboard: "stripboard", tags: "tag", highlight: "highlight", font: "font", comment: "comment",
+  branch: "branch", snapshot: "snapshots", grammar: "grammar", ai: "ai-assistant",
+};
+
 export function icon(name: keyof typeof PATHS | string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
@@ -77,7 +87,20 @@ export function icon(name: keyof typeof PATHS | string): SVGSVGElement {
   svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
   svg.classList.add("icon", `icon-${name}`);
-  svg.innerHTML = PATHS[name] ?? "";
+  svg.innerHTML = `<g class="icon-line">${PATHS[name] ?? ""}</g>`;
+  const art = ART[name];
+  if (art) {
+    // A colour swatch bar stays visible over the art, which is shortened to make room.
+    const swatch = svg.querySelector(".swatch");
+    const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+    img.setAttribute("href", `/art/icons/${art}.png`);
+    img.setAttribute("width", "24");
+    img.setAttribute("height", swatch ? "18" : "24");
+    img.classList.add("icon-art");
+    svg.append(img);
+    if (swatch) svg.append(swatch);
+    svg.classList.add("has-art");
+  }
   return svg;
 }
 
