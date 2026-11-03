@@ -1835,29 +1835,31 @@ dialog.palette-dialog::backdrop {
 dialog:not([open]) { display: none !important; }
 
 /* Owner art (docs/ART_ASSETS.md). Colour icons and the colour wordmark on light
-   themes; the white wordmark on dark themes; the single-colour wordmark under
-   high contrast; text only under Windows contrast themes. */
-:root { --art-icons: inline; --art-line: none; --wordmark: url("/art/brand/wordmark-light.png"); }
-:root:is([data-theme="night"], [data-theme="midnight"], [data-theme="oled"]) { --art-icons: none; --art-line: inline; --wordmark: url("/art/brand/wordmark-dark.png"); }
+   themes; the inverted icons (blacks and whites swapped, oranges kept) and the
+   white wordmark on dark themes; line icons and the single-colour wordmark under
+   high contrast; line icons and the name as text under Windows contrast themes. */
+:root { --art-icons: inline; --art-icons-dark: none; --art-line: none; --wordmark: url("/art/brand/wordmark-light.png"); }
+:root:is([data-theme="night"], [data-theme="midnight"], [data-theme="oled"]) { --art-icons: none; --art-icons-dark: inline; --wordmark: url("/art/brand/wordmark-dark.png"); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) { --art-icons: none; --art-line: inline; --wordmark: url("/art/brand/wordmark-dark.png"); }
+  :root:not([data-theme]) { --art-icons: none; --art-icons-dark: inline; --wordmark: url("/art/brand/wordmark-dark.png"); }
 }
-:root[data-contrast="high"] { --art-icons: none; --art-line: inline; --wordmark: url("/art/brand/wordmark-mono-dark.png"); }
+:root[data-contrast="high"] { --art-icons: none; --art-icons-dark: none; --art-line: inline; --wordmark: url("/art/brand/wordmark-mono-dark.png"); }
 :root[data-contrast="high"]:is([data-theme="night"], [data-theme="midnight"], [data-theme="oled"]) { --wordmark: url("/art/brand/wordmark-mono-light.png"); }
 @media (prefers-color-scheme: dark) {
   :root[data-contrast="high"]:not([data-theme]) { --wordmark: url("/art/brand/wordmark-mono-light.png"); }
 }
 @media (prefers-contrast: more) {
-  :root:not([data-theme]) { --art-icons: none; --art-line: inline; --wordmark: url("/art/brand/wordmark-mono-dark.png"); }
+  :root:not([data-theme]) { --art-icons: none; --art-icons-dark: none; --art-line: inline; --wordmark: url("/art/brand/wordmark-mono-dark.png"); }
 }
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root:not([data-theme]) { --wordmark: url("/art/brand/wordmark-mono-light.png"); }
 }
 @media (forced-colors: active) {
-  :root { --art-icons: none; --art-line: inline; --wordmark: none; }
+  :root { --art-icons: none; --art-icons-dark: none; --art-line: inline; --wordmark: none; }
 }
-.icon .icon-art { display: none; }
+.icon .icon-art, .icon .icon-art-dark { display: none; }
 .icon.has-art .icon-art { display: var(--art-icons); }
+.icon.has-art .icon-art-dark { display: var(--art-icons-dark); }
 .icon.has-art .icon-line { display: var(--art-line); }
 /* The wordmark keeps its text for screen readers and for when no image is shown. */
 .wordmark { display: inline-block; background: var(--wordmark) left center / contain no-repeat; color: transparent; white-space: nowrap; overflow: hidden; vertical-align: middle; }

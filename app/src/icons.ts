@@ -2,9 +2,10 @@
 // Drawn on a uniform 24 x 24 grid with 2 px margins (docs/ART_ASSETS.md).
 // Uses currentColor and stroke-width="1.8" so icons automatically adopt
 // Light, Dark, Midnight, OLED, High Contrast, and Windows Contrast themes.
-// The owner's full-colour art (ART) is drawn for light backgrounds, so CSS
-// shows it only on light themes without high contrast; every other theme
-// keeps the line drawing.
+// The owner's full-colour art (ART) is drawn for light backgrounds; each icon
+// also has a "-dark" copy with blacks and whites swapped and the oranges kept.
+// CSS picks one by theme; high contrast and Windows contrast themes keep the
+// line drawing.
 
 const PATHS: Record<string, string> = {
   // Navigation & Core Actions
@@ -92,12 +93,14 @@ export function icon(name: keyof typeof PATHS | string): SVGSVGElement {
   if (art) {
     // A colour swatch bar stays visible over the art, which is shortened to make room.
     const swatch = svg.querySelector(".swatch");
-    const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
-    img.setAttribute("href", `/art/icons/${art}.png`);
-    img.setAttribute("width", "24");
-    img.setAttribute("height", swatch ? "18" : "24");
-    img.classList.add("icon-art");
-    svg.append(img);
+    for (const [file, cls] of [[art, "icon-art"], [`${art}-dark`, "icon-art-dark"]]) {
+      const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+      img.setAttribute("href", `/art/icons/${file}.png`);
+      img.setAttribute("width", "24");
+      img.setAttribute("height", swatch ? "18" : "24");
+      img.classList.add(cls);
+      svg.append(img);
+    }
     if (swatch) svg.append(swatch);
     svg.classList.add("has-art");
   }

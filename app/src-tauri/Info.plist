@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged by Tauri into the app's Info.plist. Declares the .cirth and .cirth-review
+     document types with their own icons (docs/ART_ASSETS.md); the .icns files are
+     copied into Contents/Resources by bundle.macOS.files. Keep the extensions, names
+     and roles in step with bundle.fileAssociations in tauri.conf.json. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Kolbítar Project</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>CFBundleTypeExtensions</key><array><string>cirth</string></array>
+      <key>LSItemContentTypes</key><array><string>org.cirthscribe.cirth</string></array>
+      <key>CFBundleTypeIconFile</key><string>cirth.icns</string>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>Kolbítar Review Package</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>CFBundleTypeExtensions</key><array><string>cirth-review</string></array>
+      <key>LSItemContentTypes</key><array><string>org.cirthscribe.cirth-review</string></array>
+      <key>CFBundleTypeIconFile</key><string>cirth-review.icns</string>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.cirthscribe.cirth</string>
+      <key>UTTypeDescription</key><string>Kolbítar Project</string>
+      <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+      <key>UTTypeIconFile</key><string>cirth.icns</string>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>cirth</string></array></dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.cirthscribe.cirth-review</string>
+      <key>UTTypeDescription</key><string>Kolbítar Review Package</string>
+      <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+      <key>UTTypeIconFile</key><string>cirth-review.icns</string>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>cirth-review</string></array></dict>
+    </dict>
+  </array>
+</dict>
+</plist>

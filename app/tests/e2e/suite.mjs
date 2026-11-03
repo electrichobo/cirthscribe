@@ -2023,12 +2023,13 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
       for (const fg of ['--ink', '--muted', '--accent', '--warn', '--bad']) for (const bg of ['--bg', '--panel']) out[fg + ' on ' + bg] = Math.round(cr(fg, bg) * 100) / 100;
       return { bg: css.getPropertyValue('--bg').trim(), scheme: css.colorScheme, out };
     })()`;
-    // Owner art (docs/ART_ASSETS.md): colour icons and wordmark on Day only, line icons elsewhere.
+    // Owner art (docs/ART_ASSETS.md): colour icons and wordmark on Day, the inverted
+    // icons and white wordmark on dark themes, line icons under high contrast.
     const artState = `(() => {
-      const s = document.querySelector('#go-home svg'), a = s?.querySelector('.icon-art'), l = s?.querySelector('.icon-line');
-      return { art: a && getComputedStyle(a).display, line: l && getComputedStyle(l).display, wm: getComputedStyle(document.documentElement).getPropertyValue('--wordmark').trim() };
+      const s = document.querySelector('#go-home svg'), shown = (c) => { const e = s?.querySelector(c); return e && getComputedStyle(e).display; };
+      return { art: shown('.icon-art'), dark: shown('.icon-art-dark'), line: shown('.icon-line'), wm: getComputedStyle(document.documentElement).getPropertyValue('--wordmark').trim() };
     })()`;
-    const loaded = await app.evaluate(`Promise.all(['/art/icons/home.png', '/art/brand/wordmark-light.png', '/art/brand/wordmark-mono-light.png'].map((u) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i.naturalHeight); i.onerror = () => ok(0); i.src = u; })))`);
+    const loaded = await app.evaluate(`Promise.all(['/art/icons/home.png', '/art/icons/home-dark.png', '/art/brand/wordmark-light.png', '/art/brand/wordmark-mono-light.png'].map((u) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i.naturalHeight); i.onerror = () => ok(0); i.src = u; })))`);
     assert(loaded.every((h) => h > 0), `owner art loads: ${JSON.stringify(loaded)}`);
     const seen = {};
     for (const t of ["day", "night", "midnight", "oled", "system"]) {
@@ -2042,7 +2043,8 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
       if (t !== "system") {
         const a = await app.evaluate(artState), light = t === "day";
         if (light) await screenshot(app, "theme-day-art");
-        assert(a.art === (light ? "inline" : "none") && a.line === (light ? "none" : "inline") && a.wm.includes(light ? "wordmark-light" : "wordmark-dark"), `${t}: owner art follows the theme: ${JSON.stringify(a)}`);
+        if (t === "night") await screenshot(app, "theme-night-art");
+        assert(a.art === (light ? "inline" : "none") && a.dark === (light ? "none" : "inline") && a.line === "none" && a.wm.includes(light ? "wordmark-light" : "wordmark-dark"), `${t}: owner art follows the theme: ${JSON.stringify(a)}`);
       }
       if (t !== "system") assert(r.scheme === (t === "day" ? "light" : "dark"), `${t}: native controls follow the theme (${r.scheme})`);
     }
@@ -2055,7 +2057,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const hc = await app.evaluate(ratios);
     assert(black(hc.bg) && Object.values(hc.out).every((v) => v >= 7), `OLED + high contrast: ${JSON.stringify(hc)}`);
     const hcArt = await app.evaluate(artState);
-    assert(hcArt.art === "none" && hcArt.line === "inline" && hcArt.wm.includes("wordmark-mono-light"), `high contrast keeps line icons and the single-colour wordmark: ${JSON.stringify(hcArt)}`);
+    assert(hcArt.art === "none" && hcArt.dark === "none" && hcArt.line === "inline" && hcArt.wm.includes("wordmark-mono-light"), `high contrast keeps line icons and the single-colour wordmark: ${JSON.stringify(hcArt)}`);
     await app.evaluate("__cirth.menu('ui_contrast')");
     const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
     assert(saved.theme === "oled", `stored per user: ${saved.theme}`);

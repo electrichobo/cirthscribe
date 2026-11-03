@@ -17,16 +17,20 @@ The wordmark lettering reads "Kółbítar". The owner confirmed this is a styliz
 | `windows nsis header`, `windows nsis sidebar welcome` | NSIS installer, 150×57 and 164×314 BMP | `app/src-tauri/installer/` |
 | `maxOS retina` | macOS disk image background: 1320×800 px tagged 144 DPI, which Finder draws at 660×400 pt (Retina-sharp). A 72/96 DPI tag makes Finder rescale it. Soft light bands are painted behind Finder's two icon labels (positions measured on macOS 26) so the dark label text reads over the nib and the rock. The window is 660×432 so the 32 pt title bar does not hide the bottom of the art | `app/src-tauri/installer/dmg-background.png` |
 | `toolbar/*`, `production_review/*`, `review_newformats/*` | UI icons, 48×48 PNG | `app/public/art/icons/` |
-| `branding/project file icon`, `review file icon` | Kept as 1024 px masters, not used yet | `assets/art/` |
+| `branding/project file icon`, `review file icon` | Document icons for `.cirth` and `.cirth-review` files (`tauri icon` → `.ico`, `.icns`) | masters in `assets/art/`; `app/src-tauri/file-icons/` |
 | `branding/full wordmark * vertical`, `toolbar/color source` | Not used (no slot yet; `color source` is the brand mark, kept as a colour reference) | owner's copy only |
 
-**UI icons are shown on light themes only** (owner decision, 2026-11-02). They are full-colour pictures drawn for a light background, so the Day theme and the OS light default show them; Night, Midnight, OLED, high contrast and Windows contrast themes keep the one-colour line drawings in `app/src/icons.ts`, which follow the theme's text colour. The art registry is `ART` in `app/src/icons.ts`; the theme rules are at the end of `app/src/styles.css`.
+**UI icons by theme** (owner decisions, 2026-11-02). The art is full-colour, drawn for a light background, so the Day theme and the OS light default show it as delivered. Night, Midnight, OLED and the OS dark default show a `-dark` copy of each icon with blacks and whites swapped and the oranges kept (generated: each pixel is inverted in proportion to how grey it is, so coloured pixels stay and edges stay smooth). High contrast and Windows contrast themes keep the one-colour line drawings in `app/src/icons.ts`, which follow the theme's text colour. The art registry is `ART` in `app/src/icons.ts`; the theme rules are at the end of `app/src/styles.css`.
 
 Wired to a visible control today: home, undo, redo, scenes, board, find, focus, more, font, highlight, comment. Registered for when a control uses them: timeline, bible, storyscry, stripboard, tags, branch, snapshot, grammar, ai. Delivered with no control that shows an icon yet: bookmarks, characters, evidence, lock/unlock pages, lock/unlock scenes, outline, overview, revisions, sides, alternatives, comic, interactive, merge, review package, treatment, typewriter. The text colour menu has no delivered art and keeps its line icon.
 
+**Document icons** (2026-11-02). Tauri 2's file associations have no per-type icon, so:
+- Windows: the `.ico` files ship as resources in `file-icons\`, and `app/src-tauri/installer/hooks.nsh` (`NSIS_HOOK_POSTINSTALL`) points each file type's `DefaultIcon` at its own icon after the associations are written. Uninstall removes the whole file-type key.
+- macOS: `app/src-tauri/Info.plist`, which Tauri merges into the app's, declares both document types and exported UTIs (`org.cirthscribe.cirth`, `org.cirthscribe.cirth-review`) with their icons; `bundle.macOS.files` copies the `.icns` into `Contents/Resources`. Keep it in step with `bundle.fileAssociations`.
+
 **Not done:**
-- File type icons for `.cirth` and `.cirth-review`. Tauri 2's file associations use the app icon; a separate document icon needs a custom installer template on Windows and an `Info.plist` entry on macOS.
-- Light and dark (or one-colour vector) versions of the UI icons, which would let dark and high-contrast themes show the art too.
+- Document icons on Linux. The `.deb` and AppImage register the file types but not their icons (that needs shared-mime-info XML and icon theme files).
+- One-colour vector versions of the UI icons, which would let high-contrast themes show the art too.
 
 ## Original request (2026-10-26)
 
