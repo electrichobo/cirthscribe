@@ -4,34 +4,27 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**Milestones 0–7 complete (`docs/m7/EXIT_REVIEW.md`).** The art-asset hold ended 2026-11-02: the owner delivered 52 files, now integrated (`docs/ART_ASSETS.md`). Next: owner review of the art in the app, then manual checks and the macOS hardware run.
+**RC Alpha prep** (owner, 2026-11-02): an RC Alpha for a tester group, not 1.0. M0–M7 closed; owner art integrated and checked (N52, N53). Decisions in docs/DECISIONS.md ("Release stage", "Home samples", identifier, fonts).
 
 ## Completed & Verified
 
-- **Owner art integration (2026-11-02, `docs/ART_ASSETS.md`):**
-  - Delivered SVGs each wrap one PNG; converted with Windows' built-in .NET imaging, no new tools.
-  - App icon (`tauri icon`): `.ico`, Linux PNGs, `.icns` from the macOS-grid version; masters in `assets/art/`.
-  - NSIS header and sidebar BMPs, DMG background; wired in `tauri.conf.json`.
-  - Wordmark on Home and About: colour (light), white (dark), single-colour (high contrast), text (Windows contrast).
-  - UI icons: owner art on light themes; on dark themes an inverted `-dark` copy (blacks/whites swapped, oranges kept; owner, 2026-11-02); line icons under high contrast. `ART` in `icons.ts`, rules at the end of `styles.css`.
-  - Wordmark lettering "Kółbítar" is a stylization (owner); the text name stays Kolbítar.
-  - e2e theme test now asserts which art each theme shows and that the files load; adds `theme-day-art` screenshot.
-- **N52 macOS part (GROGU, 2026-11-02, transcribed):** build and DMG pass; DMG background drew at 75% (96 DPI tag). Fixed: 1320×800 @144 DPI; recheck at c682424 passes (fills window, sharp, icons on target), except the painted nib tip crossed the "Kolbítar" label. Fixed (owner chose lightening): light bands behind both labels at GROGU's measured positions; window 660×432 so the title bar no longer hides the art's bottom 32 pt. Recheck at ebbcb7f passes. Themes, wordmarks, About, closed dialogs pass. Not checked: Dock, Cmd+Tab, Match System in macOS Light.
-- **N52 passed (2026-11-02):** owner reports the Mac checks good (Dock, Cmd+Tab, Match System in Light) and the Windows installer works with the app opening after install.
-- **Document icons for `.cirth` / `.cirth-review` (2026-11-02):** Windows via resources + `installer/hooks.nsh` (installer builds, hook compiles, 9.31 MiB); macOS via `app/src-tauri/Info.plist` merge and `bundle.macOS.files`. N53 on GROGU (35a3f90): plist merge, icons and Kind pass; double-click launched without opening the file. Fixed: `RunEvent::Opened` handled in `main.rs` (`open_from_os`); recheck at 2c4cf42 passes: compiles on macOS, opens on cold and warm launch. `.ico` resources moved to `tauri.windows.conf.json`. Windows install not run.
-- **Found on GROGU, not fixed:** Home project list blank on two macOS cold launches (not reproduced in 6 later tries); no review-package export found in the menu bar. Save As Cancel report withdrawn (tester input).
-- **Fixed: closed dialogs drawn over the script.** Nine dialog rules set `display: flex`/`grid`, overriding the hidden state, so closed dialogs stacked at the top of the window (Branches on top, since M5 step 4). One rule now hides any closed dialog.
-- **Verified 2026-11-02 (Windows, rerun after the macOS open-file fix):** `npm run build`; `cargo build -p cirthscribe --release`; contract 4/4; offline audit passed; notices check (357); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME). `cargo test -p cirth-core` 191/191 on 2026-10-31 (no core change since).
-- **Not verified:**
-  - Physical macOS run (N31, M1–M13, D1–D4, N1–N20), interactive Linux desktop; manual checks N47–N51.
-  - Not done: file-type icons for `.cirth`/`.cirth-review` (Tauri 2 file associations use the app icon).
+- **RC Alpha prep (2026-11-02):**
+  - File > Export/Import Review Package… and palette entries (commands existed since M5 step 6, unreachable).
+  - Island Comments button opens Comments (was a stale "not available yet" placeholder); e2e updated.
+  - Home: one sample, The Obsidian Seal ("Untitled Fantasy Feature"), as a Projects-grid card; other fixtures test-only.
+  - Identifier `org.kolbitar.app`; `migrate_data_dir` copies `org.cirthscribe.spike` on first launch (unit test). UTIs `org.kolbitar.cirth(-review)`. AGENTS.md updated.
+  - Linux `.deb`: MIME XML, document icons, postinst/postrm (`app/src-tauri/linux/`). Not built (needs Linux).
+  - Fonts: Noto Sans Hebrew, Arabic, Devanagari, SC (screen; `unicode-range`). PDF prints Hebrew/Arabic/Devanagari via rustybuzz + unicode-bidi (owner-approved): visual order per paragraph direction, shaped, squeezed to the layout's columns; fallbacks embedded only when used. CJK screen only (CFF outlines). Sample PDF checked by eye (`out/fontcheck/`).
+  - Licences: OFL.txt per font, LICENSES.md, notices regenerated (371).
+- **Verified 2026-11-02 (Windows):** `cargo test -p cirth-core` 192/192 (new PDF fallback test); `cargo test -p cirthscribe` 1/1; `npm run build`; release build; contract 4/4; offline audit passed; notices check (371); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME).
+- **Earlier today:** owner art, dark icon set, document icons, Finder double-click (N52, N53 pass).
+- **Not verified:** N54 (non-Latin on screen and in PDFs by hand); Linux `.deb` icons; migration on a real old data folder; installer size with the 8.3 MB CJK font. Open: Home list blank on two macOS cold launches (not reproduced). Enter-miss under stress: not a blocker (owner).
 
 ## In-Progress / Uncommitted State
 
-- None. Notes committed and pushed (2026-11-02).
+- None. RC Alpha prep committed and pushed (2026-11-02).
 
 ## Next Immediate Step
 
-1. Remaining manual checks N47–N51 and the physical macOS run; owner picks the next priority.
-2. N53 owner check passed (2026-11-02): "everything working as intended".
-3. Empty Home project list on a macOS cold launch: seen twice, not reproduced in 6 tries (2026-11-02). Blank grid means `list_projects` had not returned. Owner chose to leave Home as is for now (2026-11-02); a "Loading…" state and an error or timeout message would make a recurrence explain itself.
+1. RC Alpha release: version number, GitHub release with installers, README rewritten as a public product README with "How can you help" and GitHub issues for bugs (milestones stay in STATUS and HANDOFF).
+2. Testers run N54 and the open manual checks; results come back as GitHub issues.

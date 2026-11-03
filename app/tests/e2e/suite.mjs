@@ -35,9 +35,9 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
   let app = await driver.launch("main");
   await waitHome(app);
-  // The app starts on Home; open the first sample by clicking it, then type at
-  // once (the busiest moment, for the End-key regression test below).
-  await clickHome(app, '[data-sample="unicode-marks"]');
+  // The app starts on Home; open the first fixture (no longer a Home sample),
+  // then type at once (the busiest moment, for the End-key regression test below).
+  await app.evaluate("(__cirth.open('unicode-marks', false), true)");
   await waitOpen(app);
   results.measurements.userAgent = await app.evaluate("navigator.userAgent");
   results.measurements.observerEntryTypes = await app.evaluate("PerformanceObserver.supportedEntryTypes");
@@ -2374,7 +2374,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
     // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
     const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
-    const where = { import: "File > Import…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", comments: "View > Tools > Comments…", alt_take: "View > Tools > Alternate Takes…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
+    const where = { import: "File > Import…", export_review: "File > Export Review Package…", import_review: "File > Import Review Package…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", comments: "View > Tools > Comments…", alt_take: "View > Tools > Alternate Takes…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
       goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
       font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
     for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
@@ -2437,11 +2437,13 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(__cirth.menu('shortcuts'), true)");
     await waitFor(app, "document.getElementById('shortcuts-dialog').open && document.querySelectorAll('#shortcuts-dialog .shortcut-table tr').length >= 15", "Help > Keyboard Shortcuts…");
     await app.evaluate("(document.getElementById('shortcuts-close').click(), true)");
-    // The comment button is a placeholder until M5: it says so and changes nothing.
+    // The island's comment button opens Comments (built in M5) and changes nothing by itself.
     const before = JSON.stringify(await blocks());
     await app.evaluate("(document.getElementById('tool-comments').click(), true)");
-    assert((await app.evaluate("document.getElementById('tool-comments').getAttribute('aria-disabled')")) === "true" && /not built yet/.test(await app.evaluate("document.getElementById('banner').textContent")), "comment placeholder says comments are not built yet");
-    assert(JSON.stringify(await blocks()) === before, "the comment placeholder changes nothing");
+    await waitFor(app, "document.getElementById('comments-overlay')?.hidden === false", "comment button opens Comments");
+    assert((await app.evaluate("document.getElementById('tool-comments').getAttribute('aria-disabled')")) === null, "comment button is not disabled");
+    await app.evaluate("(__cirth.comments.close(), true)");
+    assert(JSON.stringify(await blocks()) === before, "opening Comments changes nothing");
     // Free Writing is in the island's More menu (and on Home), no longer in File.
     await app.evaluate("__cirth.menu('free_writing')");
     await waitFor(app, "document.body.dataset.view === 'free'", "Free Writing still opens");

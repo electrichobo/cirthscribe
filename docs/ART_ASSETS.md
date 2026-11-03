@@ -26,7 +26,7 @@ Wired to a visible control today: home, undo, redo, scenes, board, find, focus, 
 
 **Document icons** (2026-11-02). Tauri 2's file associations have no per-type icon, so:
 - Windows: the `.ico` files ship as resources in `file-icons\` (declared in `app/src-tauri/tauri.windows.conf.json`, so only the Windows build carries them), and `app/src-tauri/installer/hooks.nsh` (`NSIS_HOOK_POSTINSTALL`) points each file type's `DefaultIcon` at its own icon after the associations are written. Uninstall removes the whole file-type key.
-- macOS: Finder sends a double-clicked file as an Opened event, which `main.rs` passes to the UI (held for the UI's startup call on a cold launch). `app/src-tauri/Info.plist`, which Tauri merges into the app's, declares both document types and exported UTIs (`org.cirthscribe.cirth`, `org.cirthscribe.cirth-review`) with their icons; `bundle.macOS.files` copies the `.icns` into `Contents/Resources`. Keep it in step with `bundle.fileAssociations`.
+- macOS: Finder sends a double-clicked file as an Opened event, which `main.rs` passes to the UI (held for the UI's startup call on a cold launch). `app/src-tauri/Info.plist`, which Tauri merges into the app's, declares both document types and exported UTIs (`org.kolbitar.cirth`, `org.kolbitar.cirth-review`) with their icons; `bundle.macOS.files` copies the `.icns` into `Contents/Resources`. Keep it in step with `bundle.fileAssociations`.
 
 **Not done:**
 - Document icons on Linux. The `.deb` and AppImage register the file types but not their icons (that needs shared-mime-info XML and icon theme files).

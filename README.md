@@ -164,7 +164,7 @@ Done:
 - [x] Bring-your-own AI architecture and writing assistant: off by default, zero unsolicited network requests; support for local Ollama / LM Studio or cloud providers; transparent scope disclosure and token estimation; non-destructive block diffs and accepted batch application (`cirth_core::ai`, `app/src/aidlg.ts`, E2E Test 82)
 - [x] Cloud sharing & Google Docs/Sheets workflow adapter: export capability analyzer, fidelity grading, explicit loss warnings, dynamic export dialog guidance, and interoperability guide (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, `app/src/exportdlg.ts`, E2E Test 83)
 - [x] Software tour onboarding dialog: 6-step guided walkthrough of core writing, focus modes, story planning, production tools, revision workflows, and format tools; non-blocking, keyboard accessible (Left/Right arrows, Esc), skip/complete options, and re-launchable via Help > Software Tour… (`app/src/tour.ts`, E2E Test 84)
-- [x] Non-Latin script screen font packaging: bundled SIL OFL-1.1 Noto Sans and Noto Serif for full international / non-Western Unicode script coverage (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `docs/m0/LICENSES.md`)
+- [x] Non-Latin scripts: bundled SIL OFL-1.1 Noto fonts for Latin, Greek and Cyrillic (Noto Sans and Serif), Hebrew, Arabic, Devanagari and Simplified Chinese with kana and hangul (Noto Sans SC) on screen. PDFs print Hebrew, Arabic and Devanagari, shaped and in right-to-left order, without moving page breaks; Chinese, Japanese and Korean are screen only for now
 - [x] Native OS file associations, CLI launching & drag-and-drop: registered file associations for `.cirth` (editor) and `.cirth-review` (viewer); startup argument file opening; window drag-and-drop file opening for projects and imports (`.fountain`, `.fdx`); E2E Test 85 (`tauri.conf.json`, `main.rs`, `main.ts`, E2E Test 85)
 - [x] Automated offline & zero-telemetry audit: script mathematically verifying strict CSP, zero tracking dependencies, codebase network scan, and live OS process socket inspection (`app/scripts/offline-audit.mjs`, `npm run test:offline`)
 - [x] Cross-platform macOS and Linux hardening: Unix atomic file replacement with best-effort directory fsync for APFS/FAT32 resilience, dual-pulse focus restoration after macOS full screen, `Cmd+Ctrl+F` Apple HIG keybinding, and WebKitGTK dialog focus trapping
@@ -176,11 +176,13 @@ Done:
 - [x] Command Palette / Quick Switcher (`Ctrl+K` / `Cmd+K`): fast search and instant keyboard navigation across all scenes, characters, beats, and application actions (`app/src/palette.ts`, E2E Test 88)
 - [x] Personal Dictionary Editor Dialog: dedicated dictionary manager under `Format > Spelling > Personal Dictionary…` to view, filter, add, and remove words in project and personal scopes (`app/src/dictionary.ts`, E2E Test 88)
 - [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
+- [x] RC Alpha prep: Export and Import Review Package in the File menu; the toolbar's Comments button opens Comments; Home offers one sample (*The Obsidian Seal*); app identifier `org.kolbitar.app` with the old data folder copied across; Linux document icons for `.cirth` and `.cirth-review` (not yet tried on Linux)
 - [x] Owner art: new app icon, the Kolbítar wordmark on Home and About (light, dark and high-contrast versions), Windows installer and macOS disk image art, and colour toolbar icons, with an inverted set for dark themes (`docs/ART_ASSETS.md`); checked on Windows and macOS (N52)
 
 Carried forward:
 - [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
 - [ ] Desktop manual checks for software tour and non-Latin script display (N49)
+- [ ] Desktop check of non-Latin text on screen and in PDFs (N54)
 - [ ] Desktop manual check for native print preview (N50)
 - [ ] Desktop manual check for Command Palette and Personal Dictionary (N51)
 - [ ] VM / hardware execution of setup scripts on macOS and Linux
@@ -259,7 +261,7 @@ The GPL does not forbid charging for copies; no open-source license can. But any
 Kolbítar ships with these components under their own licenses:
 
 - **Courier Prime** font: SIL Open Font License 1.1 (`assets/fonts/courier-prime/OFL.txt`)
-- **Noto Sans** and **Noto Serif** fonts: SIL Open Font License 1.1 (`assets/fonts/noto-*/OFL.txt`)
+- **Noto Sans**, **Noto Serif**, **Noto Sans Hebrew**, **Noto Sans Arabic**, **Noto Sans Devanagari** and **Noto Sans SC** fonts: SIL Open Font License 1.1 (`assets/fonts/noto-*/OFL.txt`)
 - **SCOWL** English dictionaries: © Kevin Atkinson and others, under permissive notices (`assets/dictionaries/*/README_*.txt`)
 - **spellbook** spell checker: MPL-2.0
 - **SQLite**: public domain

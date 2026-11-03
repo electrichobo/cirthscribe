@@ -1,0 +1,6 @@
+#!/bin/sh
+# Refresh the MIME and icon caches once Kolbítar's document types are removed
+# (best effort, like postinst.sh).
+if command -v update-mime-database >/dev/null 2>&1; then update-mime-database /usr/share/mime || true; fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true; fi
+exit 0

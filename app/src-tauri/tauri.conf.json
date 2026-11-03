@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Kolbítar",
-  "identifier": "org.cirthscribe.spike",
+  "identifier": "org.kolbitar.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -23,12 +23,14 @@
       {
         "ext": ["cirth"],
         "name": "Kolbítar Project",
+        "mimeType": "application/x-kolbitar-project",
         "description": "Kolbítar Screenplay & Production Project",
         "role": "Editor"
       },
       {
         "ext": ["cirth-review"],
         "name": "Kolbítar Review Package",
+        "mimeType": "application/x-kolbitar-review",
         "description": "Kolbítar Portable Review Bundle",
         "role": "Viewer"
       }
@@ -62,7 +64,18 @@
     },
     "linux": {
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37", "libgtk-3-0", "libayatana-appindicator3-1"]
+        "depends": ["libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37", "libgtk-3-0", "libayatana-appindicator3-1"],
+        "files": {
+          "/usr/share/mime/packages/kolbitar.xml": "linux/kolbitar-mime.xml",
+          "/usr/share/icons/hicolor/48x48/mimetypes/application-x-kolbitar-project.png": "linux/application-x-kolbitar-project-48.png",
+          "/usr/share/icons/hicolor/128x128/mimetypes/application-x-kolbitar-project.png": "linux/application-x-kolbitar-project-128.png",
+          "/usr/share/icons/hicolor/256x256/mimetypes/application-x-kolbitar-project.png": "linux/application-x-kolbitar-project-256.png",
+          "/usr/share/icons/hicolor/48x48/mimetypes/application-x-kolbitar-review.png": "linux/application-x-kolbitar-review-48.png",
+          "/usr/share/icons/hicolor/128x128/mimetypes/application-x-kolbitar-review.png": "linux/application-x-kolbitar-review-128.png",
+          "/usr/share/icons/hicolor/256x256/mimetypes/application-x-kolbitar-review.png": "linux/application-x-kolbitar-review-256.png"
+        },
+        "postInstallScript": "linux/postinst.sh",
+        "postRemoveScript": "linux/postrm.sh"
       },
       "appimage": {
         "bundleMediaFramework": false

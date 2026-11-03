@@ -5,6 +5,13 @@
 @font-face { font-family: "Courier Prime"; src: url("../../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; }
 @font-face { font-family: "Noto Sans"; src: url("../../assets/fonts/noto-sans/NotoSans-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; }
 @font-face { font-family: "Noto Serif"; src: url("../../assets/fonts/noto-serif/NotoSerif-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; }
+/* Scripts the screen fonts above lack (docs/m0/LICENSES.md). unicode-range keeps
+   each file from loading until a document uses its script. PDFs print Hebrew,
+   Arabic and Devanagari from the same fonts; Chinese, Japanese and Korean are screen only. */
+@font-face { font-family: "Noto Sans Hebrew"; src: url("../../assets/fonts/noto-sans-hebrew/NotoSansHebrew-Regular.ttf") format("truetype"); unicode-range: U+0590-05FF, U+FB1D-FB4F; }
+@font-face { font-family: "Noto Sans Arabic"; src: url("../../assets/fonts/noto-sans-arabic/NotoSansArabic-Regular.ttf") format("truetype"); unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF; }
+@font-face { font-family: "Noto Sans Devanagari"; src: url("../../assets/fonts/noto-sans-devanagari/NotoSansDevanagari-Regular.ttf") format("truetype"); unicode-range: U+0900-097F, U+A8E0-A8FF, U+1CD0-1CFF; }
+@font-face { font-family: "Noto Sans SC"; src: url("../../assets/fonts/noto-sans-sc/NotoSansSC-Regular.otf") format("opentype"); unicode-range: U+1100-11FF, U+2E80-2FDF, U+3000-30FF, U+3100-31FF, U+3400-4DBF, U+4E00-9FFF, U+A960-A97F, U+AC00-D7FF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF, U+20000-2FA1F; }
 
 :root {
   --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1d1f; --muted: #5d5d66; --line: #d6d3cc; --accent: #2b5fb3; --warn: #8a4b00; --bad: #a3141c; --on-accent: #ffffff;
@@ -395,7 +402,7 @@ footer #info { margin-left: auto; }
    These offsets mirror the layout profile for a close visual match; the
    authoritative page map comes from Rust, not from this CSS. */
 #editor { width: 8.5in; margin: 0 auto; background: var(--panel); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
-.ProseMirror { font-family: var(--script-font, "Courier Prime", monospace); font-size: var(--script-size, 12pt); line-height: var(--script-size, 12pt); padding: 1in 0; outline: none; white-space: pre-wrap; word-wrap: break-word; }
+.ProseMirror { font-family: var(--script-font, "Courier Prime", "Noto Sans Hebrew", "Noto Sans Arabic", "Noto Sans Devanagari", "Noto Sans SC", monospace); font-size: var(--script-size, 12pt); line-height: var(--script-size, 12pt); padding: 1in 0; outline: none; white-space: pre-wrap; word-wrap: break-word; }
 .ProseMirror p { margin: var(--script-size, 12pt) 0 0; }
 .ProseMirror p:first-child { margin-top: 0; }
 .b-heading, .b-action, .b-shot, .b-section { margin-left: 1.5in !important; width: 6in; }
@@ -544,9 +551,6 @@ body[data-view="home"], body[data-view="free"] { grid-template-rows: 1fr; }
 .home-new input { padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); }
 button.primary { padding: 7px 12px; background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; }
 .project .meta .file { font: 11px "Courier Prime", monospace; }
-.home-samples { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
-.sample { width: 100%; text-align: left; display: grid; gap: 2px; padding: 8px 10px; border-radius: 6px; }
-.sample span { color: var(--muted); font-size: 12px; }
 .home-note { color: var(--muted); font-size: 12px; }
 .home-message { color: var(--bad); border: 1px solid var(--bad); border-radius: 5px; padding: 8px 10px; background: var(--panel); }
 .home-empty { color: var(--muted); }

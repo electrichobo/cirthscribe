@@ -6,15 +6,168 @@
 //! printpdf writes into the trailer is replaced by the document id (same
 //! length, so no offsets move). Header and footer lines, like page numbers,
 //! start on page 2.
+//!
+//! Hebrew, Arabic and Devanagari, which Courier Prime cannot draw, print in a
+//! bundled Noto font: the line is put in visual order (unicode-bidi), each run
+//! is shaped (rustybuzz) and squeezed into the columns the fixed-pitch layout
+//! gave it, so page breaks stay as paginated. A fallback font is embedded only
+//! when a document uses it; lines Courier Prime can draw print as before.
+//! Chinese, Japanese and Korean are not printed yet (screen only).
 
-use crate::layout::{PageMap, Profile};
-use printpdf::{IndirectFontRef, Line, Mm, PdfDocument, Point};
+use crate::fontcheck::{self, FontInfo};
+use crate::layout::{PageMap, Profile, Seg};
+use printpdf::{IndirectFontRef, Line, Mm, PdfDocument, PdfDocumentReference, PdfLayerReference, Point, TextMatrix};
 use std::io::{BufWriter, Cursor};
+use unicode_bidi::{BidiInfo, Level};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub static REGULAR: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/CourierPrime-Regular.ttf");
 pub static BOLD: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/CourierPrime-Bold.ttf");
 pub static ITALIC: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/CourierPrime-Italic.ttf");
 pub static BOLD_ITALIC: &[u8] = include_bytes!("../../../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf");
+
+/// Fallback fonts for scripts Courier Prime lacks, tried in this order (regular weight only).
+pub static FALLBACKS: [&[u8]; 3] = [
+    include_bytes!("../../../assets/fonts/noto-sans-hebrew/NotoSansHebrew-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/noto-sans-arabic/NotoSansArabic-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/noto-sans-devanagari/NotoSansDevanagari-Regular.ttf"),
+];
+
+/// Characters in `text` that no font a PDF can use (Courier Prime or a fallback) can draw.
+pub fn missing_chars(text: &str) -> Vec<char> {
+    let Some(courier) = FontInfo::parse(REGULAR) else { return Vec::new() };
+    let fallbacks: Vec<FontInfo> = FALLBACKS.iter().filter_map(|b| FontInfo::parse(b)).collect();
+    let mut out = fontcheck::missing_chars(&courier, text);
+    out.retain(|c| !fallbacks.iter().any(|f| f.glyph(*c) != 0));
+    out
+}
+
+/// Fonts for one document: the four Courier Prime faces, plus fallbacks loaded on first use.
+struct Fonts<'a> {
+    doc: &'a PdfDocumentReference,
+    courier: [IndirectFontRef; 4],
+    courier_info: FontInfo<'static>,
+    fallback_info: Vec<FontInfo<'static>>,
+    fallback: [Option<IndirectFontRef>; 3],
+}
+
+impl Fonts<'_> {
+    /// 0 for Courier Prime (or when nothing can draw `c`), else 1 + the fallback's index.
+    fn pick(&self, c: char) -> usize {
+        if c.is_whitespace() || self.courier_info.glyph(c) != 0 {
+            return 0;
+        }
+        self.fallback_info.iter().position(|f| f.glyph(c) != 0).map_or(0, |i| i + 1)
+    }
+
+    fn fallback(&mut self, i: usize) -> Result<IndirectFontRef, String> {
+        if self.fallback[i].is_none() {
+            let f = self.doc.add_external_font(Cursor::new(FALLBACKS[i].to_vec())).map_err(|e| e.to_string())?;
+            self.fallback[i] = Some(f);
+        }
+        Ok(self.fallback[i].clone().expect("loaded above"))
+    }
+}
+
+/// Blocks whose text runs right to left: the first strong character of the
+/// block decides, so every wrapped line keeps its paragraph's direction.
+fn rtl_blocks(map: &PageMap) -> std::collections::HashSet<String> {
+    let (mut seen, mut rtl) = (std::collections::HashSet::new(), std::collections::HashSet::new());
+    for l in map.pages.iter().flat_map(|pg| &pg.lines) {
+        let Some(id) = &l.block_id else { continue };
+        if seen.contains(id) {
+            continue;
+        }
+        let text: String = l.segs.iter().map(|s| s.text.as_str()).collect();
+        match unicode_bidi::get_base_direction(text.as_str()) {
+            unicode_bidi::Direction::Rtl => {
+                rtl.insert(id.clone());
+                seen.insert(id.clone());
+            }
+            unicode_bidi::Direction::Ltr => {
+                seen.insert(id.clone());
+            }
+            unicode_bidi::Direction::Mixed => {}
+        }
+    }
+    rtl
+}
+
+/// Draws one line that needs a fallback font, starting at `x_in`. Every piece
+/// takes exactly its column width, as in the layout, so the line ends where the
+/// page map says it does.
+#[allow(clippy::too_many_arguments)]
+fn draw_mixed_line(layer: &PdfLayerReference, fonts: &mut Fonts, segs: &[Seg], rtl_para: bool, x_in: f32, y_in: f32, font_pt: f32, char_in: f32) -> Result<(), String> {
+    let mut text = String::new();
+    let mut seg_at = Vec::new(); // the seg index of each byte of `text`
+    for (i, s) in segs.iter().enumerate() {
+        text.push_str(&s.text);
+        seg_at.resize(text.len(), i);
+    }
+    let bidi = BidiInfo::new(&text, Some(if rtl_para { Level::rtl() } else { Level::ltr() }));
+    let Some(para) = bidi.paragraphs.first() else { return Ok(()) };
+    let (levels, runs) = bidi.visual_runs(para, para.range.clone());
+    let mut x = x_in;
+    for run in runs {
+        let rtl = levels[run.start].is_rtl();
+        // Split the run where the style or the font changes (logical order).
+        let mut pieces: Vec<(usize, usize, usize)> = Vec::new(); // (start, end, font)
+        for (off, c) in text[run.clone()].char_indices() {
+            let at = run.start + off;
+            let font = fonts.pick(c);
+            match pieces.last_mut() {
+                // A combining mark stays in its base character's piece.
+                Some(last) if seg_at[last.0] == seg_at[at] && (last.2 == font || c.width() == Some(0)) => last.1 = at + c.len_utf8(),
+                _ => pieces.push((at, at + c.len_utf8(), font)),
+            }
+        }
+        if rtl {
+            pieces.reverse();
+        }
+        for (start, end, font) in pieces {
+            let piece = &text[start..end];
+            let seg = &segs[seg_at[start]];
+            let w = piece.width() as f32 * char_in;
+            if font == 0 {
+                let shown: String = if rtl { piece.chars().rev().collect() } else { piece.to_string() };
+                let f = &fonts.courier[(seg.bold as usize) | ((seg.italic as usize) << 1)];
+                layer.use_text(shown, font_pt, mm(x), mm(y_in), f);
+            } else {
+                let face = rustybuzz::Face::from_slice(FALLBACKS[font - 1], 0).ok_or("fallback font unreadable")?;
+                let mut buf = rustybuzz::UnicodeBuffer::new();
+                buf.push_str(piece);
+                buf.set_direction(if rtl { rustybuzz::Direction::RightToLeft } else { rustybuzz::Direction::LeftToRight });
+                buf.guess_segment_properties();
+                let shaped = rustybuzz::shape(&face, &[], buf);
+                let k = font_pt / face.units_per_em() as f32; // font units to points
+                let natural: f32 = shaped.glyph_positions().iter().map(|g| g.x_advance as f32 * k).sum();
+                let room = w * 72.0;
+                let squeeze = if natural > room && natural > 0.0 { room / natural } else { 1.0 };
+                // Right-to-left text narrower than its columns sits at their right edge.
+                let lead = if rtl { room - natural * squeeze } else { 0.0 };
+                let f = fonts.fallback(font - 1)?;
+                let (x0, y0) = (x * 72.0 + lead, y_in * 72.0);
+                let mut pen = 0.0;
+                for (info, pos) in shaped.glyph_infos().iter().zip(shaped.glyph_positions()) {
+                    let gx = x0 + (pen + pos.x_offset as f32 * k) * squeeze;
+                    let gy = y0 + pos.y_offset as f32 * k;
+                    layer.begin_text_section();
+                    layer.set_font(&f, font_pt);
+                    layer.set_text_matrix(TextMatrix::Raw([squeeze, 0.0, 0.0, 1.0, gx, gy]));
+                    layer.write_codepoints([info.glyph_id as u16]);
+                    layer.end_text_section();
+                    pen += pos.x_advance as f32 * k;
+                }
+            }
+            if seg.underline && w > 0.0 {
+                layer.set_outline_thickness(0.6);
+                layer.add_line(Line { points: vec![(Point::new(mm(x), mm(y_in - 0.03)), false), (Point::new(mm(x + w), mm(y_in - 0.03)), false)], is_closed: false });
+            }
+            x += w;
+        }
+    }
+    Ok(())
+}
 
 pub(crate) fn mm(inches: f32) -> Mm {
     Mm(inches * 25.4)
@@ -95,6 +248,14 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
         .with_metadata_date(date);
     let load = |b: &[u8]| doc.add_external_font(Cursor::new(b.to_vec())).map_err(|e| e.to_string());
     let fonts: [IndirectFontRef; 4] = [load(REGULAR)?, load(BOLD)?, load(ITALIC)?, load(BOLD_ITALIC)?];
+    let mut mixed = Fonts {
+        doc: &doc,
+        courier: fonts.clone(),
+        courier_info: FontInfo::parse(REGULAR).ok_or("bundled font unreadable")?,
+        fallback_info: FALLBACKS.iter().filter_map(|b| FontInfo::parse(b)).collect(),
+        fallback: [None, None, None],
+    };
+    let rtl = rtl_blocks(map);
     let line_in = 1.0 / p.lines_per_inch;
     // Baseline sits about 0.8 of the line box below its top.
     let baseline = |row: usize| p.page_h_in - p.top_in - (row as f32) * line_in - 0.8 * line_in;
@@ -134,10 +295,15 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
         }
         for l in &page.lines {
             let y = baseline(l.row);
+            if l.segs.iter().any(|s| s.text.chars().any(|c| mixed.pick(c) != 0)) {
+                let rtl_para = l.block_id.as_ref().is_some_and(|id| rtl.contains(id));
+                draw_mixed_line(&layer, &mut mixed, &l.segs, rtl_para, l.x_in, y, p.font_pt, char_in)?;
+                continue;
+            }
             let mut x = l.x_in;
             for s in &l.segs {
                 let f = &fonts[(s.bold as usize) | ((s.italic as usize) << 1)];
-                let w = unicode_width::UnicodeWidthStr::width(s.text.as_str()) as f32 * char_in;
+                let w = s.text.width() as f32 * char_in;
                 if !s.text.is_empty() {
                     layer.use_text(s.text.clone(), p.font_pt, mm(x), mm(y), f);
                 }
@@ -363,5 +529,25 @@ mod tests {
         let tp = crate::title::TitlePage { title: "THE TIDE LEDGER
 Part 2".into(), draft_label: "Blue Revision".into(), draft_date: "1 May 2026".into(), ..Default::default() };
         assert_eq!(expand_tokens("{title} - {draft} - {date}", &tp), "THE TIDE LEDGER - Blue Revision - 1 May 2026");
+    }
+
+    #[test]
+    fn hebrew_arabic_and_devanagari_print_from_fallback_fonts_and_cjk_is_reported() {
+        assert!(missing_chars("שלום مرحبا नमस्ते").is_empty(), "Hebrew, Arabic and Devanagari have a PDF font");
+        assert_eq!(missing_chars("日本 é"), vec!['日', '本'], "CJK is still reported; Latin accents are in Courier Prime");
+
+        let opts = PdfOptions { title: "Scripts".into(), date_unix: 1_790_000_000, document_id: "scripts".into(), ..Default::default() };
+        let p = Profile::us_letter();
+        let doc = crate::fixtures::unicode_marks().to_document().unwrap();
+        let map = crate::layout::paginate(&doc.blocks, &p, 1);
+        let bytes = render_document(&map, &p, None, &opts).unwrap();
+        assert_xref_valid(&bytes);
+        // Fonts are named F0, F1, ...: four Courier Prime faces, then each fallback on first use.
+        let fonts = |b: &[u8]| (0..8).filter(|i| String::from_utf8_lossy(b).contains(&format!("/BaseFont/F{i}"))).count();
+        assert_eq!(fonts(&bytes), 6, "Hebrew and Arabic are embedded; Devanagari, unused, is not");
+        assert_eq!(bytes, render_document(&map, &p, None, &opts).unwrap(), "still the same bytes every time");
+
+        // A script Courier Prime can draw embeds no fallback at all.
+        assert_eq!(fonts(&render_fixture(&opts)), 4, "Latin-only PDFs embed only Courier Prime");
     }
 }

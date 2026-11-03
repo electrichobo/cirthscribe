@@ -43,12 +43,9 @@ interface Actions {
   createProject(title: string): Promise<boolean>;
 }
 
-const SAMPLES = [
-  { name: "unicode-marks", title: "Unicode and marks", about: "Accents, emoji, CJK and right-to-left text; bold, italic, underline." },
-  { name: "page-boundaries", title: "Page boundary cases", about: "Long speeches, MORE and CONT'D, dual dialogue, forced breaks." },
-  { name: "long-120", title: "The Tide Ledger", about: "A 127-page synthetic script for speed and pagination checks." },
-  { name: "high-council", title: "The Obsidian Seal", about: "A fast-paced Sorkinesque high-fantasy walk-and-talk adventure." },
-];
+// Samples shown on Home. The other fixtures (unicode-marks, page-boundaries,
+// long-120) stay for tests but are not offered to users.
+const SAMPLES = [{ name: "high-council", title: "The Obsidian Seal", about: "Untitled Fantasy Feature" }];
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
@@ -97,12 +94,19 @@ export function createHome(root: HTMLElement, actions: Actions) {
     });
   });
 
-  const samples = el("ul", { className: "home-samples" });
-  for (const s of SAMPLES) {
-    const b = el("button", { type: "button", className: "sample" }, el("strong", {}, s.title), el("span", {}, s.about));
-    b.dataset.sample = s.name;
-    b.addEventListener("click", () => void guard(() => actions.openSample(s.name)));
-    samples.append(el("li", {}, b));
+  /** A sample not yet in the library, as a card in the Projects grid. Opening it
+   *  copies it into the library, where its own card (with a Sample badge) replaces this one. */
+  function sampleCard(smp: (typeof SAMPLES)[number]): HTMLElement {
+    const initials = smp.title.split(/\s+/).filter((w) => !/^the$/i.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+    const b = el(
+      "button",
+      { type: "button", className: "project", title: `Open the sample ${smp.title}` },
+      el("div", { className: "thumb", ariaHidden: "true" }, el("span", {}, initials)),
+      el("div", { className: "meta" }, el("strong", {}, smp.title), el("span", {}, smp.about), el("div", { className: "badges" }, el("span", { className: "tag" }, "Sample"))),
+    );
+    b.dataset.sample = smp.name;
+    b.addEventListener("click", () => void guard(() => actions.openSample(smp.name)));
+    return el("div", { role: "listitem", className: "project-item" }, b);
   }
 
   const openBtn = el("button", { type: "button", id: "open-file" }, "Open a project file…");
@@ -117,7 +121,7 @@ export function createHome(root: HTMLElement, actions: Actions) {
   freeBtn.addEventListener("click", () => actions.openFreeWriting());
   const aboutBtn = el("button", { type: "button", id: "open-about", className: "link" }, "About Kolbítar and licences");
   aboutBtn.addEventListener("click", () => actions.openAbout());
-  const side = el("aside", { className: "home-side", ariaLabel: "New, open and samples" }, form, el("h2", {}, "Open"), openBtn, freeBtn, el("h2", {}, "Samples"), samples, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
+  const side = el("aside", { className: "home-side", ariaLabel: "New and open" }, form, el("h2", {}, "Open"), openBtn, freeBtn, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
   const main = el("section", { className: "home-main", ariaLabel: "Projects" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, el("span", { className: "wordmark" }, "Kolbítar")), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 
@@ -190,6 +194,8 @@ export function createHome(root: HTMLElement, actions: Actions) {
     );
     b.dataset.project = p.name;
     b.dataset.path = p.path;
+    // An opened sample keeps its sample name, so it is found the same way before and after.
+    if (p.sample && p.location === "library") b.dataset.sample = p.name;
     b.disabled = !!p.error || p.missing;
     b.addEventListener("click", () => void guard(() => actions.openPath(p.path)));
     const item = el("div", { role: "listitem", className: "project-item" }, b);
@@ -221,7 +227,8 @@ export function createHome(root: HTMLElement, actions: Actions) {
       message(`Could not read the project library: ${e}`);
     }
     count.textContent = list.length ? plural(list.length, "project") : "";
-    grid.replaceChildren(...(list.length ? list.map(card) : [el("p", { className: "home-empty" }, "No projects yet. Create one, or open a sample.")]));
+    const items = [...list.map(card), ...SAMPLES.filter((smp) => !list.some((p) => p.location === "library" && p.name === smp.name)).map(sampleCard)];
+    grid.replaceChildren(...(items.length ? items : [el("p", { className: "home-empty" }, "No projects yet. Create one to start.")]));
     titleInput.focus();
     root.dataset.loaded = "1";
     return list;

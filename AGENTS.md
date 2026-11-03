@@ -1,6 +1,6 @@
 # Kolbítar: instructions for coding agents
 
-Kolbítar is a free, open-source, offline-first desktop writing and production application for Windows, macOS, and Linux. It combines screenplay editing, story planning, a shared project bible, and script-derived production tools. The project file extension stays `.cirth`; internal crate names (cirth-core) and the app identifier keep the older working name.
+Kolbítar is a free, open-source, offline-first desktop writing and production application for Windows, macOS, and Linux. It combines screenplay editing, story planning, a shared project bible, and script-derived production tools. The project file extension stays `.cirth`; internal crate names (cirth-core) and the binary keep the older working name. The app identifier is `org.kolbitar.app` (owner, 2026-11-02; older data folders are copied across on first launch).
 
 ## Current stage (2026-10-30)
 
@@ -64,7 +64,7 @@ On Windows, dot-source `scripts/dev-env.ps1` first; it puts the portable toolcha
 
 Conventions:
 - **Schema migrations** are append-only. Never edit a shipped migration. Each schema change freezes real project files of the previous version in `crates/cirth-core/tests/data`, with a test that upgrades them.
-- **Keep the old working name internally:** the `.cirth` extension, crate names, the binary `cirthscribe` and the app identifier stay as they are. Only public-facing text says Kolbítar.
+- **Keep the old working name internally:** the `.cirth` extension, crate names and the binary `cirthscribe` stay as they are. The app identifier is `org.kolbitar.app`. Only public-facing text says Kolbítar.
 - **Writing:** match the surrounding code's comment density and idiom. Use plain, direct English in docs and UI.
 - **File edits on Windows:** edit with tools that keep UTF-8 without a BOM. Windows PowerShell 5.1's `Get-Content`/`Set-Content` corrupts non-ASCII text.
 - **Git:** commit or push only when the owner asks. Never put personal details (hostnames, IPs, usernames, personal paths) or credentials in committed files.

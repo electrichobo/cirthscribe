@@ -194,7 +194,7 @@ function updateInfo() {
   }
   const locked = lastPagination?.pages_locked ? ", pages locked" : "";
   const pages = lastPagination ? `${lastPagination.map.pages.length} pages (layout of v${lastPagination.map.doc_version}, ${lastPagination.layout_ms.toFixed(1)} ms${locked})` : "not paginated";
-  const missing = lastPagination?.missing_glyphs.length ? ` · Font lacks: ${lastPagination.missing_glyphs.join(" ")} (these break fixed pitch in PDF)` : "";
+  const missing = lastPagination?.missing_glyphs.length ? ` · Font lacks: ${lastPagination.missing_glyphs.join(" ")} (not printed in PDF)` : "";
   infoEl.textContent = `${blockKindAtCursor()} · ${counts.join(" · ")} · ${pages}${missing}`;
 }
 
@@ -1365,6 +1365,8 @@ const commandPalette = installCommandPalette(
     { id: "comments", title: "Comments…", category: "Commands", run: () => void runMenu("comments") },
     { id: "alternate_takes", title: "Alternate Takes…", category: "Commands", run: () => void runMenu("alt_take") },
     { id: "snapshots", title: "Snapshots…", category: "Commands", run: () => void runMenu("snapshots") },
+    { id: "export_review", title: "Export Review Package…", category: "Commands", run: () => void runMenu("export_review") },
+    { id: "import_review", title: "Import Review Package…", category: "Commands", run: () => void runMenu("import_review") },
     { id: "branches", title: "Branches…", category: "Commands", run: () => void runMenu("branches") },
     { id: "bible", title: "Project Bible…", category: "Commands", run: () => void bible.open() },
     { id: "timeline", title: "Story Timeline…", category: "Commands", run: () => void timeline.open() },
@@ -1545,10 +1547,8 @@ const layoutMode = createLayoutMode({
   focusBtn.addEventListener("click", () => void focusMode.toggle());
   // Comments come with M5 (anchored threads). Until then the button only says
   // so (owner, 2026-10-28): it changes nothing.
-  const commentBtn = iconButton("tool-comments", "comment", "Comments (not available yet)", "Comments: coming in a later version");
-  commentBtn.setAttribute("aria-disabled", "true");
-  commentBtn.classList.add("placeholder");
-  commentBtn.addEventListener("click", () => showBanner("Comments are not built yet: they come in a later version (milestone 5). Nothing was changed."));
+  const commentBtn = iconButton("tool-comments", "comment", "Comments", "Comments: threads anchored to the script");
+  commentBtn.addEventListener("click", () => void runMenu("comments"));
   $("island-panels").append(navBtn, boardBtn, findBtn, commentBtn, focusBtn);
   ($("view-menu-btn") as HTMLButtonElement).append(icon("more"));
   const showPressed = () => {

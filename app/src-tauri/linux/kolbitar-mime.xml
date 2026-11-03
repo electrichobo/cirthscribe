@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shared MIME info for Kolbítar's document types (installed by the .deb, see
+     bundle.linux.deb.files). The icons are the same document icons Windows and macOS use. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-kolbitar-project">
+    <comment>Kolbítar Project</comment>
+    <sub-class-of type="application/octet-stream"/>
+    <icon name="application-x-kolbitar-project"/>
+    <glob pattern="*.cirth"/>
+  </mime-type>
+  <mime-type type="application/x-kolbitar-review">
+    <comment>Kolbítar Review Package</comment>
+    <sub-class-of type="application/octet-stream"/>
+    <icon name="application-x-kolbitar-review"/>
+    <glob pattern="*.cirth-review"/>
+  </mime-type>
+</mime-info>

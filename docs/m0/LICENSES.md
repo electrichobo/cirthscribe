@@ -6,13 +6,17 @@ Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dicti
 
 **2026-10-27, M2:** `quick-xml` 0.42.0 (MIT) added as a direct dependency of cirth-core for FDX import and export, with the owner's approval. It was already in the shipped tree through Tauri, so the bundled notices file did not change; its default features add only `memchr` (MIT OR Unlicense), which was also already present.
 
+**2026-11-02, RC Alpha prep:** `rustybuzz` 0.20.1 (MIT) and `unicode-bidi` 0.3.18 (MIT OR Apache-2.0) added as direct dependencies of cirth-core, with the owner's approval, to shape and order Hebrew, Arabic and Devanagari in PDFs. They bring `ttf-parser` 0.25.1, `unicode-bidi-mirroring`, `unicode-ccc`, `unicode-properties` and `unicode-script` (see the generated inventory for their licences). The Noto fonts below were added at the same time.
+
 ## Not from package managers
 
 | Item | License | Shipped? | Notes |
 | - | - | - | - |
 | Courier Prime (4 styles), `assets/fonts/courier-prime/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded in the app and in PDFs) | From github.com/google/fonts `ofl/courierprime`. Font name may not be reused for modified versions. |
-| Noto Sans (Regular), `assets/fonts/noto-sans/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded for non-Latin / sans screen display) | From github.com/notofonts/noto-fonts. Full non-Western / international script coverage. |
-| Noto Serif (Regular), `assets/fonts/noto-serif/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded for non-Latin / serif screen display) | From github.com/notofonts/noto-fonts. Full non-Western / international script coverage. |
+| Noto Sans (Regular), `assets/fonts/noto-sans/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded for sans screen display) | From github.com/notofonts/noto-fonts. Covers Latin, Greek and Cyrillic; other scripts come from the fonts below. |
+| Noto Serif (Regular), `assets/fonts/noto-serif/` | SIL OFL 1.1 (`OFL.txt` included) | Yes (embedded for serif screen display) | From github.com/notofonts/noto-fonts. Covers Latin, Greek and Cyrillic; other scripts come from the fonts below. |
+| Noto Sans Hebrew, Arabic and Devanagari (Regular), `assets/fonts/noto-sans-hebrew/`, `-arabic/`, `-devanagari/` | SIL OFL 1.1 (`OFL.txt` with each) | Yes (embedded for screen display, and in PDFs that use the script) | From github.com/notofonts (hinted TTF), downloaded 2026-11-02 with the owner's approval. |
+| Noto Sans SC (Regular), `assets/fonts/noto-sans-sc/` | SIL OFL 1.1 (`OFL.txt` included; Adobe, Reserved Font Name "Source") | Yes (embedded for screen display only; 8.3 MB) | From github.com/notofonts/noto-cjk `Sans/SubsetOTF/SC`, downloaded 2026-11-02 with the owner's approval. Simplified Chinese plus kana and hangul. CFF outlines, which the PDF writer cannot embed, so CJK is screen only. |
 | SCOWL Hunspell dictionaries en_US-large and en_GB-large 2026.02.25, `assets/dictionaries/` | Copyright 2000-2026 Kevin Atkinson; permissive notice: copy, modify, distribute, sell, provided the copyright notice and permission notice appear in copies and supporting documentation. Affix file: BSD-style (Geoff Kuenning; modified versions must be marked). Full text in each `README_*.txt` | Yes (embedded in the app) | From github.com/en-wl/wordlist releases. Keep the README files with the dictionaries and this notice in release documentation. |
 | SQLite (bundled by `libsqlite3-sys`) | Public domain | Yes | |
 | Microsoft Edge WebView2 Runtime | Microsoft proprietary | No (system component on Windows 11) | Required at runtime on Windows |

@@ -20,7 +20,7 @@ use cirth_core::model::{Beat, Document};
 use cirth_core::ops::{Ack, Batch};
 use cirth_core::store::{Store, StoreError};
 use cirth_core::revisions::{self, RevisionSet};
-use cirth_core::{backup, fontcheck, pdf};
+use cirth_core::{backup, pdf};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -112,6 +112,38 @@ fn profile(name: &str) -> Profile {
 
 fn data_dir(app: &App) -> PathBuf {
     app.data_dir.lock().unwrap().clone()
+}
+
+/// The app identifier changed from `org.cirthscribe.spike` to `org.kolbitar.app`
+/// (2026-11-02), which moves the data folder (library, backups, preferences, Free
+/// Writing). On the first launch under the new identifier, copy the old folder's
+/// contents across; the old folder is left untouched as a fallback. The web view's
+/// own folder (`EBWebView` on Windows) is skipped: it may already exist and be in use.
+fn migrate_data_dir(new_dir: &Path) {
+    let Some(old_dir) = new_dir.parent().map(|p| p.join("org.cirthscribe.spike")) else { return };
+    if new_dir.join("projects").exists() || !old_dir.join("projects").is_dir() {
+        return;
+    }
+    fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            if name == "EBWebView" {
+                continue;
+            }
+            let (src, dst) = (entry.path(), to.join(&name));
+            if entry.file_type()?.is_dir() {
+                copy_tree(&src, &dst)?;
+            } else if !dst.exists() {
+                std::fs::copy(&src, &dst)?;
+            }
+        }
+        Ok(())
+    }
+    if let Err(e) = copy_tree(&old_dir, new_dir) {
+        eprintln!("could not copy the data folder from {}: {e}", old_dir.display());
+    }
 }
 
 fn library_dir(app: &App) -> PathBuf {
@@ -2600,9 +2632,8 @@ fn paginate_current(app: &App, profile_name: &str) -> Result<(Paginated, Documen
     let mut map = layout::paginate_production(&doc.blocks, &prof, doc.version, &numbers, page_lock.as_ref());
     let revised_pages = revision.as_ref().map_or(0, |set| revisions::mark_pages(&mut map, &doc.blocks, set));
     let t2 = Instant::now();
-    let font = fontcheck::FontInfo::parse(pdf::REGULAR).ok_or("bundled font unreadable")?;
     let all: String = doc.blocks.iter().map(|b| b.text()).collect::<Vec<_>>().join(" ");
-    let missing_glyphs = fontcheck::missing_chars(&font, &all);
+    let missing_glyphs = pdf::missing_chars(&all);
     let scene_numbers = numbers.into_values().collect();
     let scene_stats = cirth_core::navigator::scene_stats(&doc.blocks, &map);
     Ok((Paginated { map, load_ms: (t1 - t0).as_secs_f64() * 1e3, layout_ms: (t2 - t1).as_secs_f64() * 1e3, missing_glyphs, scene_numbers, scene_numbers_locked: locked, revision, revised_pages, pages_locked: page_lock.is_some(), scene_stats }, doc))
@@ -3592,6 +3623,8 @@ fn file_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("snapshots", "Snapshots…")
         .text("branches", "Branches…")
         .text("export", keyed("Export…", "E"))
+        .text("export_review", "Export Review Package…")
+        .text("import_review", "Import Review Package…")
         .text("print", keyed("Print…", "P"))
         .separator()
         .text("home", "Close Project");
@@ -3935,7 +3968,11 @@ fn main() {
             // CIRTH_DATA_DIR lets tests use a throwaway folder.
             let dir = match std::env::var_os("CIRTH_DATA_DIR") {
                 Some(d) => PathBuf::from(d),
-                None => app.path().app_local_data_dir()?,
+                None => {
+                    let dir = app.path().app_local_data_dir()?;
+                    migrate_data_dir(&dir);
+                    dir
+                }
             };
             std::fs::create_dir_all(dir.join("projects"))?;
             *app.state::<App>().data_dir.lock().unwrap() = dir;
@@ -4157,4 +4194,35 @@ fn main() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::migrate_data_dir;
+
+    #[test]
+    fn data_folder_moves_to_the_new_identifier_once() {
+        let root = std::env::temp_dir().join(format!("kolbitar-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (old, new) = (root.join("org.cirthscribe.spike"), root.join("org.kolbitar.app"));
+        std::fs::create_dir_all(old.join("projects")).unwrap();
+        std::fs::create_dir_all(old.join("EBWebView")).unwrap();
+        std::fs::write(old.join("projects/a.cirth"), b"project").unwrap();
+        std::fs::write(old.join("preferences.json"), b"{}").unwrap();
+        // The web view may already have made the new folder before setup runs.
+        std::fs::create_dir_all(new.join("EBWebView")).unwrap();
+
+        migrate_data_dir(&new);
+        assert_eq!(std::fs::read(new.join("projects/a.cirth")).unwrap(), b"project");
+        assert!(new.join("preferences.json").exists());
+        assert!(old.join("projects/a.cirth").exists(), "the old folder is left as it was");
+
+        // Later launches leave the new folder alone, even if the old one changes.
+        std::fs::write(new.join("projects/a.cirth"), b"edited").unwrap();
+        std::fs::write(old.join("projects/b.cirth"), b"other").unwrap();
+        migrate_data_dir(&new);
+        assert_eq!(std::fs::read(new.join("projects/a.cirth")).unwrap(), b"edited");
+        assert!(!new.join("projects/b.cirth").exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

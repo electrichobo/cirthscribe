@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-11-02.
+Updated 2026-11-02 (RC Alpha prep).
 
 **M7 (optional integrations) closed 2026-10-30 (`docs/m7/EXIT_REVIEW.md`). Steps 1–6 built 2026-10-30:**
 - Steps 1–4: Optional AI Assistant & Non-Destructive Diff Engine (`cirth_core::ai`, `app/src-tauri/src/main.rs`, `app/src/aidlg.ts`, and E2E Test 82).
@@ -18,7 +18,7 @@ Updated 2026-11-02.
   - Updated `docs/COMPATIBILITY.md`, manual checks N47 and N48 in `docs/testing/MANUAL_CHECKS.md`, authored `docs/m7/EXIT_REVIEW.md`.
 - Post-M7 Onboarding, Font Packaging & Cross-Platform Hardening (2026-10-30):
   - Software Tour onboarding dialog (`app/src/tour.ts`, `app/src-tauri/src/main.rs`, `app/src/main.ts`, and E2E Test 84). 6-card illustrated walkthrough (Canvas, Focus, Planning, Production, Versions, Formats), keyboard navigation (Left/Right/Esc), skip/complete with localStorage persistence, and re-launchable via `Help > Software Tour…`.
-  - Non-Latin script screen font packaging (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `app/src/styles.css`, `app/src/a11y.ts`, `docs/m0/LICENSES.md`, `assets/legal/THIRD-PARTY-NOTICES.txt`). SIL OFL 1.1 TrueType fonts covering full international Unicode ranges (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings.
+  - Non-Latin script screen font packaging (`assets/fonts/noto-sans/`, `assets/fonts/noto-serif/`, `app/src/styles.css`, `app/src/a11y.ts`, `docs/m0/LICENSES.md`, `assets/legal/THIRD-PARTY-NOTICES.txt`). SIL OFL 1.1 TrueType fonts covering full international Unicode ranges (Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK ideographs) across Serif and Sans screen font settings. **Correction 2026-11-02:** these two fonts cover Latin, Greek and Cyrillic only; Hebrew, Arabic, Devanagari and CJK came with the RC Alpha prep below.
   - Cross-platform macOS & Linux audit hardening:
     - `cirth_core::fsutil::replace_file`: best-effort parent directory `sync_all` on Unix, preventing false save errors on APFS, FAT32/exFAT, and network shares.
     - macOS focus restoration & full screen (`app/src-tauri/src/main.rs`, `app/src/bindings.ts`): dual-pulse focus restoration (150 ms + 350 ms safety net) on macOS exit from full screen; native menu and shortcut updated to `Cmd+Ctrl+F` (`Mod+Ctrl+F`) on macOS per Apple HIG to prevent system interception of `F11`.
@@ -46,6 +46,14 @@ Updated 2026-11-02.
   - Full automated suite verified: 188 core tests, 4 contract tests, 357 license notices, offline audit 100% passed, 88 CDP tests, 87 WebDriver tests (1 skipped). Added manual check N51 in `docs/testing/MANUAL_CHECKS.md`.
   - Linux Container Verification (2026-10-31): Verified 100% pass on Linux (Ubuntu 24.04, kernel 6.12 Unraid, WebKitGTK 4.1 + Xvfb) with 87/88 tests passing (1 skipped IME) in 6m 03s, with cold open at 387ms, warm open at 120ms, and 127-page pagination at 13ms.
   - Owner art integration (2026-11-02, `docs/ART_ASSETS.md`): app icon for Windows, macOS and Linux; wordmark on Home and About with light, dark and high-contrast versions; NSIS header and sidebar; DMG background; colour toolbar icons on light themes, an inverted copy (blacks and whites swapped, oranges kept) on dark themes, line icons under high contrast. Fixed closed dialogs being drawn over the script (nine dialog rules overrode the hidden state). CDP 88/88, WebDriver 87/88 (1 skipped IME). N52 macOS part run on GROGU 2026-11-02: build and themes pass; the DMG background drew at 75% (96 DPI tag), fixed with a 1320 × 800 px 144 DPI image and light bands behind the icon labels; recheck at ebbcb7f passes. Windows installer builds with the header, sidebar and icon (9.26 MiB); owner ran it: installs and the app opens. N52 passed. Document icons for `.cirth` and `.cirth-review` added on Windows (installer hook) and macOS (merged Info.plist); macOS checked on GROGU (N53): icons and Kind pass; double-clicking now opens the file on cold and warm launches (recheck at 2c4cf42); Windows install not checked; none on Linux.
+
+**RC Alpha prep (owner, 2026-11-02; target: an RC Alpha for a tester group, not 1.0):**
+- Review packages: File > Export Review Package… and Import Review Package… (and the command palette). The commands existed since M5 step 6 but nothing reached them.
+- The island's Comments button opens Comments; it still said "not available yet" after M5 built them.
+- Home: one sample, *The Obsidian Seal*, as a card in the Projects grid ("Untitled Fantasy Feature"); the other fixtures are for tests only.
+- App identifier `org.kolbitar.app` (was `org.cirthscribe.spike`); the old data folder is copied across on first launch (unit test in `app/src-tauri/src/main.rs`). Document type identifiers `org.kolbitar.cirth` and `org.kolbitar.cirth-review`.
+- Linux `.deb`: shared MIME types and document icons for `.cirth` and `.cirth-review`. Not built or tried yet (needs Linux); the AppImage cannot register them.
+- Non-Latin fonts: Noto Sans Hebrew, Arabic, Devanagari and SC for the screen. PDFs print Hebrew, Arabic and Devanagari (shaped, in right-to-left order where needed, squeezed to the fixed-pitch columns so pages do not move); CJK is screen only and still reported by the PDF export. Bold and italic in those scripts print as regular. A right-to-left paragraph prints left-aligned in its column.
 
 **M6 (additional formats and language tools) closed 2026-10-30 (`docs/m6/EXIT_REVIEW.md`). Steps 1–7 built 2026-10-29 / 2026-10-30:**
 - Step 1: document formats and profiles model (schema v16, `DocumentProfile` enum in `cirth_core::model` covering US/UK screenplays, multi-cam teleplays, stage plays, comics, interactive stories, and treatments; frozen `schema-v15-*.cirth` upgrade tests; layout engine profile support in `cirth_core::layout::Profile`; Decision A duplicate-and-convert preservation; full e2e tests passing on CDP 76/76 and WebDriver 75/75).
@@ -101,7 +109,7 @@ The repository contains a feasibility spike, not a usable application. Nothing h
 
 1. GNU-toolchain linker warning about manifests (Windows dev builds only).
 2. Windows e2e on the GitHub-hosted runner: WebView2 does not start; the e2e runner's own deadline also failed to fire there. Non-blocking in CI; see `docs/M1_PLAN.md` 1.3.
-3. End then Enter right after typing, under an artificially busy main thread (stress test, 40 ms of blocking every 50 ms): **rare miss, about 1 in 4,000 trials, cause not found.** Investigated 2026-10-27:
+3. **Not a release blocker (owner, 2026-11-02):** seen only under the artificial stress load, far faster than people type. End then Enter right after typing, under an artificially busy main thread (stress test, 40 ms of blocking every 50 ms): **rare miss, about 1 in 4,000 trials, cause not found.** Investigated 2026-10-27:
    - **Counts:** 2 misses in about 8,000 trials across 16 full-suite runs; 0 in 10,500 trials run on their own. The control without the fix still misses about 65–70%, so the test still detects the original race.
    - **The one detailed log** shows a different failure from the original race. The editor's selection and the DOM's agreed (so the M1 fix had nothing to adopt). The editor did not take in Home's caret move, and did not handle the final Enter at all (not marked handled). The browser's own Enter then did nothing, so "abc" stayed and no new line appeared.
    - **Likely causes:** both symptoms fit ProseMirror skipping its handlers, which happens when the keys are not delivered to the editor or while it believes an input-method composition is active.

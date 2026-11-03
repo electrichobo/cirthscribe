@@ -4,13 +4,15 @@ The following defaults allow progress without pretending the owner has already s
 
 | Topic | Current position | When to settle |
 | --- | --- | --- |
-| Product name | **Kolbítar** (owner, 2026-10-27; trademark and copyright checked by the owner). Public-facing text uses it; the `.cirth` extension, crate names, the binary name and the app identifier keep the old working name, and the repository stays `electrichobo/cirthscribe` | Done |
+| Product name | **Kolbítar** (owner, 2026-10-27; trademark and copyright checked by the owner). Public-facing text uses it; the `.cirth` extension, crate names and the binary name keep the old working name, and the repository stays `electrichobo/cirthscribe`. App identifier `org.kolbitar.app` (owner, 2026-11-02; was `org.cirthscribe.spike`; the old data folder is copied across on first launch) | Done |
 | Desktop stack | Rust + Tauri 2, accepted for M1 on Windows evidence (ADR 0001); macOS/Linux verification is an M1 gate | M0 ADR (done) |
 | Web UI/editor | ProseMirror, single undo stack, Rust-owned canonical document (ADR 0001) | M0 (done) |
 | Pagination authority | Rust fixed-pitch layout engine; WebView never measures pages; PDF draws the same page map (ADR 0001) | M0 (done); production rules M2 |
 | Product model | Free/open-source, offline-first, no account required | Owner requirement |
 | Project license | GPL-3.0-only with a section 7(b) author-attribution term (see `NOTICE`); chosen by the owner 2026-10-26. Selling is allowed by any open-source license, but sellers must pass on the full source under the GPL. | Done |
 | Dependency policy | Core must build/run without paid proprietary components or secret licenses | Every adoption |
+| Release stage | RC Alpha for a tester group, not 1.0 (owner, 2026-11-02). Changelog is the git history and GitHub release notes. Updates: Help > Check for Updates… opens the releases page when clicked, no background checks (M3 decision 5, reaffirmed 2026-11-02). Bug reports go to GitHub issues. At RC Alpha the README becomes a public product README with a "How can you help" section; milestones stay in STATUS and HANDOFF | Owner, 2026-11-02 |
+| Home samples | Only *The Obsidian Seal*, shown as a card in the Projects grid with the description "Untitled Fantasy Feature"; the other fixtures stay for tests only (owner, 2026-11-02) | Done |
 | Native extension | `.cirth` (SQLite file); confirmed by the owner 2026-10-26 | Done |
 | Working storage | SQLite working copy (WAL, exclusive lock) plus atomic package save; proposal in docs/m0/SCHEMA.md | M0 prototype (done); schema v2 in M1 |
 | Screenplay font | Fixed: pages and exports use Courier Prime 12 pt. Font and size choices change only the on-screen editor (owner, 2026-10-26) | Done |
@@ -25,7 +27,7 @@ The following defaults allow progress without pretending the owner has already s
 | Google support | Tested DOCX/XLSX/CSV profiles first; live feedback later | M2/M4, integration ADR later |
 | AI | Optional BYO provider/endpoint, disabled by default | M7 |
 | OS support | Owner, 2026-10-26: Windows 10 or later, x64 only (no 32-bit build); macOS 11 Big Sur or later; Linux distribution-agnostic. macOS builds for both Apple Silicon and Intel, since Big Sur runs on both (inferred, not stated by the owner). Distribution-agnostic Linux needs packaging that carries or targets an old enough base (AppImage built on an older distribution, or Flatpak); a binary built on CI's Ubuntu 24.04 needs glibc 2.39 and WebKitGTK 4.1, so it would not run on older distributions. Not yet stated: Windows on ARM | Packaging before the first release |
-| Fonts/dictionaries | Courier Prime (OFL 1.1) for the screenplay profile; non-Latin fallback and dictionaries unselected | Font M0 (done); fallback and dictionaries M1/M2 |
+| Fonts/dictionaries | Courier Prime (OFL 1.1) for the screenplay profile. Non-Latin (owner, 2026-11-02): Noto Sans Hebrew, Arabic, Devanagari and SC bundled for the screen; PDFs print Hebrew, Arabic and Devanagari from those fonts, shaped with rustybuzz and ordered with unicode-bidi (both approved), squeezed into the fixed-pitch columns so pagination does not change; CJK stays screen only because its font has CFF outlines the PDF writer cannot embed. Dictionaries: SCOWL (ADR 0002) | Done for RC Alpha; CJK in PDF later |
 | Signing/installers | Plan separately; no promise that every release can be signed at no cost | Before distribution |
 | Git-like history | In-app snapshots/branches, no Git installation requirement; branch-isolated snapshots in SQLite (owner, 2026-10-29) | Done (M5) |
 | Alternatives | Block-level alternatives for dialogue, parentheticals, action, headings (owner, 2026-10-29) | Done (M5) |
