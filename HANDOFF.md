@@ -19,7 +19,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 - **N52 macOS part (GROGU, 2026-11-02, transcribed):** build and DMG pass; DMG background drew at 75% (96 DPI tag). Fixed: 1320×800 @144 DPI; recheck at c682424 passes (fills window, sharp, icons on target), except the painted nib tip crossed the "Kolbítar" label. Fixed (owner chose lightening): light bands behind both labels at GROGU's measured positions; window 660×432 so the title bar no longer hides the art's bottom 32 pt. Recheck at ebbcb7f passes. Themes, wordmarks, About, closed dialogs pass. Not checked: Dock, Cmd+Tab, Match System in macOS Light.
 - **N52 passed (2026-11-02):** owner reports the Mac checks good (Dock, Cmd+Tab, Match System in Light) and the Windows installer works with the app opening after install.
 - **Document icons for `.cirth` / `.cirth-review` (2026-11-02):** Windows via resources + `installer/hooks.nsh` (installer builds, hook compiles, 9.31 MiB); macOS via `app/src-tauri/Info.plist` merge and `bundle.macOS.files`. N53 on GROGU (35a3f90): plist merge, icons and Kind pass; double-click launched without opening the file. Fixed: `RunEvent::Opened` handled in `main.rs` (`open_from_os`); recheck at 2c4cf42 passes: compiles on macOS, opens on cold and warm launch. `.ico` resources moved to `tauri.windows.conf.json`. Windows install not run.
-- **Found on GROGU, not fixed:** Home project list empty on a plain cold launch on macOS (reproduced at 2c4cf42); no review-package export found in the menu bar. Save As Cancel report withdrawn (tester input).
+- **Found on GROGU, not fixed:** Home project list blank on two macOS cold launches (not reproduced in 6 later tries); no review-package export found in the menu bar. Save As Cancel report withdrawn (tester input).
 - **Fixed: closed dialogs drawn over the script.** Nine dialog rules set `display: flex`/`grid`, overriding the hidden state, so closed dialogs stacked at the top of the window (Branches on top, since M5 step 4). One rule now hides any closed dialog.
 - **Verified 2026-11-02 (Windows, rerun after the macOS open-file fix):** `npm run build`; `cargo build -p cirthscribe --release`; contract 4/4; offline audit passed; notices check (357); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME). `cargo test -p cirth-core` 191/191 on 2026-10-31 (no core change since).
 - **Not verified:**
@@ -28,10 +28,10 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- None. N53 results committed and pushed (2026-11-02).
+- None. Notes committed and pushed (2026-11-02).
 
 ## Next Immediate Step
 
 1. Remaining manual checks N47–N51 and the physical macOS run; owner picks the next priority.
 2. N53 owner check passed (2026-11-02): "everything working as intended".
-3. Empty Home project list on a plain cold launch (macOS): GROGU diagnostics requested (on-screen state, timing, data folder, log). Its first theory (setup race) was reverted untested; the UI shows "No projects yet" for a truly empty list, so a blank grid suggests `list_projects` never returned.
+3. Empty Home project list on a macOS cold launch: seen twice, not reproduced in 6 tries (2026-11-02). Blank grid means `list_projects` had not returned. Owner chose to leave Home as is for now (2026-11-02); a "Loading…" state and an error or timeout message would make a recurrence explain itself.
