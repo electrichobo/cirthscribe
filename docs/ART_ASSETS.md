@@ -15,7 +15,7 @@ The wordmark lettering reads "Kółbítar". The owner confirmed this is a styliz
 | `branding/full wordmark light` / `dark` | Home header and About screen: light themes / dark themes | `app/public/art/brand/` |
 | `branding/full wordmark monochrome dark` / `light` | The same under high contrast (white / black background) | `app/public/art/brand/` |
 | `windows nsis header`, `windows nsis sidebar welcome` | NSIS installer, 150×57 and 164×314 BMP | `app/src-tauri/installer/` |
-| `maxOS retina` | macOS disk image background: 1320×800 px tagged 144 DPI, which Finder draws at 660×400 pt (Retina-sharp). A 72/96 DPI tag makes Finder rescale it | `app/src-tauri/installer/dmg-background.png` |
+| `maxOS retina` | macOS disk image background: 1320×800 px tagged 144 DPI, which Finder draws at 660×400 pt (Retina-sharp). A 72/96 DPI tag makes Finder rescale it. Soft light bands are painted behind Finder's two icon labels (positions measured on macOS 26) so the dark label text reads over the nib and the rock. The window is 660×432 so the 32 pt title bar does not hide the bottom of the art | `app/src-tauri/installer/dmg-background.png` |
 | `toolbar/*`, `production_review/*`, `review_newformats/*` | UI icons, 48×48 PNG | `app/public/art/icons/` |
 | `branding/project file icon`, `review file icon` | Kept as 1024 px masters, not used yet | `assets/art/` |
 | `branding/full wordmark * vertical`, `toolbar/color source` | Not used (no slot yet; `color source` is the brand mark, kept as a colour reference) | owner's copy only |
