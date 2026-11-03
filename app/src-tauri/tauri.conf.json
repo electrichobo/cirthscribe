@@ -33,10 +33,6 @@
         "role": "Viewer"
       }
     ],
-    "resources": {
-      "file-icons/cirth.ico": "file-icons/cirth.ico",
-      "file-icons/cirth-review.ico": "file-icons/cirth-review.ico"
-    },
     "category": "Productivity",
     "shortDescription": "Free, offline-first screenplay editor and production workspace",
     "longDescription": "Kolbítar combines screenplay editing, story planning, a shared project bible, and script-derived production tools. Free, open source, and offline first.",

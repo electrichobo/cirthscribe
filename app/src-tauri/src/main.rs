@@ -23,6 +23,7 @@ use cirth_core::revisions::{self, RevisionSet};
 use cirth_core::{backup, fontcheck, pdf};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 use tauri::{Manager, State};
@@ -46,8 +47,11 @@ struct App {
     data_dir: Mutex<PathBuf>,
     /// Free Writing workspace, opened on first use.
     free: Mutex<Option<cirth_core::freewrite::FreeStore>>,
-    /// File path passed on the command line at startup (e.g. via double-click or CLI).
+    /// File path passed on the command line at startup (e.g. via double-click or CLI),
+    /// or opened from the OS before the UI asked for it (macOS).
     startup_file: Mutex<Option<String>>,
+    /// Set once the UI has asked for its startup file; later OS file opens go to it as events.
+    ui_ready: AtomicBool,
 }
 
 #[derive(Serialize)]
@@ -3443,7 +3447,26 @@ async fn close_panel_window(app: tauri::AppHandle, panel: String) -> Result<(), 
 /// Query the file path passed to the application on startup (CLI arg or OS file association launch).
 #[tauri::command]
 fn startup_file(app: tauri::State<App>) -> Option<String> {
-    app.startup_file.lock().unwrap().clone()
+    let held = app.startup_file.lock().unwrap();
+    app.ui_ready.store(true, Ordering::SeqCst);
+    held.clone()
+}
+
+/// A file the OS asked us to open (macOS Finder double-click or Open With). Before
+/// the UI has asked for its startup file it is held for that call (cold launch);
+/// afterwards it goes to the UI as an open-file event. Both sides check under the
+/// same lock, so a file is never lost or opened twice.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn open_from_os(handle: &tauri::AppHandle, path: String) {
+    use tauri::Emitter;
+    let app = handle.state::<App>();
+    let mut held = app.startup_file.lock().unwrap();
+    if app.ui_ready.load(Ordering::SeqCst) {
+        drop(held);
+        let _ = handle.emit_to("main", "open-file", path);
+    } else {
+        *held = Some(path);
+    }
 }
 
 /// Labels of the open windows (tests check pop-out windows open and close).
@@ -4116,6 +4139,13 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building Kolbítar")
         .run(|handle, event| {
+            // macOS delivers files opened from Finder as an event, not as arguments.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                if let Some(path) = urls.iter().find_map(|u| u.to_file_path().ok()) {
+                    open_from_os(handle, path.to_string_lossy().to_string());
+                }
+            }
             // Safety net: the window's close handler saves first; if it could
             // not (e.g. the UI was unresponsive), save what the store holds.
             // Edits still waiting in the UI's debounce are not in the store.

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "resources": {
+      "file-icons/cirth.ico": "file-icons/cirth.ico",
+      "file-icons/cirth-review.ico": "file-icons/cirth-review.ico"
+    }
+  }
+}
