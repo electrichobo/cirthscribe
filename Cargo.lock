@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "cirth-core"
-version = "0.0.1"
+version = "0.8.1"
 dependencies = [
  "printpdf",
  "quick-xml",
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "cirthscribe"
-version = "0.0.1"
+version = "0.8.1"
 dependencies = [
  "cirth-core",
  "serde",

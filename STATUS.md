@@ -47,6 +47,8 @@ Updated 2026-11-02 (RC Alpha prep).
   - Linux Container Verification (2026-10-31): Verified 100% pass on Linux (Ubuntu 24.04, kernel 6.12 Unraid, WebKitGTK 4.1 + Xvfb) with 87/88 tests passing (1 skipped IME) in 6m 03s, with cold open at 387ms, warm open at 120ms, and 127-page pagination at 13ms.
   - Owner art integration (2026-11-02, `docs/ART_ASSETS.md`): app icon for Windows, macOS and Linux; wordmark on Home and About with light, dark and high-contrast versions; NSIS header and sidebar; DMG background; colour toolbar icons on light themes, an inverted copy (blacks and whites swapped, oranges kept) on dark themes, line icons under high contrast. Fixed closed dialogs being drawn over the script (nine dialog rules overrode the hidden state). CDP 88/88, WebDriver 87/88 (1 skipped IME). N52 macOS part run on GROGU 2026-11-02: build and themes pass; the DMG background drew at 75% (96 DPI tag), fixed with a 1320 × 800 px 144 DPI image and light bands behind the icon labels; recheck at ebbcb7f passes. Windows installer builds with the header, sidebar and icon (9.26 MiB); owner ran it: installs and the app opens. N52 passed. Document icons for `.cirth` and `.cirth-review` added on Windows (installer hook) and macOS (merged Info.plist); macOS checked on GROGU (N53): icons and Kind pass; double-clicking now opens the file on cold and warm launches (recheck at 2c4cf42); Windows install not checked; none on Linux.
 
+**Version 0.8.1, RC Alpha (owner, 2026-11-02).** README.md is now the public product page; the stage checklist that used to be there is below under "Milestone checklist". Owner checked N54 and the Linux document icons (pass).
+
 **RC Alpha prep (owner, 2026-11-02; target: an RC Alpha for a tester group, not 1.0):**
 - Review packages: File > Export Review Package… and Import Review Package… (and the command palette). The commands existed since M5 step 6 but nothing reached them.
 - The island's Comments button opens Comments; it still said "not available yet" after M5 built them.
@@ -104,6 +106,172 @@ The repository contains a feasibility spike, not a usable application. Nothing h
 | Native schema and container proposal | `docs/m0/SCHEMA.md` |
 | Dependency, font and tool licenses | `docs/m0/LICENSES.md` |
 | Synthetic fixtures (original text) | `fixtures/` (regenerate: `cirth-cli gen-fixtures fixtures`) |
+
+## Milestone checklist
+
+Moved from README.md on 2026-11-02, when the README became the public product page for the 0.8.1 RC Alpha. Kept as it stood then.
+
+Each stage builds on the one before. Stages are goals, not dates.
+
+#### ✅ Stage 0: Proof of concept (done)
+
+Proved the hard parts before building on them: an editor that keeps up with a 120-page script, accurate page layout, safe saving, and crash recovery. The app framework was chosen with measurements: Rust and Tauri.
+
+#### ✅ Stage 1: A writing app you can rely on (done)
+
+Done:
+- [x] Screenplay editor with automatic formatting, keyboard shortcuts and undo
+- [x] Home screen listing your projects, with sample scripts
+- [x] Save, Save As, and open files from anywhere
+- [x] Autosave, rolling backups, crash recovery, and protection when a file changes outside the app
+- [x] Older project files upgraded safely, with the original kept
+- [x] Find and replace
+- [x] Autocomplete for character names, locations and transitions
+- [x] Word counts
+- [x] Spell check (US and UK English) with your own dictionary
+- [x] Dual dialogue, forced page breaks, and a page view
+- [x] Free Writing: notes and brain dumps outside any project, with a Flow mode that turns off editing so you just keep writing
+- [x] Draft PDF export
+- [x] Plain-text export with the same pages and layout
+- [x] US Letter / A4 page size, saved with each document
+- [x] About screen with the licence and every third-party licence
+- [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
+
+Carried forward:
+- [ ] Typing-speed check on a Linux desktop
+
+#### ✅ Stage 1b: Writing workspace (done)
+
+- [x] Focus mode: full screen with only the script page
+- [x] Typewriter mode: the line you are typing stays centred while the text scrolls
+- [x] A floating toolbar centred over the script: undo, line type, bold, italic, underline, text colour, highlight, on-screen font and size, scene list and board buttons, find, focus mode, and a ⋮ menu for the rest
+- [x] Full menu bar on every system: File, Edit, View, Format, Help
+- [x] Show or hide the scene list, board, toolbar and status bar
+- [x] In narrow windows the side panels step aside and open over the script, so the page always fits
+- [x] Scene cards with a logline and summary instead of a copy of the scene
+- [x] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
+- [x] Text colour and highlight as your own on-screen markup (never printed)
+
+#### ✅ Stage 2: Professional pages and file exchange (done)
+
+Done:
+- [x] Title page, printed before page 1 in PDF and text exports
+- [x] Fountain import and export, with a report of anything that changed
+- [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
+- [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
+- [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
+- [x] Revision sets (label, colour, date, mark) in the Writers Guild colour order (White original, then Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, then Double Blue and so on), revision mode that marks changed lines, and a changed-pages PDF
+- [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
+- [x] Word (DOCX), RTF and HTML export, each with a report of what carried over
+- [x] A compatibility test pack and record ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)); first results from Preview, TextEdit and Safari on macOS
+
+Known limits:
+- Letters Courier Prime doesn't have (Chinese, Japanese, Korean, Hebrew, Arabic, emoji) print blank in PDFs; the export warns you. A fallback font comes later.
+- In Word, RTF and HTML exports, dual dialogue is printed one speech after the other.
+
+Carried forward:
+- [ ] Results from Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages and browser print
+- [ ] Check the page measurements against an industry-standard PDF
+- [ ] Tested exchange with other screenwriting apps
+
+#### ✅ Stage 3: Story planning (done)
+
+First, from the owner's notes on the current build:
+- [x] Reorganised menus: one Import (it recognises Fountain, Final Draft and plain text) and one Export dialog; View > Mode, Tools, Appearance, Go To (page or scene) and Window; elements, screen font, title page and spelling under Format; a keyboard shortcut list
+- [x] A notes scratchpad saved with the project (View > Tools > Notes)
+- [x] Panels that pop out into their own windows (scene list, board, notes)
+- [x] Themes: Day, Night, Midnight, OLED (true black) and Match System, with high contrast on top of any of them
+- [x] Remappable keyboard shortcuts (Help > Keyboard Shortcuts…), with conflicts handled and Reset all
+
+Then the plan itself:
+- [x] Episodes and series: folders for seasons, any number of episodes per project, each with its own script, scene list, cards and exports (File > Episodes and Documents…)
+- [x] One story bible shared by every episode: characters, locations and world entries, suggested from the scripts, with aliases and previewed renames (View > Tools > Bible…)
+- [x] Tabbed navigator: Scenes (page, length in eighths, colour label, characters, the card's logline) and Characters (speeches, words, scenes, first appearance), with a filter and a whole-project view
+- [x] An Outline tab in the navigator (notes live in their own panel and on the evidence board)
+- [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
+- [x] An overview map of the whole script or series: scenes as blocks sized by length, coloured by label or act, with a list view (View > Tools > Overview…)
+- [x] Index-card board, and an evidence board where notes, pictures, video links and cards for scenes, beats, bible entries and events are joined by labelled strings (View > Tools > Evidence Board…)
+- [x] Bookmarks: named places in the scripts (View > Go To)
+- [x] Beat and pacing board: cards divided into any number of acts (start from three or five), with a pacing strip and page and minute estimates
+- [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo
+- [x] Reordering scenes from the board (only with your permission, which is remembered per script, and undoable)
+- [x] Story timeline, kept separate from script order: events linked to scenes in any episode, flashbacks marked, and an optional, previewed "put the script in story order" (View > Tools > Timeline…)
+- [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
+
+#### ✅ Stage 4: Production tools (done)
+
+Done:
+- [x] Script breakdown tags (props, wardrobe, cast and more, linked to the project bible with aliases and suggested tags; View > Tools > Breakdown Tags…)
+- [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
+- [x] Reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, revisions, and breakdown tag categories (occurrences and distinct scenes kept apart)
+- [x] Character participation: speaking scenes, present-but-silent scenes (cast tags), V.O./O.S./dual speeches, dialogue share, and documented participation estimates
+- [x] Character sides: a character's scenes as pages for actors (scenes-only and cross-out modes, dual dialogue preservation, locked numbers and page labels; View > Tools > Character Sides…)
+- [x] Stripboard and shooting schedule (independent order, day breaks, banners, unscheduled pile, color legend and notes; exports in PDF, HTML, XLSX, CSV; View > Tools > Stripboard…)
+- [x] Page counts in eighths, and character appearance charts
+- [x] Reports in PDF, spreadsheet (XLSX, CSV, TSV), HTML and RTF
+- [x] Compatibility test pack for production exports (`cirth-cli compat-m4`)
+
+Carried forward:
+- [ ] Results from external spreadsheet apps (Excel, Google Sheets, LibreOffice) for StoryScry and stripboard files
+- [ ] Visual checks in external PDF viewers for stripboards and sides
+
+#### ✅ Stage 5: Notes, alternatives and versions (done)
+
+Done:
+- [x] Comments attached to the text, with inline decorations, replies, resolution tracking, orphan recovery, and accessible review dialog (View > Tools > Comments…)
+- [x] Alternative takes on blocks with take badge switcher (`Take 1/2 ▾`), active take projection across all views and word counts, and StoryScry inactive alternative reporting (View > Tools > Alternate Takes…)
+- [x] Named snapshots and checkpoints with full point-in-time package state in SQLite, non-destructive restore, and automatic pre-restore checkpoints (File > Snapshots…)
+- [x] Visual branch history and independent branch canon with branch-isolated snapshots in SQLite, fork/switch/delete management, and status bar branch pill (File > Branches…)
+- [x] Base/source/target 3-way conflict integration and locked-page baseline guard with 3-column diff view, conflict resolution choices, and baseline divergence protection (File > Branches… > Merge into Current…)
+- [x] Portable review package (`.cirth-review`) bundle export and import with anchored comments, alternate takes, provenance tracking, and defenses against path traversal, script tags, and formula injection
+- [x] Compatibility, regression verification, and exit review (Step 7)
+
+Carried forward:
+- [ ] Desktop manual checks for review, alternatives, branches, and review packages (N37–N40)
+
+#### ✅ Stage 6: More formats and language tools (done)
+
+Done:
+- [x] Document formats and profiles model (schema v16): support for US/UK screenplays, multi-cam sitcoms, stage plays, comics, interactive stories, and treatments; format assignment at creation and duplicate-and-convert script preservation
+- [x] Comic books and graphic novels: page/panel hierarchy, speech balloons, captions, sound effects, automatic panel counting, continuity validation, panel renumbering reconciliation, and Plain Text / HTML exports
+- [x] Stage plays and multi-camera teleplays: lettered scenes, uppercase dialogue, Act/Scene headings, bracketed stage directions, profile layout pagination, and text exports
+- [x] Interactive and branching stories: passages with stable IDs, inline choice syntax (`[[Label -> Target]]`), conditions, BFS graph integrity validation (dangling links, dead ends, unreachable nodes), Twee 3, standalone offline playable HTML runner, JSON graph exports, and live playtester
+- [x] General rich-text treatment documents: headings hierarchy (H1–H3), body paragraphs, blockquotes, bullet lists, character spotlights, reading time metrics, Project Bible entity cross-referencing, and semantic HTML, TXT, and DOCX exports
+- [x] 100% offline rule-based grammar and style checker: duplicate words, passive voice in action lines, screenplay dialogue quotation rules, parenthetical formatting, cliches and fillers, spacing anomalies, and one-click fix
+- [x] Compatibility matrix, format fixtures, manual checks and Milestone 6 exit review (docs/m6/EXIT_REVIEW.md)
+
+Carried forward:
+- [ ] Desktop manual checks for additional formats, language tools, and format conversion (N41–N46)
+
+#### ✅ Stage 7: Optional extras (done)
+
+Done:
+- [x] Bring-your-own AI architecture and writing assistant: off by default, zero unsolicited network requests; support for local Ollama / LM Studio or cloud providers; transparent scope disclosure and token estimation; non-destructive block diffs and accepted batch application (`cirth_core::ai`, `app/src/aidlg.ts`, E2E Test 82)
+- [x] Cloud sharing & Google Docs/Sheets workflow adapter: export capability analyzer, fidelity grading, explicit loss warnings, dynamic export dialog guidance, and interoperability guide (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, `app/src/exportdlg.ts`, E2E Test 83)
+- [x] Software tour onboarding dialog: 6-step guided walkthrough of core writing, focus modes, story planning, production tools, revision workflows, and format tools; non-blocking, keyboard accessible (Left/Right arrows, Esc), skip/complete options, and re-launchable via Help > Software Tour… (`app/src/tour.ts`, E2E Test 84)
+- [x] Non-Latin scripts: bundled SIL OFL-1.1 Noto fonts for Latin, Greek and Cyrillic (Noto Sans and Serif), Hebrew, Arabic, Devanagari and Simplified Chinese with kana and hangul (Noto Sans SC) on screen. PDFs print Hebrew, Arabic and Devanagari, shaped and in right-to-left order, without moving page breaks; Chinese, Japanese and Korean are screen only for now
+- [x] Native OS file associations, CLI launching & drag-and-drop: registered file associations for `.cirth` (editor) and `.cirth-review` (viewer); startup argument file opening; window drag-and-drop file opening for projects and imports (`.fountain`, `.fdx`); E2E Test 85 (`tauri.conf.json`, `main.rs`, `main.ts`, E2E Test 85)
+- [x] Automated offline & zero-telemetry audit: script mathematically verifying strict CSP, zero tracking dependencies, codebase network scan, and live OS process socket inspection (`app/scripts/offline-audit.mjs`, `npm run test:offline`)
+- [x] Cross-platform macOS and Linux hardening: Unix atomic file replacement with best-effort directory fsync for APFS/FAT32 resilience, dual-pulse focus restoration after macOS full screen, `Cmd+Ctrl+F` Apple HIG keybinding, and WebKitGTK dialog focus trapping
+- [x] UI Vector SVG Icon Registry: clean, comprehensive 24×24 stroke icon system covering navigation, writing, formatting, story planning, production, and revisions; automatic adaptation to light, dark, midnight, OLED, and Windows contrast themes (`app/src/icons.ts`)
+- [x] Sorkinesque high-fantasy showcase project (*The Obsidian Seal*): rapid-fire, walk-and-talk rhythm script fixture exercising characters, dialogue, scene transitions, and production beats without AI cliches (`fixtures/high-council.json`, E2E Test 86)
+- [x] Native print stylesheet and printing: `@media print` rules enforcing physical Letter portrait page dimensions, Courier Prime 12pt, margin-aligned scene numbers, screen color markup suppression, and `File > Print…` / `Ctrl+P` (`Cmd+P`) action (`app/src/styles.css`, E2E Test 87, Manual Check N50)
+- [x] Cross-platform VM provisioning & container smoke test scripts: turnkey setup scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`), plus a Docker container runner (`Dockerfile.linux`) for Unraid and headless Linux E2E verification under Xvfb
+- [x] Windows NSIS installer bundle verification: self-contained installer executable with file associations, start menu shortcuts, and uninstaller (`target/release/bundle/nsis/`)
+- [x] Command Palette / Quick Switcher (`Ctrl+K` / `Cmd+K`): fast search and instant keyboard navigation across all scenes, characters, beats, and application actions (`app/src/palette.ts`, E2E Test 88)
+- [x] Personal Dictionary Editor Dialog: dedicated dictionary manager under `Format > Spelling > Personal Dictionary…` to view, filter, add, and remove words in project and personal scopes (`app/src/dictionary.ts`, E2E Test 88)
+- [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
+- [x] RC Alpha prep: Export and Import Review Package in the File menu; the toolbar's Comments button opens Comments; Home offers one sample (*The Obsidian Seal*); app identifier `org.kolbitar.app` with the old data folder copied across; Linux document icons for `.cirth` and `.cirth-review` (not yet tried on Linux)
+- [x] Owner art: new app icon, the Kolbítar wordmark on Home and About (light, dark and high-contrast versions), Windows installer and macOS disk image art, and colour toolbar icons, with an inverted set for dark themes (`docs/ART_ASSETS.md`); checked on Windows and macOS (N52)
+
+Carried forward:
+- [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
+- [ ] Desktop manual checks for software tour and non-Latin script display (N49)
+- [ ] Desktop check of non-Latin text on screen and in PDFs (N54)
+- [ ] Desktop manual check for native print preview (N50)
+- [ ] Desktop manual check for Command Palette and Personal Dictionary (N51)
+- [ ] VM / hardware execution of setup scripts on macOS and Linux
+- [ ] Desktop check of the `.cirth` and `.cirth-review` document icons on Windows and macOS (N53)
 
 ## Open defects
 

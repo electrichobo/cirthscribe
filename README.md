@@ -2,205 +2,67 @@
 
 A free, open-source screenplay writing and story-production app for Windows, macOS and Linux. It works offline, needs no account, and has no subscription.
 
-Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)).
+Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)). Free and open source under GPL-3.0 ([details](#license)).
 
-Free and open source under GPL-3.0 ([details](#license)).
+> **0.8.1 RC Alpha: a test release.** Kolbítar is feature-complete for its first release and is now being tested by real writers. Expect rough edges. Keep your own copies of anything important (File > Save As, or export to PDF or Fountain), and please [report what you find](#how-you-can-help).
 
-> **Early development.** Kolbítar is not ready to use yet: there is no download and no release. The features marked done below work in development builds and are covered by automated tests, but your scripts are not safe in it yet. Don't trust it with real work until a release says otherwise.
+## Download
+
+Get the latest build from [Releases](https://github.com/electrichobo/cirthscribe/releases):
+
+| System | File | Notes |
+| - | - | - |
+| Windows 10 or later (64-bit) | `Kolbítar_0.8.1_x64-setup.exe` | The installer is not code-signed yet, so Windows SmartScreen may warn you. Choose **More info**, then **Run anyway**. |
+| macOS 11 or later | `Kolbítar_0.8.1_aarch64.dmg` (Apple silicon) | The app is not signed or notarized yet. Open the disk image and drag Kolbítar to Applications. The first time, right-click (or Control-click) the app and choose **Open**, or allow it in System Settings > Privacy & Security. |
+| Linux | `.deb` (Debian, Ubuntu and relatives) or `.AppImage` | The `.deb` also registers `.cirth` files and their icons. |
+
+Kolbítar never checks for updates by itself. Use **Help > Check for Updates…** to open the Releases page; each release lists what changed.
 
 ## What it is
 
 Kolbítar is one app for the whole path from first idea to shooting script:
 
-- **Write.** A screenplay editor that formats as you type: scene headings, action, characters, dialogue and transitions, with industry-standard pages.
-- **Plan.** Outlines, index cards, a story timeline, and a "bible" of your characters, locations and world. These are all views of the same script, so they never drift out of sync.
-- **Prepare for production.** Breakdowns, reports and a stripboard, built straight from the script.
-- **Exchange files.** Import and export the formats other tools use (PDF, Final Draft, Word and more), with an honest report of anything a format can't carry.
+- **Write.** A screenplay editor that formats as you type: scene headings, action, characters, dialogue and transitions, with industry-standard pages. Also stage plays, multi-camera TV, comics, interactive stories and treatments.
+- **Plan.** Outlines, index cards, a beat board, a story timeline, an evidence board, and a "bible" of your characters, locations and world. These are all views of the same script, so they never drift out of sync.
+- **Prepare for production.** Breakdown tags, reports, character sides and a stripboard, built straight from the script.
+- **Revise.** Revision sets in the standard colours, locked pages and scene numbers, snapshots, branches, alternate takes, and comments you can share as a review package.
+- **Exchange files.** PDF, Final Draft, Fountain, Word, RTF, HTML and plain text, with an honest report of anything a format can't carry.
 
 It is built around a few promises:
 
 - **Free, with no catches.** No subscriptions, paywalls or paid tiers.
 - **Your work stays on your computer.** Nothing is uploaded, nothing phones home, and no cloud account is needed.
-- **Your work is protected.** Autosave, backups, crash recovery and undo are built into the foundation, not added later.
+- **Your work is protected.** Autosave, rolling backups, crash recovery and undo.
 - **AI is optional and off by default.** If you turn it on, you choose the provider, and it never changes your script without showing you first.
 
-## Roadmap
+New to it? **Help > Software Tour** walks through the main parts, and the Home screen has a sample script, *The Obsidian Seal*, to explore.
 
-Each stage builds on the one before. Stages are goals, not dates.
+## How you can help
 
-### ✅ Stage 0: Proof of concept (done)
+This alpha is for finding problems before a wider release. Every report helps.
 
-Proved the hard parts before building on them: an editor that keeps up with a 120-page script, accurate page layout, safe saving, and crash recovery. The app framework was chosen with measurements: Rust and Tauri.
+1. **Use it for real writing**, and try the parts you would actually use: planning, revisions, production reports, exports.
+2. **Report bugs and rough edges** in [GitHub Issues](https://github.com/electrichobo/cirthscribe/issues). Please include:
+   - your system (Windows, macOS or Linux, and its version) and the Kolbítar version (Help > Licences… shows it);
+   - what you did, what you expected, and what happened instead;
+   - a screenshot if it helps.
+   Don't attach a script you want to keep private: describe the problem, or make a small test project that shows it.
+3. **Check other apps.** Open Kolbítar's exports in the apps you use (Final Draft, Word, Google Docs, Fountain apps, PDF readers) and tell us what came through and what didn't.
+4. **Run a manual check.** [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) lists checks that need a person, many not yet run. Pick one for your system and post the result as an issue.
+5. **Suggest improvements** in Issues too. Say what you were trying to do; that matters more than a specific solution.
 
-### ✅ Stage 1: A writing app you can rely on (done)
+## Known limits in this alpha
 
-Done:
-- [x] Screenplay editor with automatic formatting, keyboard shortcuts and undo
-- [x] Home screen listing your projects, with sample scripts
-- [x] Save, Save As, and open files from anywhere
-- [x] Autosave, rolling backups, crash recovery, and protection when a file changes outside the app
-- [x] Older project files upgraded safely, with the original kept
-- [x] Find and replace
-- [x] Autocomplete for character names, locations and transitions
-- [x] Word counts
-- [x] Spell check (US and UK English) with your own dictionary
-- [x] Dual dialogue, forced page breaks, and a page view
-- [x] Free Writing: notes and brain dumps outside any project, with a Flow mode that turns off editing so you just keep writing
-- [x] Draft PDF export
-- [x] Plain-text export with the same pages and layout
-- [x] US Letter / A4 page size, saved with each document
-- [x] About screen with the licence and every third-party licence
-- [x] Accessibility groundwork: full keyboard control, screen-reader labels and announcements, high contrast, adjustable interface size
+- Chinese, Japanese and Korean show on screen but do not print in PDFs yet; the export tells you when this happens. Hebrew, Arabic and Devanagari print.
+- Word, RTF and HTML exports print dual dialogue one speech after the other.
+- Exchange with Final Draft and other screenwriting apps has been built from their published formats but not yet tested in those apps.
+- Installers are not code-signed, so Windows and macOS show a warning the first time (see [Download](#download)).
+- Screen readers have not been tested, and input methods (IMEs) have only been tested in simulation.
+- Not yet tried: macOS 11 (the oldest supported version) and Intel Macs.
 
-Carried forward:
-- [ ] Typing-speed check on a Linux desktop
+The full list of what has and hasn't been tested is in [STATUS.md](STATUS.md).
 
-### ✅ Stage 1b: Writing workspace (done)
-
-- [x] Focus mode: full screen with only the script page
-- [x] Typewriter mode: the line you are typing stays centred while the text scrolls
-- [x] A floating toolbar centred over the script: undo, line type, bold, italic, underline, text colour, highlight, on-screen font and size, scene list and board buttons, find, focus mode, and a ⋮ menu for the rest
-- [x] Full menu bar on every system: File, Edit, View, Format, Help
-- [x] Show or hide the scene list, board, toolbar and status bar
-- [x] In narrow windows the side panels step aside and open over the script, so the page always fits
-- [x] Scene cards with a logline and summary instead of a copy of the scene
-- [x] Choice of on-screen font and size (pages and exports keep the standard screenplay font)
-- [x] Text colour and highlight as your own on-screen markup (never printed)
-
-### ✅ Stage 2: Professional pages and file exchange (done)
-
-Done:
-- [x] Title page, printed before page 1 in PDF and text exports
-- [x] Fountain import and export, with a report of anything that changed
-- [x] Final Draft (FDX) import and export, with a report of what carried over (not yet tested in Final Draft itself)
-- [x] Scene numbers: lock them, new scenes get A/B numbers (12A, 12B), omit and restore scenes; numbers show in the margins, exports, FDX and Fountain
-- [x] PDF export with title page, scene numbers, headers and footers; the same script always gives the same file, and pages are checked to come out identically on Windows, macOS and Linux
-- [x] Revision sets (label, colour, date, mark) in the Writers Guild colour order (White original, then Blue, Pink, Yellow, Green, Goldenrod, Buff, Salmon, Cherry, then Double Blue and so on), revision mode that marks changed lines, and a changed-pages PDF
-- [x] Locked pages: later changes go onto added pages (12A, 12B) and fully emptied pages print as "11-12", so later page numbers never move
-- [x] Word (DOCX), RTF and HTML export, each with a report of what carried over
-- [x] A compatibility test pack and record ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)); first results from Preview, TextEdit and Safari on macOS
-
-Known limits:
-- Letters Courier Prime doesn't have (Chinese, Japanese, Korean, Hebrew, Arabic, emoji) print blank in PDFs; the export warns you. A fallback font comes later.
-- In Word, RTF and HTML exports, dual dialogue is printed one speech after the other.
-
-Carried forward:
-- [ ] Results from Word, Google Docs, LibreOffice, Final Draft, Fountain apps, Pages and browser print
-- [ ] Check the page measurements against an industry-standard PDF
-- [ ] Tested exchange with other screenwriting apps
-
-### ✅ Stage 3: Story planning (done)
-
-First, from the owner's notes on the current build:
-- [x] Reorganised menus: one Import (it recognises Fountain, Final Draft and plain text) and one Export dialog; View > Mode, Tools, Appearance, Go To (page or scene) and Window; elements, screen font, title page and spelling under Format; a keyboard shortcut list
-- [x] A notes scratchpad saved with the project (View > Tools > Notes)
-- [x] Panels that pop out into their own windows (scene list, board, notes)
-- [x] Themes: Day, Night, Midnight, OLED (true black) and Match System, with high contrast on top of any of them
-- [x] Remappable keyboard shortcuts (Help > Keyboard Shortcuts…), with conflicts handled and Reset all
-
-Then the plan itself:
-- [x] Episodes and series: folders for seasons, any number of episodes per project, each with its own script, scene list, cards and exports (File > Episodes and Documents…)
-- [x] One story bible shared by every episode: characters, locations and world entries, suggested from the scripts, with aliases and previewed renames (View > Tools > Bible…)
-- [x] Tabbed navigator: Scenes (page, length in eighths, colour label, characters, the card's logline) and Characters (speeches, words, scenes, first appearance), with a filter and a whole-project view
-- [x] An Outline tab in the navigator (notes live in their own panel and on the evidence board)
-- [x] Outline editor: acts, sequences and beats in one tree, shared with the board (navigator > Outline)
-- [x] An overview map of the whole script or series: scenes as blocks sized by length, coloured by label or act, with a list view (View > Tools > Overview…)
-- [x] Index-card board, and an evidence board where notes, pictures, video links and cards for scenes, beats, bible entries and events are joined by labelled strings (View > Tools > Evidence Board…)
-- [x] Bookmarks: named places in the scripts (View > Go To)
-- [x] Beat and pacing board: cards divided into any number of acts (start from three or five), with a pacing strip and page and minute estimates
-- [x] Undo and redo for the board's cards (text, new cards, moves), separate from the script's own undo
-- [x] Reordering scenes from the board (only with your permission, which is remembered per script, and undoable)
-- [x] Story timeline, kept separate from script order: events linked to scenes in any episode, flashbacks marked, and an optional, previewed "put the script in story order" (View > Tools > Timeline…)
-- [x] Character, location and world profiles (in the bible: description, your own fields, other names, where each appears)
-
-### ✅ Stage 4: Production tools (done)
-
-Done:
-- [x] Script breakdown tags (props, wardrobe, cast and more, linked to the project bible with aliases and suggested tags; View > Tools > Breakdown Tags…)
-- [x] StoryScry: a dashboard of charts summarising every report, each opening into the full report (View > Tools > StoryScry…)
-- [x] Reports for scenes, characters, locations, action vs dialogue, interior vs exterior, day vs night, revisions, and breakdown tag categories (occurrences and distinct scenes kept apart)
-- [x] Character participation: speaking scenes, present-but-silent scenes (cast tags), V.O./O.S./dual speeches, dialogue share, and documented participation estimates
-- [x] Character sides: a character's scenes as pages for actors (scenes-only and cross-out modes, dual dialogue preservation, locked numbers and page labels; View > Tools > Character Sides…)
-- [x] Stripboard and shooting schedule (independent order, day breaks, banners, unscheduled pile, color legend and notes; exports in PDF, HTML, XLSX, CSV; View > Tools > Stripboard…)
-- [x] Page counts in eighths, and character appearance charts
-- [x] Reports in PDF, spreadsheet (XLSX, CSV, TSV), HTML and RTF
-- [x] Compatibility test pack for production exports (`cirth-cli compat-m4`)
-
-Carried forward:
-- [ ] Results from external spreadsheet apps (Excel, Google Sheets, LibreOffice) for StoryScry and stripboard files
-- [ ] Visual checks in external PDF viewers for stripboards and sides
-
-### ✅ Stage 5: Notes, alternatives and versions (done)
-
-Done:
-- [x] Comments attached to the text, with inline decorations, replies, resolution tracking, orphan recovery, and accessible review dialog (View > Tools > Comments…)
-- [x] Alternative takes on blocks with take badge switcher (`Take 1/2 ▾`), active take projection across all views and word counts, and StoryScry inactive alternative reporting (View > Tools > Alternate Takes…)
-- [x] Named snapshots and checkpoints with full point-in-time package state in SQLite, non-destructive restore, and automatic pre-restore checkpoints (File > Snapshots…)
-- [x] Visual branch history and independent branch canon with branch-isolated snapshots in SQLite, fork/switch/delete management, and status bar branch pill (File > Branches…)
-- [x] Base/source/target 3-way conflict integration and locked-page baseline guard with 3-column diff view, conflict resolution choices, and baseline divergence protection (File > Branches… > Merge into Current…)
-- [x] Portable review package (`.cirth-review`) bundle export and import with anchored comments, alternate takes, provenance tracking, and defenses against path traversal, script tags, and formula injection
-- [x] Compatibility, regression verification, and exit review (Step 7)
-
-Carried forward:
-- [ ] Desktop manual checks for review, alternatives, branches, and review packages (N37–N40)
-
-### ✅ Stage 6: More formats and language tools (done)
-
-Done:
-- [x] Document formats and profiles model (schema v16): support for US/UK screenplays, multi-cam sitcoms, stage plays, comics, interactive stories, and treatments; format assignment at creation and duplicate-and-convert script preservation
-- [x] Comic books and graphic novels: page/panel hierarchy, speech balloons, captions, sound effects, automatic panel counting, continuity validation, panel renumbering reconciliation, and Plain Text / HTML exports
-- [x] Stage plays and multi-camera teleplays: lettered scenes, uppercase dialogue, Act/Scene headings, bracketed stage directions, profile layout pagination, and text exports
-- [x] Interactive and branching stories: passages with stable IDs, inline choice syntax (`[[Label -> Target]]`), conditions, BFS graph integrity validation (dangling links, dead ends, unreachable nodes), Twee 3, standalone offline playable HTML runner, JSON graph exports, and live playtester
-- [x] General rich-text treatment documents: headings hierarchy (H1–H3), body paragraphs, blockquotes, bullet lists, character spotlights, reading time metrics, Project Bible entity cross-referencing, and semantic HTML, TXT, and DOCX exports
-- [x] 100% offline rule-based grammar and style checker: duplicate words, passive voice in action lines, screenplay dialogue quotation rules, parenthetical formatting, cliches and fillers, spacing anomalies, and one-click fix
-- [x] Compatibility matrix, format fixtures, manual checks and Milestone 6 exit review (docs/m6/EXIT_REVIEW.md)
-
-Carried forward:
-- [ ] Desktop manual checks for additional formats, language tools, and format conversion (N41–N46)
-
-### ✅ Stage 7: Optional extras (done)
-
-Done:
-- [x] Bring-your-own AI architecture and writing assistant: off by default, zero unsolicited network requests; support for local Ollama / LM Studio or cloud providers; transparent scope disclosure and token estimation; non-destructive block diffs and accepted batch application (`cirth_core::ai`, `app/src/aidlg.ts`, E2E Test 82)
-- [x] Cloud sharing & Google Docs/Sheets workflow adapter: export capability analyzer, fidelity grading, explicit loss warnings, dynamic export dialog guidance, and interoperability guide (`cirth_core::export_capability`, `docs/INTEROPERABILITY.md`, `app/src/exportdlg.ts`, E2E Test 83)
-- [x] Software tour onboarding dialog: 6-step guided walkthrough of core writing, focus modes, story planning, production tools, revision workflows, and format tools; non-blocking, keyboard accessible (Left/Right arrows, Esc), skip/complete options, and re-launchable via Help > Software Tour… (`app/src/tour.ts`, E2E Test 84)
-- [x] Non-Latin scripts: bundled SIL OFL-1.1 Noto fonts for Latin, Greek and Cyrillic (Noto Sans and Serif), Hebrew, Arabic, Devanagari and Simplified Chinese with kana and hangul (Noto Sans SC) on screen. PDFs print Hebrew, Arabic and Devanagari, shaped and in right-to-left order, without moving page breaks; Chinese, Japanese and Korean are screen only for now
-- [x] Native OS file associations, CLI launching & drag-and-drop: registered file associations for `.cirth` (editor) and `.cirth-review` (viewer); startup argument file opening; window drag-and-drop file opening for projects and imports (`.fountain`, `.fdx`); E2E Test 85 (`tauri.conf.json`, `main.rs`, `main.ts`, E2E Test 85)
-- [x] Automated offline & zero-telemetry audit: script mathematically verifying strict CSP, zero tracking dependencies, codebase network scan, and live OS process socket inspection (`app/scripts/offline-audit.mjs`, `npm run test:offline`)
-- [x] Cross-platform macOS and Linux hardening: Unix atomic file replacement with best-effort directory fsync for APFS/FAT32 resilience, dual-pulse focus restoration after macOS full screen, `Cmd+Ctrl+F` Apple HIG keybinding, and WebKitGTK dialog focus trapping
-- [x] UI Vector SVG Icon Registry: clean, comprehensive 24×24 stroke icon system covering navigation, writing, formatting, story planning, production, and revisions; automatic adaptation to light, dark, midnight, OLED, and Windows contrast themes (`app/src/icons.ts`)
-- [x] Sorkinesque high-fantasy showcase project (*The Obsidian Seal*): rapid-fire, walk-and-talk rhythm script fixture exercising characters, dialogue, scene transitions, and production beats without AI cliches (`fixtures/high-council.json`, E2E Test 86)
-- [x] Native print stylesheet and printing: `@media print` rules enforcing physical Letter portrait page dimensions, Courier Prime 12pt, margin-aligned scene numbers, screen color markup suppression, and `File > Print…` / `Ctrl+P` (`Cmd+P`) action (`app/src/styles.css`, E2E Test 87, Manual Check N50)
-- [x] Cross-platform VM provisioning & container smoke test scripts: turnkey setup scripts for Debian/Ubuntu, Fedora, Arch Linux, and macOS (`scripts/setup-linux.sh`, `scripts/setup-mac.sh`), plus a Docker container runner (`Dockerfile.linux`) for Unraid and headless Linux E2E verification under Xvfb
-- [x] Windows NSIS installer bundle verification: self-contained installer executable with file associations, start menu shortcuts, and uninstaller (`target/release/bundle/nsis/`)
-- [x] Command Palette / Quick Switcher (`Ctrl+K` / `Cmd+K`): fast search and instant keyboard navigation across all scenes, characters, beats, and application actions (`app/src/palette.ts`, E2E Test 88)
-- [x] Personal Dictionary Editor Dialog: dedicated dictionary manager under `Format > Spelling > Personal Dictionary…` to view, filter, add, and remove words in project and personal scopes (`app/src/dictionary.ts`, E2E Test 88)
-- [x] Compatibility matrix, format fidelity verification, and Milestone 7 exit review (`docs/m7/EXIT_REVIEW.md`)
-- [x] RC Alpha prep: Export and Import Review Package in the File menu; the toolbar's Comments button opens Comments; Home offers one sample (*The Obsidian Seal*); app identifier `org.kolbitar.app` with the old data folder copied across; Linux document icons for `.cirth` and `.cirth-review` (not yet tried on Linux)
-- [x] Owner art: new app icon, the Kolbítar wordmark on Home and About (light, dark and high-contrast versions), Windows installer and macOS disk image art, and colour toolbar icons, with an inverted set for dark themes (`docs/ART_ASSETS.md`); checked on Windows and macOS (N52)
-
-Carried forward:
-- [ ] Desktop manual checks for AI scope disclosure and Google Docs/Sheets external exchange (N47–N48)
-- [ ] Desktop manual checks for software tour and non-Latin script display (N49)
-- [ ] Desktop check of non-Latin text on screen and in PDFs (N54)
-- [ ] Desktop manual check for native print preview (N50)
-- [ ] Desktop manual check for Command Palette and Personal Dictionary (N51)
-- [ ] VM / hardware execution of setup scripts on macOS and Linux
-- [ ] Desktop check of the `.cirth` and `.cirth-review` document icons on Windows and macOS (N53)
-
----
-
-## Details
-
-### Current status
-
-[STATUS.md](STATUS.md) lists what works, what was tested on which platform, open defects and what is untested. Highlights:
-
-- Windows: built and tested locally (two end-to-end test drivers plus core tests).
-- Linux: tested in CI and headless Docker on Unraid (WebKitGTK under Xvfb, kernel 6.12), passing all core tests and the complete 88-test end-to-end suite (87 passed, 1 skipped IME). Not yet tried on an interactive Linux desktop.
-- macOS: builds and passes core tests in CI, and has had hands-on checks of editing and the writing workspace on macOS 26 (Apple silicon), plus a first round of export checks in Preview, TextEdit and Safari. macOS 11, the oldest supported version, has not been tried.
-
-### Building from source
+## Building from source
 
 Requirements: Rust (stable), Node.js 24, and the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS.
 
@@ -212,37 +74,30 @@ cargo build -p cirthscribe --release
 
 Windows developers can load a checkout-local toolchain with `scripts/dev-env.ps1`. End-to-end tests: `cd app; npm run e2e:cdp` (Windows) or `npm run e2e:webdriver` (needs `tauri-driver` and the platform's WebDriver). See [STATUS.md](STATUS.md) for details.
 
-### How it is built
+## How it is built
 
 - **Core** (`crates/cirth-core`, Rust): the document model, the storage (a SQLite working store and the `.cirth` package), page layout, title pages, scene numbering, revision sets and locked pages, production reports, PDF, text, Word, RTF and HTML export, Fountain and Final Draft exchange, word counts, spell check and Free Writing. It has no UI code.
 - **App** (`app/`, Tauri 2 + TypeScript + ProseMirror): the desktop shell and editor. The editor is a view of the core's document and sends versioned edits to it, so there is one saved copy of the script.
 - **Tests**: Rust unit and integration tests, plus an end-to-end suite that drives the real app through two drivers (DevTools and WebDriver).
 
-### Documentation
+## Documentation
 
 | File | What it covers |
 | - | - |
+| [STATUS.md](STATUS.md) | What works, what was tested on which system, known defects, and the stage-by-stage checklist |
 | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) | Full feature specification |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates (the detailed version of the roadmap above) |
-| [docs/M4_PLAN.md](docs/M4_PLAN.md) | Stage 4 plan (accepted) and what each step builds |
-| [docs/M3_PLAN.md](docs/M3_PLAN.md) and [docs/m3/EXIT_REVIEW.md](docs/m3/EXIT_REVIEW.md) | Stage 3 plan, what each step built, and its exit review |
-| [docs/M2_PLAN.md](docs/M2_PLAN.md) and [docs/m2/EXIT_REVIEW.md](docs/m2/EXIT_REVIEW.md) | Stage 2 plan, what each step built, and its exit review |
-| [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Which formats have been tested in which other apps, and how to test |
-| [docs/M1_PLAN.md](docs/M1_PLAN.md) and [docs/m1/EXIT_REVIEW.md](docs/m1/EXIT_REVIEW.md) | Stage 1 plan and its exit review |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones and their exit gates |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, persistence and layout strategy |
-| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Observable acceptance scenarios |
-| [docs/INTEROPERABILITY.md](docs/INTEROPERABILITY.md) | Export matrix and fidelity rules |
+| [docs/INTEROPERABILITY.md](docs/INTEROPERABILITY.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Export formats, what each can carry, and what has been tested in other apps |
 | [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/adr/](docs/adr/) | Accepted decisions and open questions |
-| [docs/m0/FINDINGS.md](docs/m0/FINDINGS.md) | Proof-of-concept measurements and risks |
-| [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person (macOS, other screenwriting apps, input methods), with results |
-| [docs/ART_ASSETS.md](docs/ART_ASSETS.md) | Art the app needs (icons, logo, installer art) and their sizes |
-| [AGENTS.md](AGENTS.md), [START_HERE.md](START_HERE.md) and [HANDOFF.md](HANDOFF.md) | Rules, first brief and session handoff for AI coding agents working on this repository |
+| [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) | Checks that need a person, with results |
+| [AGENTS.md](AGENTS.md), [START_HERE.md](START_HERE.md) and [HANDOFF.md](HANDOFF.md) | Rules and session handoff for AI coding agents working on this repository |
 
-### Contributing
+## Contributing
 
-Issues and suggestions are welcome. Contributions are accepted under the same license as the project (GPL-3.0-only, below).
+Code contributions are accepted under the same license as the project (GPL-3.0-only, below). For bugs and ideas, see [How you can help](#how-you-can-help).
 
-### License
+## License
 
 Kolbítar is free and open-source software under the **GNU General Public License, version 3 only** ([LICENSE](LICENSE)), with one additional term under section 7(b) ([NOTICE](NOTICE)).
 
@@ -256,7 +111,7 @@ In plain terms (the license text is what counts):
 
 The GPL does not forbid charging for copies; no open-source license can. But anyone who sells Kolbítar or a version of it must hand buyers the full source under the GPL, and buyers may then share it for free. Kolbítar itself will always be free.
 
-### Third-party components
+## Third-party components
 
 Kolbítar ships with these components under their own licenses:
 
