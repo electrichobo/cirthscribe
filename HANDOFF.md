@@ -23,11 +23,11 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- None in git (smoke-test notes committed 2026-11-02). Builds: Windows `target/release/bundle/nsis/Kolbítar_0.8.1_x64-setup.exe` (SHA-256 90766fb1…), Mac on GROGU `~/kolbitar-n52/target/release/bundle/dmg/Kolbítar_0.8.1_aarch64.dmg` (SHA-256 b53721c1…). Release notes draft: `out/release-notes-0.8.1.md` (not in git).
+- None in git (committed 2026-11-02). Builds: Windows `target/release/bundle/nsis/Kolbítar_0.8.1_x64-setup.exe` (SHA-256 90766fb1…), Mac on GROGU `~/kolbitar-n52/target/release/bundle/dmg/Kolbítar_0.8.1_aarch64.dmg` (SHA-256 b53721c1…). Release notes draft: `out/release-notes-0.8.1.md` (not in git).
 
 ## Next Immediate Step
 
 0. Owner shipping 0.8.1 as is (2026-11-02); known issues for the next build: sample card shows the file name once opened; Comments panel stays on Home after Close Project; "PDF written" banner persists across projects; Arabic gap in PDFs.
-1. Release builds: Windows NSIS here; macOS DMG on GROGU (aarch64); Linux `.deb` and AppImage on the Linux runner.
+1. Release builds: Windows NSIS here; macOS DMG on GROGU (aarch64); Linux `.deb` and AppImage from the next update (owner, 2026-11-02).
 2. Publish the GitHub release "Kolbítar 0.8.1 RC Alpha" (pre-release) with the three builds and notes, only with the owner's go-ahead.
 3. Testers report through GitHub Issues; transcribe manual check results into MANUAL_CHECKS.md.
