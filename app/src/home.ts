@@ -337,6 +337,8 @@ export function createHome(root: HTMLElement, actions: Actions) {
         { className: "meta" },
         el("strong", {}, title),
         ...(p.home_title && p.title && p.home_title !== p.title ? [el("span", { className: "script-title" }, `Script: ${p.title}`)] : []),
+        // An opened sample keeps its description (0.8.1 known issue).
+        ...(p.sample && SAMPLES.some((x) => x.name === p.name) ? [el("span", { className: "sample-about" }, SAMPLES.find((x) => x.name === p.name)!.about)] : []),
         el("span", { className: "file", title: p.path }, p.location === "library" ? `${p.name}.cirth` : p.path),
         el("span", {}, p.error ? p.error : `${plural(p.scenes, "scene")} · ${plural(p.blocks, "block")}`),
         el("span", {}, `Modified ${when(p.modified_ms)}${p.backups ? ` · ${plural(p.backups, "backup")}` : ""}`),

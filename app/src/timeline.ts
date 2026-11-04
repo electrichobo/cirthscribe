@@ -12,6 +12,12 @@
 //
 // Every timeline change is a planning step; "Undo" in the dialog takes back
 // its last change (ADR 0003).
+//
+// Two views (owner, 2026-11-03): the Line, shown first, puts the events on
+// one horizontal line in story order (events "at the same time" share a
+// column) with a playhead you drag, click or move with Left/Right; the event
+// under it opens below. Drag an event along the line to move it in the story;
+// "+ Add Here" adds one after the playhead. The List is the earlier list view.
 
 import { announce } from "./a11y";
 
@@ -64,11 +70,44 @@ export function createTimeline(hooks: {
   const undoBtn = el("button", { type: "button", id: "timeline-undo", disabled: true }, "Undo");
   const close = el("button", { type: "button", id: "timeline-close" }, "Close");
   const order = el("div", { className: "timeline-order", id: "timeline-order" });
+  // The line view and the switch between Line and List.
+  const line = el("div", { className: "timeline-line", id: "timeline-line" });
+  line.setAttribute("role", "group");
+  line.setAttribute("aria-label", "Story events on a line, in story order");
+  line.setAttribute("aria-describedby", "timeline-line-hint");
+  const viewLine = el("button", { type: "button", id: "timeline-view-line" }, "Line");
+  const viewList = el("button", { type: "button", id: "timeline-view-list" }, "List");
+  const views = el("div", { className: "timeline-views", role: "group" }, viewLine, viewList);
+  views.setAttribute("aria-label", "Timeline view");
+  const VIEW_KEY = "cirth.timelineView";
+  let mode: "line" | "list" = "line";
+  try {
+    mode = localStorage.getItem(VIEW_KEY) === "list" ? "list" : "line";
+  } catch {
+    // the line, by default
+  }
+  function setMode(next: "line" | "list") {
+    mode = next;
+    dialog.dataset.view = next;
+    viewLine.setAttribute("aria-pressed", String(next === "line"));
+    viewList.setAttribute("aria-pressed", String(next === "list"));
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // this session only
+    }
+    draw(chosen ?? undefined);
+  }
+  viewLine.addEventListener("click", () => setMode("line"));
+  viewList.addEventListener("click", () => setMode("list"));
+  dialog.dataset.view = mode;
   dialog.append(
     el("h2", { id: "timeline-title" }, "Timeline"),
     el("p", { className: "form-note" }, "The story in the order it happens. Nothing here moves the script, except the separate command below."),
     el("p", { className: "sr-only", id: "timeline-hint" }, "Up and Down choose an event, Alt+Up and Alt+Down move it in the story, Delete removes it."),
-    el("div", { className: "timeline-tools" }, add, addHere, status),
+    el("p", { className: "sr-only", id: "timeline-line-hint" }, "Left and Right move the playhead from event to event, Alt+Left and Alt+Right move the event in the story, Delete removes it."),
+    el("div", { className: "timeline-tools" }, views, add, addHere, status),
+    line,
     el("div", { className: "timeline-cols" }, el("div", { className: "timeline-left" }, list), detail),
     order,
     el("div", { className: "dialog-actions" }, undoBtn, close),
@@ -175,9 +214,145 @@ export function createTimeline(hooks: {
         void change({ DeleteEvent: id }, "Event removed from the timeline (Undo brings it back)");
       }
     };
+    drawLine();
     drawDetail();
     drawOrder();
-    if (focus) list.querySelector<HTMLElement>(`button[data-id="${CSS.escape(focus)}"]`)?.focus();
+    viewLine.setAttribute("aria-pressed", String(mode === "line"));
+    viewList.setAttribute("aria-pressed", String(mode === "list"));
+    if (focus) (mode === "line" ? line : list).querySelector<HTMLElement>(`button[data-id="${CSS.escape(focus)}"]`)?.focus();
+  }
+
+  /** Columns of the line: a new column for each event, except one "at the same time as the one before". */
+  function columns(): StoryEvent[][] {
+    const cols: StoryEvent[][] = [];
+    for (const e of sorted()) {
+      if (e.simultaneous && cols.length) cols[cols.length - 1].push(e);
+      else cols.push([e]);
+    }
+    return cols;
+  }
+
+  const COL = 150; // px between columns
+  function drawLine() {
+    const cols = columns();
+    const flash = new Set(st.flashbacks);
+    const track = el("div", { className: "timeline-track" });
+    track.style.width = `${Math.max(1, cols.length) * COL + 40}px`;
+    const rule = el("div", { className: "timeline-rule" });
+    const head = el("div", { className: "timeline-playhead", id: "timeline-playhead" });
+    head.setAttribute("aria-hidden", "true");
+    track.append(rule);
+    const markers: HTMLButtonElement[] = [];
+    let chosenCol = Math.max(0, cols.findIndex((c) => c.some((e) => e.id === chosen)));
+    cols.forEach((col, ci) => {
+      const stack = el("div", { className: "timeline-col" });
+      stack.style.left = `${20 + ci * COL}px`;
+      stack.append(el("span", { className: "timeline-dot" }));
+      for (const e of col) {
+        const b = el(
+          "button",
+          { type: "button", className: `timeline-mark${e.id === chosen ? " chosen" : ""}${flash.has(e.id) ? " flash" : ""}` },
+          el("span", { className: "timeline-when" }, e.when ? `${e.when}${e.uncertain ? " (?)" : ""}` : e.uncertain ? "(uncertain)" : `#${ci + 1}`),
+          el("strong", {}, e.title || "(untitled)"),
+          ...(flash.has(e.id) ? [el("span", { className: "timeline-flag flash" }, "flashback")] : []),
+        );
+        b.dataset.id = e.id;
+        b.dataset.col = String(ci);
+        b.tabIndex = e.id === chosen ? 0 : -1;
+        if (e.id === chosen) b.setAttribute("aria-current", "true");
+        b.setAttribute("aria-label", `${ci + 1} of ${cols.length}: ${e.title || "untitled"}${e.when ? `, ${e.when}` : ""}${flash.has(e.id) ? ", flashback" : ""}`);
+        stack.append(b);
+        markers.push(b);
+      }
+      track.append(stack);
+    });
+    if (!cols.length) track.append(el("p", { className: "form-note timeline-empty" }, "No events yet. Add one with + New event."));
+    const place = (ci: number) => (head.style.left = `${20 + ci * COL + 58}px`);
+    place(chosenCol);
+    if (cols.length) track.append(head);
+    line.replaceChildren(track);
+
+    const pick = (ci: number, focus = false) => {
+      ci = Math.max(0, Math.min(cols.length - 1, ci));
+      if (!cols[ci]) return;
+      chosenCol = ci;
+      chosen = cols[ci][0].id;
+      place(ci);
+      markers.forEach((m) => {
+        const on = m.dataset.id === chosen;
+        m.classList.toggle("chosen", on);
+        m.tabIndex = on ? 0 : -1;
+        if (on) m.setAttribute("aria-current", "true");
+        else m.removeAttribute("aria-current");
+      });
+      drawDetail();
+      if (focus) markers.find((m) => m.dataset.id === chosen)?.focus();
+    };
+    const colAt = (clientX: number) => Math.round((clientX - track.getBoundingClientRect().left - 20 - 58) / COL);
+
+    // Scrubbing: drag on the line (or the playhead) and the event under it opens.
+    // Dragging an event itself moves it in the story when it is let go.
+    track.onpointerdown = (ev) => {
+      if (!cols.length || ev.button !== 0) return;
+      const mark = (ev.target as HTMLElement).closest<HTMLButtonElement>(".timeline-mark");
+      const startX = ev.clientX;
+      let dragging = false;
+      try {
+        track.setPointerCapture(ev.pointerId);
+      } catch {
+        // a pointer that cannot be captured still scrubs while over the line
+      }
+      const moveFn = (m: PointerEvent) => {
+        if (mark && !dragging && Math.abs(m.clientX - startX) > 6) {
+          dragging = true;
+          mark.classList.add("dragging");
+        }
+        if (dragging) place(Math.max(0, Math.min(cols.length - 1, colAt(m.clientX))));
+        else if (!mark) pick(colAt(m.clientX));
+      };
+      const up = (u: PointerEvent) => {
+        track.removeEventListener("pointermove", moveFn);
+        track.removeEventListener("pointerup", up);
+        if (dragging && mark) {
+          mark.classList.remove("dragging");
+          moveTo(mark.dataset.id!, Math.max(0, Math.min(cols.length - 1, colAt(u.clientX))));
+        } else if (mark) {
+          chosen = mark.dataset.id!;
+          pick(Number(mark.dataset.col));
+          mark.focus();
+        } else pick(colAt(u.clientX));
+      };
+      track.addEventListener("pointermove", moveFn);
+      track.addEventListener("pointerup", up);
+    };
+    track.onkeydown = (ev) => {
+      const at = markers.indexOf(ev.target as HTMLButtonElement);
+      if (at < 0) return;
+      const id = markers[at].dataset.id!;
+      if (ev.altKey && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) {
+        ev.preventDefault();
+        move(id, ev.key === "ArrowLeft" ? -1 : 1);
+      } else if (!ev.altKey && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) {
+        ev.preventDefault();
+        pick(Number(markers[at].dataset.col) + (ev.key === "ArrowLeft" ? -1 : 1), true);
+      } else if (ev.key === "Delete") {
+        ev.preventDefault();
+        void change({ DeleteEvent: id }, "Event removed from the timeline (Undo brings it back)");
+      }
+    };
+  }
+
+  /** Put an event at column `to` of the line (it takes its own column there). */
+  function moveTo(id: string, to: number) {
+    const cols = columns().map((c) => c.filter((e) => e.id !== id)).filter((c) => c.length);
+    const ev = st.events.find((e) => e.id === id);
+    if (!ev) return;
+    const from = columns().findIndex((c) => c.some((e) => e.id === id));
+    if (from === to && !ev.simultaneous) return;
+    const before = cols[to - 1]?.at(-1);
+    const after = cols[to]?.[0];
+    const pos = before && after ? (before.pos + after.pos) / 2 : after ? after.pos - 1 : before ? before.pos + 1 : 0;
+    void change({ PutEvent: { ...ev, pos, simultaneous: false } }, "Moved in the story. The script is unchanged.", id);
   }
 
   function drawDetail() {

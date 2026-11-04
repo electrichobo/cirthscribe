@@ -43,6 +43,23 @@ pub struct CommentThread {
     /// Whether the underlying text or block was deleted.
     #[serde(default)]
     pub orphaned: bool,
+    /// What it is (owner, 2026-11-03): "comment" (feedback), "suggestion" or
+    /// "note". Never changes the script; empty means "comment" (older
+    /// threads and review packages).
+    #[serde(default = "comment_kind")]
+    pub kind: String,
+}
+
+fn comment_kind() -> String {
+    "comment".into()
+}
+
+/// The kinds a thread can be; anything else is stored as "comment".
+pub const KINDS: [&str; 3] = ["comment", "suggestion", "note"];
+
+/// A kind as stored: one of `KINDS`.
+pub fn normal_kind(kind: &str) -> &'static str {
+    KINDS.iter().find(|k| **k == kind).copied().unwrap_or("comment")
 }
 
 /// A message inside a comment thread.

@@ -626,6 +626,7 @@ fn opening_a_v11_project_adds_empty_comment_threads_and_maps_anchors_through_edi
             created_at: "2026-10-29T15:00:00Z".into(),
             resolved: false,
             orphaned: false,
+            kind: "comment".into(),
         };
         let msg = CommentMessage {
             id: "cm-1".into(),
@@ -972,3 +973,47 @@ fn opening_a_v15_project_adds_format_profiles_and_supports_duplicate_convert() {
     }
 }
 
+
+#[test]
+fn opening_a_v16_project_gives_feedback_a_kind_and_keeps_it() {
+    use cirth_core::comments::{CommentMessage, CommentThread};
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v16-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v16-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 16, "fixture must be schema v16");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(16));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v16 copy kept");
+        let s = o.store;
+
+        // Feedback written before 0.8.2 is a comment, with its text and anchor as they were.
+        let threads = s.comment_threads().unwrap();
+        if fixture == "unicode-marks" {
+            assert_eq!(threads.len(), 1, "the frozen file has one thread");
+            let t = &threads[0];
+            assert_eq!((t.thread.kind.as_str(), t.thread.quote.as_str(), t.thread.start, t.thread.end), ("comment", "crème brûlée", 13, 25));
+            assert_eq!(t.messages[0].text, "Is this too fancy for the café?");
+        } else {
+            assert!(threads.is_empty());
+        }
+
+        // A suggestion and a note keep their kind through a save and reopen; an unknown kind is a comment.
+        let doc = s.current_document().unwrap();
+        let block = s.load().unwrap().blocks[1].id.clone();
+        for (id, kind) in [("t-sugg", "suggestion"), ("t-note", "note"), ("t-odd", "shout")] {
+            let thread = CommentThread { id: id.into(), document_id: doc.clone(), block_id: block.clone(), start: 0, end: 3, quote: "abc".into(), created_at: "2026-11-03T10:00:00Z".into(), kind: kind.into(), ..Default::default() };
+            let msg = CommentMessage { id: format!("{id}-m"), thread_id: id.into(), author: String::new(), text: format!("a {kind}"), created_at: "2026-11-03T10:00:00Z".into(), edited_at: None };
+            s.put_comment_thread(&thread, Some(&msg)).unwrap();
+        }
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+        let s = Store::open_package(&pkg, &d.join("work2.db"), None).unwrap().store;
+        let kinds: std::collections::HashMap<String, String> = s.comment_threads().unwrap().into_iter().map(|t| (t.thread.id, t.thread.kind)).collect();
+        assert_eq!(kinds["t-sugg"], "suggestion");
+        assert_eq!(kinds["t-note"], "note");
+        assert_eq!(kinds["t-odd"], "comment");
+    }
+}

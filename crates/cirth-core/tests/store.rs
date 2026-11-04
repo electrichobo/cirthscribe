@@ -983,6 +983,7 @@ fn comment_threads_follow_anchors_across_edits_moves_splits_and_orphans() {
         created_at: "2026-10-29T15:00:00Z".into(),
         resolved: false,
         orphaned: false,
+        kind: "comment".into(),
     };
     let msg1 = CommentMessage {
         id: "cm-1".into(),

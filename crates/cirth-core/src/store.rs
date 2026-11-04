@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 16;
+pub const SCHEMA_VERSION: i64 = 17;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -462,6 +462,13 @@ fn migrate_v16(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v17 (0.8.2): a feedback thread has a kind: comment, suggestion or note.
+/// Existing threads are comments.
+fn migrate_v17(tx: &Transaction) -> Result<()> {
+    tx.execute_batch("ALTER TABLE comment_threads ADD COLUMN kind TEXT NOT NULL DEFAULT 'comment';")?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -481,6 +488,7 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (14, migrate_v14),
     (15, migrate_v15),
     (16, migrate_v16),
+    (17, migrate_v17),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
@@ -1375,7 +1383,7 @@ impl Store {
 
     pub fn comment_threads_of(&self, document_id: &str) -> Result<Vec<crate::comments::CommentThreadWithMessages>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned
+            "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned, kind
              FROM comment_threads WHERE document_id = ?1 ORDER BY block_id, start_char, end_char, id",
         )?;
         let threads = stmt
@@ -1391,6 +1399,7 @@ impl Store {
                     created_at: r.get(7)?,
                     resolved: r.get::<_, i64>(8)? != 0,
                     orphaned: r.get::<_, i64>(9)? != 0,
+                kind: r.get(10)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1407,7 +1416,7 @@ impl Store {
         let t = self
             .conn
             .query_row(
-                "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned
+                "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned, kind
                  FROM comment_threads WHERE id = ?1",
                 [thread_id],
                 |r| {
@@ -1422,6 +1431,7 @@ impl Store {
                         created_at: r.get(7)?,
                         resolved: r.get::<_, i64>(8)? != 0,
                         orphaned: r.get::<_, i64>(9)? != 0,
+                    kind: r.get(10)?,
                     })
                 },
             )
@@ -1462,8 +1472,8 @@ impl Store {
             return Err(StoreError::Invalid("thread needs id, document_id and block_id".into()));
         }
         self.conn.execute(
-            "INSERT OR REPLACE INTO comment_threads(id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT OR REPLACE INTO comment_threads(id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned, kind)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 thread.id,
                 thread.document_id,
@@ -1474,7 +1484,8 @@ impl Store {
                 thread.author,
                 thread.created_at,
                 thread.resolved as i64,
-                thread.orphaned as i64
+                thread.orphaned as i64,
+                crate::comments::normal_kind(&thread.kind),
             ],
         )?;
         if let Some(msg) = initial_message {
@@ -2721,7 +2732,7 @@ fn load_doc_tags(tx: &Connection, doc: &str) -> Result<Vec<crate::tags::Tag>> {
 
 fn load_doc_comments(tx: &Connection, doc: &str) -> Result<Vec<crate::comments::CommentThread>> {
     let mut stmt = tx.prepare(
-        "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned
+        "SELECT id, document_id, block_id, start_char, end_char, quote, author, created_at, resolved, orphaned, kind
          FROM comment_threads WHERE document_id = ?1 ORDER BY block_id, start_char, end_char, id",
     )?;
     let rows = stmt.query_map([doc], |r| {
@@ -2736,6 +2747,7 @@ fn load_doc_comments(tx: &Connection, doc: &str) -> Result<Vec<crate::comments::
             created_at: r.get(7)?,
             resolved: r.get::<_, i64>(8)? != 0,
             orphaned: r.get::<_, i64>(9)? != 0,
+        kind: r.get(10)?,
         })
     })?;
     Ok(rows.collect::<std::result::Result<_, _>>()?)

@@ -10,6 +10,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { ReportExported, ReportScope } from "./storyscry";
+import { announce } from "./a11y";
 
 export type StripKind = "scene" | "day_break" | "banner";
 
@@ -137,6 +138,20 @@ export function createStripboard(host: StripboardHost) {
           <button type="button" id="stripboard-sort-btn" class="btn">Sort</button>
         </div>
         <div class="toolbar-right">
+          <label class="sort-label">
+            <span>Strips</span>
+            <select id="stripboard-layout" title="Horizontal strips stacked down the page, or vertical strips side by side like a production board">
+              <option value="horizontal">Horizontal</option>
+              <option value="vertical">Vertical</option>
+            </select>
+          </label>
+          <label class="sort-label">
+            <span>Size</span>
+            <select id="stripboard-density" title="Compact shows one line of essentials per strip">
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </select>
+          </label>
           <button type="button" id="stripboard-undo" class="btn" title="Undo schedule edit">Undo</button>
           <button type="button" id="stripboard-redo" class="btn" title="Redo schedule edit">Redo</button>
         </div>
@@ -199,6 +214,31 @@ export function createStripboard(host: StripboardHost) {
     dialog.querySelector("#stripboard-add-day")!.addEventListener("click", () => addDayBreak());
     dialog.querySelector("#stripboard-add-banner")!.addEventListener("click", () => addBanner());
     dialog.querySelector("#stripboard-sort-btn")!.addEventListener("click", () => sortSchedule());
+
+    // Strip layout and size: how the board is drawn, remembered per user (the schedule is unchanged).
+    const boardBody = dialog.querySelector<HTMLElement>("#stripboard-body")!;
+    for (const [id, attr, key, dflt] of [
+      ["#stripboard-layout", "layout", "cirth.stripLayout", "horizontal"],
+      ["#stripboard-density", "density", "cirth.stripDensity", "comfortable"],
+    ] as const) {
+      const sel = dialog.querySelector<HTMLSelectElement>(id)!;
+      try {
+        sel.value = localStorage.getItem(key) ?? dflt;
+      } catch {
+        sel.value = dflt;
+      }
+      if (!sel.value) sel.value = dflt;
+      boardBody.dataset[attr] = sel.value;
+      sel.addEventListener("change", () => {
+        boardBody.dataset[attr] = sel.value;
+        try {
+          localStorage.setItem(key, sel.value);
+        } catch {
+          // this session only
+        }
+        announce(`${sel.options[sel.selectedIndex].text} strips`);
+      });
+    }
 
     dialog.querySelector("#stripboard-undo")!.addEventListener("click", async () => {
       try {

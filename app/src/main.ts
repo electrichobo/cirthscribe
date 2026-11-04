@@ -1036,6 +1036,8 @@ async function applyOpened(o: Opened, t0: number = performance.now()): Promise<v
   const t1 = performance.now();
   setView("editor");
   $("find-bar").hidden = true; // a new editor state has no search
+  showBanner(null); // a message about the previous project (0.8.1 known issue)
+  commentsDialog.closePopover();
   $("project-title").textContent = o.is_default ? o.doc.title || o.name : `${o.project_title || o.name} › ${o.doc.title}`;
   try {
     const curBranch = await branchesDialog.current();
@@ -1062,7 +1064,7 @@ async function applyOpened(o: Opened, t0: number = performance.now()): Promise<v
         return false;
       },
       handlePaste: (v, event) => handlePaste(v, event),
-      handleDOMEvents: { contextmenu: (v, e) => spell.onContextMenu(v, e as MouseEvent) },
+      handleDOMEvents: { contextmenu: (v, e) => commentsDialog.selectionMenu(v, e as MouseEvent) || spell.onContextMenu(v, e as MouseEvent) },
       clipboardTextParser: (text) => clipboardTextParser(text),
       clipboardTextSerializer: (slice) => clipboardTextSerializer(slice),
       attributes: { "aria-label": "Screenplay text", "aria-multiline": "true", "aria-describedby": "editor-hint", spellcheck: "false" },
@@ -1262,6 +1264,10 @@ void getCurrentWindow().onCloseRequested(async (event) => {
 /** Save and close the open project (if any), then show the project library. */
 async function goHome() {
   await focusMode.leave();
+  // Feedback belongs to the project: its panel and pop-up close (0.8.1 known issue).
+  commentsDialog.close();
+  commentsDialog.closePopover();
+  showBanner(null);
   if (lastOpen) {
     await panelHost.dockAll();
     try {
@@ -1628,8 +1634,13 @@ const layoutMode = createLayoutMode({
   });
   const focusBtn = iconButton("tool-focus", "focus", "Focus mode", `Focus mode: only the script, full screen (${mod}+Shift+F)`);
   focusBtn.addEventListener("click", () => void focusMode.toggle());
-  const commentBtn = iconButton("tool-comments", "comment", "Feedback", "Feedback: notes anchored to the script");
-  commentBtn.addEventListener("click", () => void runMenu("comments"));
+  // Feedback shown beside the script (icons and highlights), or hidden; Tools > Feedback… is the full list.
+  const commentBtn = iconButton("tool-comments", "comment", "Feedback", "Show or hide feedback beside the script (Tools > Feedback… lists it all)");
+  commentBtn.setAttribute("aria-pressed", String(commentsDialog.getInlineView()));
+  commentBtn.addEventListener("click", () => {
+    commentsDialog.toggleInlineView();
+    commentBtn.setAttribute("aria-pressed", String(commentsDialog.getInlineView()));
+  });
   const overviewBtn = iconButton("tool-overview", "overview", "Overview", "Overview: the whole script as blocks sized by length");
   overviewBtn.addEventListener("click", () => void runMenu("overview"));
   const scryBtn = iconButton("tool-storyscry", "storyscry", "StoryScry", "StoryScry: charts and reports on the script");

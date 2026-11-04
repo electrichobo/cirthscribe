@@ -913,14 +913,29 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.querySelectorAll('#timeline-list .timeline-event').length === 3", "three events");
     const rows = await app.evaluate("[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.textContent)");
     assert(/Childhood/.test(rows[0]) && /flashback/.test(rows[0]) && /\(\?\)/.test(rows[0]), `story order first; the flashback and the uncertain time marked: ${rows}`);
+    // The line view comes first: the same story order on one line, with a playhead.
+    assert((await app.evaluate("document.getElementById('timeline-dialog').dataset.view")) === "line", "the line view is the default");
+    const lineIds = () => app.evaluate("[...document.querySelectorAll('#timeline-line .timeline-mark')].map(b => b.dataset.id)");
+    assert(JSON.stringify(await lineIds()) === JSON.stringify(await app.evaluate("[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.dataset.id)")), "line and list agree");
+    assert(await app.evaluate("document.querySelector('#timeline-line .timeline-mark').classList.contains('flash')"), "the flashback is marked on the line");
     await screenshot(app, "timeline");
-    // B5: moving an event in the timeline never moves a scene.
-    await app.evaluate("(document.querySelector('#timeline-list .timeline-event[data-id=\"ev-weigh\"]').click(), document.querySelector('#timeline-list .timeline-event[data-id=\"ev-weigh\"]').focus(), true)");
-    await press("ArrowUp", ["alt"]);
-    await waitFor(app, "[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.dataset.id).indexOf('ev-weigh') === 1", "the event moved earlier in the story");
+    // The playhead: Left moves it to the event before, which opens below.
+    await app.evaluate("(document.querySelector('#timeline-line .timeline-mark[data-id=\"ev-weigh\"]').focus(), true)");
+    await app.evaluate("(() => { const m = document.querySelector('#timeline-line .timeline-mark[data-id=\"ev-weigh\"]'); m.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: m.getBoundingClientRect().left + 5, pointerId: 1 })); m.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, clientX: m.getBoundingClientRect().left + 5, pointerId: 1 })); return true; })()");
+    await waitFor(app, "document.getElementById('timeline-event-title')?.value === 'The weighing'", "clicking an event on the line opens it");
+    await press("ArrowLeft");
+    await waitFor(app, "document.getElementById('timeline-event-title')?.value !== 'The weighing' && document.activeElement?.classList.contains('timeline-mark')", "Left moves the playhead to the event before");
+    // B5: moving an event in the timeline never moves a scene (Alt+Left on the line).
+    await app.evaluate("(document.querySelector('#timeline-line .timeline-mark[data-id=\"ev-weigh\"]').focus(), true)");
+    await press("ArrowLeft", ["alt"]);
+    await waitFor(app, "[...document.querySelectorAll('#timeline-line .timeline-mark')].map(b => b.dataset.id).indexOf('ev-weigh') === 1", "the event moved earlier in the story");
     assert(JSON.stringify(await blocks()) === script0, "B5: the script did not move");
     await app.evaluate("(document.getElementById('timeline-undo').click(), true)");
     await waitFor(app, "[...document.querySelectorAll('#timeline-list .timeline-event')].map(b => b.dataset.id).indexOf('ev-weigh') === 2", "Undo puts it back");
+    // The list view is still there.
+    await app.evaluate("(document.getElementById('timeline-view-list').click(), true)");
+    await waitFor(app, "document.getElementById('timeline-list').getClientRects().length > 0 && !document.getElementById('timeline-line').getClientRects().length", "List shows the list");
+    await app.evaluate("(document.getElementById('timeline-view-line').click(), true)");
     // Story order needs the permission; then it is one script edit.
     assert(await app.evaluate("document.getElementById('timeline-apply-go').disabled"), "without the permission the script cannot be reordered from here");
     await app.evaluate("(document.getElementById('timeline-close').click(), true)");
@@ -2494,13 +2509,14 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(__cirth.menu('shortcuts'), true)");
     await waitFor(app, "document.getElementById('shortcuts-dialog').open && document.querySelectorAll('#shortcuts-dialog .shortcut-table tr').length >= 15", "Help > Keyboard Shortcuts…");
     await app.evaluate("(document.getElementById('shortcuts-close').click(), true)");
-    // The island's comment button opens Comments (built in M5) and changes nothing by itself.
+    // The island's Feedback button shows or hides feedback beside the script; it changes nothing in the script.
     const before = JSON.stringify(await blocks());
+    const shown = await app.evaluate("document.getElementById('tool-comments').getAttribute('aria-pressed')");
     await app.evaluate("(document.getElementById('tool-comments').click(), true)");
-    await waitFor(app, "document.getElementById('comments-overlay')?.hidden === false", "comment button opens Comments");
-    assert((await app.evaluate("document.getElementById('tool-comments').getAttribute('aria-disabled')")) === null, "comment button is not disabled");
-    await app.evaluate("(__cirth.comments.close(), true)");
-    assert(JSON.stringify(await blocks()) === before, "opening Comments changes nothing");
+    await waitFor(app, `document.getElementById('tool-comments').getAttribute('aria-pressed') === '${shown === "true" ? "false" : "true"}'`, "the Feedback button toggles feedback beside the script");
+    await app.evaluate("(document.getElementById('tool-comments').click(), true)");
+    await waitFor(app, `document.getElementById('tool-comments').getAttribute('aria-pressed') === '${shown}'`, "and back");
+    assert(JSON.stringify(await blocks()) === before, "toggling feedback changes nothing in the script");
     // Free Writing is in the island's More menu (and on Home), no longer in File.
     await app.evaluate("__cirth.menu('free_writing')");
     await waitFor(app, "document.body.dataset.view === 'free'", "Free Writing still opens");
@@ -3873,6 +3889,23 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(scheduledBefore[1].heading.includes("WEIGH STATION"), `Scene 2 moved before Scene 1: ${scheduledBefore[1].heading}`);
     assert(scheduledBefore[1].note === "Night crane required for exterior", "note recorded on Scene 2");
 
+    // Vertical strips stand side by side; compact strips drop the description. Both are remembered.
+    const stripRects = () => app.evaluate("[...document.querySelectorAll('#stripboard-scheduled-list .strip-card')].slice(0, 2).map(c => { const r = c.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; })");
+    const [h1, h2] = await stripRects();
+    assert(h2[1] > h1[1] && h1[0] === h2[0], `horizontal strips stack down the page: ${JSON.stringify([h1, h2])}`);
+    await app.evaluate("(() => { const s = document.getElementById('stripboard-layout'); s.value = 'vertical'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "document.getElementById('stripboard-body').dataset.layout === 'vertical'", "vertical layout chosen");
+    const [v1, v2] = await stripRects();
+    assert(v2[0] > v1[0] && v1[1] === v2[1] && v1[2] < 140, `vertical strips stand side by side: ${JSON.stringify([v1, v2])}`);
+    await screenshot(app, "stripboard-vertical");
+    await app.evaluate("(() => { const s = document.getElementById('stripboard-density'); s.value = 'compact'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "document.getElementById('stripboard-body').dataset.density === 'compact' && [...document.querySelectorAll('#stripboard-scheduled-list .strip-desc')].every(d => !d.getClientRects().length)", "compact strips hide the description");
+    await screenshot(app, "stripboard-vertical-compact");
+    assert((await app.evaluate("[localStorage.getItem('cirth.stripLayout'), localStorage.getItem('cirth.stripDensity')].join()")) === "vertical,compact", "the view is remembered");
+    for (const [id, v] of [["stripboard-layout", "horizontal"], ["stripboard-density", "comfortable"]]) {
+      await app.evaluate(`(() => { const s = document.getElementById('${id}'); s.value = '${v}'; s.dispatchEvent(new Event('change')); return true; })()`);
+    }
+
     // Close stripboard
     await app.evaluate("(document.getElementById('stripboard-close').click(), true)");
     await waitFor(app, "!document.getElementById('stripboard-dialog')?.open", "stripboard closed");
@@ -4128,6 +4161,31 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.querySelectorAll('.cirth-comment-mark').length > 0", "Inline comment highlight rendered");
     const markText = await app.evaluate("document.querySelector('.cirth-comment-mark')?.textContent");
     assert(markText === quote, `Mark text matches quote: "${markText}" vs "${quote}"`);
+
+    // 0.8.2: the line has an icon in the right margin; it opens the line's feedback in a pop-up.
+    const pinSel = `.fb-pin[data-block-id="${actionBlock.id}"]`;
+    await waitFor(app, `!!document.querySelector('${pinSel}')`, "the line shows a feedback icon");
+    const pinBox = await app.evaluate(`(() => { const p = document.querySelector('${pinSel}').getBoundingClientRect(), page = document.querySelector('.ProseMirror').getBoundingClientRect(); return { right: Math.round(page.right - p.right) }; })()`);
+    assert(pinBox.right >= 0 && pinBox.right < 40, `the icon sits in the page's right margin: ${JSON.stringify(pinBox)}`);
+    await app.evaluate(`(document.querySelector('${pinSel}').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })), true)`);
+    await waitFor(app, "!!document.getElementById('feedback-pop') && /Pacing feels/.test(document.getElementById('feedback-pop').textContent) && /Feedback/.test(document.querySelector('#feedback-pop .cirth-comment-kind').textContent)", "the icon opens a pop-up with the thread");
+    assert(JSON.stringify(await blocks()) === JSON.stringify(b0), "opening feedback never changes the script");
+    await screenshot(app, "feedback-pin-popup");
+    await app.evaluate("(document.querySelector('#feedback-pop .feedback-pop-close').click(), true)");
+    await waitFor(app, "!document.getElementById('feedback-pop')", "the pop-up closes");
+    // Right-click inside a selection: Add Suggestion… adds a suggestion; the script stays as it was.
+    await app.evaluate(`(() => { const v = __cirth.view; let at = -1; v.state.doc.forEach((n, off) => { if (n.attrs.id === ${JSON.stringify(actionBlock.id)}) at = off + 1; }); v.dispatch(v.state.tr.setSelection(v.state.selection.constructor.create ? v.state.selection.constructor.create(v.state.doc, at + 2, at + 8) : v.state.selection)); return true; })()`);
+    await app.evaluate("(() => { const v = __cirth.view; const c = v.coordsAtPos(v.state.selection.from + 2); v.dom.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: c.left + 1, clientY: (c.top + c.bottom) / 2 })); return true; })()");
+    await waitFor(app, "!document.getElementById('feedback-menu').hidden && document.querySelectorAll('#feedback-menu [data-add]').length === 4", "the right-click menu offers feedback, a suggestion and a note");
+    await app.evaluate("(document.querySelector('#feedback-menu [data-add=\"suggestion\"]').click(), true)");
+    await waitFor(app, "document.getElementById('feedback-add-dialog')?.open", "the suggestion dialog opens");
+    await app.evaluate("(() => { document.getElementById('feedback-add-text').value = 'Try a shorter line here.'; document.getElementById('feedback-add-save').click(); return true; })()");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('comments_state', { documentId: __cirth.lastOpen.document_id }).then(st => st.threads.some(t => t.kind === 'suggestion' && t.messages[0].text === 'Try a shorter line here.'))", "a suggestion is stored as a suggestion");
+    await waitFor(app, `document.querySelector('${pinSel} .fb-count')?.textContent === '2'`, "the line's icon counts both");
+    assert(JSON.stringify(await blocks()) === JSON.stringify(b0), "a suggestion never changes the script");
+    await app.evaluate(`window.__TAURI_INTERNALS__.invoke('comments_state', { documentId: __cirth.lastOpen.document_id }).then(st => Promise.all(st.threads.filter(t => t.kind === 'suggestion').map(t => window.__TAURI_INTERNALS__.invoke('comments_delete_thread', { threadId: t.id }))))`);
+    await app.evaluate("(__cirth.comments.refresh(), true)");
+    await waitFor(app, `!document.querySelector('${pinSel} .fb-count')`, "back to one thread");
 
     // 4. Reopen comments dialog: verify thread exists with 1 message
     await app.evaluate("(__cirth.comments.open(), true)");

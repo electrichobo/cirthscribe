@@ -474,6 +474,7 @@ mod tests {
             created_at: "2026-10-29T10:00:00Z".into(),
             resolved: false,
             orphaned: false,
+            kind: "comment".into(),
         };
         let msg = CommentMessage {
             id: "msg-1".into(),
@@ -538,6 +539,7 @@ mod tests {
             created_at: "2026-10-29T12:00:00Z".into(),
             resolved: false,
             orphaned: false,
+            kind: "comment".into(),
         };
         let msg = CommentMessage {
             id: "msg-ext-1".into(),

@@ -643,6 +643,7 @@ async fn comments_add_thread(
     quote: String,
     author: String,
     text: String,
+    kind: Option<String>,
 ) -> Result<CommentsState, String> {
     with_session(&app, |s| {
         let doc_id = match document_id {
@@ -662,6 +663,7 @@ async fn comments_add_thread(
             created_at: created_at.clone(),
             resolved: false,
             orphaned: false,
+            kind: cirth_core::comments::normal_kind(kind.as_deref().unwrap_or("comment")).to_string(),
         };
         let initial_message = if !text.trim().is_empty() {
             Some(cirth_core::comments::CommentMessage {
