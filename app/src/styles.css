@@ -199,32 +199,57 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: v
 body[data-panel="board"] .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; }
 body[data-panel="board"] .board-act { flex: 0 0 260px; }
 /* Evidence board (M3 step 9). */
-dialog.evidence { width: min(1300px, 96vw); height: 88vh; }
+/* Cork Board (evidence.ts): a free canvas, in the theme's colours. */
+dialog.about.evidence { width: 96vw; max-width: 1600px; height: 92vh; max-height: 92vh; }
 .evidence-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.evidence-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.evidence-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.evidence-group { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.evidence-group + .evidence-group { padding-left: 10px; border-left: 1px solid var(--line); }
 .evidence-tools select, .evidence-tools button { font-size: 12px; max-width: 12em; }
+.evidence-tools [data-mode][aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.evidence-zoom { font-size: 12px; min-width: 3.2em; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 .evidence-bar .form-note { margin: 0; }
+.evidence-hint { margin: 4px 0 0; font-size: 11px; }
 .evidence-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; min-height: 0; flex: 1 1 auto; margin-top: 6px; overflow: hidden; }
 .evidence-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
-.evidence-scroll { flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: color-mix(in srgb, var(--panel) 70%, var(--bg)); }
+.evidence-scroll {
+  flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 6px;
+  --cork: color-mix(in srgb, #b07a45 22%, var(--bg));
+  background-color: var(--cork);
+  background-image: radial-gradient(color-mix(in srgb, #6b4423 22%, transparent) 1px, transparent 1.4px), radial-gradient(color-mix(in srgb, #f0d9b5 16%, transparent) 1px, transparent 1.6px);
+  background-size: 9px 9px, 13px 13px; background-position: 0 0, 4px 6px;
+}
 .evidence-scroll[hidden], .evidence-listview[hidden] { display: none; }
 .evidence-listview { overflow: auto; font-size: 12px; }
-.evidence-canvas { position: relative; }
-.evidence-strings { position: absolute; left: 0; top: 0; pointer-events: none; }
-.evidence-string { stroke: var(--bad); stroke-width: 2; }
-.evidence-string-label { fill: var(--ink); font: 11px system-ui, sans-serif; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; }
-.evidence-card { position: absolute; width: 200px; padding: 6px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); font-size: 12px; }
+.evidence-sizer { position: relative; }
+.evidence-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-select: none; cursor: grab; }
+.evidence-canvas.panning { cursor: grabbing; }
+.evidence-strings { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.evidence-string { fill: none; stroke: var(--bad); stroke-width: 2; stroke-linecap: round; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .3)); }
+.evidence-string.on { stroke-width: 3.5; }
+.evidence-string-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.evidence-string-drawing { fill: none; stroke: var(--bad); stroke-width: 2; stroke-dasharray: 6 4; }
+.evidence-string-label { fill: var(--ink); font: 11px system-ui, sans-serif; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
+.evidence-card { position: absolute; width: 200px; padding: 14px 8px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); font-size: 12px; cursor: grab; touch-action: none; }
+.evidence-card.lifted { cursor: grabbing; box-shadow: 0 10px 24px rgba(0, 0, 0, .35); transform: rotate(-1deg); z-index: 2; }
 .evidence-card.chosen { outline: 2px solid var(--accent); }
-.evidence-card.note { background: color-mix(in srgb, #f3d36b 22%, var(--panel)); }
-.evidence-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); cursor: move; touch-action: none; }
+.evidence-card.drop-target { outline: 3px dashed var(--bad); outline-offset: 2px; }
+.evidence-card.note { background: color-mix(in srgb, #f3d36b 30%, var(--panel)); }
+.evidence-card.image { padding-bottom: 8px; }
+.evidence-canvas[data-mode="string"] .evidence-card { cursor: crosshair; }
+.evidence-pin { position: absolute; top: 2px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--bad) 55%, white), var(--bad) 60%); box-shadow: 0 1px 2px rgb(0 0 0 / .45); cursor: crosshair; }
+.evidence-pin:hover { transform: scale(1.25); }
+.evidence-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .evidence-card-title { font-weight: 600; margin: 2px 0; overflow-wrap: anywhere; }
 .evidence-body, .evidence-url { color: var(--muted); overflow-wrap: anywhere; }
-.evidence-card img { display: block; max-width: 100%; max-height: 140px; margin-top: 4px; border-radius: 3px; }
-.evidence-empty { padding: 20px; }
+.evidence-card img { display: block; max-width: 100%; max-height: 140px; margin-top: 4px; border-radius: 2px; pointer-events: none; }
+.evidence-empty { padding: 20px; max-width: 46ch; }
 .evidence-detail { display: grid; gap: 4px; align-content: start; overflow: auto; min-height: 0; }
 .evidence-detail input, .evidence-detail textarea, .evidence-detail select { width: 100%; padding: 4px 6px; }
 .evidence-detail h3 { font-size: 12px; margin: 8px 0 2px; }
+.evidence-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .evidence-threads { margin: 0; padding-left: 16px; font-size: 12px; }
+.evidence-thread-edit { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-align: left; font: inherit; }
 #evidence-delete { justify-self: start; margin-top: 8px; }
 /* Story timeline (M3 step 8). */
 dialog.timeline { width: min(1000px, 94vw); }

@@ -999,7 +999,41 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(document.getElementById('evidence-list-toggle').click(), true)");
     assert(/answered in/.test(await app.evaluate("document.getElementById('evidence-list-strings').textContent")), "list view names the string");
     await app.evaluate("(document.getElementById('evidence-list-toggle').click(), true)");
+    // 0.8.2 free canvas. Zoom: the buttons step it, Fit shows every card.
+    await app.evaluate("(__cirth.evidence.setZoom(1), document.getElementById('evidence-zoom-in').click(), true)");
+    await waitFor(app, "__cirth.evidence.zoom() === 1.25 && document.getElementById('evidence-zoom').textContent === '125%' && document.getElementById('evidence-canvas').style.transform === 'scale(1.25)'", "Zoom in scales the board");
+    await app.evaluate("(document.getElementById('evidence-zoom-fit').click(), true)");
+    await waitFor(app, "(() => { const s = document.querySelector('.evidence-scroll').getBoundingClientRect(); return [...document.querySelectorAll('#evidence-canvas .evidence-card')].every(c => { const r = c.getBoundingClientRect(); return r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1; }); })()", "Fit brings every card into view");
+    const video = (await cards()).find((c) => c.kind.includes("video"));
+    const ptr = `const o = (x, y) => ({ bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 7, button: 0, isPrimary: true });`;
+    // Drag from the note's pin onto the video card: a string is tied and chosen to be named.
+    await app.evaluate(`(() => { ${ptr} const card = document.querySelector('#evidence-canvas .evidence-card[data-id="${note.id}"]'); const pin = card.querySelector('.evidence-pin').getBoundingClientRect(); const t = document.querySelector('#evidence-canvas .evidence-card[data-id="${video.id}"]').getBoundingClientRect(); const x = t.left + t.width / 2, y = t.top + t.height - 6; card.querySelector('.evidence-pin').dispatchEvent(new PointerEvent('pointerdown', o(pin.left + 4, pin.top + 4))); card.dispatchEvent(new PointerEvent('pointermove', o(x, y))); card.dispatchEvent(new PointerEvent('pointerup', o(x, y))); return true; })()`);
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-string').length === 2 && !!document.getElementById('evidence-thread-label')", "dragging from a pin to a card ties a string and opens it");
+    await app.evaluate("(() => { const l = document.getElementById('evidence-thread-label'); l.value = 'filmed in'; l.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "[...document.querySelectorAll('#evidence-canvas .evidence-string-label')].some(t => t.textContent === 'filmed in')", "the string is named");
+    // Dragging the same pair again chooses the string already there.
+    await app.evaluate(`__cirth.evidence.tie(${JSON.stringify(video.id)}, ${JSON.stringify(note.id)})`);
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-string').length === 2 && document.getElementById('evidence-thread-label')?.value === 'filmed in'", "no second string between the same cards");
+    // Drag a card by its body: it moves by the pointer's distance at this zoom; the script stays.
+    const v0 = await app.evaluate(`(() => { const c = document.querySelector('#evidence-canvas .evidence-card[data-id="${video.id}"]'); return { x: c.offsetLeft, y: c.offsetTop, z: __cirth.evidence.zoom() }; })()`);
+    await app.evaluate(`(() => { ${ptr} const c = document.querySelector('#evidence-canvas .evidence-card[data-id="${video.id}"]'); const r = c.querySelector('.evidence-card-title').getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointerdown', o(r.left + 5, r.top + 5))); c.dispatchEvent(new PointerEvent('pointermove', o(r.left + 85, r.top + 45))); c.dispatchEvent(new PointerEvent('pointerup', o(r.left + 85, r.top + 45))); return true; })()`);
+    await waitFor(app, `window.__TAURI_INTERNALS__.invoke('evidence_state').then(st => { const c = st.cards.find(c => c.id === ${JSON.stringify(video.id)}); return c.x === ${v0.x + Math.round(80 / v0.z)} && c.y === ${v0.y + Math.round(40 / v0.z)}; })`, "dragging a card moves it on the board");
+    assert(JSON.stringify(await blocks()) === script0, "dragging cards and tying strings never touch the script");
+    // Click a string to choose it; Cut string removes it.
+    const named = await app.evaluate("window.__TAURI_INTERNALS__.invoke('evidence_state').then(st => st.threads.find(t => t.label === 'filmed in').id)");
+    await app.evaluate(`(document.querySelector('#evidence-canvas .evidence-string-hit[data-id="${named}"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })), true)`);
+    await waitFor(app, "document.getElementById('evidence-thread-label')?.value === 'filmed in'", "clicking a string chooses it");
+    await app.evaluate("(document.getElementById('evidence-thread-cut').click(), true)");
+    await waitFor(app, "document.querySelectorAll('#evidence-canvas .evidence-string').length === 1", "Cut string removes it");
+    // Double-click the empty board: a note where the pointer is.
+    const n0 = (await cards()).length;
+    await app.evaluate("(() => { const c = document.getElementById('evidence-canvas'), r = c.getBoundingClientRect(), z = __cirth.evidence.zoom(); c.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: r.left + 1200 * z, clientY: r.top + 800 * z })); return true; })()");
+    await waitFor(app, `window.__TAURI_INTERNALS__.invoke('evidence_state').then(st => st.cards.length === ${n0 + 1} && st.cards.some(c => c.kind === 'note' && c.x === 1100 && c.y === 780))`, "double-clicking the board adds a note there");
+    await waitFor(app, `document.querySelectorAll('#evidence-canvas .evidence-card').length === ${n0 + 1}`, "the board shows the new note");
+    await app.evaluate("(document.getElementById('evidence-zoom-fit').click(), true)");
+    await sleep(200);
     await screenshot(app, "evidence-board");
+    await app.evaluate("(__cirth.evidence.setZoom(1), true)");
     await app.evaluate("(document.getElementById('evidence-close').click(), true)");
     // A bookmark at the third block, then back to it from the start.
     await caretAtEndOf(2);
@@ -1019,7 +1053,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitHome(app);
     await openFixture("page-boundaries", false);
     const st = await app.evaluate("window.__TAURI_INTERNALS__.invoke('evidence_state')");
-    assert(st.cards.length === 4 && st.threads.length === 1 && st.bookmarks.length === 1, `kept: ${st.cards.length} cards, ${st.threads.length} strings, ${st.bookmarks.length} bookmarks`);
+    assert(st.cards.length === 5 && st.threads.length === 1 && st.cards.some((c) => c.x === 1100 && c.y === 780) && st.bookmarks.length === 1, `kept: ${st.cards.length} cards, ${st.threads.length} strings, ${st.bookmarks.length} bookmarks`);
   });
 
   await test("Page markers come from the Rust page map; zoom does not change it", async () => {
