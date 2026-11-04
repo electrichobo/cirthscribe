@@ -4,7 +4,7 @@ A free, open-source screenplay writing and story-production app for Windows, mac
 
 Created by Jared Hoy ([electrichobo](https://github.com/electrichobo)). Free and open source under GPL-3.0 ([details](#license)).
 
-> **0.8.1 RC Alpha: a test release.** Kolbítar is feature-complete for its first release and is now being tested by real writers. Expect rough edges. Keep your own copies of anything important (File > Save As, or export to PDF or Fountain), and please [report what you find](#how-you-can-help).
+> **0.8.2 RC Alpha: a test release.** Kolbítar is feature-complete for its first release and is now being tested by real writers. Expect rough edges. Keep your own copies of anything important (File > Save As, or export to PDF or Fountain), and please [report what you find](#how-you-can-help).
 
 ## Download
 
@@ -12,8 +12,8 @@ Get the latest build from [Releases](https://github.com/electrichobo/cirthscribe
 
 | System | File | Notes |
 | - | - | - |
-| Windows 10 or later (64-bit) | `Kolbítar_0.8.1_x64-setup.exe` | The installer is not code-signed yet, so Windows SmartScreen may warn you. Choose **More info**, then **Run anyway**. |
-| macOS 11 or later | `Kolbítar_0.8.1_aarch64.dmg` (Apple silicon) | The app is not signed or notarized yet. Open the disk image and drag Kolbítar to Applications. The first time, right-click (or Control-click) the app and choose **Open**, or allow it in System Settings > Privacy & Security. |
+| Windows 10 or later (64-bit) | `Kolbítar_0.8.2_x64-setup.exe` | The installer is not code-signed yet, so Windows SmartScreen may warn you. Choose **More info**, then **Run anyway**. |
+| macOS 11 or later | `Kolbítar_0.8.2_aarch64.dmg` (Apple silicon) | The app is not signed or notarized yet. Open the disk image and drag Kolbítar to Applications. The first time, right-click (or Control-click) the app and choose **Open**, or allow it in System Settings > Privacy & Security. |
 | Linux | `.deb` (Debian, Ubuntu and relatives) or `.AppImage` | Not yet: Linux builds are on hold while the Windows and macOS versions mature. You can [build from source](#building-from-source) meanwhile. The `.deb` also registers `.cirth` files and their icons. |
 
 Kolbítar never checks for updates by itself. Use **Help > Check for Updates…** to open the Releases page; each release lists what changed.
@@ -23,10 +23,10 @@ Kolbítar never checks for updates by itself. Use **Help > Check for Updates…*
 Kolbítar is one app for the whole path from first idea to shooting script:
 
 - **Write.** A screenplay editor that formats as you type: scene headings, action, characters, dialogue and transitions, with industry-standard pages. Also stage plays, multi-camera TV, comics, interactive stories and treatments.
-- **Plan.** Outlines, index cards, a beat board, a story timeline, an evidence board, and a "bible" of your characters, locations and world. These are all views of the same script, so they never drift out of sync.
+- **Plan.** Outlines, a Notecard View with colour-coded storylines and a whole-season view, a story timeline, a free-form Cork Board with pins and strings, Thoughts for loose notes, and a "bible" of your characters, locations and world. These are all views of the same script, so they never drift out of sync.
 - **Prepare for production.** Breakdown tags, reports, character sides and a stripboard, built straight from the script.
-- **Revise.** Revision sets in the standard colours, locked pages and scene numbers, snapshots, branches, alternate takes, and comments you can share as a review package.
-- **Exchange files.** PDF, Final Draft, Fountain, Word, RTF, HTML and plain text, with an honest report of anything a format can't carry.
+- **Revise.** Revision sets in the standard colours, locked pages and scene numbers, snapshots, branches, alternate takes, and feedback (comments, suggestions and notes beside the lines) you can share as a review package.
+- **Exchange files.** PDF, Final Draft, Fountain, Word, RTF, HTML and plain text, with an honest report of anything a format can't carry. Screenplay PDFs can be imported too.
 
 It is built around a few promises:
 
@@ -55,6 +55,7 @@ This alpha is for finding problems before a wider release. Every report helps.
 
 - Chinese, Japanese and Korean show on screen but do not print in PDFs yet; the export tells you when this happens. Hebrew, Arabic and Devanagari print.
 - Word, RTF and HTML exports print dual dialogue one speech after the other.
+- PDF import is a best guess: a PDF does not record which lines are headings, cues or dialogue, so Kolbítar works it out from where each line sits and reports what it guessed. Check the result. Scanned PDFs cannot be read, and bold, italic and underlining do not come through.
 - Exchange with Final Draft and other screenwriting apps has been built from their published formats but not yet tested in those apps.
 - Installers are not code-signed, so Windows and macOS show a warning the first time (see [Download](#download)).
 - Screen readers have not been tested, and input methods (IMEs) have only been tested in simulation.
