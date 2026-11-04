@@ -384,11 +384,56 @@ export function createHome(root: HTMLElement, actions: Actions) {
     return item;
   }
 
+  // The project list must never stay blank. On macOS a fresh install has
+  // twice started with no answer to this request (0.8.2 smoke test): wait a
+  // while, ask again, reload the window once, and then say so, with a retry.
+  // Tests can shorten the wait and stand in for the request.
+  const timing: { waitMs: number; list?: () => Promise<ProjectEntry[]> } = { waitMs: 6000 };
+  const answer = <T>(p: Promise<T>) =>
+    Promise.race([p, new Promise<never>((_, no) => window.setTimeout(() => no(new Error("no answer")), timing.waitMs))]);
+  async function listProjects(): Promise<ProjectEntry[] | "silent"> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await answer(timing.list ? timing.list() : invoke<ProjectEntry[]>("list_projects"));
+      } catch (e) {
+        if (!(e instanceof Error && e.message === "no answer")) throw e;
+      }
+    }
+    return "silent";
+  }
+
   async function refresh(): Promise<ProjectEntry[]> {
     root.dataset.loaded = "";
+    if (!grid.children.length) grid.replaceChildren(el("p", { className: "home-empty", id: "home-loading" }, "Loading your projects…"));
     let list: ProjectEntry[] = [];
     try {
-      list = await invoke<ProjectEntry[]>("list_projects");
+      const got = await listProjects();
+      if (got === "silent") {
+        let reloaded = false;
+        try {
+          reloaded = sessionStorage.getItem("cirth.homeReloaded") === "1";
+          if (!reloaded) sessionStorage.setItem("cirth.homeReloaded", "1");
+        } catch {
+          reloaded = true; // no storage: never reload in a loop
+        }
+        if (!reloaded) {
+          location.reload();
+          return [];
+        }
+        const again = el("button", { type: "button", id: "home-retry" }, "Try again");
+        again.addEventListener("click", () => void refresh());
+        grid.replaceChildren(el("p", { className: "home-empty", id: "home-silent" }, "Kolbítar could not read your project list on this start. Your projects are safe. Try again, or quit Kolbítar and open it again. ", again));
+        count.textContent = "";
+        root.dataset.loaded = "1";
+        announce("The project list could not be read");
+        return [];
+      }
+      list = got;
+      try {
+        sessionStorage.removeItem("cirth.homeReloaded");
+      } catch {
+        // nothing kept
+      }
     } catch (e) {
       message(`Could not read the project library: ${e}`);
     }
@@ -400,5 +445,5 @@ export function createHome(root: HTMLElement, actions: Actions) {
     return list;
   }
 
-  return { refresh, message };
+  return { refresh, message, timing };
 }

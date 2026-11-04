@@ -811,4 +811,29 @@ mod tests {
         assert!(r.notes.iter().any(|n| n.contains("Hebrew or Arabic")), "{:?}", r.notes);
         assert!(got.iter().any(|g| g.0 == BlockKind::Character && g.1 == "ABENA"));
     }
+    #[test]
+    fn an_arabic_phrase_in_our_pdf_sits_flush_with_the_english_beside_it() {
+        // 0.8.2 smoke test on macOS: the gap beside an Arabic phrase was wider than a space.
+        let p = crate::layout::Profile::us_letter();
+        let blocks = vec![crate::model::Block::new(BlockKind::Heading, "INT. GATE - DAY"), crate::model::Block::new(BlockKind::Action, "The sign reads مرحبا بكم في السوق above the gate.")];
+        let map = crate::layout::paginate(&blocks, &p, 1);
+        let bytes = crate::pdf::render_document(&map, &p, None, &crate::pdf::PdfOptions { title: "t".into(), date_unix: 1, document_id: "t".into(), ..Default::default() }).unwrap();
+        let pages = read_pages(&bytes).unwrap();
+        let mut gs: Vec<&Glyph> = pages[0].glyphs.iter().filter(|g| g.c.trim().len() == g.c.len() && !g.c.is_empty()).collect();
+        let action_y = gs.iter().find(|g| g.c == "T" && g.y > 90.0).map(|g| g.y).unwrap();
+        gs.retain(|g| (g.y - action_y).abs() < 2.0);
+        gs.sort_by(|a, b| a.x.total_cmp(&b.x));
+        let after = |word_end: f64| gs.iter().map(|g| g.x).filter(|x| *x > word_end + 0.5).fold(f64::INFINITY, f64::min);
+        let end_of = |text: &str| {
+            let t: Vec<char> = text.chars().collect();
+            let letters: Vec<&&Glyph> = gs.iter().collect();
+            (0..letters.len()).find(|&i| (0..t.len()).all(|k| letters.get(i + k).is_some_and(|g| g.c == t[k].to_string()))).map(|i| letters[i + t.len() - 1].x + letters[i + t.len() - 1].w).unwrap()
+        };
+        let space = after(end_of("sign")) - end_of("sign");
+        let before_arabic = after(end_of("reads")) - end_of("reads");
+        let above_x = gs.iter().filter(|g| g.c == "a").map(|g| g.x).find(|x| *x > end_of("reads") + 30.0).unwrap();
+        let arabic_end = gs.iter().filter(|g| g.x < above_x - 0.5).map(|g| g.x + g.w).fold(0.0, f64::max);
+        let after_arabic = above_x - arabic_end;
+        assert!((before_arabic - space).abs() < 0.8 && (after_arabic - space).abs() < 0.8, "the phrase meets the English at an ordinary space: {before_arabic:.2} and {after_arabic:.2} against {space:.2} pt");
+    }
 }

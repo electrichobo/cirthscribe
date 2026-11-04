@@ -42,6 +42,8 @@ export interface AlternativesManagerOptions {
   getView: () => EditorView | null;
   getDocumentId: () => string | null;
   onTakeChanged?: (blockId: string, takeIndex: number) => void;
+  /** After a change is stored (a planning step in the core): the main window takes the new planning version. */
+  afterWrite?: () => Promise<void> | void;
 }
 
 export interface AlternativesManager {
@@ -284,6 +286,7 @@ export function createAlternativesManager(opts: AlternativesManagerOptions): Alt
           label: label.trim() || "Alternate",
           author: "",
         });
+        await opts.afterWrite?.();
         announce(`Alternate take added for block. Total takes: ${view.total_takes}`);
         await mgr.refresh();
       } catch (e) {
@@ -299,6 +302,7 @@ export function createAlternativesManager(opts: AlternativesManagerOptions): Alt
           blockId,
           takeIndex,
         });
+        await opts.afterWrite?.();
         const activeTake = viewData.takes.find((t) => t.is_active);
         if (activeTake) {
           // Update editor node text for seamless projection
@@ -338,6 +342,7 @@ export function createAlternativesManager(opts: AlternativesManagerOptions): Alt
           blockId,
           takeIndex,
         });
+        await opts.afterWrite?.();
         announce(`Take ${takeIndex + 1} deleted`);
         await mgr.refresh();
       } catch (e) {

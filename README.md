@@ -61,6 +61,12 @@ This alpha is for finding problems before a wider release. Every report helps.
 - Screen readers have not been tested, and input methods (IMEs) have only been tested in simulation.
 - Not yet tried: macOS 11 (the oldest supported version) and Intel Macs.
 
+Known issues in 0.8.2, fixed for the next update:
+
+- On a Mac, the first launch after installing can show an empty Home screen. Quit Kolbítar and open it again.
+- Adding a card in the Notecard View right after adding feedback or an alternate take can say "Card not saved". Click again.
+- In PDFs, an Arabic phrase can have a little extra space on each side.
+
 The full list of what has and hasn't been tested is in [STATUS.md](STATUS.md).
 
 ## Building from source

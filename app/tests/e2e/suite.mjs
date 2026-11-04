@@ -116,6 +116,25 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     return { adoptedSelections: await app.evaluate("__cirth.selSync.adopted") };
   });
 
+  await test("Home never stays blank: while the project list does not answer it says it is loading, then offers Try again; the list comes back", async () => {
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    // The 0.8.2 macOS report: on a fresh install the list request twice got no answer. Make it silent here.
+    await app.evaluate(`(() => {
+      try { sessionStorage.setItem('cirth.homeReloaded', '1'); } catch {}
+      __cirth.home.timing.waitMs = 300;
+      __cirth.home.timing.list = () => new Promise(() => {});
+      return true;
+    })()`);
+    await app.evaluate("(__cirth.home.refresh(), true)");
+    await waitFor(app, "!!document.getElementById('home-silent') && !!document.getElementById('home-retry')", "Home says it could not read the list and offers Try again");
+    assert(/Your projects are safe/.test(await app.evaluate("document.getElementById('home-silent').textContent")), "and that nothing is lost");
+    // Answers again: Try again brings the list back.
+    await app.evaluate("(delete __cirth.home.timing.list, document.getElementById('home-retry').click(), true)");
+    await waitFor(app, "!document.getElementById('home-silent') && document.querySelectorAll('.home-grid > *').length > 0 && !document.getElementById('home-loading')", "the list comes back");
+    await app.evaluate("(() => { __cirth.home.timing.waitMs = 6000; try { sessionStorage.removeItem('cirth.homeReloaded'); } catch {} return true; })()");
+  });
+
   await test("Home: create a project, write, close to Home, reopen; titles never overwrite", async () => {
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);
@@ -4308,6 +4327,11 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.getElementById('feedback-add-dialog')?.open", "the suggestion dialog opens");
     await app.evaluate("(() => { document.getElementById('feedback-add-text').value = 'Try a shorter line here.'; document.getElementById('feedback-add-save').click(); return true; })()");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('comments_state', { documentId: __cirth.lastOpen.document_id }).then(st => st.threads.some(t => t.kind === 'suggestion' && t.messages[0].text === 'Try a shorter line here.'))", "a suggestion is stored as a suggestion");
+    // A card added right after feedback is stored (feedback is a planning step of its own; 0.8.2 GROGU report).
+    const cardsBefore = await app.evaluate("__cirth.board.beats.length");
+    await app.evaluate("(document.querySelector('#board .board-head button:not(.panel-pop)').click(), true)");
+    await waitFor(app, `__cirth.board.beats.length === ${cardsBefore + 1}`, "a new card right after a suggestion is stored");
+    assert(!/STALE|stale|not saved/i.test(await app.evaluate("document.getElementById('banner').textContent")), "and nothing is refused as stale");
     await waitFor(app, `document.querySelector('${pinSel} .fb-count')?.textContent === '2'`, "the line's icon counts both");
     assert(JSON.stringify(await blocks()) === JSON.stringify(b0), "a suggestion never changes the script");
     await app.evaluate(`window.__TAURI_INTERNALS__.invoke('comments_state', { documentId: __cirth.lastOpen.document_id }).then(st => Promise.all(st.threads.filter(t => t.kind === 'suggestion').map(t => window.__TAURI_INTERNALS__.invoke('comments_delete_thread', { threadId: t.id }))))`);

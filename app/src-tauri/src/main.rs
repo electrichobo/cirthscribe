@@ -119,6 +119,25 @@ fn data_dir(app: &App) -> PathBuf {
 /// Writing). On the first launch under the new identifier, copy the old folder's
 /// contents across; the old folder is left untouched as a fallback. The web view's
 /// own folder (`EBWebView` on Windows) is skipped: it may already exist and be in use.
+/// A panic in the core is written to `logs/crash.log` in the data folder,
+/// with the time and the app version: kept on this computer, never sent, and
+/// started afresh past 1 MB. A command that fails this way leaves a trace.
+fn install_crash_log(dir: &Path) {
+    let dir = dir.to_path_buf();
+    let earlier = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("crash.log");
+        let fresh = std::fs::metadata(&path).map(|m| m.len() > 1_000_000).unwrap_or(false);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(!fresh).write(true).truncate(fresh).open(&path) {
+            use std::io::Write;
+            let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+            let _ = writeln!(f, "[unix {secs}] Kolbítar {} stopped a command: {info}", env!("CARGO_PKG_VERSION"));
+        }
+        earlier(info);
+    }));
+}
+
 fn migrate_data_dir(new_dir: &Path) {
     let Some(old_dir) = new_dir.parent().map(|p| p.join("org.cirthscribe.spike")) else { return };
     if new_dir.join("projects").exists() || !old_dir.join("projects").is_dir() {
@@ -4242,6 +4261,7 @@ fn main() {
                 }
             };
             std::fs::create_dir_all(dir.join("projects"))?;
+            install_crash_log(&dir.join("logs"));
             *app.state::<App>().data_dir.lock().unwrap() = dir;
 
             // Startup file passed on the CLI or via OS file association launch.

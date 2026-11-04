@@ -256,6 +256,13 @@ const queued = <T>(f: () => Promise<T>): Promise<T> => {
   return next;
 };
 
+/** Feedback and alternate takes are planning steps stored by their own
+ *  commands: take the planning version they leave (and the cards) so the
+ *  board's next change is not refused as stale. The board's steps stay. */
+function syncPlanning(): Promise<void> {
+  return queued(async () => takePlanning(await invoke<PlanningState>("planning_state_now"))).catch(() => undefined);
+}
+
 /** Store a beat (new or changed) as one planning step (the main window's panels and pop-out windows both use it). */
 function putBeat(beat: Beat, from: "board" | "nav" = "board"): Promise<void> {
   return queued(() => putBeatNow(beat, from));
@@ -765,6 +772,11 @@ const commentsDialog = createCommentsDialog({
   getView: () => view ?? null,
   getDocumentId: () => lastOpen?.document_id ?? null,
   jumpToBlock: (blockId) => void goToTagSpan(lastOpen?.document_id ?? "", blockId, 0, 0),
+  write: async (command, args) => {
+    const r = await invoke(command, args);
+    await syncPlanning();
+    return r;
+  },
   popOut: () => {
     commentsDialog.close();
     void panelHost.popOut("feedback");
@@ -778,6 +790,7 @@ const alternativesMgrRef = { current: null as AlternativesManager | null };
 const alternativesMgr = createAlternativesManager({
   getView: () => view ?? null,
   getDocumentId: () => lastOpen?.document_id ?? null,
+  afterWrite: () => syncPlanning(),
 });
 alternativesMgrRef.current = alternativesMgr;
 const snapshotsDialog = createSnapshotsDialog({
@@ -1512,6 +1525,7 @@ const panelHost = createPanelHost({
   exportReport: (scope, report, format) => void exportReport(report, format, undefined, scope),
   feedbackWrite: async (command, args) => {
     await invoke(command, args).catch((e) => showBanner(`Feedback: ${e}`));
+    await syncPlanning();
     await commentsDialog.refresh();
   },
   jumpBlock: (blockId) => void goToTagSpan(lastOpen?.document_id ?? "", blockId, 0, 0),

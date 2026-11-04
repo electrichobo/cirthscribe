@@ -93,18 +93,25 @@ fn rtl_blocks(map: &PageMap) -> std::collections::HashSet<String> {
     rtl
 }
 
-/// How shaped text fills the columns the layout gave it: text that is too
-/// wide is squeezed to fit; text that is narrower (joined Arabic letters,
-/// Devanagari conjuncts) widens a little, at most `MAX_WIDEN`, and what room
-/// is left is shared on both sides, so no wide gap opens beside the word.
-/// Returns the horizontal scale and the space before the text, in points.
+/// How shaped text fills the columns the layout gave it. Text that is too
+/// wide is squeezed to fit. Text that is narrower (joined Arabic letters,
+/// Devanagari conjuncts) widens a little, at most `MAX_WIDEN`; what room is
+/// left goes into its own word spaces, so the phrase ends flush with the text
+/// beside it, or, for a single word, is shared on both sides.
+/// Returns the horizontal scale, the space before the text and the extra
+/// width after each space, in points.
 const MAX_WIDEN: f32 = 1.12;
-fn fit(natural: f32, room: f32) -> (f32, f32) {
+fn place(natural: f32, spaces: usize, room: f32) -> (f32, f32, f32) {
     if natural <= 0.0 || room <= 0.0 {
-        return (1.0, 0.0);
+        return (1.0, 0.0, 0.0);
     }
     let scale = (room / natural).min(MAX_WIDEN);
-    (scale, ((room - natural * scale) / 2.0).max(0.0))
+    let left = (room - natural * scale).max(0.0);
+    if spaces > 0 {
+        (scale, 0.0, left / spaces as f32)
+    } else {
+        (scale, left / 2.0, 0.0)
+    }
 }
 
 /// Draws one line that needs a fallback font, starting at `x_in`. Every piece
@@ -135,6 +142,23 @@ fn draw_mixed_line(layer: &PdfLayerReference, fonts: &mut Fonts, segs: &[Seg], r
                 _ => pieces.push((at, at + c.len_utf8(), font)),
             }
         }
+        // Spaces between two pieces of one fallback font join them: the phrase
+        // is shaped as one, and its slack goes into its own word spaces.
+        let mut joined: Vec<(usize, usize, usize)> = Vec::new();
+        let mut k = 0;
+        while k < pieces.len() {
+            let p = pieces[k];
+            if let (Some(last), Some(next)) = (joined.last_mut(), pieces.get(k + 1)) {
+                if p.2 == 0 && last.2 != 0 && next.2 == last.2 && text[p.0..p.1].chars().all(|c| c == ' ') && seg_at[last.0] == seg_at[p.0] && seg_at[p.0] == seg_at[next.0] {
+                    last.1 = next.1;
+                    k += 2;
+                    continue;
+                }
+            }
+            joined.push(p);
+            k += 1;
+        }
+        let mut pieces = joined;
         if rtl {
             pieces.reverse();
         }
@@ -155,18 +179,23 @@ fn draw_mixed_line(layer: &PdfLayerReference, fonts: &mut Fonts, segs: &[Seg], r
                 let shaped = rustybuzz::shape(&face, &[], buf);
                 let k = font_pt / face.units_per_em() as f32; // font units to points
                 let natural: f32 = shaped.glyph_positions().iter().map(|g| g.x_advance as f32 * k).sum();
-                let (squeeze, lead) = fit(natural, w * 72.0);
+                let is_space = |cluster: u32| piece.get(cluster as usize..).is_some_and(|t| t.starts_with(' '));
+                let spaces = shaped.glyph_infos().iter().filter(|i| is_space(i.cluster)).count();
+                let (squeeze, lead, per_space) = place(natural, spaces, w * 72.0);
                 let f = fonts.fallback(font - 1)?;
                 let (x0, y0) = (x * 72.0 + lead, y_in * 72.0);
-                let mut pen = 0.0;
+                let (mut pen, mut extra) = (0.0, 0.0);
                 for (info, pos) in shaped.glyph_infos().iter().zip(shaped.glyph_positions()) {
-                    let gx = x0 + (pen + pos.x_offset as f32 * k) * squeeze;
+                    let gx = x0 + extra + (pen + pos.x_offset as f32 * k) * squeeze;
                     let gy = y0 + pos.y_offset as f32 * k;
                     layer.begin_text_section();
                     layer.set_font(&f, font_pt);
                     layer.set_text_matrix(TextMatrix::Raw([squeeze, 0.0, 0.0, 1.0, gx, gy]));
                     layer.write_codepoints([info.glyph_id as u16]);
                     layer.end_text_section();
+                    if is_space(info.cluster) {
+                        extra += per_space;
+                    }
                     pen += pos.x_advance as f32 * k;
                 }
             }
@@ -612,18 +641,21 @@ Part 2".into(), draft_label: "Blue Revision".into(), draft_date: "1 May 2026".in
     }
 
     #[test]
-    fn narrow_shaped_text_widens_a_little_and_is_centred_in_its_columns() {
-        // Too wide: squeezed to exactly its room, no space before it.
-        assert_eq!(fit(50.0, 36.0), (36.0 / 50.0, 0.0));
+    fn narrow_shaped_text_widens_a_little_and_its_slack_goes_into_its_spaces() {
+        // Too wide: squeezed to exactly its room, nothing before it.
+        assert_eq!(place(50.0, 2, 36.0), (36.0 / 50.0, 0.0, 0.0));
         // A little narrow: widened to fill its room.
-        let (s, lead) = fit(34.0, 36.0);
-        assert!((s * 34.0 - 36.0).abs() < 1e-4 && lead.abs() < 1e-4);
-        // Much narrower (an Arabic word in its columns): widened at most 12%, the rest shared on both sides.
-        let (s, lead) = fit(24.0, 36.0);
-        assert!((s - MAX_WIDEN).abs() < 1e-6);
+        let (s, lead, sp) = place(34.0, 0, 36.0);
+        assert!((s * 34.0 - 36.0).abs() < 1e-4 && lead.abs() < 1e-4 && sp == 0.0);
+        // One narrow word (no spaces): widened at most 12%, the rest shared on both sides.
+        let (s, lead, sp) = place(24.0, 0, 36.0);
+        assert!((s - MAX_WIDEN).abs() < 1e-6 && sp == 0.0);
         assert!((lead * 2.0 + 24.0 * s - 36.0).abs() < 1e-4, "it still ends where its columns end");
-        assert!(lead > 0.0 && lead < 36.0 * 0.2, "the gap on each side stays small: {lead}");
-        assert_eq!(fit(0.0, 36.0), (1.0, 0.0));
+        // A narrow phrase: flush at both ends, the rest spread over its word spaces.
+        let (s, lead, sp) = place(100.0, 3, 144.0);
+        assert!((s - MAX_WIDEN).abs() < 1e-6 && lead == 0.0);
+        assert!((100.0 * s + 3.0 * sp - 144.0).abs() < 1e-3, "it fills its columns exactly");
+        assert_eq!(place(0.0, 0, 36.0), (1.0, 0.0, 0.0));
     }
 
     #[test]
