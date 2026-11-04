@@ -4,6 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { announce } from "./a11y";
+import { createPagePreview } from "./pagepreview";
 
 export interface TitlePage {
   title: string;
@@ -68,7 +69,15 @@ export function createTitlePageDialog(afterSave: () => Promise<void>) {
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   actions.append(cancel, save);
-  dialog.append(h, note, grid, actions);
+  // A preview of the printed title page beside the fields.
+  const preview = createPagePreview("Preview of the title page");
+  const values = () => Object.fromEntries([...inputs].map(([k, el]) => [k, el.value])) as unknown as TitlePage;
+  for (const el of inputs.values()) el.addEventListener("input", () => preview.update({ kind: "title", page: values() }));
+  const row = document.createElement("div");
+  row.className = "preview-row";
+  row.append(grid, preview.el);
+  dialog.classList.add("with-preview");
+  dialog.append(h, note, row, actions);
 
   cancel.addEventListener("click", () => dialog.close());
   save.addEventListener("click", async () => {
@@ -86,6 +95,7 @@ export function createTitlePageDialog(afterSave: () => Promise<void>) {
   async function open() {
     const tp = await invoke<TitlePage>("title_page");
     for (const [k, el] of inputs) el.value = tp[k] ?? "";
+    void preview.now({ kind: "title", page: values() });
     if (!dialog.open) dialog.showModal();
     inputs.get("title")!.focus();
   }

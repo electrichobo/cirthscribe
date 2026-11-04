@@ -636,6 +636,10 @@ export function createStoryScry(hooks: {
   versions: () => { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
   go: (documentId: string, sceneId: string) => void;
   exportReport: (scope: ReportScope, report: ExportableReport, format: ReportFormat, path?: string) => Promise<ReportExported | null>;
+  /** Main window: move StoryScry into a window of its own. */
+  popOut?: () => void;
+  /** Its own window: Close puts it back (the window closes). */
+  onClose?: () => void;
 }) {
   const dialog = document.createElement("dialog");
   dialog.id = "storyscry-dialog";
@@ -651,6 +655,16 @@ export function createStoryScry(hooks: {
   stampEl.id = "storyscry-stamp";
   stampEl.className = "form-note storyscry-stamp";
   head.append(h, stampEl);
+  if (hooks.popOut) {
+    const pop = document.createElement("button");
+    pop.type = "button";
+    pop.id = "storyscry-popout";
+    pop.className = "storyscry-popout";
+    pop.textContent = "Pop Out";
+    pop.title = "Open StoryScry in a window of its own, beside the script";
+    pop.addEventListener("click", () => hooks.popOut?.());
+    head.append(pop);
+  }
 
   const tools = document.createElement("div");
   tools.className = "storyscry-tools";
@@ -1537,6 +1551,7 @@ export function createStoryScry(hooks: {
   refreshBtn.addEventListener("click", () => void load());
   exportBtn.addEventListener("click", () => void runExport());
   closeBtn.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => hooks.onClose?.());
 
   return {
     async open(initialTab: ReportTab = "dashboard") {

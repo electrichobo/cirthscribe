@@ -39,8 +39,8 @@ export function announce(msg: string, urgent = false) {
   window.setTimeout(() => (r.textContent = msg), 30);
 }
 
-export type Panel = "nav" | "board" | "toolbar" | "status" | "notes";
-export const PANEL_LABEL: Record<Panel, string> = { nav: "Scene list", board: "Notecard view", toolbar: "Toolbar", status: "Status bar", notes: "Thoughts" };
+export type Panel = "nav" | "board" | "toolbar" | "status" | "notes" | "runtime";
+export const PANEL_LABEL: Record<Panel, string> = { nav: "Scene list", board: "Notecard view", toolbar: "Toolbar", status: "Status bar", notes: "Thoughts", runtime: "Runtime estimate" };
 
 // Toolbar controls return focus to the script after a mouse action, but keep
 // it after a keyboard action (in the script Tab changes the block type, so a
@@ -89,7 +89,7 @@ export const SCREEN_FONTS: Record<ScreenFont, { label: string; stack: string }> 
   sans: { label: "Sans serif", stack: `"Noto Sans", ${SCRIPTS}, system-ui, "Segoe UI", Helvetica, Arial, "DejaVu Sans", sans-serif` },
 };
 
-let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false }, typewriter: false, editor_font: "courier-prime", editor_size: 12, theme: "system", keys: {} };
+let prefs: UiPrefs = { scale: 1, contrast: "system", panels: { nav: true, board: true, toolbar: true, status: true, notes: false, runtime: true }, typewriter: false, editor_font: "courier-prime", editor_size: 12, theme: "system", keys: {} };
 const panelListeners: (() => void)[] = [];
 
 function applyPrefs() {

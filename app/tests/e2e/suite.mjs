@@ -1486,10 +1486,31 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     let b = await blocks();
     assert(text(b.at(-1)) === "VERSION ONE TWO", `menu undo left '${text(b.at(-1))}'`);
     const name = await app.evaluate("__cirth.lastOpen.name");
-    // Menu "Close Project" goes Home; the card offers its backups.
+    // Menu "Close Project" goes Home; the card's menu (its ⋯ button) offers its backups.
     await app.evaluate("__cirth.menu('home')");
     await waitHome(app);
-    await clickHome(app, `[data-backups="${name}"]`);
+    await clickHome(app, `[data-more="${name}"]`);
+    await waitFor(app, "!document.getElementById('project-menu').hidden && document.activeElement?.closest('#project-menu')", "the card's menu opens with focus");
+    const menuItems = await app.evaluate("[...document.querySelectorAll('#project-menu li')].map(li => li.dataset.menu)");
+    assert(["open", "rename", "cover", "export", "backups"].every((m) => menuItems.includes(m)), `card menu: ${menuItems}`);
+    // Rename: the card shows the new name and the script's title under it; empty goes back.
+    await app.evaluate("(document.querySelector('#project-menu [data-menu=\"rename\"]').click(), true)");
+    await waitFor(app, "document.getElementById('rename-dialog')?.open", "rename asks for the name");
+    await app.evaluate("(() => { document.getElementById('rename-input').value = 'Aardvark Project'; document.getElementById('rename-save').click(); return true; })()");
+    await waitFor(app, `document.querySelector('#home [data-project="${name}"]')?.textContent.includes('Aardvark Project') && document.querySelector('#home [data-project="${name}"] .script-title')`, "the card shows the new name and the script title");
+    // Sorting by name puts it first.
+    await app.evaluate("(() => { const s = document.getElementById('home-sort'); s.value = 'name-asc'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `document.querySelector('#home .project')?.dataset.project === ${JSON.stringify(name)}`, "name sort puts Aardvark first");
+    await app.evaluate("(() => { const s = document.getElementById('home-sort'); s.value = 'name-desc'; s.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, `document.querySelector('#home .project')?.dataset.project !== ${JSON.stringify(name)}`, "Z to A moves it off the top");
+    await app.evaluate("(() => { const s = document.getElementById('home-sort'); s.value = 'modified-desc'; s.dispatchEvent(new Event('change')); return true; })()");
+    await clickHome(app, `[data-more="${name}"]`);
+    await app.evaluate("(document.querySelector('#project-menu [data-menu=\"rename\"]').click(), true)");
+    await waitFor(app, "document.getElementById('rename-dialog')?.open", "rename again");
+    await app.evaluate("(() => { document.getElementById('rename-input').value = ''; document.getElementById('rename-save').click(); return true; })()");
+    await waitFor(app, `!document.querySelector('#home [data-project="${name}"]')?.textContent.includes('Aardvark') && !document.querySelector('#home [data-project="${name}"] .script-title')`, "an empty name goes back to the script's title");
+    await clickHome(app, `[data-more="${name}"]`);
+    await clickHome(app, `#project-menu [data-backups="${name}"]`);
     await waitFor(app, "document.getElementById('backups-dialog').open && document.querySelectorAll('[data-restore]').length > 0", "backups dialog");
     const rows = await app.evaluate("[...document.querySelectorAll('#backups-dialog li')].map(li => li.textContent)");
     await screenshot(app, "backups-dialog");
@@ -2012,6 +2033,40 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(saved.scale === 1 && saved.contrast === "system", `stored ${JSON.stringify(saved)}`);
   });
 
+  await test("Runtime rail: estimated running time beside the script follows the caret; View > Runtime Estimate hides it", async () => {
+    await openFixture("long-120");
+    await waitFor(app, "!document.getElementById('runtime-rail').hidden && /of 1\\d\\d minutes \\(estimate/.test(document.getElementById('runtime-rail').title)", "the rail shows the whole script's estimate");
+    const at = () => app.evaluate("parseInt(document.getElementById('runtime-label').textContent.replace(/\\D/g, ''), 10)");
+    await app.evaluate("(__cirth.view.dispatch(__cirth.view.state.tr.setSelection(__cirth.view.state.selection.constructor.atEnd(__cirth.view.state.doc))), true)");
+    await waitFor(app, "parseInt(document.getElementById('runtime-label').textContent.replace(/\\D/g, ''), 10) >= 120", "the caret at the end is near the full running time");
+    await app.evaluate("(__cirth.view.dispatch(__cirth.view.state.tr.setSelection(__cirth.view.state.selection.constructor.atStart(__cirth.view.state.doc))), true)");
+    await waitFor(app, "parseInt(document.getElementById('runtime-label').textContent.replace(/\\D/g, ''), 10) <= 1", "the caret at the start is at the beginning");
+    assert((await at()) <= 1, "label follows the caret");
+    await app.evaluate("__cirth.menu('view_runtime')");
+    await waitFor(app, "!document.getElementById('runtime-rail').getClientRects().length", "View > Runtime Estimate hides the rail");
+    await app.evaluate("__cirth.menu('view_runtime')");
+    await waitFor(app, "document.getElementById('runtime-rail').getClientRects().length > 0", "and shows it again");
+  });
+
+  await test("Writing sprint: Tools > Writing Sprint starts a timer on the toolbar, counts the words written, and congratulates at the end", async () => {
+    await openFixture("page-boundaries");
+    await app.evaluate("(__cirth.menu('sprint'), true)");
+    await waitFor(app, "document.getElementById('sprint-dialog')?.open && !!document.getElementById('sprint-start')", "the sprint dialog asks for a length and goal");
+    await app.evaluate("(() => { document.getElementById('sprint-minutes').value = '5'; document.getElementById('sprint-goal').value = '3'; document.getElementById('sprint-start').click(); return true; })()");
+    await waitFor(app, "!document.getElementById('sprint-chip').hidden && /4:5\\d|5:00/.test(document.getElementById('sprint-chip').textContent) && !document.getElementById('sprint-dialog').open", "the timer runs on the toolbar");
+    await caretAtEndOf(1);
+    await typeText(" one two three four");
+    await waitSynced();
+    await waitFor(app, "__cirth.sprint.state?.written === 4 && /4\\/3/.test(document.getElementById('sprint-chip').textContent) && document.getElementById('sprint-chip').classList.contains('goal-met')", "words written count and the goal is met");
+    // Finish from the chip: the congratulation shows the words and pace.
+    await app.evaluate("(document.getElementById('sprint-chip').click(), true)");
+    await waitFor(app, "document.getElementById('sprint-dialog').open && !!document.getElementById('sprint-finish')", "the chip offers pause, finish, cancel");
+    await app.evaluate("(document.getElementById('sprint-finish').click(), true)");
+    await waitFor(app, "document.getElementById('sprint-result') && /4 words in 5 minutes/.test(document.getElementById('sprint-dialog').textContent) && document.getElementById('sprint-chip').hidden", "the sprint ends with its result");
+    await app.evaluate("(document.getElementById('sprint-done').click(), true)");
+    await waitFor(app, "!document.getElementById('sprint-dialog').open", "back to writing");
+  });
+
   await test("Themes: Day, Night, Midnight, OLED and Match System from View > Appearance > Theme; every one meets contrast minimums, with high contrast too; stored per user", async () => {
     await openFixture("unicode-marks");
     const ratios = `(() => {
@@ -2323,7 +2378,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     for (const p of ["board", "toolbar", "status"]) await app.evaluate(`__cirth.menu('view_${p}')`);
     await waitFor(app, "['#board', '.toolbar', 'footer', '#navigator'].every(s => document.querySelector(s).getClientRects().length > 0)", "all panels back");
     const saved = JSON.parse(readFileSync(join(dataDir, "preferences.json"), "utf8"));
-    assert(JSON.stringify(saved.panels) === JSON.stringify({ nav: true, board: true, toolbar: true, status: true, notes: false }), `stored ${JSON.stringify(saved.panels)}`);
+    assert(JSON.stringify(saved.panels) === JSON.stringify({ nav: true, board: true, toolbar: true, status: true, notes: false, runtime: true }), `stored ${JSON.stringify(saved.panels)}`);
 
     // Focus mode: Ctrl/Cmd+Shift+F, only the script, full screen; Escape leaves.
     await caretAtEndOf(1);
@@ -2718,6 +2773,9 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert((await app.evaluate("document.getElementById('tp-title').value")) === "", "empty at first");
     await audit("title page dialog");
     const fill = { title: "THE TIDE LEDGER", credit: "Written by", authors: "Jared Hoy", draft_label: "Second Draft", draft_date: "27 October 2026", wga: "1234567", contact: "jared@example.invalid\n555 0100" };
+    // The preview beside the fields follows the typing, laid out by the core like the PDF.
+    await app.evaluate("(() => { const t = document.getElementById('tp-title'); t.value = 'THE TIDE LEDGER'; t.dispatchEvent(new Event('input')); return true; })()");
+    await waitFor(app, "[...document.querySelectorAll('#title-dialog .page-preview .pp-title')].some(s => s.textContent === 'THE TIDE LEDGER')", "the title page preview shows the title");
     await app.evaluate(`(() => { const f = ${JSON.stringify(fill)}; for (const k in f) document.getElementById('tp-' + k).value = f[k]; document.getElementById('tp-save').click(); return true; })()`);
     await waitFor(app, "!document.getElementById('title-dialog').open", "saved and closed");
     await waitAnnounced("Title page saved", "save announced");
@@ -3098,7 +3156,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.getElementById('notes').getClientRects().length > 0 && document.activeElement?.id === 'notes-text'", "Tools > Thoughts shows the panel and focuses it");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'view_notes').checked)", "Notes checked in View > Tools");
     const text = "Call Sam about the lighthouse.\nZoë's line → cut? 🌊";
-    await app.evaluate(`(() => { const t = document.getElementById('notes-text'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input')); return true; })()`);
+    await app.evaluate(`(__cirth.notes.set(${JSON.stringify(text)}), true)`);
     await waitFor(app, "document.querySelector('.notes-state').textContent === 'Kept'", "written to the working store after a pause");
     assert(JSON.stringify(await blocks()) === before, "the script is unchanged");
     // Moved with the arrow keys on its title bar; it stays inside the script area.
@@ -3110,19 +3168,28 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);
     await openFixture("page-boundaries", false);
-    await waitFor(app, `document.getElementById('notes-text').value === ${JSON.stringify(text)}`, "notes kept through Home and reopening");
+    await waitFor(app, `__cirth.notes.value === ${JSON.stringify(text)}`, "notes kept through Home and reopening");
+    // Thoughts formatting, typed: "- " starts a bullet, Ctrl/Cmd+B bolds; kept as light markup.
+    await app.evaluate("(__cirth.notes.set(''), document.getElementById('notes-text').focus(), true)");
+    await typeText("- idea ");
+    await press("b", [MOD_KEY]);
+    await typeText("bold");
+    await waitFor(app, "__cirth.notes.value === '- idea **bold**' && document.querySelector('#notes-text p.bullet strong')?.textContent === 'bold'", "bullet and bold typed in Thoughts");
+    await waitFor(app, "document.querySelector('.notes-state').textContent === 'Kept'", "formatted thoughts kept");
+    await app.evaluate(`(__cirth.notes.set(${JSON.stringify(text)}), true)`);
+    await waitFor(app, "document.querySelector('.notes-state').textContent === 'Kept'", "thoughts back to the plain text");
     // A hard kill right after typing keeps the text too (it is in the working store at once).
-    await app.evaluate(`(() => { const t = document.getElementById('notes-text'); t.value += '\\nafter save'; t.dispatchEvent(new Event('input')); return true; })()`);
+    await app.evaluate(`(__cirth.notes.set(${JSON.stringify(text + "\nafter save")}), true)`);
     await waitFor(app, "document.querySelector('.notes-state').textContent === 'Kept'", "second note kept");
     await app.kill();
     await sleep(1500);
     app = await driver.launch("after-notes-kill");
     await waitHome(app);
     await openFixture("page-boundaries", false);
-    await waitFor(app, `document.getElementById('notes-text').value === ${JSON.stringify(text + "\nafter save")}`, "notes survive a hard kill");
+    await waitFor(app, `__cirth.notes.value === ${JSON.stringify(text + "\nafter save")}`, "notes survive a hard kill");
     // Another project has its own (empty) notes; hiding the panel keeps the text.
     await openFixture("unicode-marks");
-    assert((await app.evaluate("document.getElementById('notes-text').value")) === "", "notes belong to their project");
+    assert((await app.evaluate("__cirth.notes.value")) === "", "notes belong to their project");
     await app.evaluate("__cirth.menu('view_notes')");
     await waitFor(app, "!document.getElementById('notes').getClientRects().length", "Tools > Thoughts hides it again");
   });
@@ -3159,6 +3226,12 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "__cirth.panels.rendered.notes !== undefined", "the notes window drew");
     await app.evaluate("__cirth.panelCommand({ panel: 'notes', cmd: 'notes', text: 'From the notes window' })");
     await waitFor(app, "__cirth.notes.value === 'From the notes window' && document.querySelector('.notes-state').textContent === 'Kept'", "notes from their window are kept");
+    // StoryScry in its own window: it draws its reports there; Close puts it back.
+    assert(await app.evaluate("!!document.getElementById('storyscry-popout')"), "StoryScry has a Pop Out button");
+    await app.evaluate("(__cirth.menu('popout_storyscry'), true)");
+    await waitFor(app, "__cirth.panels.rendered.storyscry?.first === 'StoryScry' && __cirth.panels.isPopped('storyscry')", "StoryScry drew in its own window");
+    await app.evaluate("__cirth.panelCommand({ panel: 'storyscry', cmd: 'dock' })");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => !l.includes('panel-storyscry')) && !__cirth.panels.isPopped('storyscry')", "closing StoryScry's window puts it back");
     // Dock from the window's Dock button; going Home closes the rest.
     await app.evaluate("__cirth.panelCommand({ panel: 'nav', cmd: 'dock' })");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => !l.includes('panel-nav'))", "Dock closes the scene list window");
@@ -3206,6 +3279,8 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.menu('page_furniture')");
     await waitFor(app, "document.getElementById('furniture-dialog')?.open === true", "headers and footers dialog");
     await audit("headers and footers dialog");
+    await app.evaluate("(() => { const h = document.getElementById('pf-header'); h.value = '{title} - {draft}'; h.dispatchEvent(new Event('input')); const f = document.getElementById('pf-footer'); f.value = 'Confidential'; f.dispatchEvent(new Event('input')); return true; })()");
+    await waitFor(app, "document.querySelector('#furniture-dialog .pp-header')?.textContent === 'PAGE BOUNDARIES - Blue Revision' && document.querySelector('#furniture-dialog .pp-footer')?.textContent === 'Confidential' && document.querySelector('#furniture-dialog .pp-number')?.textContent === '2.'", "the header and footer preview fills in the tokens");
     await app.evaluate("(() => { document.getElementById('pf-header').value = '{title} - {draft}'; document.getElementById('pf-footer').value = 'Confidential'; document.getElementById('pf-save').click(); return true; })()");
     await waitFor(app, "!document.getElementById('furniture-dialog').open", "saved");
     // Text export shows exactly what the PDF prints around the pages.

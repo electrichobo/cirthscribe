@@ -9,6 +9,7 @@ import { announce } from "./a11y";
 import type { Beat } from "./schema";
 import type { SceneInfo } from "./scenes";
 import type { NavInfo } from "./views";
+import type { ExportableReport, ReportFormat, ReportScope } from "./storyscry";
 
 /** NavInfo as JSON (maps as entry lists). */
 export interface NavWire {
@@ -21,8 +22,8 @@ export interface NavWire {
   project: boolean;
 }
 
-export type PopPanel = "nav" | "board" | "notes";
-export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Notecard view", notes: "Thoughts" };
+export type PopPanel = "nav" | "board" | "notes" | "storyscry";
+export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Notecard view", notes: "Thoughts", storyscry: "StoryScry" };
 
 /** What a panel window draws. */
 export interface PanelState {
@@ -36,6 +37,8 @@ export interface PanelState {
   nav?: NavWire;
   /** Sent once, when the window opens (it then owns the typing). */
   notes?: string;
+  /** StoryScry window: versions, so an open report can tell it is out of date. */
+  versions?: { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
 }
 
 export type PanelCommand =
@@ -49,6 +52,7 @@ export type PanelCommand =
   | { panel: PopPanel; cmd: "deleteItem"; id: string }
   | { panel: PopPanel; cmd: "scope"; project: boolean }
   | { panel: PopPanel; cmd: "openElsewhere"; documentId: string; sceneId: string }
+  | { panel: PopPanel; cmd: "exportReport"; scope: ReportScope; report: ExportableReport; format: ReportFormat }
   | { panel: PopPanel; cmd: "undo" | "redo" | "dock" }
   | { panel: PopPanel; cmd: "rendered"; items: number; first: string };
 
@@ -76,6 +80,8 @@ export function createPanelHost(hooks: {
   setScope: (project: boolean) => void;
   openElsewhere: (documentId: string, sceneId: string) => void;
   undo: (redo: boolean, panel: PopPanel) => void;
+  versions: () => { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
+  exportReport: (scope: ReportScope, report: ExportableReport, format: ReportFormat) => void;
   /** The main window's layout changed (a panel left or came back). */
   changed: () => void;
 }) {
@@ -91,7 +97,8 @@ export function createPanelHost(hooks: {
       numbers: [...hooks.numbers()].map(([id, n]) => [id, { number: n.number, omitted: n.omitted }]),
       beats: hooks.beats(),
       structural: hooks.structural(),
-      ...(panel !== "notes" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
+      ...(panel === "nav" || panel === "board" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
+      ...(panel === "storyscry" ? { versions: hooks.versions() } : {}),
       ...(withNotes ? { notes: hooks.notesText() } : {}),
     };
   }
@@ -172,6 +179,9 @@ export function createPanelHost(hooks: {
       case "undo":
       case "redo":
         hooks.undo(c.cmd === "redo", c.panel);
+        break;
+      case "exportReport":
+        hooks.exportReport(c.scope, c.report, c.format);
         break;
       case "dock":
         void dock(c.panel);

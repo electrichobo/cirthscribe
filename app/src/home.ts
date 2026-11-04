@@ -5,6 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { announce } from "./a11y";
 
 export interface ProjectEntry {
   name: string;
@@ -23,6 +24,11 @@ export interface ProjectEntry {
   older_format: boolean;
   open: boolean;
   error: string | null;
+  created_ms: number;
+  /** The name on the card, if the writer gave the project one (not the script's title). */
+  home_title: string | null;
+  /** The card's picture (a data URL), if chosen. */
+  cover: string | null;
 }
 
 interface BackupItem {
@@ -38,6 +44,8 @@ interface Actions {
   openPath(path: string): Promise<boolean>;
   restoreBackup(path: string): Promise<boolean>;
   openSample(name: string): Promise<boolean>;
+  /** Open the project and its Export dialog. */
+  exportProject(path: string): Promise<boolean>;
   /** File > Import…: a Fountain, Final Draft or plain-text script becomes a new project. */
   importScript(): Promise<boolean>;
   openFreeWriting(): void;
@@ -126,7 +134,145 @@ export function createHome(root: HTMLElement, actions: Actions) {
   const aboutBtn = el("button", { type: "button", id: "open-about", className: "link" }, "About Kolbítar and licences");
   aboutBtn.addEventListener("click", () => actions.openAbout());
   const side = el("aside", { className: "home-side", ariaLabel: "New and open" }, form, el("h2", {}, "Open"), openBtn, importBtn, freeBtn, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
-  const main = el("section", { className: "home-main", ariaLabel: "Projects" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
+  // Sorting, remembered per user (a convenience).
+  const SORT_KEY = "cirth.homeSort";
+  const sort = el("select", { id: "home-sort", className: "home-sort" });
+  sort.setAttribute("aria-label", "Sort projects");
+  for (const [v, label] of [
+    ["modified-desc", "Last modified, newest first"],
+    ["modified-asc", "Last modified, oldest first"],
+    ["created-desc", "Created, newest first"],
+    ["created-asc", "Created, oldest first"],
+    ["name-asc", "Name, A to Z"],
+    ["name-desc", "Name, Z to A"],
+  ])
+    sort.append(new Option(label, v));
+  try {
+    sort.value = localStorage.getItem(SORT_KEY) ?? "modified-desc";
+  } catch {
+    sort.value = "modified-desc";
+  }
+  if (!sort.value) sort.value = "modified-desc";
+  sort.addEventListener("change", () => {
+    try {
+      localStorage.setItem(SORT_KEY, sort.value);
+    } catch {
+      // this session only
+    }
+    void refresh();
+  });
+  const shownTitle = (p: ProjectEntry) => p.home_title || p.title || p.name;
+  function sorted(list: ProjectEntry[]): ProjectEntry[] {
+    const [by, dir] = sort.value.split("-");
+    const sign = dir === "asc" ? 1 : -1;
+    const key = (p: ProjectEntry): number | string => (by === "name" ? shownTitle(p).toLocaleLowerCase() : by === "created" ? p.created_ms : p.modified_ms);
+    return [...list].sort((a, b) => {
+      const ka = key(a), kb = key(b);
+      return (ka < kb ? -1 : ka > kb ? 1 : 0) * sign;
+    });
+  }
+
+  // A project's menu: right-click its card, the context-menu key, or its ⋯ button.
+  const menu = el("ul", { id: "project-menu", className: "project-menu" });
+  menu.setAttribute("role", "menu");
+  menu.hidden = true;
+  function closeMenu(focusBack?: HTMLElement) {
+    menu.hidden = true;
+    focusBack?.focus();
+  }
+  function openMenu(p: ProjectEntry, at: { x: number; y: number }, from: HTMLElement) {
+    const items: [string, string, () => void | Promise<unknown>][] = [];
+    if (!p.missing && !p.error) items.push(["open", "Open", () => guard(() => actions.openPath(p.path))]);
+    items.push(["rename", "Rename…", () => rename(p)]);
+    items.push(["cover", "Change Picture…", () => chooseCover(p)]);
+    if (p.cover) items.push(["cover-remove", "Remove Picture", () => setCover(p, null)]);
+    if (!p.missing && !p.error) items.push(["export", "Export…", () => guard(() => actions.exportProject(p.path))]);
+    if (p.backups && !p.missing) items.push(["backups", `Backups (${p.backups})…`, () => showBackups(p)]);
+    if (p.location === "elsewhere") items.push(["forget", "Remove from List", async () => (await invoke("forget_recent", { path: p.path }), refresh())]);
+    menu.replaceChildren(
+      ...items.map(([id, label, run]) => {
+        const li = el("li", { tabIndex: -1, className: "project-menu-item" }, label);
+        li.setAttribute("role", "menuitem");
+        li.dataset.menu = id;
+        if (id === "backups") li.dataset.backups = p.name;
+        li.addEventListener("click", () => {
+          closeMenu();
+          void run();
+        });
+        return li;
+      }),
+    );
+    menu.hidden = false;
+    const host = root.getBoundingClientRect();
+    menu.style.left = `${Math.min(at.x - host.left, host.width - 220)}px`;
+    menu.style.top = `${at.y - host.top}px`;
+    (menu.firstElementChild as HTMLElement | null)?.focus();
+    menu.onkeydown = (e) => {
+      const lis = [...menu.querySelectorAll<HTMLElement>("li")];
+      const i = lis.indexOf(document.activeElement as HTMLElement);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        lis[(i + (e.key === "ArrowDown" ? 1 : lis.length - 1)) % lis.length]?.focus();
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        (document.activeElement as HTMLElement).click();
+      } else if (e.key === "Escape" || e.key === "Tab") {
+        e.preventDefault();
+        closeMenu(from);
+      }
+    };
+  }
+  document.addEventListener("mousedown", (e) => {
+    if (!menu.hidden && !menu.contains(e.target as Node)) closeMenu();
+  });
+
+  // Rename: a small dialog with the name field (empty goes back to the script's title).
+  const renameDialog = el("dialog", { className: "about form-dialog", id: "rename-dialog" });
+  renameDialog.setAttribute("aria-label", "Rename project");
+  async function rename(p: ProjectEntry) {
+    const input = el("input", { type: "text", id: "rename-input", value: p.home_title ?? "", placeholder: p.title || p.name });
+    input.setAttribute("aria-label", "Project name on Home");
+    const save = el("button", { type: "submit", id: "rename-save", className: "primary" }, "Rename");
+    const cancel = el("button", { type: "button", id: "rename-cancel" }, "Cancel");
+    const form = el(
+      "form",
+      { method: "dialog" },
+      el("h2", { id: "rename-title" }, "Rename project"),
+      el("p", { className: "form-note" }, `The name on its card. It need not be the script's title ("${p.title || p.name}"); leave it empty to use that again.`),
+      input,
+      el("div", { className: "dialog-actions" }, cancel, save),
+    );
+    cancel.addEventListener("click", () => renameDialog.close());
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await invoke("set_home_title", { path: p.path, title: input.value.trim() || null });
+        renameDialog.close();
+        await refresh();
+        announce(`Renamed to ${input.value.trim() || p.title}`);
+      } catch (err) {
+        message(`Could not rename: ${err}`);
+      }
+    });
+    renameDialog.replaceChildren(form);
+    renameDialog.showModal();
+    input.select();
+  }
+  async function setCover(p: ProjectEntry, source: string | null) {
+    try {
+      await invoke("set_home_cover", { path: p.path, source });
+      await refresh();
+      announce(source ? "Picture changed" : "Picture removed");
+    } catch (e) {
+      message(`Could not change the picture: ${e}`);
+    }
+  }
+  async function chooseCover(p: ProjectEntry) {
+    const path = await openDialog({ multiple: false, directory: false, filters: [{ name: "Picture", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
+    if (typeof path === "string") await setCover(p, path);
+  }
+
+  const main = el("section", { className: "home-main", ariaLabel: "Projects" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count, sort), msg, grid, menu, renameDialog);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, el("span", { className: "wordmark" }, "Kolbítar")), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 
   // Backups dialog: lists one project's backups; each can be restored as a copy.
@@ -172,7 +318,7 @@ export function createHome(root: HTMLElement, actions: Actions) {
   }
 
   function card(p: ProjectEntry): HTMLElement {
-    const title = p.title || p.name;
+    const title = shownTitle(p);
     const initials = title.replace(/\(.*?\)/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
     const badges = el("div", { className: "badges" });
     if (p.sample) badges.append(el("span", { className: "tag" }, "Sample"));
@@ -185,11 +331,12 @@ export function createHome(root: HTMLElement, actions: Actions) {
     const b = el(
       "button",
       { type: "button", className: "project", title: p.error ?? `Open ${title}` },
-      el("div", { className: "thumb", ariaHidden: "true" }, el("span", {}, initials || "?")),
+      p.cover ? el("div", { className: "thumb has-cover", ariaHidden: "true", style: `background-image: url("${p.cover}")` }) : el("div", { className: "thumb", ariaHidden: "true" }, el("span", {}, initials || "?")),
       el(
         "div",
         { className: "meta" },
         el("strong", {}, title),
+        ...(p.home_title && p.title && p.home_title !== p.title ? [el("span", { className: "script-title" }, `Script: ${p.title}`)] : []),
         el("span", { className: "file", title: p.path }, p.location === "library" ? `${p.name}.cirth` : p.path),
         el("span", {}, p.error ? p.error : `${plural(p.scenes, "scene")} · ${plural(p.blocks, "block")}`),
         el("span", {}, `Modified ${when(p.modified_ms)}${p.backups ? ` · ${plural(p.backups, "backup")}` : ""}`),
@@ -202,13 +349,26 @@ export function createHome(root: HTMLElement, actions: Actions) {
     if (p.sample && p.location === "library") b.dataset.sample = p.name;
     b.disabled = !!p.error || p.missing;
     b.addEventListener("click", () => void guard(() => actions.openPath(p.path)));
-    const item = el("div", { role: "listitem", className: "project-item" }, b);
-    if (p.backups && !p.missing) {
-      const bk = el("button", { type: "button", className: "forget" }, `Backups (${p.backups})…`);
-      bk.dataset.backups = p.name;
-      bk.addEventListener("click", () => void showBackups(p));
-      item.append(bk);
-    }
+    const more = el("button", { type: "button", className: "project-more", title: "Rename, picture, export, backups" }, "⋯");
+    more.setAttribute("aria-label", `More for ${title}`);
+    more.setAttribute("aria-haspopup", "menu");
+    more.dataset.more = p.name;
+    more.addEventListener("click", () => {
+      const r = more.getBoundingClientRect();
+      openMenu(p, { x: r.left, y: r.bottom + 4 }, more);
+    });
+    b.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openMenu(p, { x: e.clientX, y: e.clientY }, b);
+    });
+    b.addEventListener("keydown", (e) => {
+      if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+        e.preventDefault();
+        const r = b.getBoundingClientRect();
+        openMenu(p, { x: r.left + 12, y: r.top + 24 }, b);
+      }
+    });
+    const item = el("div", { role: "listitem", className: "project-item" }, b, more);
     if (p.missing) {
       // A remembered file that is gone: offer to drop it from the list.
       const forget = el("button", { type: "button", className: "forget" }, "Remove from list");
@@ -231,7 +391,7 @@ export function createHome(root: HTMLElement, actions: Actions) {
       message(`Could not read the project library: ${e}`);
     }
     count.textContent = list.length ? plural(list.length, "project") : "";
-    const items = [...list.map(card), ...SAMPLES.filter((smp) => !list.some((p) => p.location === "library" && p.name === smp.name)).map(sampleCard)];
+    const items = [...sorted(list).map(card), ...SAMPLES.filter((smp) => !list.some((p) => p.location === "library" && p.name === smp.name)).map(sampleCard)];
     grid.replaceChildren(...(items.length ? items : [el("p", { className: "home-empty" }, "No projects yet. Create one to start.")]));
     titleInput.focus();
     root.dataset.loaded = "1";

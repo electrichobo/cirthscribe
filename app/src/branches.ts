@@ -4,6 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { announce } from "./a11y";
+import { confirmDialog } from "./confirm";
 import type { SnapshotSummary } from "./snapshots";
 
 export interface BranchSummary {
@@ -34,19 +35,31 @@ export function createBranchesDialog(hooks: {
 
   const h = document.createElement("h2");
   h.id = "branches-title";
-  h.textContent = "Branches and Narrative History";
+  h.textContent = "Branches";
 
   const note = document.createElement("p");
   note.className = "form-note";
   note.textContent =
-    "Branches let you explore alternative storylines, character arcs, and drafts in full isolation. Each branch has its own independent script, bible facts, and planning state.";
+    "A branch is a separate copy of your script for trying something different: another ending, a director's cut, a big rewrite. Writing in a branch never touches your main script. Like what you wrote? Bring it back. If not, delete the branch.";
+  // Three plain steps, so the window explains itself.
+  const steps = document.createElement("ol");
+  steps.className = "branch-steps";
+  for (const t of [
+    "Name a new branch and choose Start Branch.",
+    "Write in it as usual. The status bar shows which branch you are in.",
+    "Switch back any time, bring its changes into another branch, or delete it.",
+  ]) {
+    const li = document.createElement("li");
+    li.textContent = t;
+    steps.append(li);
+  }
 
-  header.append(h, note);
+  header.append(h, note, steps);
 
   // Branch creation form
   const createWrap = document.createElement("form");
   createWrap.className = "branch-create-row";
-  createWrap.setAttribute("aria-label", "Fork new branch");
+  createWrap.setAttribute("aria-label", "Start a new branch");
   createWrap.onsubmit = (e) => {
     e.preventDefault();
     void doCreate();
@@ -56,7 +69,7 @@ export function createBranchesDialog(hooks: {
   nameInput.type = "text";
   nameInput.id = "branch-name-input";
   nameInput.className = "snap-input branch-name-input";
-  nameInput.placeholder = "Branch name (e.g. director-cut, happy-ending)…";
+  nameInput.placeholder = "Name, e.g. Happy Ending";
   nameInput.setAttribute("aria-label", "Branch name");
   nameInput.required = true;
 
@@ -64,7 +77,7 @@ export function createBranchesDialog(hooks: {
   descInput.type = "text";
   descInput.id = "branch-desc-input";
   descInput.className = "snap-input branch-desc-input";
-  descInput.placeholder = "Description or narrative premise (optional)…";
+  descInput.placeholder = "What you want to try (optional)";
   descInput.setAttribute("aria-label", "Branch description");
 
   const fromSelect = document.createElement("select");
@@ -76,7 +89,7 @@ export function createBranchesDialog(hooks: {
   createBtn.type = "submit";
   createBtn.id = "branch-create-btn";
   createBtn.className = "btn btn-primary";
-  createBtn.textContent = "+ Fork Branch";
+  createBtn.textContent = "Start Branch";
   createBtn.setAttribute("aria-label", "Fork branch");
 
   createWrap.append(nameInput, descInput, fromSelect, createBtn);
@@ -115,7 +128,7 @@ export function createBranchesDialog(hooks: {
     fromSelect.innerHTML = "";
     const currOpt = document.createElement("option");
     currOpt.value = "";
-    currOpt.textContent = "Fork from current state";
+    currOpt.textContent = "Start from the script as it is now";
     fromSelect.appendChild(currOpt);
 
     try {
@@ -123,7 +136,7 @@ export function createBranchesDialog(hooks: {
       for (const s of snaps) {
         const opt = document.createElement("option");
         opt.value = s.id;
-        opt.textContent = `Snapshot: ${s.label} (${s.scene_count} scenes)`;
+        opt.textContent = `Start from snapshot "${s.label}" (${s.scene_count} scenes)`;
         fromSelect.appendChild(opt);
       }
     } catch {
@@ -143,7 +156,7 @@ export function createBranchesDialog(hooks: {
     if (!branchesCache.length) {
       const empty = document.createElement("p");
       empty.className = "form-note";
-      empty.textContent = "No branches in this project.";
+      empty.textContent = "No branches yet: your main script is the only one.";
       list.appendChild(empty);
       return;
     }
@@ -166,11 +179,11 @@ export function createBranchesDialog(hooks: {
 
       const title = document.createElement("strong");
       title.className = "branch-name";
-      title.textContent = `⑂ ${branch.name}`;
+      title.textContent = branch.name;
 
       const badge = document.createElement("span");
       badge.className = `branch-badge ${branch.is_active ? "badge-active" : "badge-inactive"}`;
-      badge.textContent = branch.is_active ? "✓ Active Branch" : "Branch";
+      badge.textContent = branch.is_active ? "You are here" : "Branch";
 
       titleRow.append(title, badge);
 
@@ -182,10 +195,10 @@ export function createBranchesDialog(hooks: {
         ? branchesCache.find((b) => b.id === branch.parent_branch_id)?.name || "parent"
         : null;
       const forkInfo = parentName
-        ? `Forked from ${parentName} at v${branch.fork_version}`
-        : "Root production canon";
+        ? `Started from ${parentName}`
+        : "Your main script";
 
-      meta.textContent = `${forkInfo} · Head v${branch.head_version} · ${branch.scene_count} scene${branch.scene_count === 1 ? "" : "s"} · ${branch.word_count.toLocaleString()} words · ${dateStr}`;
+      meta.textContent = `${forkInfo} · ${branch.scene_count} scene${branch.scene_count === 1 ? "" : "s"} · ${branch.word_count.toLocaleString()} words${dateStr ? ` · started ${dateStr.slice(0, 16)}` : ""}`;
 
       main.append(titleRow, meta);
 
@@ -203,19 +216,19 @@ export function createBranchesDialog(hooks: {
         const switchBtn = document.createElement("button");
         switchBtn.type = "button";
         switchBtn.className = "btn btn-switch";
-        switchBtn.textContent = "Switch to Branch";
+        switchBtn.textContent = "Switch to This Branch";
         switchBtn.setAttribute("aria-label", `Switch to branch ${branch.name}`);
         switchBtn.onclick = async () => {
-          status.textContent = `Switching to branch "${branch.name}"…`;
+          status.textContent = `Switching to "${branch.name}"…`;
           try {
             const opened = await invoke<any>("branches_switch", { id: branch.id });
             announce(`Switched to branch "${branch.name}".`);
-            status.textContent = `Active branch is now "${branch.name}".`;
+            status.textContent = `You are now writing in "${branch.name}".`;
             if (hooks.onBranchChanged) hooks.onBranchChanged(branch.name);
             await hooks.onSwitched(opened);
             await loadList();
           } catch (e) {
-            status.textContent = `Switch failed: ${e}`;
+            status.textContent = `Could not switch: ${e}`;
           }
         };
         actions.append(switchBtn);
@@ -223,7 +236,7 @@ export function createBranchesDialog(hooks: {
         const mergeBtn = document.createElement("button");
         mergeBtn.type = "button";
         mergeBtn.className = "btn btn-merge";
-        mergeBtn.textContent = "Merge into Current…";
+        mergeBtn.textContent = `Bring Changes Into "${branchesCache.find((b) => b.is_active)?.name ?? "this branch"}"…`;
         mergeBtn.setAttribute("aria-label", `Merge branch ${branch.name} into current branch`);
         mergeBtn.onclick = () => {
           dialog.close();
@@ -240,13 +253,19 @@ export function createBranchesDialog(hooks: {
           deleteBtn.textContent = "Delete";
           deleteBtn.setAttribute("aria-label", `Delete branch ${branch.name}`);
           deleteBtn.onclick = async () => {
+            const ok = await confirmDialog(
+              `Delete the branch "${branch.name}"?`,
+              "Its script and everything written in it are removed. Your other branches are not changed. This cannot be undone.",
+              "Delete Branch",
+            );
+            if (!ok) return;
             try {
               await invoke("branches_delete", { id: branch.id });
               announce(`Branch "${branch.name}" deleted.`);
               status.textContent = `Branch "${branch.name}" deleted.`;
               await loadList();
             } catch (e) {
-              status.textContent = `Delete failed: ${e}`;
+              status.textContent = `Could not delete: ${e}`;
             }
           };
           actions.append(deleteBtn);
@@ -254,7 +273,7 @@ export function createBranchesDialog(hooks: {
       } else {
         const activeLabel = document.createElement("span");
         activeLabel.className = "branch-current-label";
-        activeLabel.textContent = "Current Branch";
+        activeLabel.textContent = "You are writing here";
         actions.append(activeLabel);
       }
 
@@ -269,20 +288,20 @@ export function createBranchesDialog(hooks: {
     const desc = descInput.value.trim();
     const snapId = fromSelect.value || null;
 
-    status.textContent = `Forking branch "${name}"…`;
+    status.textContent = `Starting "${name}"…`;
     try {
       const created = await invoke<BranchSummary>("branches_create", {
         name,
         description: desc,
         fromSnapshotId: snapId,
       });
-      announce(`Branch "${created.name}" created.`);
-      status.textContent = `Branch "${created.name}" created.`;
+      announce(`Branch "${created.name}" started.`);
+      status.textContent = `Branch "${created.name}" started. Switch to it to write there.`;
       nameInput.value = "";
       descInput.value = "";
       await loadList();
     } catch (e) {
-      status.textContent = `Failed to create branch: ${e}`;
+      status.textContent = `Could not start the branch: ${e}`;
     }
   }
 

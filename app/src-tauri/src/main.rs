@@ -2229,6 +2229,12 @@ struct ProjectEntry {
     /// A remembered file that no longer exists at its path.
     missing: bool,
     error: Option<String>,
+    /// When the file was created (falls back to modified where the system does not say).
+    created_ms: u64,
+    /// The name shown on Home, if the writer gave the project one (it need not be the script's title).
+    home_title: Option<String>,
+    /// The card's picture as a data URL, if the writer chose one.
+    cover: Option<String>,
 }
 
 fn entry_for(app: &App, path: &Path, location: &'static str, current: Option<&Path>) -> ProjectEntry {
@@ -2251,11 +2257,21 @@ fn entry_for(app: &App, path: &Path, location: &'static str, current: Option<&Pa
         open,
         missing: !path.exists(),
         error: None,
+        created_ms: 0,
+        home_title: None,
+        cover: None,
     };
+    if let Some(m) = load_home_meta(app).remove(&normalize(path).display().to_string()) {
+        e.home_title = m.title;
+        e.cover = m.cover.and_then(|f| cover_data_url(&data_dir(app).join("covers").join(f)));
+    }
     if e.missing {
         return e;
     }
-    e.modified_ms = std::fs::metadata(path).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+    let ms = |t: std::io::Result<std::time::SystemTime>| t.ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64);
+    let meta = std::fs::metadata(path);
+    e.modified_ms = meta.as_ref().ok().and_then(|m| ms(m.modified())).unwrap_or(0);
+    e.created_ms = meta.as_ref().ok().and_then(|m| ms(m.created())).unwrap_or(e.modified_ms);
     match Store::inspect(path) {
         Ok(info) => {
             e.title = info.title;
@@ -2278,6 +2294,99 @@ fn entry_for(app: &App, path: &Path, location: &'static str, current: Option<&Pa
         Err(err) => e.error = Some(err.to_string()),
     }
     e
+}
+
+// Home's own details for a project (owner, 2026-11-03): a name and a picture
+// shown on its card. Kept in the app's data folder (home.json, covers/), not
+// in the project file, so Home never writes to a project that is not open.
+#[derive(Serialize, Deserialize, Default, Clone)]
+struct HomeMeta {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
+    /// File name in `covers/`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cover: Option<String>,
+}
+
+fn load_home_meta(app: &App) -> std::collections::BTreeMap<String, HomeMeta> {
+    std::fs::read(data_dir(app).join("home.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
+fn save_home_meta(app: &App, meta: &std::collections::BTreeMap<String, HomeMeta>) -> Result<(), String> {
+    let bytes = serde_json::to_vec_pretty(meta).map_err(|e| e.to_string())?;
+    let (tmp, target) = (data_dir(app).join("home.json.tmp"), data_dir(app).join("home.json"));
+    std::fs::write(&tmp, bytes).map_err(io_err)?;
+    cirth_core::fsutil::replace_file(&tmp, &target).map_err(io_err)
+}
+
+/// A picture as a data URL (PNG, JPEG, GIF or WebP; the page may show only data: images).
+fn cover_data_url(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let mime = match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => return None,
+    };
+    Some(format!("data:{mime};base64,{}", base64(&bytes)))
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for c in bytes.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            out.push(if i <= c.len() { T[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+        }
+    }
+    out
+}
+
+/// Home > a project's menu > Rename…: the name on its card (`None` or empty: the script's title again).
+#[tauri::command]
+async fn set_home_title(app: State<'_, App>, path: String, title: Option<String>) -> Result<(), String> {
+    let mut meta = load_home_meta(&app);
+    let key = normalize(Path::new(&path)).display().to_string();
+    let entry = meta.entry(key.clone()).or_default();
+    entry.title = title.map(|t| t.trim().chars().take(120).collect::<String>()).filter(|t| !t.is_empty());
+    if entry.title.is_none() && entry.cover.is_none() {
+        meta.remove(&key);
+    }
+    save_home_meta(&app, &meta)
+}
+
+/// Home > a project's menu > Change Picture…: copy the chosen image into
+/// covers/ (2 MB at most); `None` removes the picture.
+#[tauri::command]
+async fn set_home_cover(app: State<'_, App>, path: String, source: Option<String>) -> Result<(), String> {
+    let covers = data_dir(&app).join("covers");
+    let mut meta = load_home_meta(&app);
+    let key = normalize(Path::new(&path)).display().to_string();
+    let entry = meta.entry(key.clone()).or_default();
+    if let Some(old) = entry.cover.take() {
+        let _ = std::fs::remove_file(covers.join(old));
+    }
+    if let Some(src) = source {
+        let src = PathBuf::from(src);
+        let ext = src.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).unwrap_or_default();
+        if !["png", "jpg", "jpeg", "gif", "webp"].contains(&ext.as_str()) {
+            return Err("choose a PNG, JPEG, GIF or WebP picture".into());
+        }
+        if std::fs::metadata(&src).map_err(io_err)?.len() > 2 * 1024 * 1024 {
+            return Err("that picture is larger than 2 MB; choose a smaller one".into());
+        }
+        std::fs::create_dir_all(&covers).map_err(io_err)?;
+        let hash = key.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100_0000_01b3));
+        let name = format!("{hash:016x}.{ext}");
+        std::fs::copy(&src, covers.join(&name)).map_err(io_err)?;
+        entry.cover = Some(name);
+    }
+    if entry.title.is_none() && entry.cover.is_none() {
+        meta.remove(&key);
+    }
+    save_home_meta(&app, &meta)
 }
 
 /// Library projects plus recently opened files elsewhere, newest first.
@@ -2827,6 +2936,68 @@ async fn set_title_page(app: State<'_, App>, page: cirth_core::title::TitlePage)
     })
 }
 
+/// A preview of where text prints on a page (title page, or a page with its
+/// header, page number and footer), placed by the core like the PDF is. The
+/// dialogs draw these lines to scale beside their fields.
+#[derive(Serialize)]
+struct PagePreview {
+    page_w_in: f32,
+    page_h_in: f32,
+    font_pt: f32,
+    /// Each line's left edge and the top of its line box, in inches from the page's top left.
+    lines: Vec<PreviewLine>,
+}
+
+#[derive(Serialize)]
+struct PreviewLine {
+    x_in: f32,
+    y_in: f32,
+    text: String,
+    /// "title", "header", "number", "footer" or "body" (the dimmed sample text).
+    role: &'static str,
+}
+
+#[tauri::command]
+async fn page_preview(app: State<'_, App>, kind: String, profile_name: String, page: Option<cirth_core::title::TitlePage>, header: Option<String>, footer: Option<String>) -> Result<PagePreview, String> {
+    with_session(&app, |s| {
+        let main = s.store.current_document().map_err(err)?;
+        let p = layout::Profile::for_document_profile(s.store.document_format_profile(&main).map_err(err)?, Some(profile_name.as_str()));
+        let tp = match page {
+            Some(tp) => tp,
+            None => s.store.title_page(&main).map_err(err)?,
+        };
+        let line_in = 1.0 / p.lines_per_inch;
+        let char_in = 1.0 / p.chars_per_inch;
+        let width = |t: &str| t.chars().count() as f32 * char_in;
+        let mut lines = Vec::new();
+        if kind == "title" {
+            for l in cirth_core::title::layout(&tp, &p) {
+                lines.push(PreviewLine { x_in: l.x_in, y_in: p.top_in + l.row as f32 * line_in, text: l.text, role: "title" });
+            }
+        } else {
+            // A page 2 as the PDF draws it: header at the left, number at the right, footer centred.
+            let top = 0.5;
+            let header = cirth_core::pdf::expand_tokens(header.unwrap_or_default().trim(), &tp);
+            if !header.is_empty() {
+                lines.push(PreviewLine { x_in: p.action.left_in, y_in: top, text: header, role: "header" });
+            }
+            lines.push(PreviewLine { x_in: p.page_w_in - 1.0 - width("2."), y_in: top, text: "2.".into(), role: "number" });
+            let footer = cirth_core::pdf::expand_tokens(footer.unwrap_or_default().trim(), &tp);
+            if !footer.is_empty() {
+                let centre = (p.action.left_in + p.page_w_in - 1.0) / 2.0;
+                lines.push(PreviewLine { x_in: centre - width(&footer) / 2.0, y_in: p.page_h_in - 0.5 + 0.2 * line_in - line_in, text: footer, role: "footer" });
+            }
+            // A few dimmed lines stand for the script, so the furniture is seen in place.
+            for (i, t) in ["INT. LOCATION - DAY", "", "Action runs across the page here,", "as the script will."].iter().enumerate() {
+                if !t.is_empty() {
+                    lines.push(PreviewLine { x_in: p.action.left_in, y_in: p.top_in + i as f32 * line_in, text: t.to_string(), role: "body" });
+                }
+            }
+        }
+        Ok(PagePreview { page_w_in: p.page_w_in, page_h_in: p.page_h_in, font_pt: p.font_pt, lines })
+    })
+}
+
 #[derive(Serialize)]
 struct TxtExported {
     path: String,
@@ -3287,11 +3458,13 @@ struct Panels {
     status: bool,
     /// The notes panel; off until the writer opens it.
     notes: bool,
+    /// The runtime rail beside the script.
+    runtime: bool,
 }
 
 impl Default for Panels {
     fn default() -> Self {
-        Panels { nav: true, board: true, toolbar: true, status: true, notes: false }
+        Panels { nav: true, board: true, toolbar: true, status: true, notes: false, runtime: true }
     }
 }
 
@@ -3305,7 +3478,7 @@ impl Default for UiPrefs {
 /// toggles its mark natively; this puts it back in line with the setting).
 fn sync_view_checks(app: &tauri::AppHandle, prefs: &UiPrefs) {
     let p = &prefs.panels;
-    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status), ("view_notes", p.notes), ("view_typewriter", prefs.typewriter)];
+    let checks = [("view_nav", p.nav), ("view_board", p.board), ("view_toolbar", p.toolbar), ("view_status", p.status), ("view_notes", p.notes), ("view_runtime", p.runtime), ("view_typewriter", prefs.typewriter)];
     let mut map: std::collections::HashMap<String, bool> = checks.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
     for f in SCREEN_FONTS {
         map.insert(format!("font_{f}"), prefs.editor_font == f);
@@ -3462,7 +3635,7 @@ fn window_command(window: tauri::WebviewWindow, action: String) -> Result<bool, 
 #[tauri::command]
 async fn pop_out_panel(app: tauri::AppHandle, panel: String, title: String) -> Result<(), String> {
     use tauri::{Emitter, Manager};
-    if !["nav", "board", "notes"].contains(&panel.as_str()) {
+    if !["nav", "board", "notes", "storyscry"].contains(&panel.as_str()) {
         return Err(format!("unknown panel {panel}"));
     }
     let label = format!("panel-{panel}");
@@ -3472,7 +3645,11 @@ async fn pop_out_panel(app: tauri::AppHandle, panel: String, title: String) -> R
         w.show().map_err(e)?;
         return w.set_focus().map_err(e);
     }
-    let (w, h) = if panel == "board" { (420.0, 720.0) } else { (340.0, 640.0) };
+    let (w, h) = match panel.as_str() {
+        "board" => (420.0, 720.0),
+        "storyscry" => (1040.0, 760.0),
+        _ => (340.0, 640.0),
+    };
     let window = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("panel.html?panel={panel}").into()))
         .title(format!("{title} - Kolbítar"))
         .inner_size(w, h)
@@ -3725,6 +3902,7 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .separator()
         .item(&check_item(app, "view_toolbar", "Toolbar", true)?)
         .item(&check_item(app, "view_status", "Status Bar", true)?)
+        .item(&check_item(app, "view_runtime", "Runtime Estimate", true)?)
         .separator()
         .item(&appearance)
         .item(&window)
@@ -3753,9 +3931,12 @@ fn tools_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry
         .text("alt_take", "Alternate Takes…")
         .text("branches", "Branches…")
         .separator()
+        .text("sprint", "Writing Sprint…")
+        .separator()
         .text("popout_nav", "Scene List in Its Own Window")
         .text("popout_board", "Notecard View in Its Own Window")
         .text("popout_notes", "Thoughts in Their Own Window")
+        .text("popout_storyscry", "StoryScry in Its Own Window")
         .build()
 }
 
@@ -4060,6 +4241,9 @@ fn main() {
             startup_file,
             open_fixture,
             list_projects,
+            set_home_title,
+            set_home_cover,
+            page_preview,
             create_project,
             open_project,
             open_path,
@@ -4236,7 +4420,16 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::migrate_data_dir;
+    use super::{base64, migrate_data_dir};
+
+    #[test]
+    fn base64_matches_the_standard_alphabet_and_padding() {
+        assert_eq!(base64(b"Man"), "TWFu");
+        assert_eq!(base64(b"Ma"), "TWE=");
+        assert_eq!(base64(b"M"), "TQ==");
+        assert_eq!(base64(b""), "");
+        assert_eq!(base64(&[0xff, 0xfe, 0xfd, 0x00]), "//79AA==");
+    }
 
     #[test]
     fn data_folder_moves_to_the_new_identifier_once() {

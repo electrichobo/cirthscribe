@@ -1,7 +1,8 @@
-// View > Tools > Notes: a scratchpad saved with the project and tied to
-// nothing else (no scene, block or document). It floats over the script and
-// can be moved by its title bar (mouse) or with the arrow keys on the title
-// bar; pop-out windows come in workspace step W3.
+// Tools > Thoughts: a scratchpad saved with the project and tied to nothing
+// else (no scene, block or document). It floats over the script and can be
+// moved by its title bar (mouse) or with the arrow keys on the title bar, or
+// popped out into its own window. Bullets, bold, italic and underline come
+// from the Thoughts editor (thoughts.ts).
 //
 // Text is written to the working store half a second after typing stops and
 // when the field loses focus; the project file gets it at the next save,
@@ -9,10 +10,11 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { announce } from "./a11y";
+import { createThoughtsEditor } from "./thoughts";
 
 const POS_KEY = "cirth.notesPos";
 
-export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => void; close: () => void }) {
+export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => void; close: () => void; popOut?: () => void }) {
   root.setAttribute("aria-label", "Thoughts");
   const bar = document.createElement("div");
   bar.className = "notes-bar";
@@ -28,16 +30,31 @@ export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => 
   closeBtn.textContent = "✕";
   closeBtn.setAttribute("aria-label", "Hide thoughts");
   closeBtn.title = "Hide thoughts (Tools > Thoughts)";
-  bar.append(grip, closeBtn);
-  const text = document.createElement("textarea");
-  text.id = "notes-text";
-  text.setAttribute("aria-label", "Project notes");
-  text.placeholder = "Anything you want to keep with this project.";
-  text.spellcheck = true;
+  if (hooks.popOut) {
+    const pop = document.createElement("button");
+    pop.type = "button";
+    pop.className = "notes-popout";
+    pop.id = "notes-popout";
+    pop.textContent = "⧉";
+    pop.setAttribute("aria-label", "Thoughts in their own window");
+    pop.title = "Open Thoughts in a window of its own";
+    pop.addEventListener("click", () => hooks.popOut?.());
+    bar.append(grip, pop, closeBtn);
+  } else {
+    bar.append(grip, closeBtn);
+  }
+  const box = document.createElement("div");
+  box.className = "thoughts";
   const state = document.createElement("span");
   state.className = "notes-state";
   state.setAttribute("aria-live", "off");
-  root.append(bar, text, state);
+  root.append(bar, box, state);
+  const text = createThoughtsEditor(box, () => {
+    dirty = true;
+    state.textContent = "";
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => void flush(), 500);
+  });
 
   let dirty = false;
   let timer = 0;
@@ -65,14 +82,8 @@ export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => 
     }
   }
 
-  text.addEventListener("input", () => {
-    dirty = true;
-    state.textContent = "";
-    window.clearTimeout(timer);
-    timer = window.setTimeout(() => void flush(), 500);
-  });
-  text.addEventListener("blur", () => void flush());
-  text.addEventListener("keydown", (e) => {
+  text.dom.addEventListener("blur", () => void flush());
+  text.dom.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
@@ -134,13 +145,13 @@ export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => 
     async load(open: boolean) {
       window.clearTimeout(timer);
       dirty = false;
-      text.value = open ? await invoke<string>("project_notes").catch(() => "") : "";
+      text.set(open ? await invoke<string>("project_notes").catch(() => "") : "");
       state.textContent = "";
     },
     flush,
     /** Text typed in a pop-out notes window (ADR 0004). */
     set(value: string) {
-      text.value = value;
+      text.set(value);
       dirty = true;
       void flush();
     },

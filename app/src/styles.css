@@ -107,8 +107,19 @@ body[data-hide-board] { --board-w: 0; }
 .notes-panel { position: absolute; z-index: 6; right: calc(var(--board-w, 320px) + 16px); top: 12px; width: 300px; height: 260px; min-width: 200px; min-height: 140px; resize: both; overflow: hidden; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, .22); }
 .notes-bar { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
 .notes-grip { flex: 1; text-align: left; border: 0; background: none; padding: 5px 10px; font-weight: 600; cursor: move; touch-action: none; }
-.notes-close { border: 0; background: none; padding: 4px 10px; }
-#notes-text { flex: 1; resize: none; border: 0; padding: 8px 10px; background: var(--panel); color: var(--ink); font: 13px/1.45 system-ui, sans-serif; outline-offset: -2px; }
+.notes-close, .notes-popout { border: 0; background: none; padding: 4px 10px; }
+/* Thoughts (thoughts.ts): a small editor with bullets, bold, italic, underline. */
+.thoughts { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.thoughts-bar { display: flex; gap: 2px; padding: 2px 6px; border-bottom: 1px solid var(--line); }
+.thoughts-tool { min-width: 26px; height: 24px; border: 0; background: none; border-radius: 5px; color: var(--ink); font: 600 13px Georgia, serif; }
+.thoughts-tool:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.thoughts-tool[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.thoughts-italic { font-style: italic; } .thoughts-underline { text-decoration: underline; }
+.thoughts-text { flex: 1; overflow: auto; }
+#notes-text { min-height: 100%; box-sizing: border-box; padding: 8px 10px; background: var(--panel); color: var(--ink); font: 13px/1.45 system-ui, sans-serif; outline-offset: -2px; white-space: pre-wrap; }
+#notes-text p { margin: 0 0 2px; }
+#notes-text p.bullet { position: relative; padding-left: 16px; }
+#notes-text p.bullet::before { content: "•"; position: absolute; left: 3px; color: var(--muted); }
 .notes-state { position: absolute; right: 18px; bottom: 4px; font-size: 11px; color: var(--muted); pointer-events: none; }
 body[data-hide-notes] #notes { display: none; }
 /* Popped out into their own windows (ADR 0004): no room taken here. */
@@ -122,7 +133,7 @@ body[data-popped-nav] #navigator, body[data-popped-board] #board, body[data-popp
 body[data-view="panel"] { display: block; }
 .panel-window { height: 100vh; overflow: auto; padding: 10px 12px; box-sizing: border-box; }
 body[data-panel="notes"] .panel-window { display: flex; flex-direction: column; overflow: hidden; }
-body[data-panel="notes"] #notes-text { flex: 1; width: 100%; resize: none; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: 13px/1.45 system-ui, sans-serif; }
+body[data-panel="notes"] .thoughts { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 body[data-hide-nav] #navigator, body[data-hide-board] #board, body[data-hide-toolbar] > .toolbar, body[data-hide-status] > footer { display: none; }
 .popup-menu { position: absolute; z-index: 20; min-width: 180px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .2); display: grid; }
 .popup-menu[hidden] { display: none; }
@@ -1900,3 +1911,45 @@ dialog.about h2.tour-title { margin: 2px 0 10px; font-size: 20px; line-height: 1
 .format-pop label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .format-pop select { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 6px; padding: 3px 4px; }
 .format-pop-note { margin: 0; max-width: 26em; font-size: 12px; color: var(--muted); }
+
+/* Home: sorting, a card's picture and its menu (home.ts). */
+.home-sort { margin-left: auto; font-size: 13px; }
+.project-item { position: relative; }
+.project .thumb.has-cover { background-size: cover; background-position: center; }
+.project .meta .script-title { color: var(--muted); font-size: 12px; }
+.project-more { position: absolute; top: 6px; right: 6px; width: 28px; height: 24px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); line-height: 1; }
+.project-menu { position: absolute; z-index: 40; min-width: 200px; margin: 0; padding: 4px; list-style: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .25); }
+.project-menu[hidden] { display: none; }
+.project-menu-item { padding: 6px 10px; border-radius: 5px; cursor: pointer; }
+.project-menu-item:hover, .project-menu-item:focus { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
+
+/* Title page and header/footer previews (pagepreview.ts): a page drawn to scale. */
+dialog.form-dialog.with-preview { width: min(980px, 96vw); }
+.preview-row { display: flex; gap: 18px; align-items: flex-start; }
+.preview-row > .form-grid { flex: 1; min-width: 0; }
+.page-preview { position: relative; flex: none; background: #fff; color: #111; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0, 0, 0, .18); font-family: "Courier Prime", monospace; line-height: 1; overflow: hidden; }
+.pp-line { position: absolute; white-space: pre; }
+.pp-body { color: #9a9a9a; }
+.pp-header, .pp-footer, .pp-number { color: #111; }
+@media (max-width: 760px) { .preview-row { flex-direction: column; } }
+
+/* Runtime rail (runtime.ts): beside the script, over its column, not scrolling with it. */
+.runtime-rail { grid-area: editor; justify-self: end; align-self: stretch; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; margin: 12px 10px 12px 0; pointer-events: none; }
+.runtime-rail[hidden] { display: none; }
+body[data-hide-runtime] .runtime-rail, body[data-view]:not([data-view="editor"]) .runtime-rail, body[data-focus] .runtime-rail { display: none; }
+.runtime-label { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.runtime-track { position: relative; flex: 1; width: 6px; border-radius: 3px; background: var(--line); cursor: pointer; pointer-events: auto; }
+.runtime-fill { position: absolute; left: 0; right: 0; top: 0; border-radius: 3px; background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.runtime-marker { position: absolute; left: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); }
+.runtime-tick { position: absolute; left: -3px; width: 12px; height: 1px; background: var(--muted); }
+.runtime-tick::after { content: attr(data-min); position: absolute; right: 14px; top: -6px; font-size: 9px; color: var(--muted); }
+
+/* Writing sprint (sprint.ts): the timer chip on the island and its reminders. */
+.sprint-chip { margin: 0 4px; padding: 3px 10px; border-radius: 12px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-variant-numeric: tabular-nums; font-size: 13px; }
+.sprint-chip[hidden] { display: none; }
+.sprint-chip.goal-met { border-color: var(--good, #3f9e4d); background: color-mix(in srgb, #3f9e4d 18%, transparent); }
+.sprint-toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 60; padding: 8px 16px; border-radius: 10px; background: var(--panel); color: var(--ink); border: 1px solid var(--accent); box-shadow: 0 6px 18px rgba(0, 0, 0, .22); font-size: 14px; }
+.sprint-big { font-size: 22px; font-weight: 600; margin: 8px 0; }
+
+/* Branches: three plain steps under the explanation. */
+.branch-steps { margin: 6px 0 10px; padding-left: 22px; color: var(--muted); font-size: 13px; line-height: 1.5; }

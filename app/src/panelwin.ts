@@ -9,6 +9,8 @@ import { renderBoard, renderNavigator, setSceneNumbers, navUi, type BoardState, 
 import { installLiveRegions, focusKey, restoreFocus, applyTheme, type UiPrefs } from "./a11y";
 import type { PanelCommand, PanelState, PopPanel } from "./panels";
 import type { SceneInfo } from "./scenes";
+import { createStoryScry, type ReportBundle, type ReportScope } from "./storyscry";
+import { createThoughtsEditor } from "./thoughts";
 
 const panel = (new URLSearchParams(location.search).get("panel") ?? "nav") as PopPanel;
 const root = document.getElementById("panel-root")!;
@@ -102,30 +104,54 @@ function drawNotes(text: string) {
   const h = document.createElement("h2");
   h.textContent = "Thoughts";
   head.append(h, dockButton());
-  const area = document.createElement("textarea");
-  area.id = "notes-text";
-  area.setAttribute("aria-label", "Project notes");
-  area.value = text;
+  const box = document.createElement("div");
+  box.className = "thoughts";
+  root.replaceChildren(head, box);
   let timer = 0;
   const flush = () => {
     window.clearTimeout(timer);
-    send({ cmd: "notes", text: area.value });
+    send({ cmd: "notes", text: editor.value });
   };
-  area.addEventListener("input", () => {
+  const editor = createThoughtsEditor(box, () => {
     window.clearTimeout(timer);
     timer = window.setTimeout(flush, 400);
   });
-  area.addEventListener("blur", flush);
+  editor.set(text);
+  editor.dom.addEventListener("blur", flush);
   window.addEventListener("beforeunload", flush);
-  root.replaceChildren(head, area);
-  area.focus();
+  editor.focus();
   send({ cmd: "rendered", items: text ? 1 : 0, first: text.split("\n")[0] });
+}
+
+// StoryScry in a window of its own: it reads the reports from the core
+// directly (read-only, ADR 0004); going to a scene and exporting go through
+// the main window. Closing it puts StoryScry back.
+let scry: ReturnType<typeof createStoryScry> | null = null;
+function drawStoryScry(state: PanelState) {
+  if (!scry) {
+    scry = createStoryScry({
+      fetch: (scope: ReportScope) => invoke<ReportBundle>("storyscry_reports", { scope }),
+      versions: () => last?.versions ?? { scriptVersion: 0, hasUnsynced: false, planningVersion: 0 },
+      go: (documentId, sceneId) => send({ cmd: "openElsewhere", documentId, sceneId }),
+      exportReport: async (scope, report, format) => {
+        send({ cmd: "exportReport", scope, report, format });
+        return null;
+      },
+      onClose: () => send({ cmd: "dock" }),
+    });
+    last = state;
+    void scry.open().then(() => send({ cmd: "rendered", items: 1, first: "StoryScry" }));
+  } else {
+    last = state;
+    scry.notifyChanged();
+  }
 }
 
 void listen<PanelState>("panel-state", (e) => {
   if (e.payload.panel !== panel) return;
+  if (panel === "storyscry") return drawStoryScry(e.payload);
   if (panel === "notes") {
-    if (e.payload.notes !== undefined && !root.querySelector("#notes-text")) drawNotes(e.payload.notes);
+    if (e.payload.notes !== undefined && !root.querySelector(".thoughts")) drawNotes(e.payload.notes);
     return;
   }
   last = e.payload;

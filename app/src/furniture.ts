@@ -4,6 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { announce } from "./a11y";
+import { createPagePreview } from "./pagepreview";
 
 export function createFurnitureDialog(afterSave: () => Promise<void>) {
   const dialog = document.createElement("dialog");
@@ -41,7 +42,15 @@ export function createFurnitureDialog(afterSave: () => Promise<void>) {
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   actions.append(cancel, save);
-  dialog.append(h, note, grid, actions);
+  // A preview of page 2 with its header, page number and footer.
+  const preview = createPagePreview("Preview of a page with its header and footer");
+  const args = () => ({ kind: "furniture", header: header.value, footer: footer.value });
+  for (const el of [header, footer]) el.addEventListener("input", () => preview.update(args()));
+  const row = document.createElement("div");
+  row.className = "preview-row";
+  row.append(grid, preview.el);
+  dialog.classList.add("with-preview");
+  dialog.append(h, note, row, actions);
   document.body.append(dialog);
 
   cancel.addEventListener("click", () => dialog.close());
@@ -60,6 +69,7 @@ export function createFurnitureDialog(afterSave: () => Promise<void>) {
     const f = await invoke<{ header: string; footer: string }>("page_furniture");
     header.value = f.header;
     footer.value = f.footer;
+    void preview.now(args());
     if (!dialog.open) dialog.showModal();
     header.focus();
   }

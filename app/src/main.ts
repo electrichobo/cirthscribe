@@ -33,6 +33,8 @@ import { createLatency } from "./latency";
 import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
+import { createRuntimeRail } from "./runtime";
+import { createSprint } from "./sprint";
 import { icon, iconButton } from "./icons";
 import { createLayoutMode } from "./layout-mode";
 import { createTitlePageDialog } from "./titlepage";
@@ -517,6 +519,10 @@ const storyScry = createStoryScry({
   }),
   go: (doc, scene) => (doc === lastOpen?.document_id ? revealScene(view, scene) : void openElsewhere(doc, scene)),
   exportReport: (scope, report, format, path) => exportReport(report, format, path, scope),
+  popOut: () => {
+    storyScry.close();
+    void panelHost.popOut("storyscry");
+  },
 });
 
 // The stripboard and shooting schedule (M4 step 5, E3, E4, E9).
@@ -926,6 +932,7 @@ async function repaginate() {
         .setMeta(sceneNumbersKey, buildSceneNumberDecorations(view.state.doc, sceneNumbers))
         .setMeta("addToHistory", false),
     );
+    runtimeRail.paginated();
     if (changed) rerenderSide();
     void refreshNav();
     if (p.map.warnings.length) showBanner(`Layout warnings: ${p.map.warnings.join("; ")}`);
@@ -946,6 +953,7 @@ function dispatch(tr: Transaction) {
   const next = view.state.apply(tr);
   view.updateState(next);
   formatBar.update(next);
+  if (tr.docChanged || tr.selectionSet) runtimeRail.moved();
   if (!tr.getMeta("pointer") && (tr.docChanged || tr.selectionSet)) centreTypingLine();
   const after = next.selection.$from.parent;
   if (after.type.name === "block" && before.type.name === "block" && after.attrs.id === before.attrs.id && after.attrs.kind !== before.attrs.kind) {
@@ -1367,6 +1375,7 @@ const commandPalette = installCommandPalette(
     { id: "comments", title: "Feedback…", category: "Commands", run: () => void runMenu("comments") },
     { id: "alternate_takes", title: "Alternate Takes…", category: "Commands", run: () => void runMenu("alt_take") },
     { id: "snapshots", title: "Snapshots…", category: "Commands", run: () => void runMenu("snapshots") },
+    { id: "sprint", title: "Writing Sprint…", category: "Commands", run: () => void runMenu("sprint") },
     { id: "export_review", title: "Export Review Package…", category: "Commands", run: () => void runMenu("export_review") },
     { id: "import_review", title: "Import Review Package…", category: "Commands", run: () => void runMenu("import_review") },
     { id: "branches", title: "Branches…", category: "Commands", run: () => void runMenu("branches") },
@@ -1463,8 +1472,10 @@ const panelHost = createPanelHost({
     navUi.project = project;
     void refreshNav();
   },
-  openElsewhere: (d, sc) => void openElsewhere(d, sc),
+  openElsewhere: (d, sc) => (d === lastOpen?.document_id ? revealScene(view, sc) : void openElsewhere(d, sc)),
   setNotes: (text) => notesPanel.set(text),
+  versions: () => ({ scriptVersion: syncer?.currentVersion ?? 0, hasUnsynced: syncer?.hasUnsynced ?? false, planningVersion }),
+  exportReport: (scope, report, format) => void exportReport(report, format, undefined, scope),
   undo: (again, panel) => {
     if (!view || !lastOpen) return;
     if (panel === "board") void boardUndo(again);
@@ -1479,7 +1490,7 @@ function setStructural(on: boolean) {
   if (lastOpen) void invoke("set_board_structural", { on }).catch((e) => showBanner(`Could not store the board setting: ${e}`));
   rerenderSide();
 }
-const notesPanel = createNotesPanel($("notes"), { focusScript: () => view?.focus(), close: () => void togglePanel("notes") });
+const notesPanel = createNotesPanel($("notes"), { focusScript: () => view?.focus(), close: () => void togglePanel("notes"), popOut: () => void panelHost.popOut("notes") });
 notesFlush = () => notesPanel.flush();
 onPanelsChanged(() => {
   if (currentPrefs().panels.notes) notesPanel.shown();
@@ -1494,6 +1505,19 @@ const revisions = createRevisions(
   () => syncer.flush(),
 );
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
+// Runtime estimate along the script's right edge (View > Runtime Estimate).
+const runtimeRail = createRuntimeRail({ view: () => (view && lastOpen ? view : null), starts: () => lastPagination?.map.page_starts ?? [], open: () => !!lastOpen });
+document.querySelector<HTMLElement>(".panes")!.append(runtimeRail.el);
+// Writing sprints (Tools > Writing Sprint…): the timer chip sits on the island.
+const sprint = createSprint({
+  words: async () => {
+    await syncer.flush();
+    return (await invoke<DocCounts>("word_counts")).total;
+  },
+  open: () => !!lastOpen,
+  focusScript: () => view?.focus(),
+});
+$("island").insertBefore(sprint.chip, $("view-menu-btn"));
 // Screen font and size: on screen only (pages and exports keep Courier Prime 12 pt).
 {
   const island = $("format-island");
@@ -1653,6 +1677,11 @@ const home = createHome($("home"), {
   restoreBackup: (path) => openWith("restore_backup", { path }),
   openSample: (name) => open(name, false),
   importScript: () => importAny(),
+  exportProject: async (path) => {
+    if (!(await openWith("open_path", { path }))) return false;
+    await exportDialog.open();
+    return true;
+  },
   openFreeWriting: () => void openFreeWriting(),
   openAbout: () => void about.open(),
   createProject: (title) => openWith("create_project", { title }),
@@ -1828,7 +1857,8 @@ async function runMenu(id: string): Promise<void> {
       if (lastOpen) await overview.open();
       break;
     case "storyscry":
-      if (lastOpen) await storyScry.open();
+      // In its own window: bring that window forward instead.
+      if (lastOpen) await (panelHost.isPopped("storyscry") ? panelHost.popOut("storyscry") : storyScry.open());
       break;
     case "stripboard":
       if (lastOpen) await stripboard.open();
@@ -2051,9 +2081,13 @@ async function runMenu(id: string): Promise<void> {
     case "theme_oled":
       await setTheme(id.slice(6) as Theme);
       break;
+    case "sprint":
+      if (lastOpen) sprint.open();
+      break;
     case "popout_nav":
     case "popout_board":
     case "popout_notes":
+    case "popout_storyscry":
       if (lastOpen) await panelHost.popOut(id.slice(7) as PopPanel);
       break;
     case "view_nav":
@@ -2061,7 +2095,8 @@ async function runMenu(id: string): Promise<void> {
     case "view_toolbar":
     case "view_status":
     case "view_notes":
-      await togglePanel(id.slice(5) as "nav" | "board" | "toolbar" | "status" | "notes");
+    case "view_runtime":
+      await togglePanel(id.slice(5) as "nav" | "board" | "toolbar" | "status" | "notes" | "runtime");
       if (id === "view_notes" && currentPrefs().panels.notes && lastOpen) notesPanel.focus();
       break;
   }
@@ -2454,6 +2489,7 @@ $("structural").addEventListener("change", (e) => setStructural((e.target as HTM
   projectTree,
   openDocument: (id: string) => openWith("open_document", { id }),
   notes: notesPanel,
+  sprint,
   importerFor,
   exportDialog,
   exportAs,
