@@ -38,6 +38,8 @@ interface Actions {
   openPath(path: string): Promise<boolean>;
   restoreBackup(path: string): Promise<boolean>;
   openSample(name: string): Promise<boolean>;
+  /** File > Import…: a Fountain, Final Draft or plain-text script becomes a new project. */
+  importScript(): Promise<boolean>;
   openFreeWriting(): void;
   openAbout(): void;
   createProject(title: string): Promise<boolean>;
@@ -116,12 +118,14 @@ export function createHome(root: HTMLElement, actions: Actions) {
       return typeof path === "string" ? actions.openPath(path) : false;
     }),
   );
+  const importBtn = el("button", { type: "button", id: "import-file", title: "Fountain, Final Draft (.fdx) or plain text: it becomes a new project" }, "Import a script…");
+  importBtn.addEventListener("click", () => void guard(() => actions.importScript()));
   const freeBtn = el("button", { type: "button", id: "open-free" }, "Free Writing");
   freeBtn.title = "Notes and brain dumps outside any project";
   freeBtn.addEventListener("click", () => actions.openFreeWriting());
   const aboutBtn = el("button", { type: "button", id: "open-about", className: "link" }, "About Kolbítar and licences");
   aboutBtn.addEventListener("click", () => actions.openAbout());
-  const side = el("aside", { className: "home-side", ariaLabel: "New and open" }, form, el("h2", {}, "Open"), openBtn, freeBtn, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
+  const side = el("aside", { className: "home-side", ariaLabel: "New and open" }, form, el("h2", {}, "Open"), openBtn, importBtn, freeBtn, el("p", { className: "home-note" }, "New projects are created in the app's library folder. Use Save As in the editor to keep a project anywhere else."), aboutBtn);
   const main = el("section", { className: "home-main", ariaLabel: "Projects" }, el("div", { className: "home-head" }, el("h2", {}, "Projects"), count), msg, grid);
   root.replaceChildren(el("header", { className: "home-brand" }, el("h1", {}, el("span", { className: "wordmark" }, "Kolbítar")), el("span", {}, "Project library")), el("div", { className: "home-body" }, side, main));
 

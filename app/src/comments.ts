@@ -90,7 +90,7 @@ function buildCommentDecorations(doc: PMNode, threads: CommentThreadView[], docu
           Decoration.inline(pos + 1 + fromU16, pos + 1 + toU16, {
             class: `cirth-comment-mark${t.resolved ? " cirth-comment-resolved" : ""}`,
             "data-thread-id": t.id,
-            title: `Comment: ${authorPrefix}${firstMsg}${t.resolved ? " (Resolved)" : ""}`,
+            title: `Feedback: ${authorPrefix}${firstMsg}${t.resolved ? " (Resolved)" : ""}`,
           }),
         );
       }
@@ -172,7 +172,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     dialog.id = "comments-dialog";
     dialog.className = "cirth-dialog cirth-comments-dialog";
     dialog.setAttribute("role", "dialog");
-    dialog.setAttribute("aria-label", "Comments and Review");
+    dialog.setAttribute("aria-label", "Feedback");
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
@@ -225,11 +225,11 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     const head = document.createElement("div");
     head.className = "cirth-comments-header";
     const title = document.createElement("h2");
-    title.textContent = "Comments & Review";
+    title.textContent = "Feedback";
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "cirth-btn cirth-dialog-close";
-    closeBtn.setAttribute("aria-label", "Close comments dialog");
+    closeBtn.setAttribute("aria-label", "Close Feedback");
     closeBtn.textContent = "✕";
     closeBtn.onclick = () => close();
 
@@ -246,7 +246,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     newBtn.type = "button";
     newBtn.id = "comments-new-btn";
     newBtn.className = "cirth-btn cirth-btn-primary";
-    newBtn.textContent = "+ Add Comment to Selection";
+    newBtn.textContent = "+ Add Feedback to Selection";
     newBtn.onclick = () => openNewThreadPrompt();
     bar.appendChild(newBtn);
 
@@ -310,8 +310,8 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     const searchInput = document.createElement("input");
     searchInput.type = "search";
     searchInput.className = "cirth-input cirth-comments-search";
-    searchInput.placeholder = "Filter comments or quote…";
-    searchInput.setAttribute("aria-label", "Filter comments or quote");
+    searchInput.placeholder = "Filter feedback or quote…";
+    searchInput.setAttribute("aria-label", "Filter feedback or quote");
     searchInput.value = searchFilter;
     searchInput.oninput = () => {
       searchFilter = searchInput.value.trim().toLowerCase();
@@ -354,7 +354,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     if (!filtered.length) {
       const empty = document.createElement("div");
       empty.className = "cirth-comments-empty";
-      empty.textContent = activeFilter === "all" ? "No comments in this document." : `No ${activeFilter} comments.`;
+      empty.textContent = activeFilter === "all" ? "No feedback in this document." : `No ${activeFilter} feedback.`;
       list.appendChild(empty);
       return;
     }
@@ -400,7 +400,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
           const anchor = selectionAnchor(opts.getView(), opts.getDocumentId());
           if (!anchor) {
             announce("Select replacement text in the editor first");
-            alert("Please highlight text in the script editor to reattach this comment thread.");
+            alert("Select text in the script to reattach this feedback.");
             return;
           }
           await invoke("comments_reattach", {
@@ -411,7 +411,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
             quote: anchor.quote,
           });
           await refresh();
-          announce("Comment thread reattached");
+          announce("Feedback reattached");
         };
         orphanWarn.appendChild(reattachBtn);
         card.appendChild(orphanWarn);
@@ -513,7 +513,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
       deleteBtn.className = "cirth-btn cirth-btn-sm cirth-btn-danger";
       deleteBtn.textContent = "Delete thread";
       deleteBtn.onclick = async () => {
-        if (confirm("Delete this comment thread and its replies?")) {
+        if (confirm("Delete this feedback and its replies?")) {
           await invoke("comments_delete_thread", { threadId: t.id });
           await refresh();
         }
@@ -539,12 +539,12 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
   function openNewThreadPrompt(): void {
     const anchor = selectionAnchor(opts.getView(), opts.getDocumentId());
     if (!anchor) {
-      announce("Select text in the editor first to add a comment");
-      alert("Please highlight text in the screenplay editor to attach a comment thread.");
+      announce("Select text in the script first to add feedback");
+      alert("Select text in the script to attach feedback to it.");
       return;
     }
 
-    const text = prompt(`Comment on “${anchor.quote}”:`);
+    const text = prompt(`Feedback on “${anchor.quote}”:`);
     if (text === null || !text.trim()) return;
 
     invoke("comments_add_thread", {
@@ -557,9 +557,9 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
       text: text.trim(),
     }).then(async () => {
       await refresh();
-      announce("Comment added");
+      announce("Feedback added");
     }).catch((err) => {
-      announce(`Failed to add comment: ${err}`);
+      announce(`Could not add feedback: ${err}`);
     });
   }
 
@@ -568,7 +568,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     await loadState();
     render();
     o.hidden = false;
-    announce("Comments and Review opened");
+    announce("Feedback opened");
   }
 
   function close(): void {
@@ -588,7 +588,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
   function toggleInlineView(): void {
     showInline = !showInline;
     updateEditorDecorations();
-    announce(showInline ? "Inline comment highlights visible" : "Inline comment highlights hidden");
+    announce(showInline ? "Feedback highlights shown" : "Feedback highlights hidden");
   }
 
   function getInlineView(): boolean {

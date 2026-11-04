@@ -2360,22 +2360,24 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const menu = () => app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
     let items = await menu();
     const tops = [...new Set(items.map((i) => i.path.split(" > ")[0]))];
-    assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Help"]), `top-level menus: ${tops}`);
+    assert(JSON.stringify(tops) === JSON.stringify(["File", "Edit", "View", "Format", "Tools", "Go To", "Help"]), `top-level menus: ${tops}`);
     const ids = new Set(items.map((i) => i.id));
     const want = ["new", "open", "import", "save", "save_as", "export", "home", "quit", "undo", "redo", "find", "spell_suggest", "spell_en_US", "spell_en_GB", "spell_off",
       "mode_normal", "mode_page", "view_typewriter", "focus_mode", "full_screen", "view_nav", "view_board", "view_toolbar", "view_status", "tags", "comments", "alt_take", "storyscry", "ui_larger", "ui_smaller", "ui_reset", "ui_contrast",
       "goto_page", "goto_scene", "win_minimize", "win_zoom", "focus_next",
-      "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "latency", "updates", "licences", "about",
+      "bold", "italic", "underline", "dual", "page_break", "page_letter", "page_a4", "title_page", "page_furniture", "shortcuts", "updates", "licences", "about", "evidence", "branches", "export_review", "import_review",
       ...["heading", "action", "character", "parenthetical", "dialogue", "transition", "shot", "section", "lyric"].map((k) => `kind_${k}`)];
     const missing = want.filter((id) => !ids.has(id));
     assert(!missing.length, `missing menu items: ${missing}`);
+    assert(!ids.has("latency"), "Typing Latency is not in the public menus (it stays reachable for tests)");
+    assert(items.some((i) => i.id === "branches" && i.path.startsWith("Tools > Branches…")) && items.some((i) => i.id === "branches" && i.path.startsWith("File > Branches…")), "Branches is in Tools as well as File");
     const editNative = items.filter((i) => i.path.startsWith("Edit > ") && !want.includes(i.id));
     assert(editNative.length >= 4, `Edit has the OS's Cut, Copy, Paste and Select All: ${editNative.map((i) => i.path)}`);
     // Owner's layout (2026-10-28): one Import and one Export; modes, tools, appearance, go to and window under View;
     // elements, screen font, title page, headers and footers and spelling under Format; Free Writing is not in File.
     const at = (id) => items.find((i) => i.id === id)?.path ?? "(missing)";
-    const where = { import: "File > Import…", export_review: "File > Export Review Package…", import_review: "File > Import Review Package…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "View > Tools > Scene List", tags: "View > Tools > Breakdown Tags…", comments: "View > Tools > Comments…", alt_take: "View > Tools > Alternate Takes…", storyscry: "View > Tools > StoryScry…", ui_contrast: "View > Appearance > High Contrast",
-      goto_page: "View > Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
+    const where = { import: "File > Import…", export_review: "File > Export Review Package…", import_review: "File > Import Review Package…", mode_page: "View > Mode > Page View", view_typewriter: "View > Mode > Typewriter Mode", view_nav: "Tools > Scene List", view_board: "Tools > Notecard View", view_notes: "Tools > Thoughts", evidence: "Tools > Cork Board…", tags: "Tools > Breakdown Tags…", comments: "Tools > Feedback…", alt_take: "Tools > Alternate Takes…", storyscry: "Tools > StoryScry…", ui_contrast: "View > Appearance > Theme > High Contrast", command_palette: "Go To > Go To Anything…",
+      goto_page: "Go To > Page…", win_minimize: "View > Window > Minimise", title_page: "Format > Title Page…", page_furniture: "Format > Headers and Footers…", spell_off: "Format > Spelling > Off",
       font_mono: "Format > Screen Font > System Monospace", shortcuts: "Help > Keyboard Shortcuts…", updates: "Help > Check for Updates…", licences: "Help > Licences…" };
     for (const [id, path] of Object.entries(where)) assert(at(id).startsWith(path), `${id} at ${path}: ${at(id)}`);
     assert(at("export").startsWith("File > Export…") && items.some((i) => i.path.startsWith("Format > Element > Dialogue (")), `one Export and an Element menu: ${at("export")}`);
@@ -2422,7 +2424,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const formats = await app.evaluate("[...document.querySelectorAll('#export-dialog input[name=export-format]')].map(r => r.value + (r.disabled ? ':off' : ''))");
     assert(formats.join() === "pdf,pdf_changed:off,txt,fountain,fdx,docx,rtf,html,reports,stripboard,sides", `export formats: ${formats}`);
     await app.evaluate("(document.getElementById('export-cancel').click(), true)");
-    // View > Go To > Scene… and Page…: the caret moves there.
+    // Go To > Scene… and Page…: the caret moves there.
     const scenes = await app.evaluate("__cirth.scenes()");
     await app.evaluate("(__cirth.menu('goto_scene'), true)");
     await waitFor(app, "document.getElementById('goto-dialog').open", "Go To Scene opens");
@@ -2902,8 +2904,9 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "document.getElementById('revisions-dialog')?.open === true", "Revision Sets dialog open");
     await audit("revision sets dialog");
     await app.evaluate("(() => { document.getElementById('rev-add').click(); return true; })()");
-    await waitFor(app, "__cirth.revisions.state.sets.length === 1 && __cirth.revisions.state.active === __cirth.revisions.state.sets[0].id", "first set added and active");
-    assert((await rev("r.sets[0].label + '/' + r.sets[0].colour")) === "Blue Revision/blue", "the first set is Blue");
+    await waitFor(app, "__cirth.revisions.state.sets.length === 2 && __cirth.revisions.state.active === __cirth.revisions.state.sets[1].id", "first set added and active");
+    assert((await rev("r.sets[0].label + '/' + r.sets[0].colour")) === "Original (White)/white", "every script starts with its original White set");
+    assert((await rev("r.sets[1].label + '/' + r.sets[1].colour")) === "Blue Revision/blue", "the first revision is Blue");
     const blue = await rev("r.active");
     await app.evaluate("(() => { document.getElementById('rev-close').click(); return true; })()");
     // Nothing changed yet: no changed pages to print.
@@ -2934,7 +2937,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Text export: the changed page alone, with the set's header and line marks.
     assert(await app.evaluate(`__cirth.exportText(${JSON.stringify(changed)}, true)`), "changed pages exported");
     const ch = readFileSync(changed, "utf8");
-    const today = await rev("r.sets[0].date");
+    const today = await rev("r.sets[1].date");
     assert(ch.split("\f").length === 1, `one changed page: ${ch.split("\f").length}`);
     assert(new RegExp(`Blue Revision \\(${today}\\)`).test(ch), `revision header: ${ch.slice(0, 200)}`);
     assert(ch.split("\n").some((l) => l.includes("again") && / \*$/.test(l)), `a mark beside the changed line: ${ch}`);
@@ -2959,9 +2962,9 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.menu('revision_sets')");
     await waitFor(app, "document.getElementById('revisions-dialog')?.open === true", "dialog again");
     await app.evaluate("(() => { document.getElementById('rev-add').click(); return true; })()");
-    await waitFor(app, "__cirth.revisions.state.sets.length === 2 && __cirth.revisions.state.sets[1].label === 'Pink Revision' && __cirth.revisions.state.active === __cirth.revisions.state.sets[1].id", "Pink added and active");
+    await waitFor(app, "__cirth.revisions.state.sets.length === 3 && __cirth.revisions.state.sets[2].label === 'Pink Revision' && __cirth.revisions.state.active === __cirth.revisions.state.sets[2].id", "Pink added and active");
+    const pink = await rev("r.sets[2].id");
     assert(!(await app.evaluate(`__cirth.exportText(${JSON.stringify(changed)}, true)`)), "no Pink changes yet");
-    assert(await app.evaluate(`document.querySelector('#revisions-dialog tr[data-id="${blue}"] .rev-delete').disabled`), "a set that marks text cannot be deleted");
     // Back to Blue, clear its marks (asks first), then it can be deleted.
     await app.evaluate(`(() => { const r = document.querySelector('#revisions-dialog tr[data-id="${blue}"] input[type=radio]'); r.click(); return true; })()`);
     await waitFor(app, `__cirth.revisions.state.active === ${JSON.stringify(blue)}`, "Blue active again");
@@ -2972,7 +2975,12 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, `!document.querySelector('.ProseMirror .rev[data-rev="${blue}"]')`, "Blue marks cleared");
     await waitSynced();
     await app.evaluate("__cirth.menu('revision_sets')");
-    await waitFor(app, `document.getElementById('revisions-dialog')?.open === true && !document.querySelector('#revisions-dialog tr[data-id="${blue}"] .rev-delete').disabled`, "deletable once unused");
+    await waitFor(app, "document.getElementById('revisions-dialog')?.open === true", "dialog for deleting");
+    // Deleting asks first; Pink, with its automatic name, moves up to Blue.
+    await app.evaluate(`(() => { document.querySelector('#revisions-dialog tr[data-id="${blue}"] .rev-delete').click(); return true; })()`);
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true && /cannot be undone/.test(document.getElementById('confirm-dialog').textContent)", "deleting asks first");
+    await app.evaluate("(() => { document.getElementById('confirm-ok').click(); return true; })()");
+    await waitFor(app, `__cirth.revisions.state.sets.length === 2 && __cirth.revisions.state.sets[1].id === ${JSON.stringify(pink)} && __cirth.revisions.state.sets[1].label === 'Blue Revision' && __cirth.revisions.state.sets[1].colour === 'blue'`, "Blue deleted; Pink closed up to Blue");
     await app.evaluate("(() => { document.getElementById('rev-close').click(); return true; })()");
   });
 
@@ -2981,8 +2989,10 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const pag = () => app.evaluate("window.__TAURI_INTERNALS__.invoke('paginate', { profile: 'letter' }).then(p => ({ locked: p.pages_locked, labels: p.map.pages.map(pg => pg.label), starts: p.map.page_starts }))");
     const before = await pag();
     assert(!before.locked && before.labels.join() === before.labels.map((_, i) => i + 1).join(), `unlocked pages are 1..N: ${before.labels}`);
-    await app.evaluate("__cirth.menu('pages_lock')");
+    await app.evaluate("(__cirth.menu('pages_lock'), true)"); // not awaited: it asks about a revision set
     await waitAnnounced("Pages locked", "lock announced");
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true && /revision/.test(document.getElementById('confirm-dialog').textContent)", "locking offers to start a revision set");
+    await app.evaluate("(() => { document.getElementById('confirm-cancel').click(); return true; })()");
     assert((await pag()).locked, "locked");
     assert(/pages locked/.test(await app.evaluate("document.getElementById('info').textContent")), "the status bar says so");
     // Add text on the first page after page 1 that has an action block starting on it.
@@ -3085,7 +3095,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     const before = JSON.stringify(await blocks());
     assert(!(await app.evaluate("document.getElementById('notes').getClientRects().length")), "notes are hidden at first");
     await app.evaluate("__cirth.menu('view_notes')");
-    await waitFor(app, "document.getElementById('notes').getClientRects().length > 0 && document.activeElement?.id === 'notes-text'", "View > Tools > Notes shows the panel and focuses it");
+    await waitFor(app, "document.getElementById('notes').getClientRects().length > 0 && document.activeElement?.id === 'notes-text'", "Tools > Thoughts shows the panel and focuses it");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('menu_items').then(m => m.find(i => i.id === 'view_notes').checked)", "Notes checked in View > Tools");
     const text = "Call Sam about the lighthouse.\nZoë's line → cut? 🌊";
     await app.evaluate(`(() => { const t = document.getElementById('notes-text'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input')); return true; })()`);
@@ -3114,7 +3124,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await openFixture("unicode-marks");
     assert((await app.evaluate("document.getElementById('notes-text').value")) === "", "notes belong to their project");
     await app.evaluate("__cirth.menu('view_notes')");
-    await waitFor(app, "!document.getElementById('notes').getClientRects().length", "View > Tools > Notes hides it again");
+    await waitFor(app, "!document.getElementById('notes').getClientRects().length", "Tools > Thoughts hides it again");
   });
 
   await test("Pop-out panels: scene list, board and notes open in their own windows, draw from the main window, send changes back (moves undo in the script), and dock", async () => {
@@ -3264,6 +3274,12 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"characters\"]').click(), true)");
     await waitFor(app, "!!document.getElementById('storyscry-characters-table')", "Characters report table");
     await audit("StoryScry characters report");
+    // A report has a Back button to the dashboard (hidden on the dashboard itself).
+    assert(await app.evaluate("!document.getElementById('storyscry-back').hidden"), "Back to Dashboard shown in a report");
+    await app.evaluate("(document.getElementById('storyscry-back').click(), true)");
+    await waitFor(app, "document.getElementById('storyscry-back').hidden && document.getElementById('storyscry-dialog').open && document.querySelector('#storyscry-dialog [data-tab=\"dashboard\"]').getAttribute('aria-selected') === 'true'", "Back returns to the dashboard without closing");
+    await app.evaluate("(document.querySelector('#storyscry-dialog [data-tab=\"characters\"]').click(), true)");
+    await waitFor(app, "!!document.getElementById('storyscry-characters-table')", "Characters report again");
     const charNames = await app.evaluate("__cirth.storyScry.data.characters.map(c => c.name)");
     assert(charNames.includes("INES") && !charNames.includes("TOBIAS"), `TOBIAS merged into INES: ${charNames}`);
     await app.evaluate("(() => { const f = document.getElementById('storyscry-filter'); f.value = 'ines'; f.dispatchEvent(new Event('input')); return true; })()");
@@ -3417,6 +3433,12 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     // Inline decoration .cirth-tag-mark is rendered in ProseMirror over "the red ledger".
     const markTexts = await app.evaluate("[...document.querySelectorAll('.ProseMirror .cirth-tag-mark')].map(e => e.textContent)");
     assert(markTexts.includes("the red ledger"), `editor decorates tagged span: ${JSON.stringify(markTexts)}`);
+    // Tags take their category's colour (props: violet by default); changing it recolours the script.
+    const markColour = () => app.evaluate("(() => { const m = [...document.querySelectorAll('.ProseMirror .cirth-tag-mark')].find(e => e.textContent === 'the red ledger'); return m ? m.style.getPropertyValue('--tag-colour').trim() : null; })()");
+    assert((await markColour()) === "#8a4fc7", `props tags are violet: ${await markColour()}`);
+    await app.evaluate("(() => { const i = document.querySelector('#tags-colours input[data-category=\"props\"]'); i.value = '#228844'; i.dispatchEvent(new Event('change')); return true; })()");
+    await waitFor(app, "__cirth.tags.data.colours.props === '#228844'", "props colour changed");
+    await waitFor(app, "[...document.querySelectorAll('.ProseMirror .cirth-tag-mark')].some(e => e.style.getPropertyValue('--tag-colour').trim() === '#228844')", "the script shows the new colour");
 
     // F2: Suggested tags found "the ledger" in the second sentence via the bible alias.
     const sug0 = await app.evaluate("__cirth.tags.data.suggestions.find(s => s.entity_name === 'Red Ledger')");
@@ -4003,7 +4025,7 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
     // Check empty state
     const emptyMsg = await app.evaluate("document.querySelector('#comments-list-container .cirth-comments-empty')?.textContent");
-    assert(emptyMsg && emptyMsg.includes("No comments"), `Empty state displayed: ${emptyMsg}`);
+    assert(emptyMsg && emptyMsg.includes("No feedback"), `Empty state displayed: ${emptyMsg}`);
 
     // Close comments dialog
     await app.evaluate("(__cirth.comments.close(), true)");
@@ -4428,9 +4450,11 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     );
     assert(divBranch && divBranch.id, "branch-divergent-pages created while unlocked");
 
-    // Lock pages on main
-    await app.evaluate("__cirth.menu('pages_lock')");
+    // Lock pages on main (and decline the revision set it offers)
+    await app.evaluate("(__cirth.menu('pages_lock'), true)");
     await waitAnnounced("Pages locked", "lock announced");
+    await waitFor(app, "document.getElementById('confirm-dialog')?.open === true", "revision set offered");
+    await app.evaluate("(() => { document.getElementById('confirm-cancel').click(); return true; })()");
 
     // Open merge preview: divergent baseline MUST be detected
     await app.evaluate(`__cirth.merge.open('${divBranch.id}')`);
@@ -5473,42 +5497,44 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
 
     // 3. Step 1 initial checks
     const badge1 = await app.evaluate("document.getElementById('tour-badge')?.textContent");
-    assert(badge1.includes("1. The Writing Canvas"), `Step 1 badge matches: ${badge1}`);
+    assert(badge1.includes("1. The Writing Page"), `Step 1 badge matches: ${badge1}`);
     const title1 = await app.evaluate("document.getElementById('tour-dialog-title')?.textContent");
-    assert(title1.includes("Distraction-Free Screenplay Writing"), `Step 1 title matches: ${title1}`);
+    assert(title1.includes("A screenplay page that formats itself"), `Step 1 title matches: ${title1}`);
     const prevDisabled = await app.evaluate("document.getElementById('tour-btn-prev')?.disabled");
     assert(prevDisabled === true, "Previous button disabled on step 1");
     const nextText1 = await app.evaluate("document.getElementById('tour-btn-next')?.textContent");
     assert(nextText1 === "Next", "Next button says Next on step 1");
 
     // 4. Advance through steps using the Next button
-    for (let i = 2; i <= 6; i++) {
+    const steps = await app.evaluate("__cirth.tour.steps");
+    assert(steps === 10, `ten tour cards: ${steps}`);
+    for (let i = 2; i <= steps; i++) {
       await app.evaluate("document.getElementById('tour-btn-next')?.click()");
       await waitFor(app, `document.getElementById('tour-badge')?.textContent.includes('${i}.')`, `Step ${i} rendered`);
     }
 
-    // Step 6 checks: Next button becomes "Get Started", Skip button is hidden
+    // Last card: Next button becomes "Get Started", Skip button is hidden
     const badge6 = await app.evaluate("document.getElementById('tour-badge')?.textContent");
-    assert(badge6.includes("6. Formats & Intelligence"), `Step 6 badge matches: ${badge6}`);
+    assert(badge6.includes("10. Write Your Way"), `last badge matches: ${badge6}`);
     const nextText6 = await app.evaluate("document.getElementById('tour-btn-next')?.textContent");
     assert(nextText6 === "Get Started", "Next button says Get Started on final step");
     const skipHidden = await app.evaluate("document.getElementById('tour-btn-skip')?.style.display === 'none'");
     assert(skipHidden, "Skip button hidden on final step");
 
-    // 5. Test keyboard navigation: ArrowLeft steps back to step 5, ArrowRight steps to step 6
+    // 5. Test keyboard navigation: ArrowLeft steps back to step 9, ArrowRight steps to step 10
     await app.evaluate(`(() => {
       const d = document.getElementById('tour-dialog');
       d.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     })()`);
-    await waitFor(app, "document.getElementById('tour-badge')?.textContent.includes('5.')", "ArrowLeft steps back to step 5");
+    await waitFor(app, "document.getElementById('tour-badge')?.textContent.startsWith('9.')", "ArrowLeft steps back to step 9");
     const badge5 = await app.evaluate("document.getElementById('tour-badge')?.textContent");
-    assert(badge5.includes("5. Revisions & Takes"), `Step 5 badge matches: ${badge5}`);
+    assert(badge5.includes("9. Feedback"), `Step 9 badge matches: ${badge5}`);
 
     await app.evaluate(`(() => {
       const d = document.getElementById('tour-dialog');
       d.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     })()`);
-    await waitFor(app, "document.getElementById('tour-badge')?.textContent.includes('6.')", "ArrowRight steps forward to step 6");
+    await waitFor(app, "document.getElementById('tour-badge')?.textContent.startsWith('10.')", "ArrowRight steps forward to step 10");
 
     // 6. Complete tour via Get Started
     await app.evaluate("document.getElementById('tour-btn-next')?.click()");
@@ -5521,7 +5547,14 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("window.__cirth.menu('tour')");
     await waitFor(app, "document.getElementById('tour-dialog')?.open === true", "Tour dialog reopened via menu");
     const badgeReset = await app.evaluate("document.getElementById('tour-badge')?.textContent");
-    assert(badgeReset.includes("1. The Writing Canvas"), `Re-opened tour resets to step 1: ${badgeReset}`);
+    assert(badgeReset.includes("1. The Writing Page"), `Re-opened tour resets to step 1: ${badgeReset}`);
+    // Readable on a dark theme: the text takes the theme's ink, and the card shows its icon.
+    await app.evaluate("__cirth.menu('theme_night')");
+    await waitFor(app, "document.documentElement.dataset.theme === 'night'", "night theme");
+    const tourInk = await app.evaluate(`(() => { const probe = document.createElement('span'); probe.style.color = 'var(--ink)'; document.body.append(probe); const ink = getComputedStyle(probe).color; probe.remove(); return { ink, desc: getComputedStyle(document.getElementById('tour-desc')).color, title: getComputedStyle(document.getElementById('tour-dialog-title')).color, icon: !!document.querySelector('#tour-svg-wrap svg.icon') }; })()`);
+    assert(tourInk.desc === tourInk.ink && tourInk.title === tourInk.ink && tourInk.icon, `tour text uses the theme ink on Night: ${JSON.stringify(tourInk)}`);
+    await screenshot(app, "tour-night");
+    await app.evaluate("__cirth.menu('theme_system')");
 
     // 8. Test Skip Tour button
     await app.evaluate("document.getElementById('tour-btn-skip')?.click()");
@@ -5672,11 +5705,11 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitHome(app);
   });
 
-  await test("Command Palette (Ctrl/Cmd+K) and Personal Dictionary management", async () => {
+  await test("Go To Anything (Ctrl/Cmd+K) and Personal Dictionary management", async () => {
     await app.evaluate("__cirth.goHome()");
     await waitHome(app);
 
-    // Verify native menu contains Command Palette under View > Go To and Personal Dictionary under Format > Spelling
+    // Verify the native menu has Go To Anything under Go To and Personal Dictionary under Format > Spelling
     const menuItems = await app.evaluate("window.__TAURI_INTERNALS__.invoke('menu_items')");
     const paletteItem = menuItems.find(i => i.id === "command_palette");
     const dictItem = menuItems.find(i => i.id === "spell_dictionary");
@@ -5749,6 +5782,17 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
       })()
     `);
     await waitFor(app, "!document.querySelector('dialog.palette-dialog')?.open", "palette closed after selection");
+    await waitFor(app, "__cirth.view.state.selection.$from.parent.textContent.includes('GRAND VAULT OF RUNES')", "the caret moved to the chosen scene");
+
+    // A character goes to their first speech.
+    const firstCue = await app.evaluate(`(() => { let name = null, at = -1; __cirth.view.state.doc.forEach((n, off) => { if (name === null && n.attrs.kind === 'character') { name = n.textContent.split('(')[0].trim(); at = off; } }); return { name, at }; })()`);
+    assert(firstCue.name, `the sample has a character cue: ${JSON.stringify(firstCue)}`);
+    await app.evaluate("(__cirth.view.dispatch(__cirth.view.state.tr.setSelection(__cirth.view.state.selection.constructor.atEnd(__cirth.view.state.doc))), true)");
+    await app.evaluate("__cirth.palette.open()");
+    await waitFor(app, "document.querySelector('dialog.palette-dialog')?.open", "palette open again");
+    await app.evaluate(`(() => { const inp = document.querySelector(".palette-input"); inp.value = ${JSON.stringify(firstCue.name)}; inp.dispatchEvent(new Event("input")); })()`);
+    await app.evaluate(`(() => { const item = [...document.querySelectorAll(".palette-item")].find((li) => li.textContent.includes("go to the first")); item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); return true; })()`);
+    await waitFor(app, `__cirth.view.state.selection.from === ${firstCue.at + 1}`, "the caret moved to the character's first speech");
 
     // Return to Home cleanly
     await app.evaluate("__cirth.goHome()");

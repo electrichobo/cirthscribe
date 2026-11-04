@@ -780,9 +780,19 @@ export function createStoryScry(hooks: {
   closeBtn.type = "button";
   closeBtn.id = "storyscry-close";
   closeBtn.textContent = "Close";
+  // A report goes back to the dashboard rather than closing StoryScry (owner, 2026-11-03).
+  const backBtn = document.createElement("button");
+  backBtn.type = "button";
+  backBtn.id = "storyscry-back";
+  backBtn.textContent = "← Back to Dashboard";
+  backBtn.hidden = true;
+  backBtn.addEventListener("click", () => {
+    selectTab("dashboard");
+    tabButtons.get("dashboard")?.focus();
+  });
   const actions = document.createElement("div");
   actions.className = "dialog-actions storyscry-actions";
-  actions.append(exportBar, closeBtn);
+  actions.append(exportBar, backBtn, closeBtn);
 
   dialog.append(head, tools, episodesBar, staleBar, tabBar, body, actions);
   document.body.append(dialog);
@@ -883,6 +893,7 @@ export function createStoryScry(hooks: {
     }
     tablesBtn.hidden = tab !== "dashboard";
     filterInput.hidden = tab === "dashboard";
+    backBtn.hidden = tab === "dashboard";
     draw();
   }
 
@@ -1539,6 +1550,7 @@ export function createStoryScry(hooks: {
       }
       tablesBtn.hidden = tab !== "dashboard";
       filterInput.hidden = tab === "dashboard";
+      backBtn.hidden = tab === "dashboard";
       await load();
       if (!dialog.open) dialog.showModal();
       (tabButtons.get(tab) ?? closeBtn).focus();

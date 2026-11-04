@@ -208,7 +208,7 @@ const today = () => {
  * Revision sets dialog, revision mode and clearing marks. `getView` gives the
  * open editor; `onChange` runs after anything that changes printed output.
  */
-export function createRevisions(getView: () => EditorView | null, onChange: () => void) {
+export function createRevisions(getView: () => EditorView | null, onChange: () => void, flush: () => Promise<void> = async () => undefined) {
   let state: RevisionState = { sets: [], passages: [], active: null, mode: false, next_colour: "blue", next_label: "Blue Revision" };
   const statusEl = document.createElement("span");
   statusEl.id = "revision-status";
@@ -233,6 +233,22 @@ export function createRevisions(getView: () => EditorView | null, onChange: () =
     statusEl.textContent = set ? `${state.mode ? "Revising" : "Revision set"}: ${set.label}${set.date ? ` (${set.date})` : ""}` : "";
     statusEl.className = state.mode ? "revising" : "";
     if (dialog.open) render();
+  }
+
+  /** Delete a set after asking; text it marks loses the marks first (that part can be undone). */
+  async function removeSet(set: RevisionSet, passages: number) {
+    const marked = passages > 0 ? ` Its marks on ${passages} passage${passages === 1 ? "" : "s"} are cleared first; the text stays as it is.` : "";
+    const later = " Later sets with automatic names move up the colour order to close the gap.";
+    if (!(await confirmDialog(`Delete ${set.label}?`, `${marked}${later} Deleting the set cannot be undone.`.trim(), "Delete Set"))) return false;
+    const view = getView();
+    if (passages > 0 && view) {
+      view.dispatch(clearTr(view.state, set.id).setMeta(revisionKey, {}));
+      await flush();
+    }
+    if (!(await command("delete", { id: set.id }))) return false;
+    announce(`${set.label} deleted`);
+    onChange();
+    return true;
   }
 
   async function command(action: string, args: Record<string, unknown> = {}) {
@@ -296,10 +312,9 @@ export function createRevisions(getView: () => EditorView | null, onChange: () =
       del.type = "button";
       del.textContent = "Delete";
       del.className = "rev-delete";
-      del.disabled = (state.passages[i] ?? 0) > 0;
-      del.title = del.disabled ? "Clear this set's marks before deleting it" : "Delete this set";
+      del.title = "Delete this set";
       del.setAttribute("aria-label", `Delete ${s.label}`);
-      del.addEventListener("click", () => void command("delete", { id: s.id }));
+      del.addEventListener("click", () => void removeSet(s, state.passages[i] ?? 0));
       body.append(tr);
     });
     table.append(body);

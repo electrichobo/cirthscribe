@@ -60,6 +60,8 @@ export interface TagsState {
   tags: TagView[];
   suggestions: TagSuggestion[];
   categories: [string, string][];
+  /** Category key to its colour (`#rrggbb`). */
+  colours: Record<string, string>;
   entities: Entity[];
   places: Record<string, { document_id: string; document_title: string; heading: string }>;
 }
@@ -136,6 +138,13 @@ interface TagsPluginState {
 
 export const tagsPluginKey = new PluginKey<TagsPluginState>("cirth-tags");
 
+// Each category's colour, as the core last sent it (tags_state); tagged text
+// is underlined in it.
+let colours: Record<string, string> = {};
+export function setTagColours(c: Record<string, string>) {
+  colours = c ?? {};
+}
+
 function buildTagDecorations(doc: PMNode, tags: TagView[], documentId: string | null): DecorationSet {
   if (!documentId || !tags.length) return DecorationSet.empty;
   const byBlock = new Map<string, TagView[]>();
@@ -160,6 +169,7 @@ function buildTagDecorations(doc: PMNode, tags: TagView[], documentId: string | 
         decos.push(
           Decoration.inline(pos + 1 + fromU16, pos + 1 + toU16, {
             class: "cirth-tag-mark",
+            style: colours[t.category] ? `--tag-colour: ${colours[t.category]}` : "",
             "data-tag-id": t.id,
             "data-tag-category": t.category,
             title: `${t.category}: ${t.entity_name}${t.note ? " — " + t.note : ""}`,
@@ -214,6 +224,7 @@ export function createBreakdownTags(hooks: {
   apply: (op: TagOp) => Promise<boolean>;
   undo: () => Promise<boolean>;
   addCategory: (label: string) => Promise<[string, string]>;
+  setColour: (category: string, colour: string | null) => Promise<Record<string, string>>;
   selection: () => SelectionAnchor | null;
   currentDocument: () => string | null;
   decorate: (tags: TagView[]) => void;
@@ -253,6 +264,33 @@ export function createBreakdownTags(hooks: {
   newCatInput.setAttribute("aria-label", "New category name");
   const newCatBtn = el("button", { type: "button", id: "tags-add-category" }, "Add Category");
 
+  // Category colours: one swatch each; choosing a colour recolours the script and lists.
+  const coloursBox = el("details", { className: "tags-colours", id: "tags-colours" });
+  coloursBox.append(el("summary", {}, "Category colours"));
+  const coloursRow = el("div", { className: "tags-colours-row" });
+  coloursBox.append(coloursRow);
+  function drawColours() {
+    coloursRow.replaceChildren(
+      ...st.categories.map(([k, label]) => {
+        const input = el("input", { type: "color", value: st.colours?.[k] ?? "#888888" });
+        input.dataset.category = k;
+        input.setAttribute("aria-label", `${label} colour`);
+        input.addEventListener("change", async () => {
+          try {
+            st.colours = await hooks.setColour(k, input.value);
+            setTagColours(st.colours);
+            hooks.decorate(st.tags);
+            drawLists();
+            announce(`${label} tags are now shown in the new colour`);
+          } catch (e) {
+            status.textContent = `Could not change the colour: ${e}`;
+          }
+        });
+        return el("label", { className: "tags-colour" }, input, label);
+      }),
+    );
+  }
+
   const toolbar = el(
     "div",
     { className: "tags-toolbar" },
@@ -270,10 +308,10 @@ export function createBreakdownTags(hooks: {
 
   const undoBtn = el("button", { type: "button", id: "tags-undo", disabled: true }, "Undo");
   const closeBtn = el("button", { type: "button", id: "tags-close" }, "Close");
-  dialog.append(h, status, selPanel, toolbar, cols, el("div", { className: "dialog-actions" }, undoBtn, closeBtn));
+  dialog.append(h, status, selPanel, toolbar, coloursBox, cols, el("div", { className: "dialog-actions" }, undoBtn, closeBtn));
   document.body.append(dialog);
 
-  let st: TagsState = { tags: [], suggestions: [], categories: [], entities: [], places: {} };
+  let st: TagsState = { tags: [], suggestions: [], categories: [], colours: {}, entities: [], places: {} };
   let activeSel: SelectionAnchor | null = null;
   let steps = 0;
 
@@ -298,8 +336,10 @@ export function createBreakdownTags(hooks: {
 
   async function reload() {
     st = await hooks.state();
+    setTagColours(st.colours);
     hooks.decorate(st.tags);
     syncCategoryFilter();
+    drawColours();
     drawSelectionBox();
     drawLists();
   }
@@ -490,6 +530,7 @@ export function createBreakdownTags(hooks: {
         { className: "tags-badge" },
         t.orphaned ? `⚠ Orphaned · ${catLabel(t.category)}` : catLabel(t.category),
       );
+      if (st.colours?.[t.category]) badge.style.setProperty("--tag-colour", st.colours[t.category]);
       const titleSpan = el(
         "span",
         { className: "tags-item-main" },

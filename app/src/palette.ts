@@ -1,6 +1,6 @@
-// Command Palette / Quick Switcher (Ctrl+K / Cmd+K)
-// Fast fuzzy/substring search to instantly jump to scenes, characters,
-// outline beats, or run any application command without leaving the keyboard.
+// Go To Anything (Go To > Go To Anything…, Ctrl/Cmd+K): one search box that
+// jumps to a scene, to a character's first speech, or runs a command, without
+// leaving the keyboard.
 
 import type { EditorView } from "prosemirror-view";
 
@@ -13,15 +13,15 @@ export interface PaletteAction {
 }
 
 export function installCommandPalette(
-  getView: () => EditorView | undefined,
+  _getView: () => EditorView | undefined,
   getActions: () => PaletteAction[],
-  getScenes: () => { number: string; heading: string; pos: number }[],
-  getCharacters: () => { name: string; count: number }[],
+  getScenes: () => { number: string; heading: string; go: () => void }[],
+  getCharacters: () => { name: string; count: number; go: () => void }[],
   notify: (msg: string) => void
 ) {
   const dlg = document.createElement("dialog");
   dlg.className = "palette-dialog";
-  dlg.setAttribute("aria-label", "Command Palette");
+  dlg.setAttribute("aria-label", "Go To Anything");
 
   dlg.innerHTML = `
     <div class="palette-wrap">
@@ -60,18 +60,7 @@ export function installCommandPalette(
     const scenes = getScenes();
     for (const sc of scenes) {
       const label = sc.number ? `${sc.number}. ${sc.heading}` : sc.heading;
-      items.push({
-        id: `scene-${sc.pos}`,
-        title: label,
-        category: "Scenes",
-        hint: "Jump to scene",
-        run: () => {
-          const v = getView();
-          if (!v) return;
-          v.dispatch(v.state.tr.setSelection((v.state.selection.constructor as any).near(v.state.doc.resolve(sc.pos))).scrollIntoView());
-          v.focus();
-        },
-      });
+      items.push({ id: `scene-${label}`, title: label, category: "Scenes", hint: "Go to scene", run: sc.go });
     }
 
     // Add characters
@@ -81,10 +70,8 @@ export function installCommandPalette(
         id: `char-${ch.name}`,
         title: ch.name,
         category: "Characters",
-        hint: `${ch.count} speech${ch.count === 1 ? "" : "es"}`,
-        run: () => {
-          notify(`Character: ${ch.name} (${ch.count} speeches)`);
-        },
+        hint: `${ch.count} speech${ch.count === 1 ? "" : "es"} · go to the first`,
+        run: ch.go,
       });
     }
 

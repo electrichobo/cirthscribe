@@ -430,6 +430,8 @@ struct TagView {
 
 #[derive(Serialize)]
 struct TagsState {
+    /// Category key to its colour (`#rrggbb`).
+    colours: std::collections::BTreeMap<String, String>,
     tags: Vec<TagView>,
     suggestions: Vec<cirth_core::tags::TagSuggestion>,
     categories: Vec<(String, String)>,
@@ -503,7 +505,17 @@ async fn tags_state(app: State<'_, App>) -> Result<TagsState, String> {
             })
             .collect();
         let categories = s.store.tag_categories().map_err(err)?;
-        Ok(TagsState { tags, suggestions, categories, entities, places })
+        let colours = s.store.tag_colours().map_err(err)?;
+        Ok(TagsState { tags, suggestions, categories, colours, entities, places })
+    })
+}
+
+/// Breakdown Tags: a category's colour (`#rrggbb`), or `None` for its default.
+#[tauri::command]
+async fn set_tag_colour(app: State<'_, App>, category: String, colour: Option<String>) -> Result<std::collections::BTreeMap<String, String>, String> {
+    with_session(&app, |s| {
+        s.store.set_tag_colour(&category, colour.as_deref()).map_err(err)?;
+        s.store.tag_colours().map_err(err)
     })
 }
 
@@ -2329,7 +2341,13 @@ struct RevisionState {
 
 fn revision_state_of(s: &Session) -> Result<RevisionState, String> {
     let main = s.store.current_document().map_err(err)?;
-    let sets = s.store.revision_sets(&main).map_err(err)?;
+    let mut sets = s.store.revision_sets(&main).map_err(err)?;
+    // Every script starts with its original White set (owner, 2026-11-03).
+    if sets.is_empty() {
+        let white = revisions::original();
+        s.store.put_revision_set(&main, &white).map_err(err)?;
+        sets.push(white);
+    }
     let blocks = s.store.load().map_err(err)?.blocks;
     let (next_colour, next_label) = revisions::next_set(&sets);
     Ok(RevisionState {
@@ -2363,7 +2381,16 @@ async fn revision_command(app: State<'_, App>, action: String, set: Option<Revis
                     s.store.set_active_revision(&main, Some(&set.id)).map_err(err)?;
                 }
             }
-            "delete" => s.store.delete_revision_set(&main, &id.ok_or("no revision set")?).map_err(err)?,
+            "delete" => {
+                // The UI clears the set's marks first (undoably); the later sets then close up the colour order.
+                s.store.delete_revision_set(&main, &id.ok_or("no revision set")?).map_err(err)?;
+                let sets = s.store.revision_sets(&main).map_err(err)?;
+                for (old, new) in sets.iter().zip(revisions::close_up(&sets)) {
+                    if *old != new {
+                        s.store.put_revision_set(&main, &new).map_err(err)?;
+                    }
+                }
+            }
             "activate" => s.store.set_active_revision(&main, id.as_deref()).map_err(err)?,
             "mode" => s.store.set_revision_mode(&main, on.unwrap_or(false)).map_err(err)?,
             other => return Err(format!("unknown revision action {other}")),
@@ -3670,27 +3697,6 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
             false,
         )?)
         .build()?;
-    // Every panel the writer can show or hide. Later panels (outline, bible,
-    // timeline, notes) join here as they are built.
-    let tools = SubmenuBuilder::new(app, "Tools")
-        .item(&check_item(app, "view_nav", "Scene List", true)?)
-        .item(&check_item(app, "view_board", "Board", true)?)
-        .item(&check_item(app, "view_notes", "Notes", false)?)
-        .text("overview", "Overview…")
-        .text("storyscry", "StoryScry…")
-        .text("stripboard", "Stripboard…")
-        .text("sides", "Character Sides…")
-        .text("tags", "Breakdown Tags…")
-        .text("comments", "Comments…")
-        .text("alt_take", "Alternate Takes…")
-        .text("bible", "Bible…")
-        .text("timeline", "Timeline…")
-        .text("evidence", "Evidence Board…")
-        .separator()
-        .text("popout_nav", "Scene List in Its Own Window")
-        .text("popout_board", "Board in Its Own Window")
-        .text("popout_notes", "Notes in Their Own Window")
-        .build()?;
     let theme = SubmenuBuilder::new(app, "Theme")
         .item(&check_item(app, "theme_system", "Match System", true)?)
         .separator()
@@ -3698,6 +3704,8 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .item(&check_item(app, "theme_night", "Night", false)?)
         .item(&check_item(app, "theme_midnight", "Midnight", false)?)
         .item(&check_item(app, "theme_oled", "OLED (true black)", false)?)
+        .separator()
+        .text("ui_contrast", "High Contrast")
         .build()?;
     let appearance = SubmenuBuilder::new(app, "Appearance")
         .item(&theme)
@@ -3705,17 +3713,6 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .text("ui_larger", keyed("Larger Interface", "="))
         .text("ui_smaller", keyed("Smaller Interface", "-"))
         .text("ui_reset", keyed("Actual Size", "0"))
-        .separator()
-        .text("ui_contrast", "High Contrast")
-        .build()?;
-    let go_to = SubmenuBuilder::new(app, "Go To")
-        .text("command_palette", keyed("Command Palette…", "K"))
-        .separator()
-        .text("goto_page", keyed("Page…", "G"))
-        .text("goto_scene", keyed("Scene…", "Shift+G"))
-        .separator()
-        .text("bookmark_add", "Add Bookmark Here…")
-        .text("bookmarks", "Bookmarks…")
         .build()?;
     let window = SubmenuBuilder::new(app, "Window")
         .text("win_minimize", "Minimise")
@@ -3725,14 +3722,54 @@ fn view_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>
         .build()?;
     SubmenuBuilder::new(app, "View")
         .item(&mode)
-        .item(&tools)
         .separator()
         .item(&check_item(app, "view_toolbar", "Toolbar", true)?)
         .item(&check_item(app, "view_status", "Status Bar", true)?)
         .separator()
         .item(&appearance)
-        .item(&go_to)
         .item(&window)
+        .build()
+}
+
+/// The writer's tools: panels to show or hide, the tool windows, and pop-outs.
+fn tools_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::SubmenuBuilder;
+    SubmenuBuilder::new(app, "Tools")
+        .item(&check_item(app, "view_nav", "Scene List", true)?)
+        .item(&check_item(app, "view_board", "Notecard View", true)?)
+        .item(&check_item(app, "view_notes", "Thoughts", false)?)
+        .separator()
+        .text("storyscry", "StoryScry…")
+        .text("overview", "Overview…")
+        .text("bible", "Bible…")
+        .text("timeline", "Timeline…")
+        .text("evidence", "Cork Board…")
+        .separator()
+        .text("tags", "Breakdown Tags…")
+        .text("stripboard", "Stripboard…")
+        .text("sides", "Character Sides…")
+        .separator()
+        .text("comments", "Feedback…")
+        .text("alt_take", "Alternate Takes…")
+        .text("branches", "Branches…")
+        .separator()
+        .text("popout_nav", "Scene List in Its Own Window")
+        .text("popout_board", "Notecard View in Its Own Window")
+        .text("popout_notes", "Thoughts in Their Own Window")
+        .build()
+}
+
+/// Moving around the script: search, page, scene, character, bookmarks.
+fn go_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::SubmenuBuilder;
+    SubmenuBuilder::new(app, "Go To")
+        .text("command_palette", keyed("Go To Anything…", "K"))
+        .separator()
+        .text("goto_page", keyed("Page…", "G"))
+        .text("goto_scene", keyed("Scene…", "Shift+G"))
+        .separator()
+        .text("bookmark_add", "Add Bookmark Here…")
+        .text("bookmarks", "Bookmarks…")
         .build()
 }
 
@@ -3833,7 +3870,6 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
     let help = SubmenuBuilder::new(app, "Help")
         .text("tour", "Software Tour…")
         .text("shortcuts", "Keyboard Shortcuts…")
-        .text("latency", "Typing Latency…")
         .separator()
         .text("updates", "Check for Updates…")
         .text("licences", "Licences…");
@@ -3841,6 +3877,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
     let help = help.text("about", "About Kolbítar");
     let help = help.build()?;
     let (file, edit, view, format) = (file_menu(app)?, edit_menu(app)?, view_menu(app)?, format_menu(app)?);
+    let (tools, go) = (tools_menu(app)?, go_menu(app)?);
     #[cfg(target_os = "macos")]
     {
         // Our own About screen (with the licences) instead of the bare native one.
@@ -3858,10 +3895,10 @@ fn build_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
             .separator()
             .item(&quit)
             .build()?;
-        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view, &format, &help]).build();
+        return MenuBuilder::new(app).items(&[&app_menu, &file, &edit, &view, &format, &tools, &go, &help]).build();
     }
     #[cfg(not(target_os = "macos"))]
-    MenuBuilder::new(app).items(&[&file, &edit, &view, &format, &help]).build()
+    MenuBuilder::new(app).items(&[&file, &edit, &view, &format, &tools, &go, &help]).build()
 }
 
 /// Set check marks in the native menu (radio-like groups such as page size
@@ -4067,6 +4104,7 @@ fn main() {
             export_report,
             tags_state,
             add_tag_category,
+            set_tag_colour,
             comments_state,
             comments_add_thread,
             comments_add_reply,

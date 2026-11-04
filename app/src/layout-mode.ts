@@ -56,7 +56,7 @@ export function createLayoutMode(opts: { zoom: () => number; panes: HTMLElement;
       const first = opts.panels[side].querySelector<HTMLElement>('[tabindex="0"], button, textarea, input');
       first?.focus();
     }
-    announce(`${side === "nav" ? "Scene list" : "Board"} ${open ? "open over the script" : "closed"}`);
+    announce(`${side === "nav" ? "Scene list" : "Notecard view"} ${open ? "open over the script" : "closed"}`);
   }
 
   function closeFloats() {

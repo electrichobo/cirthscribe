@@ -55,7 +55,7 @@ export function createReviewDialog(hooks: {
   const note = document.createElement("p");
   note.className = "form-note";
   note.textContent =
-    "Inspect outside notes, comment threads, and alternate takes before merging them cleanly into your script.";
+    "Look over a reader's feedback and alternate takes before bringing them into your script.";
 
   head.append(h, note);
 
@@ -96,7 +96,7 @@ export function createReviewDialog(hooks: {
   importBtn.type = "button";
   importBtn.id = "review-import-btn";
   importBtn.className = "btn btn-primary";
-  importBtn.textContent = "Import Review Notes";
+  importBtn.textContent = "Import Feedback";
   importBtn.disabled = true;
 
   foot.append(cancelBtn, importBtn);
@@ -132,7 +132,7 @@ export function createReviewDialog(hooks: {
       statsGrid.innerHTML = `
         <div class="review-stat-box">
           <span class="stat-num">${summary.comment_thread_count}</span>
-          <span class="stat-label">Comment Threads</span>
+          <span class="stat-label">Feedback Threads</span>
         </div>
         <div class="review-stat-box">
           <span class="stat-num">${summary.comment_message_count}</span>
@@ -149,7 +149,7 @@ export function createReviewDialog(hooks: {
       if (!dialog.open) {
         dialog.showModal();
       }
-      announce(`Review package inspected: ${summary.comment_thread_count} threads and ${summary.alternative_count} alternatives found.`);
+      announce(`Review package: ${summary.comment_thread_count} feedback threads and ${summary.alternative_count} alternate takes.`);
       return summary;
     } catch (e) {
       announce(`Cannot open review package: ${e}`);

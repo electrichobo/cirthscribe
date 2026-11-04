@@ -68,7 +68,7 @@ export function createEvidenceBoard(hooks: {
   const tools = el("div", { className: "evidence-tools" });
   const canvas = el("div", { className: "evidence-canvas", id: "evidence-canvas" });
   canvas.setAttribute("role", "group");
-  canvas.setAttribute("aria-label", "Evidence board: Tab reaches each card, Alt+arrows move it, Enter edits it, Delete removes it");
+  canvas.setAttribute("aria-label", "Cork board: Tab reaches each card, Alt+arrows move it, Enter edits it, Delete removes it");
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "evidence-strings");
   svg.setAttribute("aria-hidden", "true");
@@ -80,7 +80,7 @@ export function createEvidenceBoard(hooks: {
   asList.setAttribute("aria-pressed", "false");
   const close = el("button", { type: "button", id: "evidence-close" }, "Close");
   dialog.append(
-    el("h2", { id: "evidence-title" }, "Evidence board"),
+    el("h2", { id: "evidence-title" }, "Cork Board"),
     el("div", { className: "evidence-bar" }, tools, status),
     el("div", { className: "evidence-cols" }, el("div", { className: "evidence-main" }, scroller, listView), detail),
     el("div", { className: "dialog-actions" }, asList, undoBtn, close),

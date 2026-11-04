@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**0.8.1 RC Alpha** (owner, 2026-11-02): first test release for a tester group, not 1.0. Version set to 0.8.1; README is now the public product page; the milestone checklist moved to STATUS.md. Decisions in docs/DECISIONS.md ("Release stage", "Home samples", identifier, fonts).
+**0.8.2** (owner, 2026-11-03): all of the owner's notes in `docs/0.8.2_PLAN.md` (sections A–C), plus Linux builds and the 0.8.1 known issues. 0.8.1 RC Alpha is tagged (`v0.8.1`); its GitHub release is the owner's step.
 
 ## Completed & Verified
 
@@ -17,17 +17,16 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
   - Fonts: Noto Sans Hebrew, Arabic, Devanagari, SC (screen; `unicode-range`). PDF prints Hebrew/Arabic/Devanagari via rustybuzz + unicode-bidi (owner-approved): visual order per paragraph direction, shaped, squeezed to the layout's columns; fallbacks embedded only when used. CJK screen only (CFF outlines). Sample PDF checked by eye (`out/fontcheck/`).
   - Licences: OFL.txt per font, LICENSES.md, notices regenerated (371).
 - **Verified 2026-11-02 (Windows):** `cargo test -p cirth-core` 192/192 (new PDF fallback test); `cargo test -p cirthscribe` 1/1; `npm run build`; release build; contract 4/4; offline audit passed; notices check (371); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME).
+- **0.8.2 section A built (2026-11-03, uncommitted):** tour rebuilt (theme colours, 10 cards, icon art); Tools and Go To top-level menus; Go To Anything fixes; renames (Feedback, Cork Board, Notecard View, Thoughts); island Overview/StoryScry and a text-formatting panel; StoryScry Back; Home Import; About "The name" (wording awaiting owner); revision sets (Original White, delete + close-up, Lock Pages offer); tag colours; icons at 96 px. Details under "Built" in `docs/0.8.2_PLAN.md`. Verified: core tests pass (incl. new revision and tag-colour tests), contract 4/4, CDP 88/88, WebDriver 87/88 (1 skipped IME).
 - **0.8.1 release prep:** version 0.8.1 (Cargo workspace, `app/package.json`, lockfile); public README (Download with unsigned-installer steps, How you can help via GitHub Issues, Known limits); README's stage checklist moved to STATUS.md. Owner checked N54 and the `.deb` icons (pass).
 - **Earlier today:** owner art, dark icon set, document icons, Finder double-click (N52, N53 pass).
 - **Not verified:** migration on a real old data folder; installer size with the 8.3 MB CJK font. Open: Home list blank on two macOS cold launches (not reproduced). Enter-miss under stress: not a blocker (owner).
 
 ## In-Progress / Uncommitted State
 
-- None in git (committed 2026-11-02). Builds: Windows `target/release/bundle/nsis/Kolbítar_0.8.1_x64-setup.exe` (SHA-256 90766fb1…), Mac on GROGU `~/kolbitar-n52/target/release/bundle/dmg/Kolbítar_0.8.1_aarch64.dmg` (SHA-256 b53721c1…). Release notes draft: `out/release-notes-0.8.1.md` (not in git).
+- None. Section A committed and pushed (2026-11-03).
 
 ## Next Immediate Step
 
-0. Owner shipping 0.8.1 as is (2026-11-02); known issues for the next build: sample card shows the file name once opened; Comments panel stays on Home after Close Project; "PDF written" banner persists across projects; Arabic gap in PDFs.
-1. Release builds: Windows NSIS here; macOS DMG on GROGU (aarch64); Linux `.deb` and AppImage from the next update (owner, 2026-11-02).
-2. Publish the GitHub release "Kolbítar 0.8.1 RC Alpha" (pre-release) with the three builds and notes, only with the owner's go-ahead.
-3. Testers report through GitHub Issues; transcribe manual check results into MANUAL_CHECKS.md.
+1. Section B: pop-outs (Thoughts, StoryScry, Feedback), Thoughts formatting, Home right-click menu and sorting, title page and header/footer previews, runtime rail, sprint mode, simpler Branches.
+2. Section C redesigns, PDF import, 0.8.1 known issues, Linux build.

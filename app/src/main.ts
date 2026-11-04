@@ -33,7 +33,7 @@ import { createLatency } from "./latency";
 import { createFocusMode } from "./focus";
 import { createViewMenu } from "./viewmenu";
 import { createFormatBar } from "./formatbar";
-import { icon, iconButton, iconSelect } from "./icons";
+import { icon, iconButton } from "./icons";
 import { createLayoutMode } from "./layout-mode";
 import { createTitlePageDialog } from "./titlepage";
 import { createFurnitureDialog } from "./furniture";
@@ -46,7 +46,7 @@ import { createOverview, type OverviewData, type OverviewScene } from "./overvie
 import { createStoryScry, type ExportableReport, type ReportBundle, type ReportExported, type ReportFormat, type ReportScope } from "./storyscry";
 import { createStripboard } from "./stripboard";
 import { createCharacterSides } from "./sides";
-import { createBreakdownTags, charToUtf16Offset, selectionAnchor, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
+import { createBreakdownTags, charToUtf16Offset, selectionAnchor, setTagColours, tagsPlugin, tagsPluginKey, type TagOp, type TagsState, type TagView } from "./tags";
 import { createCommentsDialog, commentsPlugin } from "./comments";
 import { createAlternativesManager, alternativesPlugin, type AlternativesManager } from "./alternatives";
 import { createSnapshotsDialog } from "./snapshots";
@@ -649,7 +649,7 @@ const planUndo = () =>
 // The evidence board (M3 step 9): cards and strings are planning data; pictures are packaged; links are never fetched.
 const evidence = createEvidenceBoard({
   state: () => invoke("evidence_state"),
-  apply: (op: EvidenceOp) => planOp(op, "Evidence board"),
+  apply: (op: EvidenceOp) => planOp(op, "Cork board"),
   undo: planUndo,
   sources: async () => {
     const places = (await invoke<{ places: Record<string, { document_title: string; heading: string }> }>("evidence_state")).places;
@@ -715,6 +715,7 @@ async function refreshTagDecorations() {
   if (!view || !lastOpen) return;
   try {
     const st = await invoke<TagsState>("tags_state");
+    setTagColours(st.colours);
     decorateTags(st.tags);
   } catch {
     // Decoration is visual only; never block editing.
@@ -729,6 +730,7 @@ const breakdownTags = createBreakdownTags({
   apply: (op: TagOp) => planOp(op, "Breakdown tags"),
   undo: planUndo,
   addCategory: (label) => invoke<[string, string]>("add_tag_category", { label }),
+  setColour: (category, colour) => invoke<Record<string, string>>("set_tag_colour", { category, colour }),
   selection: () => selectionAnchor(view ?? null, lastOpen?.document_id ?? null),
   currentDocument: () => lastOpen?.document_id ?? null,
   decorate: decorateTags,
@@ -1362,7 +1364,7 @@ const commandPalette = installCommandPalette(
     { id: "stripboard", title: "Stripboard and Schedule…", category: "Commands", run: () => void runMenu("stripboard") },
     { id: "character_sides", title: "Character Sides…", category: "Commands", run: () => void runMenu("sides") },
     { id: "breakdown_tags", title: "Breakdown Tags…", category: "Commands", run: () => void runMenu("tags") },
-    { id: "comments", title: "Comments…", category: "Commands", run: () => void runMenu("comments") },
+    { id: "comments", title: "Feedback…", category: "Commands", run: () => void runMenu("comments") },
     { id: "alternate_takes", title: "Alternate Takes…", category: "Commands", run: () => void runMenu("alt_take") },
     { id: "snapshots", title: "Snapshots…", category: "Commands", run: () => void runMenu("snapshots") },
     { id: "export_review", title: "Export Review Package…", category: "Commands", run: () => void runMenu("export_review") },
@@ -1370,7 +1372,7 @@ const commandPalette = installCommandPalette(
     { id: "branches", title: "Branches…", category: "Commands", run: () => void runMenu("branches") },
     { id: "bible", title: "Project Bible…", category: "Commands", run: () => void bible.open() },
     { id: "timeline", title: "Story Timeline…", category: "Commands", run: () => void timeline.open() },
-    { id: "evidence", title: "Evidence Board…", category: "Commands", run: () => void evidence.open() },
+    { id: "evidence", title: "Cork Board…", category: "Commands", run: () => void evidence.open() },
     { id: "project_tree", title: "Episodes and Documents…", category: "Commands", run: () => void projectTree.open() },
     { id: "personal_dictionary", title: "Personal Dictionary…", category: "Commands", run: () => void dictDialog.open() },
     { id: "tour", title: "Software Tour…", category: "Commands", run: () => tourDialog.open(true) },
@@ -1385,21 +1387,33 @@ const commandPalette = installCommandPalette(
     return scenes.map((s) => ({
       number: sceneNumbers.get(s.sceneId)?.number ?? String(s.index),
       heading: s.heading,
-      pos: s.from,
+      go: () => revealScene(view, s.sceneId),
     }));
   },
   () => {
     if (!view || !lastOpen) return [];
-    const counts = new Map<string, number>();
-    view.state.doc.forEach((n) => {
+    // Each character's speech count and the position of their first cue.
+    const found = new Map<string, { count: number; at: number }>();
+    view.state.doc.forEach((n, offset) => {
       if (n.attrs.kind === "character") {
         const raw = n.textContent.replace(/\s*\(.*$/, "").trim().toUpperCase();
-        if (raw) counts.set(raw, (counts.get(raw) || 0) + 1);
+        if (!raw) return;
+        const f = found.get(raw);
+        if (f) f.count++;
+        else found.set(raw, { count: 1, at: offset + 1 });
       }
     });
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => ({ name, count }));
+    return [...found.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([name, f]) => ({
+        name,
+        count: f.count,
+        go: () => {
+          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, f.at)).scrollIntoView());
+          view.focus();
+          announce(`${name}, first speech`);
+        },
+      }));
   },
   showBanner
 );
@@ -1470,11 +1484,15 @@ notesFlush = () => notesPanel.flush();
 onPanelsChanged(() => {
   if (currentPrefs().panels.notes) notesPanel.shown();
 });
-const revisions = createRevisions(() => view ?? null, () => {
-  syncMenuChecks();
-  void repaginate();
-  void saveFile(false).catch(() => undefined);
-});
+const revisions = createRevisions(
+  () => view ?? null,
+  () => {
+    syncMenuChecks();
+    void repaginate();
+    void saveFile(false).catch(() => undefined);
+  },
+  () => syncer.flush(),
+);
 const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(navigator.userAgent));
 // Screen font and size: on screen only (pages and exports keep Courier Prime 12 pt).
 {
@@ -1491,12 +1509,53 @@ const formatBar = createFormatBar($("format-island"), () => view, /Mac/i.test(na
   size.title = "Size of the script text on screen only";
   for (let pt = 10; pt <= 20; pt++) size.append(new Option(`${pt} pt`, String(pt)));
   size.addEventListener("change", () => void setScreenSize(Number(size.value)));
-  const fontWrap = iconSelect("font", font);
-  island.append(fontWrap, size);
+  // Text formatting folds into one panel under the font icon (owner, 2026-11-03):
+  // bold, italic, underline, colour and highlight, then the screen font and size.
+  // The element list stays on the island. The panel stays open while you format.
+  const pop = document.createElement("div");
+  pop.id = "format-pop";
+  pop.className = "format-pop";
+  pop.setAttribute("role", "group");
+  pop.setAttribute("aria-label", "Text formatting");
+  pop.hidden = true;
+  const marksRow = document.createElement("div");
+  marksRow.className = "format-pop-row";
+  marksRow.append(...[...island.children].slice(1));
+  const screenRow = document.createElement("div");
+  screenRow.className = "format-pop-row";
+  const fontLabel = document.createElement("label");
+  fontLabel.append("Screen font ", font);
+  screenRow.append(fontLabel, size);
+  const note = document.createElement("p");
+  note.className = "format-pop-note";
+  note.textContent = "Colour, highlight and screen font are for you only: pages and exports always print Courier Prime 12 pt.";
+  pop.append(marksRow, screenRow, note);
+  const formatBtn = iconButton("tool-format", "font", "Text formatting", "Text formatting: bold, italic, underline, colour, highlight, screen font");
+  formatBtn.setAttribute("aria-haspopup", "true");
+  formatBtn.setAttribute("aria-expanded", "false");
+  formatBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  const setOpen = (open: boolean, focus = false) => {
+    pop.hidden = !open;
+    formatBtn.setAttribute("aria-expanded", String(open));
+    formatBtn.setAttribute("aria-pressed", String(open));
+    if (open && focus) pop.querySelector<HTMLElement>("button, select")?.focus();
+  };
+  formatBtn.addEventListener("click", () => setOpen(pop.hidden !== false, !usedPointer()));
+  pop.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      setOpen(false);
+      formatBtn.focus();
+    }
+  });
+  document.addEventListener("mousedown", (e) => {
+    if (!pop.hidden && !pop.contains(e.target as Node) && !formatBtn.contains(e.target as Node)) setOpen(false);
+  });
+  island.append(formatBtn);
+  $("island").append(pop);
   const show = () => {
     const p = currentPrefs();
     font.value = p.editor_font;
-    fontWrap.dataset.value = p.editor_font;
     size.value = String(p.editor_size);
   };
   onPanelsChanged(show);
@@ -1537,7 +1596,7 @@ const layoutMode = createLayoutMode({
   // In the floating layout these open the panel over the script instead.
   // A panel in its own window comes to the front instead (ADR 0004).
   navBtn.addEventListener("click", () => (panelHost.isPopped("nav") ? void panelHost.popOut("nav") : layoutMode.mode === "overlay" && currentPrefs().panels.nav ? layoutMode.toggleFloat("nav") : void togglePanel("nav")));
-  const boardBtn = iconButton("toggle-board", "board", "Board", "Show or hide the board");
+  const boardBtn = iconButton("toggle-board", "board", "Notecard view", "Show or hide the notecard view");
   boardBtn.addEventListener("click", () => (panelHost.isPopped("board") ? void panelHost.popOut("board") : layoutMode.mode === "overlay" && currentPrefs().panels.board ? layoutMode.toggleFloat("board") : void togglePanel("board")));
   const findBtn = iconButton("tool-find", "find", "Find and replace", `Find and replace (${mod}+F)`);
   findBtn.addEventListener("click", () => {
@@ -1545,11 +1604,13 @@ const layoutMode = createLayoutMode({
   });
   const focusBtn = iconButton("tool-focus", "focus", "Focus mode", `Focus mode: only the script, full screen (${mod}+Shift+F)`);
   focusBtn.addEventListener("click", () => void focusMode.toggle());
-  // Comments come with M5 (anchored threads). Until then the button only says
-  // so (owner, 2026-10-28): it changes nothing.
-  const commentBtn = iconButton("tool-comments", "comment", "Comments", "Comments: threads anchored to the script");
+  const commentBtn = iconButton("tool-comments", "comment", "Feedback", "Feedback: notes anchored to the script");
   commentBtn.addEventListener("click", () => void runMenu("comments"));
-  $("island-panels").append(navBtn, boardBtn, findBtn, commentBtn, focusBtn);
+  const overviewBtn = iconButton("tool-overview", "overview", "Overview", "Overview: the whole script as blocks sized by length");
+  overviewBtn.addEventListener("click", () => void runMenu("overview"));
+  const scryBtn = iconButton("tool-storyscry", "storyscry", "StoryScry", "StoryScry: charts and reports on the script");
+  scryBtn.addEventListener("click", () => void runMenu("storyscry"));
+  $("island-panels").append(navBtn, boardBtn, overviewBtn, scryBtn, findBtn, commentBtn, focusBtn);
   ($("view-menu-btn") as HTMLButtonElement).append(icon("more"));
   const showPressed = () => {
     const overlay = layoutMode.mode === "overlay";
@@ -1591,6 +1652,7 @@ const home = createHome($("home"), {
   openPath: (path) => openWith("open_path", { path }),
   restoreBackup: (path) => openWith("restore_backup", { path }),
   openSample: (name) => open(name, false),
+  importScript: () => importAny(),
   openFreeWriting: () => void openFreeWriting(),
   openAbout: () => void about.open(),
   createProject: (title) => openWith("create_project", { title }),
@@ -2052,6 +2114,18 @@ async function pageLockAction(id: string) {
     announce(id === "pages_lock" ? `Pages locked: ${n} pages. Added text now goes onto A pages; later pages keep their numbers` : "Pages unlocked");
   } catch (e) {
     showBanner(`Locked pages: ${e}`);
+    return;
+  }
+  // Locked pages usually go with a revision set (owner, 2026-11-03): offer to start one.
+  if (id === "pages_lock" && !revisions.state.active) {
+    await revisions.refresh();
+    const next = revisions.state.next_label;
+    const ok = await confirmDialog(
+      "Add these changes as a revision?",
+      `Pages are locked. Changes from now on are usually marked in a revision set, so the pages they touch print as revised in that colour. Start ${next} and turn on revision mode?`,
+      `Start ${next}`,
+    );
+    if (ok && (await revisions.setMode(true))) syncMenuChecks();
   }
 }
 
@@ -2253,7 +2327,7 @@ async function exportReviewPackage(path?: string, reviewer?: string): Promise<bo
   await syncer.flush();
   try {
     const r = await invoke<ReviewExportResult>("review_export", { path: target, reviewer: reviewer ?? null });
-    showBanner(`Review package exported: ${r.comment_thread_count} threads and ${r.alternative_count} alternate takes.`);
+    showBanner(`Review package exported: ${r.comment_thread_count} feedback threads and ${r.alternative_count} alternate takes.`);
     announce(`Review package exported to ${r.path}`);
     return true;
   } catch (e) {

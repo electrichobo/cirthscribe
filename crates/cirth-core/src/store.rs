@@ -1272,6 +1272,34 @@ impl Store {
         Ok((key, clean_label))
     }
 
+    /// Each category's colour (`#rrggbb`): the writer's choice, else the default.
+    pub fn tag_colours(&self) -> Result<std::collections::BTreeMap<String, String>> {
+        let chosen: std::collections::BTreeMap<String, String> = self.setting("project", "tag_colours")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        Ok(self
+            .tag_categories()?
+            .into_iter()
+            .map(|(k, _)| {
+                let c = chosen.get(&k).filter(|c| crate::tags::valid_colour(c)).cloned().unwrap_or_else(|| crate::tags::default_colour(&k).to_string());
+                (k, c)
+            })
+            .collect())
+    }
+
+    /// Set a category's colour (`#rrggbb`); `None` goes back to the default.
+    pub fn set_tag_colour(&self, category: &str, colour: Option<&str>) -> Result<()> {
+        if let Some(c) = colour {
+            if !crate::tags::valid_colour(c) {
+                return Err(StoreError::Invalid(format!("{c} is not a colour like #d64545")));
+            }
+        }
+        let mut chosen: std::collections::BTreeMap<String, String> = self.setting("project", "tag_colours")?.and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+        match colour {
+            Some(c) => chosen.insert(category.to_string(), c.to_ascii_lowercase()),
+            None => chosen.remove(category),
+        };
+        self.set_setting("project", "tag_colours", &serde_json::to_string(&chosen).unwrap_or_default())
+    }
+
     /// All breakdown tags in the project, ordered by document, block, and start offset.
     pub fn tags(&self) -> Result<Vec<crate::tags::Tag>> {
         let mut stmt = self.conn.prepare(

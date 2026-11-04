@@ -13,21 +13,21 @@ import { announce } from "./a11y";
 const POS_KEY = "cirth.notesPos";
 
 export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => void; close: () => void }) {
-  root.setAttribute("aria-label", "Notes");
+  root.setAttribute("aria-label", "Thoughts");
   const bar = document.createElement("div");
   bar.className = "notes-bar";
   const grip = document.createElement("button");
   grip.type = "button";
   grip.className = "notes-grip";
-  grip.textContent = "Notes";
+  grip.textContent = "Thoughts";
   grip.title = "Drag to move, or use the arrow keys";
-  grip.setAttribute("aria-label", "Notes panel: arrow keys move it");
+  grip.setAttribute("aria-label", "Thoughts panel: arrow keys move it");
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "notes-close";
   closeBtn.textContent = "✕";
-  closeBtn.setAttribute("aria-label", "Hide notes");
-  closeBtn.title = "Hide notes (View > Tools > Notes)";
+  closeBtn.setAttribute("aria-label", "Hide thoughts");
+  closeBtn.title = "Hide thoughts (Tools > Thoughts)";
   bar.append(grip, closeBtn);
   const text = document.createElement("textarea");
   text.id = "notes-text";
@@ -56,7 +56,7 @@ export function createNotesPanel(root: HTMLElement, hooks: { focusScript: () => 
       .catch((e) => {
         dirty = true;
         state.textContent = "NOT KEPT";
-        announce(`Notes not kept: ${e}`, true);
+        announce(`Thoughts not kept: ${e}`, true);
       });
     try {
       await saving;

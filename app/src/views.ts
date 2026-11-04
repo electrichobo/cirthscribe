@@ -654,7 +654,7 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
   const scenes = script.scenes();
   const byScene = new Map(scenes.map((s) => [s.sceneId, s]));
   const order = boardOrder(st.beats, scenes, st.structural);
-  const header = el("div", { className: "board-head" }, el("h2", {}, `Board (${order.length})`));
+  const header = el("div", { className: "board-head" }, el("h2", {}, `Notecards (${order.length})`));
   const badge = el("span", { className: `badge ${st.structural ? "live" : "planning"}` }, st.structural ? "Moves reorder the script" : "Planning only");
   const add = el("button", { type: "button" }, "New beat for current scene");
   add.addEventListener("click", async () => {
@@ -662,10 +662,10 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
     const beat: Beat = { id: newId(), logline: "", summary: "", scene_id: script.current() ?? null, pos: Math.max(0, ...top.map((b) => b.pos)) + 1, kind: "beat", title: "", parent: null };
     await script.putBeat(beat);
     rerender();
-    announce("New beat added at the end of the board");
+    announce("New card added at the end of the notecard view");
   });
   // Starting structures: generic act names only (never a trademarked method).
-  const structure = el("select", { className: "board-structure", id: "board-structure", title: "Add acts to the outline to divide the board" });
+  const structure = el("select", { className: "board-structure", id: "board-structure", title: "Add acts to the outline to divide the notecard view" });
   structure.setAttribute("aria-label", "Add acts from a starting structure");
   structure.append(new Option("Add acts…", ""), new Option("Three acts", "3"), new Option("Five acts", "5"), new Option("One more act", "1"));
   structure.addEventListener("change", async () => {

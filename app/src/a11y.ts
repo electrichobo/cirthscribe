@@ -40,7 +40,7 @@ export function announce(msg: string, urgent = false) {
 }
 
 export type Panel = "nav" | "board" | "toolbar" | "status" | "notes";
-export const PANEL_LABEL: Record<Panel, string> = { nav: "Scene list", board: "Board", toolbar: "Toolbar", status: "Status bar", notes: "Notes" };
+export const PANEL_LABEL: Record<Panel, string> = { nav: "Scene list", board: "Notecard view", toolbar: "Toolbar", status: "Status bar", notes: "Thoughts" };
 
 // Toolbar controls return focus to the script after a mouse action, but keep
 // it after a keyboard action (in the script Tab changes the block type, so a

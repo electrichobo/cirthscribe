@@ -88,7 +88,7 @@ function draw() {
     box.id = "structural";
     box.checked = last.structural;
     box.addEventListener("change", () => send({ cmd: "structural", on: box.checked }));
-    toggle.append(box, " Board may reorder script");
+    toggle.append(box, " Notecard view may reorder script");
     renderBoard(body, script, board, () => undefined, key?.split("|")[0]);
     root.replaceChildren(toggle, ...body.childNodes);
     send({ cmd: "rendered", items: last.beats.length, first: last.beats[0]?.logline ?? "" });
@@ -100,7 +100,7 @@ function drawNotes(text: string) {
   const head = document.createElement("div");
   head.className = "panel-head";
   const h = document.createElement("h2");
-  h.textContent = "Notes";
+  h.textContent = "Thoughts";
   head.append(h, dockButton());
   const area = document.createElement("textarea");
   area.id = "notes-text";

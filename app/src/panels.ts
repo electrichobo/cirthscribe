@@ -22,7 +22,7 @@ export interface NavWire {
 }
 
 export type PopPanel = "nav" | "board" | "notes";
-export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Board", notes: "Notes" };
+export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Notecard view", notes: "Thoughts" };
 
 /** What a panel window draws. */
 export interface PanelState {

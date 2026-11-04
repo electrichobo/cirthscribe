@@ -31,6 +31,8 @@ const PATHS: Record<string, string> = {
   storyscry: '<path d="M5 19h14M7 16V9M12 16V5M17 16v-4"/>',
   stripboard: '<rect x="4" y="4" width="16" height="3.5" rx="1"/><rect x="4" y="9.5" width="16" height="3.5" rx="1"/><rect x="4" y="15" width="16" height="3.5" rx="1"/>',
   tags: '<path d="m14 4 6 6-9.5 9.5a2 2 0 0 1-2.8 0L4.5 16.3a2 2 0 0 1 0-2.8z"/><circle cx="16.5" cy="7.5" r="1" fill="currentColor"/>',
+  evidence: '<rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><circle cx="8" cy="9" r="1.2" fill="currentColor"/><circle cx="16" cy="9.5" r="1.2" fill="currentColor"/><circle cx="11" cy="15.5" r="1.2" fill="currentColor"/><path d="m8 9 8 .5-5 6z"/>',
+  overview: '<rect x="3.5" y="5" width="4" height="14" rx="1"/><rect x="9.5" y="5" width="6" height="14" rx="1"/><rect x="17.5" y="5" width="3" height="14" rx="1"/>',
 
   // Formatting & Styling
   bold: '<path d="M6 5h6a3.5 3.5 0 0 1 0 7H6zM6 12h7a3.5 3.5 0 0 1 0 7H6z"/>',
@@ -73,7 +75,7 @@ const ART: Record<string, string> = {
   home: "home", undo: "undo", redo: "redo", find: "find", focus: "focus", more: "more",
   scenes: "scenes", board: "board", timeline: "timeline", bible: "bible", storyscry: "storyscry",
   stripboard: "stripboard", tags: "tag", highlight: "highlight", font: "font", comment: "comment",
-  branch: "branch", snapshot: "snapshots", grammar: "grammar", ai: "ai-assistant",
+  branch: "branch", snapshot: "snapshots", grammar: "grammar", ai: "ai-assistant", evidence: "evidence", overview: "overview",
 };
 
 export function icon(name: keyof typeof PATHS | string): SVGSVGElement {

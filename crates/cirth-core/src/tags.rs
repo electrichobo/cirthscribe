@@ -52,6 +52,36 @@ pub struct Tag {
     pub orphaned: bool,
 }
 
+/// Colour of a breakdown category, as `#rrggbb`. The standard categories
+/// follow the usual breakdown-sheet colours (cast red, stunts orange, extras
+/// green, effects blue, props violet, vehicles pink, sound brown); a
+/// writer-defined category takes a steady colour from a spare palette.
+/// The writer can change any of them (`Store::set_tag_colour`).
+pub fn default_colour(category: &str) -> &'static str {
+    match category {
+        "cast" => "#d64545",
+        "stunts" => "#e07b22",
+        "extras" => "#3f9e4d",
+        "vfx_sfx" => "#3a78d0",
+        "props" => "#8a4fc7",
+        "vehicles" => "#d6589c",
+        "sound" => "#8a5a33",
+        "costume" => "#c9a227",
+        "makeup" => "#2a9d9a",
+        "set_dressing" => "#6b7a8f",
+        other => {
+            const SPARE: [&str; 6] = ["#b3563a", "#4f7d2f", "#3d6fa3", "#9b4f8f", "#a6862c", "#3a8c7a"];
+            let h = other.bytes().fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(b as u32));
+            SPARE[(h as usize) % SPARE.len()]
+        }
+    }
+}
+
+/// Whether `c` is a colour `#rrggbb`.
+pub fn valid_colour(c: &str) -> bool {
+    c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
 /// A suggested breakdown tag found by matching a bible entry's name or alias
 /// in action text (M4 step 3). Never applied automatically; the writer can
 /// accept (creating a `Tag`) or reject (hiding this suggestion).
@@ -409,6 +439,15 @@ pub fn suggest(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn categories_have_breakdown_colours_and_custom_ones_are_steady() {
+        assert_eq!(default_colour("cast"), "#d64545");
+        assert_eq!(default_colour("props"), "#8a4fc7");
+        assert_eq!(default_colour("my_custom"), default_colour("my_custom"), "a custom category always gets the same colour");
+        assert!(crate::bible::TAG_CATEGORIES.iter().all(|(k, _)| valid_colour(default_colour(k))));
+        assert!(valid_colour("#A0b1C2") && !valid_colour("red") && !valid_colour("#12345") && !valid_colour("#12345g"));
+    }
+
     use super::*;
 
     fn mk_tag(block_id: &str, start: usize, end: usize, quote: &str) -> Tag {

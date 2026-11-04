@@ -63,6 +63,40 @@ pub fn next_set(sets: &[RevisionSet]) -> (String, String) {
     (colour.to_string(), label)
 }
 
+/// The set every script starts with: the original draft, on white paper.
+/// It labels the original; it is never the active set, so nothing prints as revised.
+pub fn original() -> RevisionSet {
+    RevisionSet { id: uuid::Uuid::new_v4().to_string(), label: "Original (White)".into(), colour: "white".into(), ..Default::default() }
+}
+
+/// Whether `label` is still the automatic name for `colour` ("Blue Revision",
+/// "Double Blue Revision", "Blue Revision 4"...), so the writer has not renamed it.
+fn auto_label(label: &str, colour: &str) -> bool {
+    let mut name = colour.to_string();
+    if let Some(first) = name.get_mut(..1) {
+        first.make_ascii_uppercase();
+    }
+    let base = format!("{name} Revision");
+    label == base || label == format!("Double {base}") || label == format!("Triple {base}") || label.strip_prefix(&format!("{base} ")).is_some_and(|n| n.parse::<u32>().is_ok())
+}
+
+/// After a set is deleted, the sets after it close up the colour order: each
+/// set that still has its automatic colour and name takes the ones it would
+/// have had. White sets and sets the writer renamed keep theirs.
+pub fn close_up(sets: &[RevisionSet]) -> Vec<RevisionSet> {
+    let mut out: Vec<RevisionSet> = Vec::with_capacity(sets.len());
+    for s in sets {
+        let mut s = s.clone();
+        if s.colour != "white" && auto_label(&s.label, &s.colour) {
+            let (colour, label) = next_set(&out);
+            s.colour = colour;
+            s.label = label;
+        }
+        out.push(s);
+    }
+    out
+}
+
 /// Header printed on the set's changed pages, e.g. "Blue Revision (2026-10-27)".
 pub fn header(set: &RevisionSet) -> String {
     let (label, date) = (set.label.trim(), set.date.trim());
@@ -165,6 +199,23 @@ mod tests {
         assert_eq!(COLOURS[0], "white");
         assert_eq!(next_set(&[RevisionSet { colour: "white".into(), ..set("w") }]), ("blue".into(), "Blue Revision".into()));
         assert_eq!(header(&set("a")), "Blue Revision (2026-10-27)");
+    }
+
+    #[test]
+    fn deleting_a_set_closes_up_the_colours_but_keeps_renamed_and_white_sets() {
+        let auto = |id: &str, colour: &str, label: &str| RevisionSet { colour: colour.into(), label: label.into(), ..set(id) };
+        let sets = vec![RevisionSet { id: "w".into(), ..original() }, auto("b", "blue", "Blue Revision"), auto("y", "yellow", "Yellow Revision"), auto("g", "green", "Green Revision")];
+        // Pink was deleted: yellow becomes pink, green becomes yellow.
+        let closed = close_up(&sets);
+        let got: Vec<(&str, &str)> = closed.iter().map(|s| (s.colour.as_str(), s.label.as_str())).collect();
+        assert_eq!(got, vec![("white", "Original (White)"), ("blue", "Blue Revision"), ("pink", "Pink Revision"), ("yellow", "Yellow Revision")]);
+        assert_eq!(closed[2].id, "y", "sets keep their ids, so marked text stays with its set");
+        // A renamed set keeps its colour and name, and the order continues after it.
+        let sets = vec![RevisionSet { id: "w".into(), ..original() }, auto("s", "pink", "Studio Draft"), auto("y", "green", "Green Revision")];
+        let closed = close_up(&sets);
+        assert_eq!((closed[1].colour.as_str(), closed[1].label.as_str()), ("pink", "Studio Draft"));
+        assert_eq!((closed[2].colour.as_str(), closed[2].label.as_str()), ("yellow", "Yellow Revision"));
+        assert!(auto_label("Double Blue Revision", "blue") && auto_label("Blue Revision 4", "blue") && !auto_label("Blue Revision draft", "blue"));
     }
 
     #[test]
