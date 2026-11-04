@@ -4,7 +4,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Current Milestone & Goal
 
-**0.8.2** (owner, 2026-11-03): all of the owner's notes in `docs/0.8.2_PLAN.md` (sections A–C), plus Linux builds and the 0.8.1 known issues. 0.8.1 RC Alpha is tagged (`v0.8.1`); its GitHub release is the owner's step.
+**0.8.2** (owner, 2026-11-03): all of the owner's notes in `docs/0.8.2_PLAN.md` (sections A–C), plus the 0.8.1 known issues. Linux builds held back until Windows and macOS are further along (owner, 2026-11-03). 0.8.1 RC Alpha is tagged (`v0.8.1`); its GitHub release is the owner's step.
 
 ## Completed & Verified
 
@@ -35,4 +35,4 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## Next Immediate Step
 
-1. The Linux build (needs a Linux machine). Every other 0.8.2 item and the four 0.8.1 known issues are built; then the full e2e suites on both drivers and the 0.8.2 release steps.
+1. All of 0.8.2 and the four 0.8.1 known issues are built and pushed (efb20cf). Next: the owner's manual checks N55–N59 (Mac ones on GROGU), then the 0.8.2 release steps for Windows and macOS (version bump, README, installers). Linux builds held back.

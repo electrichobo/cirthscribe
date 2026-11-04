@@ -14,7 +14,7 @@ Get the latest build from [Releases](https://github.com/electrichobo/cirthscribe
 | - | - | - |
 | Windows 10 or later (64-bit) | `Kolbítar_0.8.1_x64-setup.exe` | The installer is not code-signed yet, so Windows SmartScreen may warn you. Choose **More info**, then **Run anyway**. |
 | macOS 11 or later | `Kolbítar_0.8.1_aarch64.dmg` (Apple silicon) | The app is not signed or notarized yet. Open the disk image and drag Kolbítar to Applications. The first time, right-click (or Control-click) the app and choose **Open**, or allow it in System Settings > Privacy & Security. |
-| Linux | `.deb` (Debian, Ubuntu and relatives) or `.AppImage` | From the next update; 0.8.1 has no Linux build. You can [build from source](#building-from-source) meanwhile. The `.deb` also registers `.cirth` files and their icons. |
+| Linux | `.deb` (Debian, Ubuntu and relatives) or `.AppImage` | Not yet: Linux builds are on hold while the Windows and macOS versions mature. You can [build from source](#building-from-source) meanwhile. The `.deb` also registers `.cirth` files and their icons. |
 
 Kolbítar never checks for updates by itself. Use **Help > Check for Updates…** to open the Releases page; each release lists what changed.
 
