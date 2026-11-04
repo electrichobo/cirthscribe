@@ -6,6 +6,8 @@ Generated 2026-10-26 (after adding spellbook 0.4.2, MPL-2.0, and the SCOWL dicti
 
 **2026-10-27, M2:** `quick-xml` 0.42.0 (MIT) added as a direct dependency of cirth-core for FDX import and export, with the owner's approval. It was already in the shipped tree through Tauri, so the bundled notices file did not change; its default features add only `memchr` (MIT OR Unlicense), which was also already present.
 
+**2026-11-03, 0.8.2:** `pdf-extract` 0.12.1 (MIT) added as a direct dependency of cirth-core, with the owner's approval, for PDF import (it reports each character's place, size and font). It brings `lopdf` 0.42.0 (MIT; printpdf keeps its own lopdf 0.31), `adobe-cmap-parser`, `cff-parser`, `postscript`, `type1-encoding-parser`, `euclid`, `nom` 8, `rangemap`, `stringprep` and the RustCrypto crates `aes`, `cbc`, `ecb`, `md-5`, `sha2` (used to open encrypted PDFs that need no password); see the generated inventory for their licences.
+
 **2026-11-02, RC Alpha prep:** `rustybuzz` 0.20.1 (MIT) and `unicode-bidi` 0.3.18 (MIT OR Apache-2.0) added as direct dependencies of cirth-core, with the owner's approval, to shape and order Hebrew, Arabic and Devanagari in PDFs. They bring `ttf-parser` 0.25.1, `unicode-bidi-mirroring`, `unicode-ccc`, `unicode-properties` and `unicode-script` (see the generated inventory for their licences). The Noto fonts below were added at the same time.
 
 ## Not from package managers
@@ -35,19 +37,23 @@ Coverage note: the Rust table resolves dependencies for Windows (x86_64-pc-windo
 - **MPL-2.0** (file-level copyleft): `spellbook` (spell checking, chosen in ADR 0002), `cssparser`, `cssparser-macros`, `dtoa-short`, `selectors` (via Tauri), `option-ext` (via `dirs`). Distributable in binaries; modified MPL files must stay MPL. Compatible with the project license (GPL-3.0-only): MPL-2.0 section 3.3 allows combination with the GPL, and none of these packages carries the "Incompatible With Secondary Licenses" notice (checked in the spellbook 0.4.2 source).
 - Build-only MPL-2.0: `lightningcss` (Vite), not shipped.
 - No GPL/LGPL, unknown or proprietary packages in the Rust graph or the shipped JS.
-## Rust crates (resolved for x86_64-pc-windows-gnu): 269
+
+## Rust crates (resolved for x86_64-pc-windows-gnu): 304
 
 | License expression | Count | Crates (first 8) |
 | - | - | - |
-| MIT OR Apache-2.0 | 131 | anyhow 1.0.104, base64 0.23.1, bitflags 2.13.2, block-buffer 0.10.4, bstr 1.13.1, camino 1.2.6, cargo-platform 0.1.9, cc 1.10.0, ... |
-| MIT | 46 | bytes 1.12.1, cargo_metadata 0.19.2, cfb 0.14.0, darling 0.24.1, darling_core 0.24.1, darling_macro 0.24.1, derive_more 2.1.1, derive_more-impl 2.1.1, ... |
+| MIT OR Apache-2.0 | 146 | aes 0.8.4, anyhow 1.0.104, base64 0.23.1, bitflags 2.13.2, block-buffer 0.10.4, block-padding 0.3.3, bstr 1.13.1, camino 1.2.6, ... |
+| MIT | 57 | adobe-cmap-parser 0.4.1, bytes 1.12.1, cargo_metadata 0.19.2, cfb 0.14.0, core_maths 0.1.1, darling 0.24.1, darling_core 0.24.1, darling_macro 0.24.1, ... |
 | Apache-2.0 OR MIT | 28 | autocfg 1.5.1, bit-set 0.8.0, bit-vec 0.8.0, cargo_toml 1.0.1, ctor 1.0.13, equivalent 1.0.3, fastrand 2.5.0, idna_adapter 1.2.2, ... |
 | Unicode-3.0 | 18 | icu_collections 2.4.0, icu_locale_core 2.4.0, icu_normalizer 2.4.0, icu_normalizer_data 2.4.0, icu_properties 2.4.0, icu_properties_data 2.4.0, icu_provider 2.4.0, litemap 0.8.3, ... |
-| MIT/Apache-2.0 | 10 | bitflags 1.3.2, bs58 0.5.1, core_detect 1.0.0, fallible-iterator 0.3.0, fallible-streaming-iterator 0.1.9, ident_case 1.0.1, json-patch 4.2.0, linked-hash-map 0.5.6, ... |
+| MIT/Apache-2.0 | 14 | bitflags 1.3.2, bs58 0.5.1, core_detect 1.0.0, fallible-iterator 0.3.0, fallible-streaming-iterator 0.1.9, ident_case 1.0.1, json-patch 4.2.0, linked-hash-map 0.5.6, ... |
 | Unlicense OR MIT | 8 | aho-corasick 1.1.5, byteorder 1.5.0, jiff 0.2.38, jiff-core 0.1.1, jiff-tzdb 0.1.9, jiff-tzdb-platform 0.1.3, memchr 2.8.3, winapi-util 0.1.11 |
 | MPL-2.0 **review** | 6 | cssparser 0.37.0, cssparser-macros 0.7.1, dtoa-short 0.3.5, option-ext 0.2.0, selectors 0.38.0, spellbook 0.4.2 |
+| (MIT OR Apache-2.0) AND Unicode-3.0 | 3 | unicode-ident 1.0.27, unicode-normalization 0.1.26, unicode-properties 0.1.5 |
 | BSD-3-Clause | 2 | alloc-no-stdlib 3.0.0, alloc-stdlib 0.3.0 |
+| Zlib OR Apache-2.0 OR MIT | 2 | bytemuck 1.25.2, tinyvec 1.13.3 |
 | Zlib | 2 | foldhash 0.2.0, zlib-rs 0.6.8 |
+| Apache-2.0/MIT | 2 | md5 0.7.0, postscript 0.14.1 |
 | MIT OR Zlib OR Apache-2.0 | 2 | miniz_oxide 0.8.9, miniz_oxide 0.9.1 |
 | Apache-2.0 | 2 | owned_ttf_parser 0.19.0, tao 0.37.2 |
 | MIT OR Apache-2.0 OR Zlib | 2 | raw-window-handle 0.6.2, static_vcruntime 3.0.0 |
@@ -58,10 +64,8 @@ Coverage note: the Rust table resolves dependencies for Windows (x86_64-pc-windo
 | Apache-2.0 AND MIT | 1 | dpi 0.1.2 |
 | CC0-1.0 OR MIT-0 OR Apache-2.0 | 1 | dunce 1.0.5 |
 | (Apache-2.0 OR MIT) AND BSD-3-Clause | 1 | encoding_rs 0.8.42 |
+| MIT / Apache-2.0 | 1 | euclid 0.20.14 |
 | Apache-2.0 / MIT | 1 | fnv 1.0.7 |
-| Apache-2.0/MIT | 1 | md5 0.7.0 |
-| Zlib OR Apache-2.0 OR MIT | 1 | tinyvec 1.13.3 |
-| (MIT OR Apache-2.0) AND Unicode-3.0 | 1 | unicode-ident 1.0.27 |
 
 ## npm packages shipped in the app bundle: 12
 

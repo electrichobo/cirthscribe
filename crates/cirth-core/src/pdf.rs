@@ -333,7 +333,40 @@ pub fn render_document(map: &PageMap, p: &Profile, title_page: Option<&crate::ti
     doc.save(&mut out).map_err(|e| e.to_string())?;
     let mut bytes = out.into_inner().map_err(|e| e.to_string())?;
     fix_trailer_id(&mut bytes, &doc_id);
+    fix_to_unicode(&mut bytes);
     Ok(fix_info_strings(bytes))
+}
+
+/// printpdf writes each font's ToUnicode map with characters beyond U+FFFF as
+/// five or six hex digits (`<10efd>`), which is not a valid UTF-16 string and
+/// stops other programs reading the text back. Those characters are only ever
+/// glyphs the font has and the script does not use, so each becomes U+FFFD,
+/// padded with spaces to the same length: no offset in the file moves.
+pub(crate) fn fix_to_unicode(bytes: &mut [u8]) {
+    let mut at = 0;
+    while let Some(start) = find_from(bytes, at, b"begincmap") {
+        let Some(end) = find_from(bytes, start, b"endcmap") else { return };
+        let mut i = start;
+        while i < end {
+            if bytes[i] == b'<' && bytes.get(i + 1) != Some(&b'<') {
+                let mut j = i + 1;
+                while j < end && bytes[j].is_ascii_hexdigit() {
+                    j += 1;
+                }
+                let n = j - i - 1;
+                if j < end && bytes[j] == b'>' && (n == 5 || n == 6) {
+                    bytes[i + 1..i + 5].copy_from_slice(b"fffd");
+                    for b in &mut bytes[i + 5..j] {
+                        *b = b' ';
+                    }
+                }
+                i = j;
+            } else {
+                i += 1;
+            }
+        }
+        at = end;
+    }
 }
 
 pub(crate) fn fix_trailer_id(bytes: &mut [u8], doc_id: &str) {
@@ -540,6 +573,42 @@ mod tests {
         let tp = crate::title::TitlePage { title: "THE TIDE LEDGER
 Part 2".into(), draft_label: "Blue Revision".into(), draft_date: "1 May 2026".into(), ..Default::default() };
         assert_eq!(expand_tokens("{title} - {draft} - {date}", &tp), "THE TIDE LEDGER - Blue Revision - 1 May 2026");
+    }
+
+    #[test]
+    fn to_unicode_maps_have_only_valid_utf16() {
+        let mut b = b"x begincmap\n2 beginbfchar\n<01dc> <10efd>\n<0003> <0020>\n<0004> <10ffff>\nendbfchar\nendcmap <10efd>".to_vec();
+        let n = b.len();
+        fix_to_unicode(&mut b);
+        assert_eq!(b.len(), n, "nothing moves");
+        assert_eq!(String::from_utf8(b).unwrap(), "x begincmap\n2 beginbfchar\n<01dc> <fffd >\n<0003> <0020>\n<0004> <fffd  >\nendbfchar\nendcmap <10efd>");
+        // Our PDFs with Arabic and Devanagari now read back (the CMap parser used to stop at them).
+        let opts = PdfOptions { title: "Scripts".into(), date_unix: 1_790_000_000, document_id: "scripts".into(), ..Default::default() };
+        let p = Profile::us_letter();
+        let doc = crate::fixtures::unicode_marks().to_document().unwrap();
+        let map = crate::layout::paginate(&doc.blocks, &p, 1);
+        let bytes = render_document(&map, &p, None, &opts).unwrap();
+        assert_xref_valid(&bytes);
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(!regex_like_odd_hex(&s), "no odd-length hex left in a ToUnicode map");
+    }
+
+    fn regex_like_odd_hex(s: &str) -> bool {
+        let mut rest = s;
+        while let Some(a) = rest.find("begincmap") {
+            let Some(e) = rest[a..].find("endcmap") else { break };
+            let body = &rest[a..a + e];
+            for tok in body.split('<').skip(1) {
+                if let Some(end) = tok.find('>') {
+                    let h = &tok[..end];
+                    if !h.is_empty() && h.chars().all(|c| c.is_ascii_hexdigit()) && h.len() % 2 == 1 {
+                        return true;
+                    }
+                }
+            }
+            rest = &rest[a + e..];
+        }
+        false
     }
 
     #[test]

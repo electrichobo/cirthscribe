@@ -17,6 +17,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
   - Fonts: Noto Sans Hebrew, Arabic, Devanagari, SC (screen; `unicode-range`). PDF prints Hebrew/Arabic/Devanagari via rustybuzz + unicode-bidi (owner-approved): visual order per paragraph direction, shaped, squeezed to the layout's columns; fallbacks embedded only when used. CJK screen only (CFF outlines). Sample PDF checked by eye (`out/fontcheck/`).
   - Licences: OFL.txt per font, LICENSES.md, notices regenerated (371).
 - **Verified 2026-11-02 (Windows):** `cargo test -p cirth-core` 192/192 (new PDF fallback test); `cargo test -p cirthscribe` 1/1; `npm run build`; release build; contract 4/4; offline audit passed; notices check (371); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME).
+- **0.8.2 PDF import (2026-11-03, committed):** `pdf-extract` 0.12.1 approved and added (LICENSES.md, notices 394); `crates/cirth-core/src/pdf_import.rs` (best-guess elements from page position, report); `import_pdf` command; `importerFor`/`importAny`/open-file take `.pdf`; ToUnicode fix in `pdf::fix_to_unicode` (export) and `repair_to_unicode` (import). Verified: core tests 204 pass (new unit and round-trip tests), clippy clean for the new code; e2e "PDF import" and the menu test pass on CDP and WebDriver. Full suites after it: CDP 92/92, WebDriver 91/92 (1 skipped IME), contract 4/4, notices check passes. Manual check N59 (PDFs from other apps).
 - **0.8.1 known issue, Arabic gap in PDFs (2026-11-03, committed):** `pdf::fit` widens narrow shaped text up to 12% and centres it in its columns; unit test; `cargo test -p cirth-core` 197 pass. Not checked by eye (no PDF renderer on VADER; manual check N58).
 - **0.8.2 section C, Notecard View redesign (2026-11-03, committed):** storylines (schema v18, `model::Storyline`, `PutStoryline`/`DeleteStoryline`/`RestoreStoryline` planning ops, `project_outline`; frozen `schema-v17-*.cirth` + upgrade test; snapshot/branch table lists); Notecard View toolset, card colours, act columns, storyline grid, season view (`views.ts`), pop-out board wired; contract fixture has `storyline`; manual check N57. Verified: core tests 196 pass, app tests 2/2, contract 4/4, CDP 91/91. WebDriver: the first full run failed five late tests in a row (from "Export Capability Analysis" on: "no project open", then the editor never opened); that test passed alone and a second full run passed 90/91 (1 skipped IME). Not reproduced; watch for it.
 - **0.8.2 section C, Cork Board canvas (2026-11-03, committed):** `app/src/evidence.ts` rewritten as a free canvas (tools, pin-drag strings, curved strings you can click, double-click notes, pan, zoom, Fit); Cork Board CSS; e2e extended; manual checks N55 (canvas) and N56 (Feedback window). No core change. Verified: build, full CDP 90/90 and WebDriver 89/90 (1 skipped IME), contract 4/4; the board test again on both drivers after the last placement fix.
@@ -30,8 +31,8 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- None. Arabic PDF gap fix committed.
+- None. PDF import committed.
 
 ## Next Immediate Step
 
-1. PDF import (needs the owner's approval of a PDF-reading crate) and the Linux build (needs a Linux machine). All other 0.8.2 items and the four 0.8.1 known issues are built.
+1. The Linux build (needs a Linux machine). Every other 0.8.2 item and the four 0.8.1 known issues are built; then the full e2e suites on both drivers and the 0.8.2 release steps.

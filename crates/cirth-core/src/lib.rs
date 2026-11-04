@@ -27,6 +27,7 @@ pub mod navigator;
 pub mod numbering;
 pub mod ops;
 pub mod pdf;
+pub mod pdf_import;
 pub mod planning;
 pub mod printdoc;
 pub mod report_export;

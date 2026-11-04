@@ -2578,8 +2578,8 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await app.evaluate("__cirth.menu('mode_normal')");
     await waitFor(app, "document.body.dataset.pageview === 'continuous'", "View > Mode > Normal View");
     // Import reads the format from the file: Final Draft by content or extension, otherwise Fountain/plain text.
-    const det = await app.evaluate(`[__cirth.importerFor('a.fdx', ''), __cirth.importerFor('script.txt', '<?xml version="1.0"?><FinalDraft DocumentType="Script">'), __cirth.importerFor('b.fountain', 'INT. ROOM'), __cirth.importerFor('c.txt', 'INT. ROOM'), __cirth.importerFor('d.pdf', '%PDF')]`);
-    assert(JSON.stringify(det) === JSON.stringify(["fdx", "fdx", "fountain", "fountain", null]), `import detection: ${det}`);
+    const det = await app.evaluate(`[__cirth.importerFor('a.fdx', ''), __cirth.importerFor('script.txt', '<?xml version="1.0"?><FinalDraft DocumentType="Script">'), __cirth.importerFor('b.fountain', 'INT. ROOM'), __cirth.importerFor('c.txt', 'INT. ROOM'), __cirth.importerFor('d.pdf', '%PDF'), __cirth.importerFor('e.bin', '%PDF-1.7'), __cirth.importerFor('f.docx', 'PK')]`);
+    assert(JSON.stringify(det) === JSON.stringify(["fdx", "fdx", "fountain", "fountain", "pdf", "pdf", null]), `import detection: ${det}`);
     // File > Export… lists every format; changed pages only with an active revision set.
     await app.evaluate("(__cirth.menu('export'), true)");
     await waitFor(app, "document.getElementById('export-dialog').open", "File > Export… opens the dialog");
@@ -2997,6 +2997,28 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     writeFileSync(bad, "<html><body>hello</body></html>");
     assert(!(await app.evaluate(`__cirth.importFdx(${JSON.stringify(bad)})`)), "refused");
     assert(/not an \.fdx script/.test(await app.evaluate("document.getElementById('banner').textContent")), "says why");
+  });
+
+  await test("PDF import (0.8.2): a PDF becomes a new project, each element guessed from where it sits, with a report; a file that is not a PDF is refused", async () => {
+    await openFixture("page-boundaries");
+    const kinds = (bs) => bs.filter((x) => text(x).trim()).map((x) => (x.kind === "lyric" ? "dialogue" : x.kind) + (x.dual ? "*" : "")).join();
+    const words = (bs) => bs.filter((x) => text(x).trim()).map((x) => text(x).split(/\s+/).filter(Boolean).join(" ")).join("|");
+    const before = await blocks();
+    const src = join(dataDir, "ledger draft.pdf");
+    assert(await app.evaluate(`__cirth.exportPdf(${JSON.stringify(src)})`), "PDF exported");
+    await app.evaluate(`(__cirth.importAny(${JSON.stringify(src)}), true)`);
+    await waitFor(app, "__cirth.lastOpen && __cirth.lastOpen.name.startsWith('ledger-draft')", "the PDF opens as a new project");
+    const after = await blocks();
+    assert(kinds(after) === kinds(before), `every element comes back as the same kind:\n${kinds(after)}\n${kinds(before)}`);
+    assert(words(after) === words(before), "and with the same words");
+    const banner = await app.evaluate("document.getElementById('banner').textContent");
+    assert(banner.includes("Imported") && banner.includes("guessed") && banner.includes("dual dialogue"), `the report says what was guessed: ${banner}`);
+    assert(await storedMatchesEditor(), "the imported script is stored");
+    // Not a PDF: refused with a message.
+    const bad = join(dataDir, "not really.pdf");
+    writeFileSync(bad, "hello, I am text");
+    assert(!(await app.evaluate(`__cirth.importAny(${JSON.stringify(bad)})`)), "refused");
+    assert(/could not be read as a PDF/.test(await app.evaluate("document.getElementById('banner').textContent")), "says why");
   });
 
   await test("Scene numbers: none until locked; lock numbers 1..N; a new scene gets 1A; omit and restore; numbers in text and Fountain exports; unlock asks first", async () => {

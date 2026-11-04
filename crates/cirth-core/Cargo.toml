@@ -22,6 +22,9 @@ quick-xml = "0.42.0"
 zip = { version = "9.1.3", default-features = false, features = ["deflate-flate2"] }
 rustybuzz = "0.20.1"
 unicode-bidi = "0.3.18"
+# PDF import (owner-approved 2026-11-03, decision 30): each character's
+# place, size and font on the page, through lopdf.
+pdf-extract = "0.12.1"
 
 [[bin]]
 name = "cirth-cli"

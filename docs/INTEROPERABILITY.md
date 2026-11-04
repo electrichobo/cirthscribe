@@ -110,7 +110,7 @@ These features may not survive external conversion and must be assessed separate
 
 An FDX export may carry some revision or numbering data if the adapter actually supports it. Never infer complete parity from a valid XML file. Maintain a tested element/attribute support matrix.
 
-Prioritize native reopen and FDX import during the early interchange work. DOCX/RTF/TXT/HTML imports are separate parser features, not implied by the export list. Arbitrary PDF-to-editable reconstruction is out of the initial scope.
+Prioritize native reopen and FDX import during the early interchange work. DOCX/RTF/TXT/HTML imports are separate parser features, not implied by the export list. Arbitrary PDF-to-editable reconstruction is out of the initial scope. **0.8.2 (owner, decision 30):** File > Import… reads a screenplay PDF as a best guess (`cirth_core::pdf_import`, using `pdf-extract`): each line's element comes from where it starts relative to the action margin, its capitals and a few patterns; page numbers, (MORE), CONTINUED and revision headers are dropped; margin scene numbers are kept and locked; side-by-side speeches become dual dialogue; a first page with no scene or speech becomes the title page; right-to-left text is put back into reading order. Styles are not read; characters the PDF did not print (CJK, emoji in Kolbítar's own PDFs) cannot come back; scanned and password-locked PDFs are refused. The import report says all of this. Tested on Kolbítar's own PDFs; PDFs from other apps are a manual check (N59).
 
 ## Compatibility record
 

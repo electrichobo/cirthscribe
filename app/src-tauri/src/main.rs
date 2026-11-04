@@ -2128,6 +2128,34 @@ async fn import_fdx(app: State<'_, App>, path: String) -> Result<Opened, String>
     Ok(out)
 }
 
+/// File > Import… for a PDF: a new library project from the script a PDF
+/// shows, recovered as a best guess (cirth_core::pdf_import); the report says
+/// what was guessed. The file itself is only read.
+#[tauri::command]
+async fn import_pdf(app: State<'_, App>, path: String) -> Result<Opened, String> {
+    let t0 = Instant::now();
+    let bytes = std::fs::read(&path).map_err(io_err)?;
+    let stem = Path::new(&path).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Imported".into());
+    let r = cirth_core::pdf_import::import(&bytes, &stem)?;
+    let name = unused_library_name(&app, &r.document.title);
+    let mut out = start_new(&app, library_path(&app, &name), &r.document, &[], t0)?;
+    if !r.title_page.is_empty() || !r.scene_numbers.is_empty() {
+        with_session(&app, |s| {
+            let doc = s.store.current_document().map_err(err)?;
+            if !r.title_page.is_empty() {
+                s.store.set_title_page(&doc, &r.title_page).map_err(err)?;
+            }
+            if !r.scene_numbers.is_empty() {
+                s.store.lock_scene_numbers_with(&doc, &r.scene_numbers).map_err(err)?;
+            }
+            s.store.save_package(&s.package).map_err(err)?;
+            Ok(())
+        })?;
+    }
+    out.import_notes = r.notes;
+    Ok(out)
+}
+
 /// File > Export > Final Draft…: the current document and its title page.
 #[tauri::command]
 async fn export_fdx(app: State<'_, App>, path: String) -> Result<FountainExported, String> {
@@ -4273,6 +4301,7 @@ fn main() {
             apply_batch,
             load_document,
             planning_state_now,
+            import_pdf,
             project_outline,
             project_tree,
             create_document_with_profile,

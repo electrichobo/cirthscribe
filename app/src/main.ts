@@ -2247,15 +2247,16 @@ async function sceneNumbersAction(id: string) {
 /** The importer for a file: Final Draft XML by its content or extension,
  *  otherwise plain text read as Fountain (Fountain is plain text, so a
  *  screenplay saved as .txt imports the same way). */
-export function importerFor(path: string, head: string): "fdx" | "fountain" | null {
+export function importerFor(path: string, head: string): "fdx" | "fountain" | "pdf" | null {
   const ext = path.toLowerCase().split(".").pop() ?? "";
+  if (ext === "pdf" || head.startsWith("%PDF-")) return "pdf";
   if (ext === "fdx" || /<FinalDraft[\s>]/.test(head)) return "fdx";
   if (["fountain", "spmd", "txt", "text"].includes(ext)) return "fountain";
   return null;
 }
 
-/** File > Import…: a new project from a Fountain, Final Draft or plain-text
- *  file; the format is read from the file. */
+/** File > Import…: a new project from a Fountain, Final Draft, plain-text or
+ *  PDF file; the format is read from the file. */
 async function importAny(path?: string): Promise<boolean> {
   const source =
     path ??
@@ -2263,7 +2264,7 @@ async function importAny(path?: string): Promise<boolean> {
       multiple: false,
       directory: false,
       filters: [
-        { name: "Screenplays (Fountain, Final Draft, plain text)", extensions: ["fountain", "spmd", "fdx", "txt", "text"] },
+        { name: "Screenplays (Fountain, Final Draft, PDF, plain text)", extensions: ["fountain", "spmd", "fdx", "pdf", "txt", "text"] },
         { name: "All files", extensions: ["*"] },
       ],
     }));
@@ -2271,9 +2272,10 @@ async function importAny(path?: string): Promise<boolean> {
   const head = await invoke<string>("peek_file", { path: source }).catch(() => "");
   const kind = importerFor(source, head);
   if (!kind) {
-    showBanner(`Kolbítar cannot import this file: ${source}. It reads Fountain (.fountain, .spmd), Final Draft (.fdx) and plain text (.txt). Word and RTF import are planned.`);
+    showBanner(`Kolbítar cannot import this file: ${source}. It reads Fountain (.fountain, .spmd), Final Draft (.fdx), PDF (.pdf, a best guess) and plain text (.txt). Word and RTF import are planned.`);
     return false;
   }
+  if (kind === "pdf") return openWith("import_pdf", { path: source });
   return kind === "fdx" ? importFdx(source) : importFountain(source);
 }
 
@@ -2643,7 +2645,7 @@ async function openOrImportFile(path: string): Promise<boolean> {
     return openWith("open_path", { path });
   } else if (lower.endsWith(".cirth-review")) {
     return importReviewPackage(path);
-  } else if (lower.endsWith(".fountain") || lower.endsWith(".spmd") || lower.endsWith(".fdx") || lower.endsWith(".txt")) {
+  } else if (lower.endsWith(".fountain") || lower.endsWith(".spmd") || lower.endsWith(".fdx") || lower.endsWith(".txt") || lower.endsWith(".pdf")) {
     return importAny(path);
   } else {
     const opened = await openWith("open_path", { path });
