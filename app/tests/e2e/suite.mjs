@@ -3248,6 +3248,19 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await waitFor(app, "__cirth.panels.rendered.storyscry?.first === 'StoryScry' && __cirth.panels.isPopped('storyscry')", "StoryScry drew in its own window");
     await app.evaluate("__cirth.panelCommand({ panel: 'storyscry', cmd: 'dock' })");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => !l.includes('panel-storyscry')) && !__cirth.panels.isPopped('storyscry')", "closing StoryScry's window puts it back");
+    // Feedback in its own window: a change made there is made by the main window, and both redraw.
+    await app.evaluate("(__cirth.menu('popout_feedback'), true)");
+    await waitFor(app, "__cirth.panels.rendered.feedback?.first === 'Feedback' && __cirth.panels.isPopped('feedback')", "Feedback drew in its own window");
+    const fbBefore = await app.evaluate("__cirth.panels.rendered.feedback.items");
+    await app.evaluate(`(() => { const n = __cirth.view.state.doc.firstChild; return __cirth.panelCommand({ panel: 'feedback', cmd: 'feedbackWrite', command: 'comments_add_thread', args: { documentId: __cirth.lastOpen.document_id, blockId: n.attrs.id, start: 0, end: Math.min(4, n.textContent.length), quote: n.textContent.slice(0, 4), author: 'Tester', text: 'From the Feedback window', kind: 'note' } }); })()`);
+    await waitFor(app, `__cirth.panels.rendered.feedback?.items === ${fbBefore + 1}`, "the Feedback window redraws with the new note");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('comments_state', { documentId: __cirth.lastOpen.document_id }).then(st => st.threads.some(t => t.kind === 'note' && t.messages[0].text === 'From the Feedback window'))", "the note is stored");
+    await waitFor(app, "!!document.querySelector('.fb-pin')", "the script shows the note's icon");
+    await app.evaluate("(__cirth.menu('comments'), true)");
+    await sleep(300);
+    assert(await app.evaluate("document.getElementById('comments-overlay')?.hidden !== false"), "Tools > Feedback brings the window forward instead of opening a second list");
+    await app.evaluate("__cirth.panelCommand({ panel: 'feedback', cmd: 'dock' })");
+    await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => !l.includes('panel-feedback')) && !__cirth.panels.isPopped('feedback')", "closing Feedback's window puts it back");
     // Dock from the window's Dock button; going Home closes the rest.
     await app.evaluate("__cirth.panelCommand({ panel: 'nav', cmd: 'dock' })");
     await waitFor(app, "window.__TAURI_INTERNALS__.invoke('window_labels').then(l => !l.includes('panel-nav'))", "Dock closes the scene list window");

@@ -3637,7 +3637,7 @@ fn window_command(window: tauri::WebviewWindow, action: String) -> Result<bool, 
 #[tauri::command]
 async fn pop_out_panel(app: tauri::AppHandle, panel: String, title: String) -> Result<(), String> {
     use tauri::{Emitter, Manager};
-    if !["nav", "board", "notes", "storyscry"].contains(&panel.as_str()) {
+    if !["nav", "board", "notes", "storyscry", "feedback"].contains(&panel.as_str()) {
         return Err(format!("unknown panel {panel}"));
     }
     let label = format!("panel-{panel}");
@@ -3650,6 +3650,7 @@ async fn pop_out_panel(app: tauri::AppHandle, panel: String, title: String) -> R
     let (w, h) = match panel.as_str() {
         "board" => (420.0, 720.0),
         "storyscry" => (1040.0, 760.0),
+        "feedback" => (520.0, 760.0),
         _ => (340.0, 640.0),
     };
     let window = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("panel.html?panel={panel}").into()))
@@ -3939,6 +3940,7 @@ fn tools_menu(app: &tauri::App) -> tauri::Result<tauri::menu::Submenu<tauri::Wry
         .text("popout_board", "Notecard View in Its Own Window")
         .text("popout_notes", "Thoughts in Their Own Window")
         .text("popout_storyscry", "StoryScry in Its Own Window")
+        .text("popout_feedback", "Feedback in Its Own Window")
         .build()
 }
 

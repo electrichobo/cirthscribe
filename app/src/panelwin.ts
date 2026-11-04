@@ -11,6 +11,7 @@ import type { PanelCommand, PanelState, PopPanel } from "./panels";
 import type { SceneInfo } from "./scenes";
 import { createStoryScry, type ReportBundle, type ReportScope } from "./storyscry";
 import { createThoughtsEditor } from "./thoughts";
+import { createCommentsDialog } from "./comments";
 
 const panel = (new URLSearchParams(location.search).get("panel") ?? "nav") as PopPanel;
 const root = document.getElementById("panel-root")!;
@@ -147,8 +148,28 @@ function drawStoryScry(state: PanelState) {
   }
 }
 
+// Feedback in a window of its own: it reads the feedback from the core
+// directly; every change and going to the text are done by the main window
+// (ADR 0004), which then sends a fresh state and the list redraws.
+let feedback: ReturnType<typeof createCommentsDialog> | null = null;
+let feedbackDoc: string | null = null;
+function drawFeedback(state: PanelState) {
+  feedbackDoc = state.documentId ?? null;
+  if (!feedback) {
+    feedback = createCommentsDialog({
+      getView: () => null,
+      getDocumentId: () => feedbackDoc,
+      jumpToBlock: (blockId) => send({ cmd: "jumpBlock", blockId }),
+      write: async (command, args) => send({ cmd: "feedbackWrite", command, args }),
+      onClose: () => send({ cmd: "dock" }),
+    });
+    void feedback.open().then(() => send({ cmd: "rendered", items: document.querySelectorAll(".cirth-comment-card").length, first: "Feedback" }));
+  } else void feedback.refresh().then(() => send({ cmd: "rendered", items: document.querySelectorAll(".cirth-comment-card").length, first: "Feedback" }));
+}
+
 void listen<PanelState>("panel-state", (e) => {
   if (e.payload.panel !== panel) return;
+  if (panel === "feedback") return drawFeedback(e.payload);
   if (panel === "storyscry") return drawStoryScry(e.payload);
   if (panel === "notes") {
     if (e.payload.notes !== undefined && !root.querySelector(".thoughts")) drawNotes(e.payload.notes);

@@ -1,6 +1,6 @@
 # Handoff
 
-Working state between agent sessions; see "Session Continuity & Constrained Takeover Protocol" in AGENTS.md. Last updated 2026-10-31.
+Working state between agent sessions; see "Session Continuity & Constrained Takeover Protocol" in AGENTS.md. Last updated 2026-11-03.
 
 ## Current Milestone & Goal
 
@@ -17,6 +17,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
   - Fonts: Noto Sans Hebrew, Arabic, Devanagari, SC (screen; `unicode-range`). PDF prints Hebrew/Arabic/Devanagari via rustybuzz + unicode-bidi (owner-approved): visual order per paragraph direction, shaped, squeezed to the layout's columns; fallbacks embedded only when used. CJK screen only (CFF outlines). Sample PDF checked by eye (`out/fontcheck/`).
   - Licences: OFL.txt per font, LICENSES.md, notices regenerated (371).
 - **Verified 2026-11-02 (Windows):** `cargo test -p cirth-core` 192/192 (new PDF fallback test); `cargo test -p cirthscribe` 1/1; `npm run build`; release build; contract 4/4; offline audit passed; notices check (371); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME).
+- **0.8.2 section C, Feedback pop-out (2026-11-03, committed):** Feedback in its own window (`panels.ts` feedback panel, `feedbackWrite`/`jumpBlock` commands, `panelwin.ts` `drawFeedback`, Tools menu item); writes go through `opts.write` in `comments.ts`; Feedback dialog overlay styling (it drew unstyled below the status bar). Verified: tsc, build, CDP 90/90, WebDriver 89/90 (1 skipped IME). Not checked by eye: the popped window itself.
 - **0.8.2 section C, part 1 (2026-11-03, committed):** stripboard vertical and compact views; timeline Line view with a playhead; Feedback kinds (schema v17, frozen v16 files), margin icons with a pop-up, right-click Add Feedback/Suggestion/Note; three 0.8.1 known issues fixed.
 - **0.8.2 section B built (2026-11-03, committed):** StoryScry pop-out and Thoughts pop-out button; Thoughts rich text (`thoughts.ts`, light markup); Home card menu (rename, picture, export, backups) with `home.json`/`covers/`, and sorting; title page and header/footer previews (`page_preview`, `pagepreview.ts`); runtime rail (`runtime.ts`); writing sprints (`sprint.ts`); Branches in plain words, delete asks first. Verified: core tests, app tests 2/2, contract 4/4, notices 371, CDP 90/90, WebDriver 89/90 (1 skipped IME).
 - **0.8.2 section A built (2026-11-03, committed 212bf52):** tour rebuilt (theme colours, 10 cards, icon art); Tools and Go To top-level menus; Go To Anything fixes; renames (Feedback, Cork Board, Notecard View, Thoughts); island Overview/StoryScry and a text-formatting panel; StoryScry Back; Home Import; About "The name" (wording awaiting owner); revision sets (Original White, delete + close-up, Lock Pages offer); tag colours; icons at 96 px. Details under "Built" in `docs/0.8.2_PLAN.md`. Verified: core tests pass (incl. new revision and tag-colour tests), contract 4/4, CDP 88/88, WebDriver 87/88 (1 skipped IME).
@@ -26,8 +27,8 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- None. Section C part 1 committed and pushed (2026-11-03).
+- None. Feedback pop-out committed.
 
 ## Next Immediate Step
 
-1. Section C: Feedback window pop-out; Cork Board canvas; Notecard View redesign, PDF import, 0.8.1 known issues, Linux build.
+1. Section C: Cork Board canvas (`evidence` module and its storage); Notecard View redesign, PDF import, 0.8.1 known issues, Linux build.

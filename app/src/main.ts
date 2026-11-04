@@ -747,6 +747,14 @@ const commentsDialog = createCommentsDialog({
   getView: () => view ?? null,
   getDocumentId: () => lastOpen?.document_id ?? null,
   jumpToBlock: (blockId) => void goToTagSpan(lastOpen?.document_id ?? "", blockId, 0, 0),
+  popOut: () => {
+    commentsDialog.close();
+    void panelHost.popOut("feedback");
+  },
+  // Feedback in its own window redraws whenever the feedback here changes.
+  onCommentsChanged: () => {
+    if (panelHost.isPopped("feedback")) panelHost.broadcast();
+  },
 });
 const alternativesMgrRef = { current: null as AlternativesManager | null };
 const alternativesMgr = createAlternativesManager({
@@ -1482,6 +1490,12 @@ const panelHost = createPanelHost({
   setNotes: (text) => notesPanel.set(text),
   versions: () => ({ scriptVersion: syncer?.currentVersion ?? 0, hasUnsynced: syncer?.hasUnsynced ?? false, planningVersion }),
   exportReport: (scope, report, format) => void exportReport(report, format, undefined, scope),
+  feedbackWrite: async (command, args) => {
+    await invoke(command, args).catch((e) => showBanner(`Feedback: ${e}`));
+    await commentsDialog.refresh();
+  },
+  jumpBlock: (blockId) => void goToTagSpan(lastOpen?.document_id ?? "", blockId, 0, 0),
+  documentId: () => lastOpen?.document_id ?? null,
   undo: (again, panel) => {
     if (!view || !lastOpen) return;
     if (panel === "board") void boardUndo(again);
@@ -1881,7 +1895,7 @@ async function runMenu(id: string): Promise<void> {
       if (lastOpen) await breakdownTags.open();
       break;
     case "comments":
-      if (lastOpen) await commentsDialog.open();
+      if (lastOpen) await (panelHost.isPopped("feedback") ? panelHost.popOut("feedback") : commentsDialog.open());
       break;
     case "alt_take":
       if (lastOpen) await alternativesMgr.addTakePrompt();
@@ -2099,6 +2113,7 @@ async function runMenu(id: string): Promise<void> {
     case "popout_board":
     case "popout_notes":
     case "popout_storyscry":
+    case "popout_feedback":
       if (lastOpen) await panelHost.popOut(id.slice(7) as PopPanel);
       break;
     case "view_nav":

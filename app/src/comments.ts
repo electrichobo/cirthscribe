@@ -196,6 +196,12 @@ export interface CommentsDialogOptions {
   getDocumentId: () => string | null;
   jumpToBlock: (blockId: string) => void;
   onCommentsChanged?: (threads: CommentThreadView[]) => void;
+  /** Make a change (a core command). The main window runs it; Feedback in its own window sends it there (ADR 0004). */
+  write?: (command: string, args: Record<string, unknown>) => Promise<unknown>;
+  /** Main window: move Feedback into a window of its own. */
+  popOut?: () => void;
+  /** Its own window: closing it puts Feedback back. */
+  onClose?: () => void;
 }
 
 export interface CommentsDialog {
@@ -212,6 +218,7 @@ export interface CommentsDialog {
 }
 
 export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialog {
+  const write = opts.write ?? ((command: string, args: Record<string, unknown>) => invoke(command, args));
   let overlay: HTMLElement | null = null;
   let dialog: HTMLElement | null = null;
   let state: CommentsState = { threads: [], planning_version: 0, can_undo: false, can_redo: false };
@@ -258,7 +265,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
 
   async function handleUndo(redo: boolean) {
     try {
-      await invoke("planning_undo", { redo });
+      await write("planning_undo", { redo });
       await refresh();
       announce(redo ? "Redone" : "Undone");
     } catch (e) {
@@ -297,6 +304,16 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     closeBtn.onclick = () => close();
 
     head.appendChild(title);
+    if (opts.popOut) {
+      const pop = document.createElement("button");
+      pop.type = "button";
+      pop.id = "comments-popout";
+      pop.className = "cirth-btn cirth-btn-sm";
+      pop.textContent = "Pop Out";
+      pop.title = "Open Feedback in a window of its own, beside the script";
+      pop.onclick = () => opts.popOut?.();
+      head.appendChild(pop);
+    }
     head.appendChild(closeBtn);
     d.appendChild(head);
 
@@ -443,7 +460,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
           alert("Select text in the script to reattach this feedback.");
           return;
         }
-        await invoke("comments_reattach", {
+        await write("comments_reattach", {
           threadId: t.id,
           blockId: anchor.block_id,
           start: anchor.start,
@@ -500,7 +517,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     replyBtn.onclick = async () => {
       const text = replyInput.value.trim();
       if (!text) return;
-      await invoke("comments_add_reply", {
+      await write("comments_add_reply", {
         threadId: t.id,
         author: "",
         text,
@@ -541,7 +558,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     resolveBtn.className = "cirth-btn cirth-btn-sm";
     resolveBtn.textContent = t.resolved ? "Reopen thread" : "Resolve thread";
     resolveBtn.onclick = async () => {
-      await invoke("comments_set_resolved", {
+      await write("comments_set_resolved", {
         threadId: t.id,
         resolved: !t.resolved,
       });
@@ -555,7 +572,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     deleteBtn.textContent = "Delete thread";
     deleteBtn.onclick = async () => {
       if (await confirmDialog("Delete this feedback?", "The feedback and its replies are removed. The script is not changed.", "Delete")) {
-        await invoke("comments_delete_thread", { threadId: t.id });
+        await write("comments_delete_thread", { threadId: t.id });
         await refresh();
       }
     };
@@ -644,7 +661,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
     add.onclick = async () => {
       if (!text.value.trim()) return text.focus();
       try {
-        await invoke("comments_add_thread", {
+        await write("comments_add_thread", {
           documentId: anchor.document_id,
           blockId: anchor.block_id,
           start: anchor.start,
@@ -787,6 +804,7 @@ export function createCommentsDialog(opts: CommentsDialogOptions): CommentsDialo
   function close(): void {
     if (overlay) overlay.hidden = true;
     opts.getView()?.focus();
+    opts.onClose?.();
   }
 
   function isOpen(): boolean {

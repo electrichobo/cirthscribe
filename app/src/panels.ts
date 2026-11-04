@@ -22,8 +22,8 @@ export interface NavWire {
   project: boolean;
 }
 
-export type PopPanel = "nav" | "board" | "notes" | "storyscry";
-export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Notecard view", notes: "Thoughts", storyscry: "StoryScry" };
+export type PopPanel = "nav" | "board" | "notes" | "storyscry" | "feedback";
+export const POP_LABEL: Record<PopPanel, string> = { nav: "Scene list", board: "Notecard view", notes: "Thoughts", storyscry: "StoryScry", feedback: "Feedback" };
 
 /** What a panel window draws. */
 export interface PanelState {
@@ -37,6 +37,8 @@ export interface PanelState {
   nav?: NavWire;
   /** Sent once, when the window opens (it then owns the typing). */
   notes?: string;
+  /** Feedback window: the open document (it reads the feedback from the core). */
+  documentId?: string | null;
   /** StoryScry window: versions, so an open report can tell it is out of date. */
   versions?: { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
 }
@@ -53,6 +55,8 @@ export type PanelCommand =
   | { panel: PopPanel; cmd: "scope"; project: boolean }
   | { panel: PopPanel; cmd: "openElsewhere"; documentId: string; sceneId: string }
   | { panel: PopPanel; cmd: "exportReport"; scope: ReportScope; report: ExportableReport; format: ReportFormat }
+  | { panel: PopPanel; cmd: "feedbackWrite"; command: string; args: Record<string, unknown> }
+  | { panel: PopPanel; cmd: "jumpBlock"; blockId: string }
   | { panel: PopPanel; cmd: "undo" | "redo" | "dock" }
   | { panel: PopPanel; cmd: "rendered"; items: number; first: string };
 
@@ -82,6 +86,10 @@ export function createPanelHost(hooks: {
   undo: (redo: boolean, panel: PopPanel) => void;
   versions: () => { scriptVersion: number; hasUnsynced: boolean; planningVersion: number };
   exportReport: (scope: ReportScope, report: ExportableReport, format: ReportFormat) => void;
+  /** Feedback in its own window: a change, run here (the main window stays the authority). */
+  feedbackWrite: (command: string, args: Record<string, unknown>) => Promise<void>;
+  jumpBlock: (blockId: string) => void;
+  documentId: () => string | null;
   /** The main window's layout changed (a panel left or came back). */
   changed: () => void;
 }) {
@@ -99,6 +107,7 @@ export function createPanelHost(hooks: {
       structural: hooks.structural(),
       ...(panel === "nav" || panel === "board" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
       ...(panel === "storyscry" ? { versions: hooks.versions() } : {}),
+      ...(panel === "feedback" ? { documentId: hooks.documentId() } : {}),
       ...(withNotes ? { notes: hooks.notesText() } : {}),
     };
   }
@@ -182,6 +191,12 @@ export function createPanelHost(hooks: {
         break;
       case "exportReport":
         hooks.exportReport(c.scope, c.report, c.format);
+        break;
+      case "feedbackWrite":
+        void hooks.feedbackWrite(c.command, c.args);
+        break;
+      case "jumpBlock":
+        hooks.jumpBlock(c.blockId);
         break;
       case "dock":
         void dock(c.panel);

@@ -333,7 +333,15 @@ dialog.storyscry { width: min(1140px, 95vw); height: min(760px, 88vh); }
 /* Comment threads (M5 step 1, ROADMAP M5, comments.ts). */
 .cirth-comment-mark { background: color-mix(in srgb, #f59e0b 24%, transparent); border-bottom: 2px solid #f59e0b; border-radius: 2px; cursor: pointer; }
 .cirth-comment-mark.cirth-comment-resolved { background: color-mix(in srgb, var(--line) 40%, transparent); border-bottom: 1.5px dashed var(--muted); opacity: 0.7; }
+.cirth-dialog-overlay { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: rgb(0 0 0 / 0.35); }
+.cirth-dialog-overlay[hidden] { display: none; }
+.cirth-dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; box-shadow: 0 12px 40px rgb(0 0 0 / 0.3); box-sizing: border-box; }
 .cirth-comments-dialog { width: min(760px, 94vw); max-height: min(780px, 90vh); display: flex; flex-direction: column; }
+#comments-popout { margin-left: auto; margin-right: 8px; }
+/* Feedback in its own window fills it. */
+body[data-panel="feedback"] .cirth-dialog-overlay { background: var(--bg); place-items: stretch; }
+body[data-panel="feedback"] .cirth-comments-dialog { width: 100%; max-height: none; height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+body[data-panel="feedback"] .cirth-comments-list { max-height: none; }
 .cirth-comments-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .cirth-comments-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 .cirth-comments-filter-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 10px; }
