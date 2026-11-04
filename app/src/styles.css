@@ -2059,3 +2059,54 @@ dialog.timeline[data-view="list"] .timeline-line { display: none; }
 .cirth-comment-mark.kind-note { text-decoration: underline dotted color-mix(in srgb, #3a8c7a 70%, transparent); }
 .project .meta .sample-about { color: var(--muted); font-size: 12px; }
 @media print { .fb-pin { display: none !important; } }
+
+/* Notecard View toolset, storylines, grid and season (0.8.2, views.ts). */
+#board, body[data-panel="board"] #panel-root { container-type: inline-size; }
+.board-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -2px 0 8px; font-size: 12px; }
+.board-views { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.board-views button { border: 0; border-radius: 0; padding: 3px 9px; font-size: 12px; background: var(--panel); color: var(--ink); }
+.board-views button + button { border-left: 1px solid var(--line); }
+.board-views button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.board-tools select, .board-tools > button { font-size: 12px; }
+.board-storylines { display: grid; gap: 4px; padding: 8px; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.sl-row { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.sl-row > * { min-width: 0; }
+.sl-row button { flex: none; }
+.sl-row .sl-name, .sl-row #board-storyline-new { flex: 1; width: auto; min-width: 0; padding: 3px 6px; }
+.sl-color { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
+.sl-new { margin-top: 2px; }
+.board-storylines .form-note { margin: 2px 0 0; font-size: 11px; }
+.card.has-storyline, .season-card.has-storyline { border-left: 6px solid var(--sl); }
+.card-sl { font-weight: 600; color: color-mix(in srgb, var(--sl, var(--muted)) 75%, var(--ink)); }
+.card-storyline { font-size: 11px; justify-self: start; max-width: 100%; margin-top: 2px; }
+.card.dimmed, .season-card.dimmed { opacity: .38; }
+.card.dimmed:focus-within, .card.dimmed:focus { opacity: 1; }
+/* Acts as columns once the view is wide enough. */
+@container (min-width: 620px) {
+  .board-acts { flex-direction: row; align-items: flex-start; overflow-x: auto; padding-bottom: 6px; }
+  .board-act { flex: 0 0 250px; }
+}
+.board-grid-scroll { overflow: auto; padding-bottom: 6px; }
+.board-grid { display: grid; gap: 6px; align-items: stretch; grid-template-columns: minmax(90px, 140px) repeat(var(--cols, 1), minmax(220px, 1fr)); }
+.grid-cell[data-act-name]::before { content: attr(data-act-name); display: none; font-size: 11px; color: var(--muted); }
+/* A narrow panel: each storyline, then its cells, one under another, each naming its act. */
+@container (max-width: 619px) {
+  .board-grid { grid-template-columns: minmax(0, 1fr); }
+  .grid-corner, .grid-act { display: none; }
+  .grid-line { margin-top: 4px; }
+  .grid-cell[data-act-name]:not([data-act-name=""])::before { display: block; }
+}
+.grid-corner { min-height: 1px; }
+.grid-act { font-size: 12px; font-weight: 600; border-bottom: 2px solid var(--accent); padding: 2px 0; position: sticky; top: 0; background: var(--bg); z-index: 1; }
+.grid-line { font-size: 12px; font-weight: 600; padding: 6px 6px 6px 8px; border-left: 6px solid var(--sl, var(--line)); background: color-mix(in srgb, var(--sl, var(--line)) 14%, var(--panel)); border-radius: 4px; overflow-wrap: anywhere; }
+.grid-cell { display: grid; gap: 6px; align-content: start; min-height: 48px; padding: 4px; border: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); border-radius: 6px; }
+.grid-cell.drop-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.board-season { overflow: auto; }
+.season-cols { display: flex; gap: 10px; align-items: flex-start; min-width: max-content; padding-bottom: 6px; }
+.season-col { flex: 0 0 220px; display: grid; gap: 5px; align-content: start; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.season-col.current { border-color: var(--accent); }
+.season-col h3 { font-size: 12px; margin: 0 0 2px; display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+.season-act { font-size: 11px; margin: 6px 0 0; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.season-card { display: grid; gap: 2px; text-align: left; font-size: 12px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.season-card:disabled { cursor: default; color: var(--muted); }
+.season-card .card-sl { font-size: 11px; }

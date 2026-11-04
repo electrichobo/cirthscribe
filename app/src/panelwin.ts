@@ -5,7 +5,7 @@
 import "./styles.css";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { renderBoard, renderNavigator, setSceneNumbers, navUi, type BoardState, type ScriptView } from "./views";
+import { renderBoard, renderNavigator, setSceneNumbers, navUi, type BoardState, type ScriptView, type SeasonDoc } from "./views";
 import { installLiveRegions, focusKey, restoreFocus, applyTheme, type UiPrefs } from "./a11y";
 import type { PanelCommand, PanelState, PopPanel } from "./panels";
 import type { SceneInfo } from "./scenes";
@@ -67,6 +67,8 @@ const script: ScriptView = {
   setLabel: (sceneId, label) => send({ cmd: "label", sceneId, label }),
   deleteItem: (id) => send({ cmd: "deleteItem", id }),
   openElsewhere: (documentId, sceneId) => send({ cmd: "openElsewhere", documentId, sceneId }),
+  storylineOp: async (op) => send({ cmd: "storylineOp", op }),
+  season: () => invoke<SeasonDoc[]>("project_outline"),
 };
 
 function draw() {
@@ -83,6 +85,7 @@ function draw() {
     if (root.contains(a) && (a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === "text"))) return;
     board.beats = last.beats;
     board.structural = last.structural;
+    board.storylines = last.storylines ?? [];
     const body = document.createElement("div");
     const toggle = document.createElement("label");
     toggle.className = "toggle board-option";
@@ -92,7 +95,7 @@ function draw() {
     box.checked = last.structural;
     box.addEventListener("change", () => send({ cmd: "structural", on: box.checked }));
     toggle.append(box, " Notecard view may reorder script");
-    renderBoard(body, script, board, () => undefined, key?.split("|")[0]);
+    renderBoard(body, script, board, () => draw(), key?.split("|")[0]);
     root.replaceChildren(toggle, ...body.childNodes);
     send({ cmd: "rendered", items: last.beats.length, first: last.beats[0]?.logline ?? "" });
   }

@@ -32,6 +32,7 @@ The following defaults allow progress without pretending the owner has already s
 | Git-like history | In-app snapshots/branches, no Git installation requirement; branch-isolated snapshots in SQLite (owner, 2026-10-29) | Done (M5) |
 | Alternatives | Block-level alternatives for dialogue, parentheticals, action, headings (owner, 2026-10-29) | Done (M5) |
 | Comments identity | Anonymous by default with optional author name/initials, fully offline (owner, 2026-10-29) | Done (M5) |
+| Notecard colours | Named storylines (A plot, B plot, an arc), each with a colour, shared by the whole project; a beat belongs to at most one. The Notecard View lays acts out as columns, with a grid of a row per storyline across the acts, and a season view of every script (owner, 2026-11-03). Schema v18 | Done (0.8.2) |
 
 ## Later questions that do not block drafting or M0
 

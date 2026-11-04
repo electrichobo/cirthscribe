@@ -22,7 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 17;
+pub const SCHEMA_VERSION: i64 = 18;
 
 static CRASH_HOOK: std::sync::OnceLock<fn(&'static str)> = std::sync::OnceLock::new();
 
@@ -469,6 +469,15 @@ fn migrate_v17(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// v18 (0.8.2): storylines, named and coloured, that beats belong to.
+fn migrate_v18(tx: &Transaction) -> Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE storylines (id TEXT PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL, pos REAL NOT NULL);
+         ALTER TABLE beats ADD COLUMN storyline_id TEXT;",
+    )?;
+    Ok(())
+}
+
 type Migration = fn(&Transaction) -> Result<()>;
 
 /// (target version, step). Append only; never edit a shipped step.
@@ -489,6 +498,7 @@ const MIGRATIONS: &[(i64, Migration)] = &[
     (15, migrate_v15),
     (16, migrate_v16),
     (17, migrate_v17),
+    (18, migrate_v18),
 ];
 
 /// Bring a database from `from` to `SCHEMA_VERSION` in one transaction.
@@ -2042,9 +2052,9 @@ impl Store {
 
     /// A document's outline items and cards, in outline order.
     pub fn beats_of(&self, document_id: &str) -> Result<Vec<Beat>> {
-        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id FROM beats WHERE document_id = ?1 ORDER BY pos")?;
+        let mut stmt = self.conn.prepare("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id, storyline_id FROM beats WHERE document_id = ?1 ORDER BY pos")?;
         let beats = stmt
-            .query_map([document_id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)? }))?
+            .query_map([document_id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)?, storyline: r.get(8)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(beats)
     }
@@ -2053,10 +2063,30 @@ impl Store {
     /// settings change, they count as unsaved work until the next save.
     pub fn put_beat(&self, beat: &Beat) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id, kind, title, parent_id) VALUES (?1, ?2, ?3, ?4, ?5, COALESCE((SELECT document_id FROM beats WHERE id = ?1), ?6), ?7, ?8, ?9)",
-            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos, self.current_document()?, beat.kind, beat.title, beat.parent],
+            "INSERT OR REPLACE INTO beats(id, logline, summary, scene_id, pos, document_id, kind, title, parent_id, storyline_id) VALUES (?1, ?2, ?3, ?4, ?5, COALESCE((SELECT document_id FROM beats WHERE id = ?1), ?6), ?7, ?8, ?9, ?10)",
+            params![beat.id, beat.logline, beat.summary, beat.scene_id, beat.pos, self.current_document()?, beat.kind, beat.title, beat.parent, beat.storyline],
         )?;
         self.mark_unsaved()
+    }
+
+    /// The project's storylines, in their order.
+    pub fn storylines(&self) -> Result<Vec<crate::model::Storyline>> {
+        let mut stmt = self.conn.prepare("SELECT id, name, color, pos FROM storylines ORDER BY pos, id")?;
+        let rows = stmt.query_map([], |r| Ok(crate::model::Storyline { id: r.get(0)?, name: r.get(1)?, color: r.get(2)?, pos: r.get(3)? }))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    fn put_storyline(&self, s: &crate::model::Storyline) -> Result<()> {
+        if s.id.trim().is_empty() || s.name.trim().is_empty() || !crate::model::valid_color(&s.color) || !s.pos.is_finite() {
+            return Err(StoreError::Invalid("a storyline needs a name, a colour (#rrggbb) and a place".into()));
+        }
+        self.conn.execute("INSERT OR REPLACE INTO storylines(id, name, color, pos) VALUES (?1, ?2, ?3, ?4)", params![s.id, s.name.trim(), s.color.to_ascii_lowercase(), s.pos])?;
+        self.mark_unsaved()
+    }
+
+    /// Every script's outline and cards, in the project's order (a season outline).
+    pub fn project_outline(&self) -> Result<Vec<(Id, String, Vec<Beat>)>> {
+        self.documents()?.into_iter().map(|(id, title)| Ok((id.clone(), title, self.beats_of(&id)?))).collect()
     }
 
     /// An outline item's kind and place are valid: a known kind; a parent
@@ -2103,7 +2133,7 @@ impl Store {
     pub fn beat(&self, id: &str) -> Result<Option<Beat>> {
         Ok(self
             .conn
-            .query_row("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id FROM beats WHERE id = ?1", [id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)? }))
+            .query_row("SELECT id, logline, summary, scene_id, pos, kind, title, parent_id, storyline_id FROM beats WHERE id = ?1", [id], |r| Ok(Beat { id: r.get(0)?, logline: r.get(1)?, summary: r.get(2)?, scene_id: r.get(3)?, pos: r.get(4)?, kind: r.get(5)?, title: r.get(6)?, parent: r.get(7)?, storyline: r.get(8)? }))
             .optional()?)
     }
 
@@ -2130,6 +2160,11 @@ impl Store {
                     return Err(StoreError::Invalid("a card needs an id and a position".into()));
                 }
                 self.check_outline_place(b)?;
+                if let Some(sl) = &b.storyline {
+                    if self.conn.query_row("SELECT 1 FROM storylines WHERE id = ?1", [sl], |_| Ok(())).optional()?.is_none() {
+                        return Err(StoreError::Invalid("that storyline is not in the project".into()));
+                    }
+                }
                 let before = self.beat(&b.id)?;
                 self.put_beat(b)?;
                 match before {
@@ -2389,6 +2424,33 @@ impl Store {
                 self.conn.execute("DELETE FROM beats WHERE id = ?1", [id])?;
                 self.mark_unsaved()?;
                 PlanningOp::PutBeat(old)
+            }
+            PlanningOp::PutStoryline(sl) => {
+                let before = self.storylines()?.into_iter().find(|x| x.id == sl.id);
+                self.put_storyline(sl)?;
+                match before {
+                    Some(old) => PlanningOp::PutStoryline(old),
+                    None => PlanningOp::DeleteStoryline(sl.id.clone()),
+                }
+            }
+            PlanningOp::DeleteStoryline(id) => {
+                let Some(old) = self.storylines()?.into_iter().find(|x| &x.id == id) else {
+                    return Err(StoreError::Invalid(format!("no storyline {id}")));
+                };
+                let mut stmt = self.conn.prepare("SELECT id FROM beats WHERE storyline_id = ?1 ORDER BY id")?;
+                let beats = stmt.query_map([id], |r| r.get::<_, String>(0))?.collect::<std::result::Result<Vec<_>, _>>()?;
+                drop(stmt);
+                self.conn.execute("UPDATE beats SET storyline_id = NULL WHERE storyline_id = ?1", [id])?;
+                self.conn.execute("DELETE FROM storylines WHERE id = ?1", [id])?;
+                self.mark_unsaved()?;
+                PlanningOp::RestoreStoryline { storyline: old, beats }
+            }
+            PlanningOp::RestoreStoryline { storyline, beats } => {
+                self.put_storyline(storyline)?;
+                for b in beats {
+                    self.conn.execute("UPDATE beats SET storyline_id = ?1 WHERE id = ?2", params![storyline.id, b])?;
+                }
+                PlanningOp::DeleteStoryline(storyline.id.clone())
             }
         };
         let version = current + 1;

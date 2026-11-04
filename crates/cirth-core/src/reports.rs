@@ -1305,6 +1305,7 @@ mod tests {
             kind: "beat".into(),
             title: String::new(),
             parent: None,
+            storyline: None,
         };
 
         let rev_set = RevisionSet {

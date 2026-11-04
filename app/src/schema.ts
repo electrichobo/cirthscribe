@@ -144,6 +144,17 @@ export interface Beat {
   title: string;
   /** The act or sequence it sits in; null at the top of the outline. */
   parent: string | null;
+  /** The storyline it belongs to (0.8.2); null or absent for none. */
+  storyline?: string | null;
+}
+
+/** A named, coloured storyline that beats belong to (0.8.2); shared by the whole project. */
+export interface Storyline {
+  id: string;
+  name: string;
+  /** "#rrggbb". */
+  color: string;
+  pos: number;
 }
 
 const has = (marks: readonly Mark[], name: string) => marks.some((m) => m.type.name === name);

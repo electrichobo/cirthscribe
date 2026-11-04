@@ -1017,3 +1017,59 @@ fn opening_a_v16_project_gives_feedback_a_kind_and_keeps_it() {
         assert_eq!(kinds["t-odd"], "comment");
     }
 }
+
+#[test]
+fn opening_a_v17_project_adds_storylines_and_keeps_beats_and_feedback() {
+    use cirth_core::model::Storyline;
+    use cirth_core::planning::PlanningOp;
+    for fixture in ["unicode-marks", "page-boundaries"] {
+        let d = tmpdir(&format!("v17-{fixture}"));
+        let pkg = d.join(format!("{fixture}.cirth"));
+        std::fs::copy(data(&format!("schema-v17-{fixture}.cirth")), &pkg).unwrap();
+        let original = std::fs::read(&pkg).unwrap();
+        assert_eq!(store::schema_of(&pkg).unwrap(), 17, "fixture must be schema v17");
+        let o = Store::open_package(&pkg, &d.join("work.db"), Some(&d.join("backups"))).unwrap();
+        assert_eq!(o.migrated_from, Some(17));
+        assert_eq!(std::fs::read(o.pre_migration_backup.as_ref().unwrap()).unwrap(), original, "untouched v17 copy kept");
+        let s = o.store;
+
+        // Beats written before 0.8.2 keep their text and have no storyline; feedback keeps its kind.
+        let beats = s.beats().unwrap();
+        assert!(!beats.is_empty() && beats.iter().all(|b| b.storyline.is_none() && b.summary.ends_with("(authored)")));
+        assert!(s.storylines().unwrap().is_empty());
+        let threads = s.comment_threads().unwrap();
+        assert!(threads.iter().any(|t| t.thread.id == "v17-suggestion" && t.thread.kind == "suggestion" && t.messages[0].text == "Frozen v17 suggestion"));
+
+        // A storyline, a beat in it; deleting the storyline frees the beat and undo puts both back.
+        let a = Storyline { id: "sl-a".into(), name: " A plot ".into(), color: "#C0392B".into(), pos: 1.0 };
+        s.apply_planning(&PlanningOp::PutStoryline(a.clone()), None).unwrap();
+        let sl = s.storylines().unwrap();
+        assert_eq!((sl[0].name.as_str(), sl[0].color.as_str()), ("A plot", "#c0392b"), "name trimmed, colour kept in lower case");
+        let mut b0 = beats[0].clone();
+        b0.storyline = Some("sl-a".into());
+        s.apply_planning(&PlanningOp::PutBeat(b0.clone()), None).unwrap();
+        assert_eq!(s.beat(&b0.id).unwrap().unwrap().storyline.as_deref(), Some("sl-a"));
+        let (_, undo) = s.apply_planning(&PlanningOp::DeleteStoryline("sl-a".into()), None).unwrap();
+        assert!(s.storylines().unwrap().is_empty() && s.beat(&b0.id).unwrap().unwrap().storyline.is_none(), "the beat stays, without the storyline");
+        assert_eq!(s.beat(&b0.id).unwrap().unwrap().summary, b0.summary);
+        s.apply_planning(&undo, None).unwrap();
+        assert_eq!(s.beat(&b0.id).unwrap().unwrap().storyline.as_deref(), Some("sl-a"), "undo puts the beat back in the storyline");
+
+        // Refused: a bad colour, an empty name, a storyline that does not exist.
+        assert!(s.apply_planning(&PlanningOp::PutStoryline(Storyline { color: "red".into(), ..a.clone() }), None).is_err());
+        assert!(s.apply_planning(&PlanningOp::PutStoryline(Storyline { name: "  ".into(), ..a.clone() }), None).is_err());
+        assert!(s.apply_planning(&PlanningOp::PutBeat(cirth_core::model::Beat { storyline: Some("nope".into()), ..b0.clone() }), None).is_err());
+
+        // The season outline lists every script with its beats.
+        let outline = s.project_outline().unwrap();
+        assert!(outline.iter().any(|(id, _, bs)| *id == s.current_document().unwrap() && bs.len() == beats.len()));
+
+        // Kept through a save and reopen.
+        s.save_package(&pkg).unwrap();
+        drop(s);
+        assert_eq!(store::schema_of(&pkg).unwrap(), SCHEMA_VERSION);
+        let s = Store::open_package(&pkg, &d.join("work2.db"), None).unwrap().store;
+        assert_eq!(s.storylines().unwrap().len(), 1);
+        assert_eq!(s.beat(&b0.id).unwrap().unwrap().storyline.as_deref(), Some("sl-a"));
+    }
+}

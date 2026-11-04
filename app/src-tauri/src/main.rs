@@ -2553,6 +2553,8 @@ async fn load_document(app: State<'_, App>) -> Result<Document, String> {
 struct PlanningState {
     version: u64,
     beats: Vec<Beat>,
+    /// The project's storylines (0.8.2), shared by every script.
+    storylines: Vec<cirth_core::model::Storyline>,
     structural: bool,
     can_undo: bool,
     can_redo: bool,
@@ -2565,11 +2567,26 @@ fn planning_state(s: &Session, done: bool) -> Result<PlanningState, String> {
     Ok(PlanningState {
         version: s.store.planning_version().map_err(err)?,
         beats: s.store.beats().map_err(err)?,
+        storylines: s.store.storylines().map_err(err)?,
         structural: s.store.board_structural(&doc).map_err(err)?,
         can_undo: s.planning.can_undo(),
         can_redo: s.planning.can_redo(),
         done,
     })
+}
+
+/// One script's outline in the season view.
+#[derive(Serialize)]
+struct SeasonDoc {
+    document_id: String,
+    title: String,
+    beats: Vec<Beat>,
+}
+
+/// Every script's outline and cards, for the Notecard View's season (read only).
+#[tauri::command]
+async fn project_outline(app: State<'_, App>) -> Result<Vec<SeasonDoc>, String> {
+    with_session(&app, |s| Ok(s.store.project_outline().map_err(err)?.into_iter().map(|(document_id, title, beats)| SeasonDoc { document_id, title, beats }).collect()))
 }
 
 #[tauri::command]
@@ -4256,6 +4273,7 @@ fn main() {
             apply_batch,
             load_document,
             planning_state_now,
+            project_outline,
             project_tree,
             create_document_with_profile,
             get_document_profile,

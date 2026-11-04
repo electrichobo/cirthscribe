@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { listen, emitTo } from "@tauri-apps/api/event";
-import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, newId, type Beat, type Block, type Kind } from "./schema";
+import { schema, docFromBlocks, nodeToBlock, KIND_LABEL, newId, type Beat, type Block, type Kind, type Storyline } from "./schema";
 import { idsPlugin } from "./ids";
 import { screenplayKeymap, setKind, setKeyConfig, getKeyConfig, defaultKeyConfig, comicKeyConfig } from "./keys";
 import { Syncer, diff, type SyncStatus } from "./sync";
@@ -16,7 +16,7 @@ import { clipboardTextParser, clipboardTextSerializer, handlePaste, insertBlocks
 import { pageMarksPlugin, pageKey, buildDecorations, type PageStart } from "./pagemarks";
 import { sceneNumbersPlugin, sceneNumbersKey, buildSceneNumberDecorations, type SceneNumber } from "./scenenums";
 import { confirmDialog } from "./confirm";
-import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, navUi, outlineOrder, type BoardState, type ScriptView, type NavInfo, type CharacterStat, setSceneNumbers, sceneAtCursor } from "./views";
+import { renderBoard, renderNavigator, moveCard, editorScript, revealScene, navUi, outlineOrder, type BoardState, type ScriptView, type StorylineOp, type SeasonDoc, type NavInfo, type CharacterStat, setSceneNumbers, sceneAtCursor } from "./views";
 import { createPanelHost, POP_LABEL, type PopPanel } from "./panels";
 import { scenesOf, moveScene, reorderScenes } from "./scenes";
 import { installPerf } from "./perf";
@@ -211,6 +211,7 @@ let pageTimer: number | undefined;
 interface PlanningState {
   version: number;
   beats: Beat[];
+  storylines: Storyline[];
   structural: boolean;
   can_undo: boolean;
   can_redo: boolean;
@@ -227,6 +228,7 @@ function takePlanning(st: PlanningState) {
   const old = new Map(board.beats.map((b) => [b.id, b]));
   board.beats = st.beats.map((b) => Object.assign(old.get(b.id) ?? b, b));
   board.structural = st.structural;
+  board.storylines = st.storylines ?? [];
   ($("structural") as HTMLInputElement).checked = st.structural;
   storyScry?.notifyChanged();
 }
@@ -277,6 +279,22 @@ async function putBeatNow(beat: Beat, from: "board" | "nav"): Promise<void> {
   }
   panelHost.broadcast();
 }
+
+/** A storyline added, changed or deleted: one planning step, undone from the board. */
+function storylineOp(op: StorylineOp): Promise<void> {
+  return queued(async () => {
+    try {
+      takePlanning(await invoke<PlanningState>("planning_command", { op, base: planningVersion }));
+      boardSteps.push({ kind: "planning" });
+      boardRedo = [];
+    } catch (e) {
+      await refreshPlanning().catch(() => undefined);
+      showBanner(String(e).includes("stale") ? "The board had changed, so it was reloaded; that storyline change was not applied. Make it again." : `Storyline not saved: ${e}`);
+    }
+    rerenderSide();
+  });
+}
+const season = () => invoke<SeasonDoc[]>("project_outline");
 
 /** A scene move made from the board: a script edit, recorded so the board can undo it. */
 function boardMove(sceneId: string, before: string | null) {
@@ -910,7 +928,7 @@ function rerenderSide() {
   const typing = a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type === "text");
   if (!boardEl.contains(a) || !typing) {
     const key = focusKey(boardEl);
-    renderBoard(boardBody, { ...script(), putBeat, move: boardMove }, board, rerenderSide, key?.split("|")[0]);
+    renderBoard(boardBody, { ...script(), putBeat, move: boardMove, storylineOp, season }, board, rerenderSide, key?.split("|")[0]);
     restoreFocus(boardEl, key);
   }
   panelHost.broadcast();
@@ -1469,6 +1487,8 @@ const panelHost = createPanelHost({
   numbers: () => sceneNumbers,
   beats: () => board.beats,
   structural: () => board.structural,
+  storylines: () => board.storylines ?? [],
+  storylineOp: (op) => storylineOp(op),
   setStructural: (on) => setStructural(on),
   reveal: (id) => revealScene(view, id),
   move: (id, before, panel) => (panel === "board" ? boardMove(id, before) : script().move(id, before)),

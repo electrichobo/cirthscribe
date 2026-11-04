@@ -584,6 +584,60 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     assert(!(await app.evaluate("document.getElementById('structural').checked")), "another document starts with it off");
   });
 
+  await test("Notecard View storylines (0.8.2): add and colour storylines, put cards in them, bring one forward, a grid of storylines across the acts, drop into a cell; deleting one keeps its cards and undo brings it back; the script never changes", async () => {
+    await openFixture("page-boundaries");
+    const script0 = JSON.stringify(await blocks());
+    const beats = () => app.evaluate("JSON.parse(JSON.stringify(__cirth.board.beats.filter(b => b.kind === 'beat')))");
+    const lines = () => app.evaluate("JSON.parse(JSON.stringify(__cirth.board.storylines ?? []))");
+    const click = (sel) => app.evaluate(`(document.querySelector(${JSON.stringify(sel)}).click(), true)`);
+    await click("#board-view-acts");
+    assert(await app.evaluate("!!document.getElementById('board-view-lines') && !!document.getElementById('board-view-season') && document.getElementById('board-filter').disabled"), "the toolset shows views; the filter waits for a storyline");
+    // Two storylines, each with its own colour.
+    await click("#board-storylines-toggle");
+    await waitFor(app, "!!document.getElementById('board-storylines')", "the storyline list opens");
+    for (const name of ["A plot", "B plot"]) {
+      await app.evaluate(`(() => { document.getElementById('board-storyline-new').value = ${JSON.stringify(name)}; document.getElementById('board-storyline-add').click(); return true; })()`);
+      await waitFor(app, `__cirth.board.storylines.some(l => l.name === ${JSON.stringify(name)})`, `${name} added`);
+    }
+    const [a, b] = await lines();
+    assert(a.color !== b.color && /^#[0-9a-f]{6}$/.test(a.color), `each storyline gets its own colour: ${a.color} ${b.color}`);
+    await app.evaluate(`(() => { const c = document.querySelector('#board-storylines .sl-row[data-id="${a.id}"] .sl-color'); c.value = '#123456'; c.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, `__cirth.board.storylines.find(l => l.id === ${JSON.stringify(a.id)}).color === '#123456'`, "a storyline can be recoloured");
+    // A card in A plot shows its colour and name.
+    const c0 = (await beats())[0];
+    const sel = `#board .card[data-beat-id="${c0.id}"]`;
+    await app.evaluate(`(() => { const p = document.querySelector('${sel} .card-storyline'); p.value = ${JSON.stringify(a.id)}; p.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).storyline === ${JSON.stringify(a.id)} && document.querySelector('${sel}').classList.contains('has-storyline') && document.querySelector('${sel}').style.getPropertyValue('--sl') === '#123456' && document.querySelector('${sel} .card-sl')?.textContent === 'A plot'`, "the card wears A plot's colour");
+    // Bring A plot forward: the other cards step back.
+    const nBeats = (await beats()).length;
+    await app.evaluate(`(() => { const f = document.getElementById('board-filter'); f.value = ${JSON.stringify(a.id)}; f.dispatchEvent(new Event('change')); return true; })()`);
+    await waitFor(app, `!document.querySelector('${sel}').classList.contains('dimmed') && document.querySelectorAll('#board .card.dimmed').length === ${nBeats - 1}`, "only A plot's cards stand out");
+    await app.evaluate("(() => { const f = document.getElementById('board-filter'); f.value = ''; f.dispatchEvent(new Event('change')); return true; })()");
+    // The grid: a row per storyline (and one for cards with none), the card in A plot's row.
+    await click("#board-view-lines");
+    await waitFor(app, "!!document.getElementById('board-grid')", "the storyline grid shows");
+    const rowNames = await app.evaluate("[...document.querySelectorAll('#board-grid .grid-line')].map(h => h.textContent)");
+    assert(JSON.stringify(rowNames) === JSON.stringify(["A plot", "B plot", "No storyline"]), `a row for each storyline: ${rowNames}`);
+    assert(await app.evaluate(`document.querySelector('${sel}').closest('.grid-cell').dataset.storyline === ${JSON.stringify(a.id)}`), "the card sits in A plot's row");
+    // Drop it in B plot's row: it moves to B plot; the script is unchanged.
+    await app.evaluate(`(() => { const cell = document.querySelector('#board-grid .grid-cell[data-storyline="${b.id}"]'); const dt = new DataTransfer(); dt.setData('text/x-beat', ${JSON.stringify(c0.id)}); cell.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt })); return true; })()`);
+    await waitFor(app, `__cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).storyline === ${JSON.stringify(b.id)} && document.querySelector('${sel}')?.closest('.grid-cell')?.dataset.storyline === ${JSON.stringify(b.id)}`, "dropping in B plot's row moves the card there");
+    // Delete B plot: the card stays, without a storyline; undo in the board brings both back.
+    await app.evaluate(`(document.querySelector('#board-storylines .sl-row[data-id="${b.id}"] .sl-delete').click(), true)`);
+    await waitFor(app, `__cirth.board.storylines.length === 1 && __cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).storyline == null && __cirth.board.beats.filter(b => b.kind === 'beat').length === ${nBeats}`, "deleting a storyline keeps its cards");
+    await app.evaluate(`(document.querySelector('#board .card[data-beat-id="${c0.id}"]').focus(), true)`);
+    await press("z", [MOD_KEY]);
+    await waitFor(app, `__cirth.board.storylines.length === 2 && __cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)}).storyline === ${JSON.stringify(b.id)}`, "undo brings the storyline back with its card");
+    assert(JSON.stringify(await blocks()) === script0, "storylines never change the script");
+    await screenshot(app, "notecard-storylines");
+    // Kept with the project.
+    await app.evaluate("__cirth.goHome()");
+    await waitHome(app);
+    await openFixture("page-boundaries", false);
+    await waitFor(app, `(__cirth.board.storylines ?? []).length === 2 && __cirth.board.beats.find(b => b.id === ${JSON.stringify(c0.id)})?.storyline === ${JSON.stringify(b.id)}`, "storylines are kept with the project");
+    await click("#board-view-acts");
+  });
+
   await test("Episodes and series: File > Episodes and Documents adds a season folder and an episode; each document has its own script, scene list and cards; rename and move; the open episode is kept", async () => {
     await openFixture("page-boundaries");
     const pilotBlocks = JSON.stringify(await blocks());
@@ -622,6 +676,10 @@ export async function runSuite({ driver, results, dataDir, screensDir }) {
     await choose((await app.evaluate("[...document.querySelectorAll('#tree-list .tree-name')].map(n => n.textContent)"))[0]);
     await click("tree-open");
     await waitFor(app, `__cirth.scenes().length === ${pilotScenes} && __cirth.board.beats.length === ${pilotCards}`, "the pilot opens with its own scenes and cards");
+    // The season view: every script side by side with its own cards.
+    await app.evaluate("(document.getElementById('board-view-season').click(), true)");
+    await waitFor(app, `document.querySelectorAll('#board-season .season-col').length === 2 && document.querySelector('#board-season .season-col.current')?.querySelectorAll('.season-card').length === ${pilotCards} && [...document.querySelectorAll('#board-season .season-col')].some(c => /Low Water/.test(c.textContent) && c.querySelectorAll('.season-card').length === 1)`, "the season shows both scripts' cards");
+    await app.evaluate("(document.getElementById('board-view-acts').click(), true)");
     assert(JSON.stringify(await blocks()) === pilotBlocks, "the pilot's script is unchanged");
     // Rename and move: the episode up to the top level, renamed; a folder is never offered as its own target.
     await app.evaluate("(__cirth.menu('project_tree'), true)");

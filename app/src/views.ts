@@ -12,7 +12,7 @@
 import type { EditorView } from "prosemirror-view";
 import { TextSelection } from "prosemirror-state";
 import { moveScene, scenesOf, type SceneInfo } from "./scenes";
-import { newId, type Beat } from "./schema";
+import { newId, type Beat, type Storyline } from "./schema";
 import { announce } from "./a11y";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] => {
@@ -57,7 +57,33 @@ export interface ScriptView {
   reorderFromOutline?(id: string): void;
   /** Run an outline change against the data as it is when its turn comes (a planning step). */
   planWith?(plan: (all: Beat[]) => Beat | string): Promise<Beat | string>;
+  /** A storyline added, changed or deleted (a planning step, undoable). */
+  storylineOp?(op: StorylineOp): Promise<void>;
+  /** Every script's outline, for the season view (read only). */
+  season?(): Promise<SeasonDoc[]>;
 }
+
+export type StorylineOp = { PutStoryline: Storyline } | { DeleteStoryline: string };
+export interface SeasonDoc {
+  document_id: string;
+  title: string;
+  beats: Beat[];
+}
+
+/** Storyline colours offered first (any colour can be picked). */
+export const STORYLINE_COLORS = ["#c0392b", "#2e86c1", "#27ae60", "#d68910", "#8e44ad", "#16a085", "#d35400", "#7f8c8d"];
+
+/** The Notecard View's own choices: which view, which storyline stands out, whether the storyline list is open. Remembered per viewer. */
+export const boardUi: { view: "acts" | "lines" | "season"; filter: string; editing: boolean } = (() => {
+  const ui = { view: "acts" as "acts" | "lines" | "season", filter: "", editing: false };
+  try {
+    const v = localStorage.getItem("cirth.boardView");
+    if (v === "lines" || v === "season") ui.view = v;
+  } catch {
+    // default view
+  }
+  return ui;
+})();
 
 /** The editor as a ScriptView (main window). */
 export function editorScript(view: EditorView, putBeat: (beat: Beat) => Promise<void>, panelButton?: ScriptView["panelButton"]): ScriptView {
@@ -589,6 +615,8 @@ function renderCharacters(body: HTMLElement, script: ScriptView, info: NavInfo |
 export interface BoardState {
   beats: Beat[];
   structural: boolean;
+  /** The project's storylines (0.8.2). */
+  storylines?: Storyline[];
 }
 
 /** Outline items in reading order: each item, then what it holds (by position among siblings). */
@@ -685,6 +713,53 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
   header.append(badge, add, structure);
   const pb = script.panelButton?.("board");
   if (pb) header.append(pb);
+
+  // The Notecard View's toolset: views, storylines, and which storyline stands out.
+  const lines = [...(st.storylines ?? [])].sort((a, b) => a.pos - b.pos);
+  const lineOf = (b: Beat) => (b.storyline ? lines.find((l) => l.id === b.storyline) : undefined);
+  const tools = el("div", { className: "board-tools", id: "board-tools" });
+  const views = el("div", { className: "board-views" });
+  views.setAttribute("role", "group");
+  views.setAttribute("aria-label", "Notecard view layout");
+  const viewNames: [typeof boardUi.view, string, string][] = [
+    ["acts", "Acts", "Cards under their acts"],
+    ["lines", "Storylines", "A row for each storyline across the acts"],
+    ...(script.season ? ([["season", "Season", "Every script's cards side by side"]] as [typeof boardUi.view, string, string][]) : []),
+  ];
+  for (const [v, label, title] of viewNames) {
+    const b = el("button", { type: "button", id: `board-view-${v}`, title }, label);
+    b.setAttribute("aria-pressed", String(boardUi.view === v));
+    b.addEventListener("click", () => {
+      boardUi.view = v;
+      try {
+        localStorage.setItem("cirth.boardView", v);
+      } catch {
+        // not kept
+      }
+      rerender();
+    });
+    views.append(b);
+  }
+  if (boardUi.view === "season" && !script.season) boardUi.view = "acts";
+  const editBtn = el("button", { type: "button", id: "board-storylines-toggle" }, `Storylines (${lines.length})…`);
+  editBtn.setAttribute("aria-expanded", String(boardUi.editing));
+  editBtn.addEventListener("click", () => {
+    boardUi.editing = !boardUi.editing;
+    rerender();
+  });
+  const filter = el("select", { id: "board-filter" });
+  filter.setAttribute("aria-label", "Storyline to bring forward");
+  filter.append(new Option("All storylines", ""), ...lines.map((l) => new Option(l.name, l.id)), new Option("No storyline", "-"));
+  if (boardUi.filter && boardUi.filter !== "-" && !lines.some((l) => l.id === boardUi.filter)) boardUi.filter = "";
+  filter.value = boardUi.filter;
+  filter.disabled = !lines.length;
+  filter.addEventListener("change", () => {
+    boardUi.filter = filter.value;
+    rerender();
+    announce(filter.value ? `Cards in ${filter.selectedOptions[0].text} stand out` : "All storylines shown");
+  });
+  tools.append(views, editBtn, filter);
+  const editor = boardUi.editing ? storylineEditor(script, lines, rerender) : null;
 
   // Acts: each card's act is its outermost act (sequences show on the card).
   const byId = new Map(st.beats.map((b) => [b.id, b]));
@@ -831,7 +906,28 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
     const where = stat(b);
     const seq = seqOf(b);
     const meta = el("div", { className: "card-pace" }, ...(seq ? [el("span", { className: "card-seq" }, seq.title || "Sequence")] : []), ...(where ? [el("span", { title: "Page and minutes are estimates (a page is about a minute)" }, `p. ${where.page} · ≈ ${Math.round(where.position)} min`)] : []));
+    const line = lineOf(b);
+    if (line) {
+      card.classList.add("has-storyline");
+      card.style.setProperty("--sl", line.color);
+      meta.prepend(el("span", { className: "card-sl" }, line.name));
+    }
+    if (boardUi.filter && (boardUi.filter === "-" ? !!line : b.storyline !== boardUi.filter)) card.classList.add("dimmed");
     card.append(link, logline, summary, meta);
+    if (lines.length && script.storylineOp) {
+      const pick = el("select", { className: "card-storyline" });
+      pick.dataset.part = "storyline";
+      pick.setAttribute("aria-label", "Storyline this card is in");
+      pick.append(new Option("No storyline", ""), ...lines.map((l) => new Option(l.name, l.id)));
+      pick.value = line?.id ?? "";
+      pick.addEventListener("change", () => {
+        void script.putBeat({ ...b, storyline: pick.value || null }).then(() => {
+          rerender();
+          announce(pick.value ? `Card is in ${pick.selectedOptions[0].text}. The script is unchanged.` : "Card has no storyline");
+        });
+      });
+      card.append(pick);
+    }
     // The keyboard way into an act (dragging onto an act is the mouse way).
     if (acts.length && !st.structural) {
       const pick = el("select", { className: "card-act" });
@@ -853,7 +949,18 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
     cards.push(card);
     cardEls.set(b.id, card);
   });
-  // Lay the cards out under their acts.
+  // Lay the cards out: a grid of storylines across the acts, the season, or under their acts.
+  if (boardUi.view === "lines") {
+    setRoving(cards, cards.find((c) => c.dataset.item === focusBeat) ?? cards[0], inner);
+    root.replaceChildren(header, tools, ...(editor ? [editor] : []), pacing, el("p", { className: "sr-only", id: "board-hint" }, BOARD_HINT), storylineGrid(script, st, order, acts, lines, actOf, cardEls, rerender));
+    return;
+  }
+  if (boardUi.view === "season") {
+    const season = el("div", { className: "board-season", id: "board-season" }, el("p", { className: "form-note" }, "Gathering every script's cards…"));
+    root.replaceChildren(header, tools, ...(editor ? [editor] : []), season);
+    void script.season!().then((docs) => drawSeason(season, script, docs, lines)).catch((e) => season.replaceChildren(el("p", { className: "form-note" }, `The season could not be gathered: ${e}`)));
+    return;
+  }
   for (const g of groups) {
     const section = el("section", { className: `board-act${g.act ? "" : " no-act"}` });
     const title = g.act ? g.act.title || "(untitled act)" : acts.length ? "Not in an act" : "";
@@ -889,5 +996,136 @@ export function renderBoard(root: HTMLElement, script: ScriptView, st: BoardStat
     actsEl.append(section);
   }
   setRoving(cards, cards.find((c) => c.dataset.item === focusBeat) ?? cards[0], inner);
-  root.replaceChildren(header, pacing, el("p", { className: "sr-only", id: "board-hint" }, BOARD_HINT), actsEl);
+  root.replaceChildren(header, tools, ...(editor ? [editor] : []), pacing, el("p", { className: "sr-only", id: "board-hint" }, BOARD_HINT), actsEl);
+}
+
+/** The project's storylines: name, colour, delete; and a new one. */
+function storylineEditor(script: ScriptView, lines: Storyline[], rerender: () => void) {
+  const box = el("div", { className: "board-storylines", id: "board-storylines" });
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", "Storylines");
+  const op = (o: StorylineOp, msg: string) => void script.storylineOp?.(o).then(() => (rerender(), announce(msg)));
+  for (const l of lines) {
+    const color = el("input", { type: "color", className: "sl-color", value: l.color });
+    color.setAttribute("aria-label", `Colour of ${l.name}`);
+    color.addEventListener("change", () => op({ PutStoryline: { ...l, color: color.value } }, `${l.name} recoloured`));
+    const name = el("input", { type: "text", className: "sl-name", value: l.name });
+    name.setAttribute("aria-label", "Storyline name");
+    name.addEventListener("change", () => (name.value.trim() ? op({ PutStoryline: { ...l, name: name.value.trim() } }, "Storyline renamed") : (name.value = l.name)));
+    const del = el("button", { type: "button", className: "sl-delete" }, "Delete");
+    del.setAttribute("aria-label", `Delete ${l.name}; its cards stay, without a storyline`);
+    del.addEventListener("click", () => op({ DeleteStoryline: l.id }, `${l.name} deleted; its cards stay, without a storyline. Undo brings it back.`));
+    const row = el("div", { className: "sl-row" }, color, name, del);
+    row.dataset.id = l.id;
+    box.append(row);
+  }
+  const fresh = el("input", { type: "text", id: "board-storyline-new", placeholder: lines.length ? "Another storyline" : "A plot, B plot, an arc…" });
+  fresh.setAttribute("aria-label", "New storyline name");
+  const add = el("button", { type: "button", id: "board-storyline-add" }, "Add storyline");
+  const go = () => {
+    const n = fresh.value.trim();
+    if (!n) return announce("Name the storyline first");
+    const color = STORYLINE_COLORS.find((c) => !lines.some((l) => l.color === c)) ?? STORYLINE_COLORS[lines.length % STORYLINE_COLORS.length];
+    op({ PutStoryline: { id: newId(), name: n, color, pos: Math.max(0, ...lines.map((l) => l.pos)) + 1 } }, `Storyline ${n} added. Choose it on a card to colour the card.`);
+  };
+  add.addEventListener("click", go);
+  fresh.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") (e.preventDefault(), go());
+  });
+  box.append(el("div", { className: "sl-row sl-new" }, fresh, add));
+  if (!lines.length) box.append(el("p", { className: "form-note" }, "A storyline is a thread of the story, such as the A plot or one character's arc. Each card can belong to one; its colour shows on the card."));
+  return box;
+}
+
+/** Storylines across the acts: a row for each storyline, a column for each act. Dropping a card in a cell puts it in that storyline (and act). */
+function storylineGrid(script: ScriptView, st: BoardState, order: Beat[], acts: Beat[], lines: Storyline[], actOf: (b: Beat) => Beat | undefined, cardEls: Map<string, HTMLElement>, rerender: () => void) {
+  const cols: (Beat | undefined)[] = [...acts];
+  if (!acts.length || order.some((b) => !actOf(b))) cols.push(undefined);
+  const rows: (Storyline | undefined)[] = [...lines];
+  if (!lines.length || order.some((b) => !b.storyline || !lines.some((l) => l.id === b.storyline))) rows.push(undefined);
+  const grid = el("div", { className: "board-grid", id: "board-grid" });
+  grid.style.setProperty("--cols", String(cols.length));
+  grid.append(el("div", { className: "grid-corner" }));
+  for (const c of cols) grid.append(el("div", { className: "grid-act" }, c ? c.title || "(untitled act)" : acts.length ? "Not in an act" : "Cards"));
+  const known = (b: Beat) => (b.storyline && lines.some((l) => l.id === b.storyline) ? b.storyline : null);
+  for (const r of rows) {
+    const head = el("div", { className: "grid-line" }, r ? r.name : "No storyline");
+    if (r) head.style.setProperty("--sl", r.color);
+    grid.append(head);
+    for (const c of cols) {
+      const cell = el("div", { className: "grid-cell" });
+      cell.setAttribute("role", "list");
+      cell.setAttribute("aria-label", `${r ? r.name : "No storyline"}, ${c ? c.title || "untitled act" : "not in an act"}`);
+      cell.dataset.storyline = r?.id ?? "";
+      cell.dataset.act = c?.id ?? "";
+      cell.dataset.actName = c ? c.title || "(untitled act)" : acts.length ? "Not in an act" : "";
+      for (const b of order) if ((known(b) ?? undefined) === (r?.id ?? undefined) && actOf(b)?.id === c?.id) cell.append(cardEls.get(b.id)!);
+      cell.addEventListener("dragover", (e) => (e.preventDefault(), cell.classList.add("drop-over")));
+      cell.addEventListener("dragleave", () => cell.classList.remove("drop-over"));
+      cell.addEventListener("drop", (e) => {
+        cell.classList.remove("drop-over");
+        if ((e.target as HTMLElement).closest(".card")) return;
+        e.preventDefault();
+        const id = e.dataTransfer?.getData("text/x-beat");
+        const b = id ? st.beats.find((x) => x.id === id) : undefined;
+        if (!b) return;
+        void dropInCell(script, st, b, r?.id ?? null, c?.id ?? null).then((msg) => (rerender(), announce(msg)));
+      });
+      grid.append(cell);
+    }
+  }
+  return el("div", { className: "board-grid-scroll" }, grid);
+}
+
+/** A card dropped in a storyline-and-act cell: its storyline, and (when the board may) its act. The script is unchanged. */
+export async function dropInCell(script: ScriptView, st: BoardState, b: Beat, storyline: string | null, act: string | null): Promise<string> {
+  const next: Beat = { ...b, storyline };
+  const byId = new Map(st.beats.map((x) => [x.id, x]));
+  let cur = b.parent ? byId.get(b.parent) : undefined;
+  while (cur && cur.kind !== "act") cur = cur.parent ? byId.get(cur.parent) : undefined;
+  const moveAct = !st.structural && (cur?.id ?? null) !== act;
+  if (moveAct) {
+    const kids = st.beats.filter((x) => (x.parent ?? null) === act && x.id !== b.id);
+    next.parent = act;
+    next.pos = Math.max(0, ...kids.map((x) => x.pos)) + 1;
+  }
+  await script.putBeat(next);
+  const name = storyline ? (st.storylines ?? []).find((l) => l.id === storyline)?.name : null;
+  return `${name ? `Card is in ${name}` : "Card has no storyline"}${moveAct ? `, ${act ? `in ${byId.get(act)?.title ?? "the act"}` : "out of its act"}` : ""}. The script is unchanged.`;
+}
+
+/** The season: every script of the project side by side, each with its acts and cards (read only; a card goes to its scene). */
+function drawSeason(root: HTMLElement, script: ScriptView, docs: SeasonDoc[], lines: Storyline[]) {
+  const current = script.nav?.().currentDocument ?? null;
+  const cols = el("div", { className: "season-cols" });
+  for (const d of docs) {
+    const col = el("section", { className: `season-col${d.document_id === current ? " current" : ""}` });
+    col.dataset.document = d.document_id;
+    const beats = boardOrder(d.beats, [], false);
+    col.append(el("h3", {}, d.title || "(untitled script)", el("span", { className: "board-act-meta" }, ` ${beats.length} beat${beats.length === 1 ? "" : "s"}${d.document_id === current ? " · open" : ""}`)));
+    const byId = new Map(d.beats.map((x) => [x.id, x]));
+    let lastAct: string | null | undefined;
+    for (const b of beats) {
+      let a = b.parent ? byId.get(b.parent) : undefined;
+      while (a && a.kind !== "act") a = a.parent ? byId.get(a.parent) : undefined;
+      if ((a?.id ?? null) !== lastAct) {
+        lastAct = a?.id ?? null;
+        if (a) col.append(el("h4", { className: "season-act" }, a.title || "(untitled act)"));
+      }
+      const line = b.storyline ? lines.find((l) => l.id === b.storyline) : undefined;
+      const card = el("button", { type: "button", className: "season-card", disabled: !b.scene_id }, el("span", { className: "season-line" }, b.logline || b.summary || "(empty card)"), ...(line ? [el("span", { className: "card-sl" }, line.name)] : []));
+      card.title = b.scene_id ? "Go to the scene" : "Not linked to a scene";
+      if (line) (card.classList.add("has-storyline"), card.style.setProperty("--sl", line.color));
+      if (boardUi.filter && (boardUi.filter === "-" ? !!line : b.storyline !== boardUi.filter)) card.classList.add("dimmed");
+      card.addEventListener("click", () => {
+        if (!b.scene_id) return;
+        if (d.document_id === current) script.reveal(b.scene_id);
+        else script.openElsewhere?.(d.document_id, b.scene_id);
+      });
+      col.append(card);
+    }
+    if (!beats.length) col.append(el("p", { className: "form-note" }, "No cards yet."));
+    cols.append(col);
+  }
+  root.replaceChildren(...(docs.length < 2 ? [el("p", { className: "form-note" }, "This project has one script. Add episodes to the project to plan a season here.")] : []), cols);
 }

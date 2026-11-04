@@ -240,6 +240,27 @@ pub struct Beat {
     /// The act or sequence it sits in; None at the top of the outline.
     #[serde(default)]
     pub parent: Option<Id>,
+    /// The storyline a beat belongs to (0.8.2: A plot, B plot, an arc); its
+    /// colour shows on the card. None for no storyline.
+    #[serde(default)]
+    pub storyline: Option<Id>,
+}
+
+/// A named, coloured thread of the story that beats belong to (0.8.2,
+/// Notecard View). Storylines belong to the whole project, so a season's
+/// episodes share them.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+pub struct Storyline {
+    pub id: Id,
+    pub name: String,
+    /// "#rrggbb".
+    pub color: String,
+    pub pos: f64,
+}
+
+/// A colour in the form "#rrggbb".
+pub fn valid_color(c: &str) -> bool {
+    c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit())
 }
 
 fn beat_kind() -> String {
@@ -251,7 +272,7 @@ pub const OUTLINE_KINDS: [&str; 3] = ["act", "sequence", "beat"];
 
 impl Default for Beat {
     fn default() -> Self {
-        Beat { id: String::new(), logline: String::new(), summary: String::new(), scene_id: None, pos: 0.0, kind: beat_kind(), title: String::new(), parent: None }
+        Beat { id: String::new(), logline: String::new(), summary: String::new(), scene_id: None, pos: 0.0, kind: beat_kind(), title: String::new(), parent: None, storyline: None }
     }
 }
 

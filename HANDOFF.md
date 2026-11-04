@@ -17,6 +17,7 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
   - Fonts: Noto Sans Hebrew, Arabic, Devanagari, SC (screen; `unicode-range`). PDF prints Hebrew/Arabic/Devanagari via rustybuzz + unicode-bidi (owner-approved): visual order per paragraph direction, shaped, squeezed to the layout's columns; fallbacks embedded only when used. CJK screen only (CFF outlines). Sample PDF checked by eye (`out/fontcheck/`).
   - Licences: OFL.txt per font, LICENSES.md, notices regenerated (371).
 - **Verified 2026-11-02 (Windows):** `cargo test -p cirth-core` 192/192 (new PDF fallback test); `cargo test -p cirthscribe` 1/1; `npm run build`; release build; contract 4/4; offline audit passed; notices check (371); e2e CDP 88/88, WebDriver 87/88 (1 skipped IME).
+- **0.8.2 section C, Notecard View redesign (2026-11-03, committed):** storylines (schema v18, `model::Storyline`, `PutStoryline`/`DeleteStoryline`/`RestoreStoryline` planning ops, `project_outline`; frozen `schema-v17-*.cirth` + upgrade test; snapshot/branch table lists); Notecard View toolset, card colours, act columns, storyline grid, season view (`views.ts`), pop-out board wired; contract fixture has `storyline`; manual check N57. Verified: core tests 196 pass, app tests 2/2, contract 4/4, CDP 91/91. WebDriver: the first full run failed five late tests in a row (from "Export Capability Analysis" on: "no project open", then the editor never opened); that test passed alone and a second full run passed 90/91 (1 skipped IME). Not reproduced; watch for it.
 - **0.8.2 section C, Cork Board canvas (2026-11-03, committed):** `app/src/evidence.ts` rewritten as a free canvas (tools, pin-drag strings, curved strings you can click, double-click notes, pan, zoom, Fit); Cork Board CSS; e2e extended; manual checks N55 (canvas) and N56 (Feedback window). No core change. Verified: build, full CDP 90/90 and WebDriver 89/90 (1 skipped IME), contract 4/4; the board test again on both drivers after the last placement fix.
 - **0.8.2 section C, Feedback pop-out (2026-11-03, committed):** Feedback in its own window (`panels.ts` feedback panel, `feedbackWrite`/`jumpBlock` commands, `panelwin.ts` `drawFeedback`, Tools menu item); writes go through `opts.write` in `comments.ts`; Feedback dialog overlay styling (it drew unstyled below the status bar). Verified: tsc, build, CDP 90/90, WebDriver 89/90 (1 skipped IME). Not checked by eye: the popped window itself.
 - **0.8.2 section C, part 1 (2026-11-03, committed):** stripboard vertical and compact views; timeline Line view with a playhead; Feedback kinds (schema v17, frozen v16 files), margin icons with a pop-up, right-click Add Feedback/Suggestion/Note; three 0.8.1 known issues fixed.
@@ -28,8 +29,8 @@ Working state between agent sessions; see "Session Continuity & Constrained Take
 
 ## In-Progress / Uncommitted State
 
-- None. Cork Board canvas committed.
+- None. Notecard View redesign committed.
 
 ## Next Immediate Step
 
-1. Section C: Notecard View redesign (23, 26: story-structure colours, season outlines; `views.ts` renderBoard); PDF import (needs a crate approval), 0.8.1 known issues, Linux build.
+1. Section C: PDF import (needs the owner's approval of a PDF-reading crate), 0.8.1 known issues, Linux build.

@@ -28,6 +28,7 @@ pub const BRANCH_TABLES: &[&str] = &[
     "story_events",
     "board_cards",
     "board_threads",
+    "storylines",
     "assets",
     "bookmarks",
     "breakdown_tags",

@@ -6,9 +6,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { announce } from "./a11y";
-import type { Beat } from "./schema";
+import type { Beat, Storyline } from "./schema";
 import type { SceneInfo } from "./scenes";
-import type { NavInfo } from "./views";
+import type { NavInfo, StorylineOp } from "./views";
 import type { ExportableReport, ReportFormat, ReportScope } from "./storyscry";
 
 /** NavInfo as JSON (maps as entry lists). */
@@ -33,6 +33,8 @@ export interface PanelState {
   numbers: [string, { number: string; omitted: boolean }][];
   beats: Beat[];
   structural: boolean;
+  /** The project's storylines (Notecard View colours). */
+  storylines?: Storyline[];
   /** The navigator's data (scene list window). */
   nav?: NavWire;
   /** Sent once, when the window opens (it then owns the typing). */
@@ -48,6 +50,7 @@ export type PanelCommand =
   | { panel: PopPanel; cmd: "reveal"; sceneId: string }
   | { panel: PopPanel; cmd: "move"; sceneId: string; before: string | null }
   | { panel: PopPanel; cmd: "putBeat"; beat: Beat }
+  | { panel: PopPanel; cmd: "storylineOp"; op: StorylineOp }
   | { panel: PopPanel; cmd: "structural"; on: boolean }
   | { panel: PopPanel; cmd: "notes"; text: string }
   | { panel: PopPanel; cmd: "label"; sceneId: string; label: string }
@@ -71,6 +74,9 @@ export function createPanelHost(hooks: {
   numbers: () => Map<string, { number: string; omitted: boolean }>;
   beats: () => Beat[];
   structural: () => boolean;
+  storylines: () => Storyline[];
+  /** A storyline change from the board window (a planning step here). */
+  storylineOp: (op: StorylineOp) => Promise<void>;
   setStructural: (on: boolean) => void;
   reveal: (sceneId: string) => void;
   move: (sceneId: string, before: string | null, panel: PopPanel) => void;
@@ -105,6 +111,7 @@ export function createPanelHost(hooks: {
       numbers: [...hooks.numbers()].map(([id, n]) => [id, { number: n.number, omitted: n.omitted }]),
       beats: hooks.beats(),
       structural: hooks.structural(),
+      storylines: hooks.storylines(),
       ...(panel === "nav" || panel === "board" ? { nav: wire(hooks.nav(), hooks.project()) } : {}),
       ...(panel === "storyscry" ? { versions: hooks.versions() } : {}),
       ...(panel === "feedback" ? { documentId: hooks.documentId() } : {}),
@@ -163,6 +170,9 @@ export function createPanelHost(hooks: {
         break;
       case "move":
         hooks.move(c.sceneId, c.before, c.panel);
+        break;
+      case "storylineOp":
+        void hooks.storylineOp(c.op);
         break;
       case "putBeat":
         void hooks.putBeat(c.beat, c.panel);

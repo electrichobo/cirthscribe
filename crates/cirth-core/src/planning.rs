@@ -19,6 +19,12 @@ pub enum PlanningOp {
     /// Create a card or replace it (text, link, planning position).
     PutBeat(Beat),
     DeleteBeat(String),
+    /// A storyline created or changed (0.8.2): name, colour, order.
+    PutStoryline(crate::model::Storyline),
+    /// Deletes a storyline; its beats keep their text and lose the storyline.
+    DeleteStoryline(String),
+    /// Undoes `DeleteStoryline`: the storyline and the beats that were in it.
+    RestoreStoryline { storyline: crate::model::Storyline, beats: Vec<String> },
     /// A scene's colour label ("" for none).
     SetSceneLabel { scene_id: String, label: String },
     /// A bible entry created or changed (M3 step 7).
