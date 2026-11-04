@@ -93,6 +93,20 @@ fn rtl_blocks(map: &PageMap) -> std::collections::HashSet<String> {
     rtl
 }
 
+/// How shaped text fills the columns the layout gave it: text that is too
+/// wide is squeezed to fit; text that is narrower (joined Arabic letters,
+/// Devanagari conjuncts) widens a little, at most `MAX_WIDEN`, and what room
+/// is left is shared on both sides, so no wide gap opens beside the word.
+/// Returns the horizontal scale and the space before the text, in points.
+const MAX_WIDEN: f32 = 1.12;
+fn fit(natural: f32, room: f32) -> (f32, f32) {
+    if natural <= 0.0 || room <= 0.0 {
+        return (1.0, 0.0);
+    }
+    let scale = (room / natural).min(MAX_WIDEN);
+    (scale, ((room - natural * scale) / 2.0).max(0.0))
+}
+
 /// Draws one line that needs a fallback font, starting at `x_in`. Every piece
 /// takes exactly its column width, as in the layout, so the line ends where the
 /// page map says it does.
@@ -141,10 +155,7 @@ fn draw_mixed_line(layer: &PdfLayerReference, fonts: &mut Fonts, segs: &[Seg], r
                 let shaped = rustybuzz::shape(&face, &[], buf);
                 let k = font_pt / face.units_per_em() as f32; // font units to points
                 let natural: f32 = shaped.glyph_positions().iter().map(|g| g.x_advance as f32 * k).sum();
-                let room = w * 72.0;
-                let squeeze = if natural > room && natural > 0.0 { room / natural } else { 1.0 };
-                // Right-to-left text narrower than its columns sits at their right edge.
-                let lead = if rtl { room - natural * squeeze } else { 0.0 };
+                let (squeeze, lead) = fit(natural, w * 72.0);
                 let f = fonts.fallback(font - 1)?;
                 let (x0, y0) = (x * 72.0 + lead, y_in * 72.0);
                 let mut pen = 0.0;
@@ -529,6 +540,21 @@ mod tests {
         let tp = crate::title::TitlePage { title: "THE TIDE LEDGER
 Part 2".into(), draft_label: "Blue Revision".into(), draft_date: "1 May 2026".into(), ..Default::default() };
         assert_eq!(expand_tokens("{title} - {draft} - {date}", &tp), "THE TIDE LEDGER - Blue Revision - 1 May 2026");
+    }
+
+    #[test]
+    fn narrow_shaped_text_widens_a_little_and_is_centred_in_its_columns() {
+        // Too wide: squeezed to exactly its room, no space before it.
+        assert_eq!(fit(50.0, 36.0), (36.0 / 50.0, 0.0));
+        // A little narrow: widened to fill its room.
+        let (s, lead) = fit(34.0, 36.0);
+        assert!((s * 34.0 - 36.0).abs() < 1e-4 && lead.abs() < 1e-4);
+        // Much narrower (an Arabic word in its columns): widened at most 12%, the rest shared on both sides.
+        let (s, lead) = fit(24.0, 36.0);
+        assert!((s - MAX_WIDEN).abs() < 1e-6);
+        assert!((lead * 2.0 + 24.0 * s - 36.0).abs() < 1e-4, "it still ends where its columns end");
+        assert!(lead > 0.0 && lead < 36.0 * 0.2, "the gap on each side stays small: {lead}");
+        assert_eq!(fit(0.0, 36.0), (1.0, 0.0));
     }
 
     #[test]
