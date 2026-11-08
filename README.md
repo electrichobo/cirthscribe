@@ -1,76 +1,123 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="app/public/art/brand/wordmark-dark.png">
-    <img src="app/public/art/brand/wordmark-light.png" alt="Kolbítar" width="400">
-  </picture>
+<!-- KÓLBÍTAR | PROJECT LANDING PAGE -->
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="app/public/art/brand/wordmark-dark.png">
+  <img src="app/public/art/brand/wordmark-light.png" alt="Kólbítar" width="460">
+</picture>
+
+### From first idea to final shooting script.
+
+**Write the script. Find the story. Plan the production.**
+
+A free, offline screenwriting workspace where your script, scene cards, story bible, cork board, and production reports all work together.
+
+<p>
+  <a href="https://github.com/electrichobo/cirthscribe/releases/latest"><img alt="Get the latest release" src="https://img.shields.io/badge/GET_THE_APP-Download-BA4939?style=for-the-badge"></a>
+  <a href="#see-it-in-action"><img alt="Explore screenshots" src="https://img.shields.io/badge/EXPLORE-The_App-444444?style=for-the-badge"></a>
 </p>
 
-<h3 align="center">Write the script, plan the story, prepare the shoot. One free app, on your own computer.</h3>
-
-<p align="center">
-  Kolbítar is a screenwriting app that keeps the whole story in one place: a screenplay editor that formats as you type, with the outline, notecards, cork board, story bible and production reports all built from the same script. It works offline, needs no account and costs nothing.
+<p>
+  <img alt="Release: 0.8.2 RC Alpha" src="https://img.shields.io/badge/release-0.8.2_RC_Alpha-BB7A3B?style=flat-square">
+  <img alt="Windows and macOS" src="https://img.shields.io/badge/Windows_%7C_macOS-supported-555555?style=flat-square">
+  <img alt="Offline first" src="https://img.shields.io/badge/offline-100%25-347C61?style=flat-square">
+  <a href="LICENSE"><img alt="GPL-3.0-only license" src="https://img.shields.io/badge/license-GPL--3.0--only-555555?style=flat-square"></a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/electrichobo/cirthscribe/releases"><img alt="Download" src="https://img.shields.io/badge/download-0.8.2_RC_Alpha-c0392b"></a>
-  <img alt="Windows and macOS" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-555">
-  <a href="LICENSE"><img alt="License: GPL-3.0-only" src="https://img.shields.io/badge/license-GPL--3.0--only-2e86c1"></a>
-  <img alt="Works offline" src="https://img.shields.io/badge/works-offline-27ae60">
-</p>
+<img src="docs/images/editor.png" alt="Kólbítar screenplay editor with scene navigation and color-coded story cards" width="100%">
 
-<p align="center">
-  <img src="docs/images/editor.png" alt="The Kolbítar editor with the sample script, the scene list on the left and colour-coded notecards on the right" width="900">
-</p>
+<sub>One script. Every part of the story. No subscription, account, or cloud required.</sub>
 
-> **0.8.2 RC Alpha: a test release.** Kolbítar is being tested by working writers before its first full release. Expect rough edges, keep your own copies of anything important (File > Save As, or export to PDF or Fountain), and please [report what you find](#contributing).
+</div>
 
-## Contents
+> [!IMPORTANT]
+> **Early release: 0.8.2 RC Alpha.** Kólbítar is in active testing, not yet a stable 1.0 release. Expect rough edges. Keep separate copies of important work using **File > Save As** or exports to PDF or Fountain. [Report issues](https://github.com/electrichobo/cirthscribe/issues) to help improve it.
 
-[Install](#install) · [About](#about) · [Features](#features) · [Getting started](#getting-started) · [How it's built](#how-its-built) · [Security and privacy](#security-and-privacy) · [Contributing](#contributing) · [What's next](#whats-next) · [License](#license) · [Acknowledgements](#acknowledgements)
+---
 
-## Install
+## Why Kólbítar?
 
-1. Open the [latest release](https://github.com/electrichobo/cirthscribe/releases).
-2. Download the file for your computer.
-3. Run it.
+Your screenplay should be the center of your writing process, not another file you have to keep in sync with everything else.
 
-| System | File | First launch |
-| - | - | - |
-| Windows 10 or later, 64-bit | `Kolbítar_0.8.2_x64-setup.exe` | The installer isn't code-signed yet, so SmartScreen may warn you. Choose **More info**, then **Run anyway**. |
-| macOS 11 or later, Apple silicon | `Kolbítar_0.8.2_aarch64.dmg` | Drag Kolbítar to Applications. The app isn't notarized yet, so the first time, Control-click it and choose **Open**, or allow it in System Settings > Privacy & Security. |
-| Linux | none yet | Linux builds are on hold while the Windows and macOS versions mature. You can [build from source](#build-from-source). |
+| **Write naturally** | **See the whole story** | **Get ready to shoot** |
+| :--- | :--- | :--- |
+| Industry-standard screenplay pages, automatic formatting, focus modes, and revision tools. | Scene outlines, notecards, a freeform cork board, a timeline, and a story bible tied to the same script. | Breakdowns, stripboards, character sides, exportable reports, and production-ready revisions. |
 
-If you use the [GitHub CLI](https://cli.github.com/), you can download the latest installer from a terminal:
+**Built around four ideas:**
+
+- **One script, connected views.** Plan and write without maintaining separate versions of the same story. Moving a card does not change the screenplay unless you permit it.
+- **Your work belongs to you.** Files stay local. No account, forced sync, subscription, or telemetry.
+- **Your writing is worth protecting.** Autosaves, backups, recovery, and versioned project safeguards help protect work in progress.
+- **Free and open source.** Use it for personal or professional projects, inspect the code, or contribute improvements.
+
+## See it in action
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/cork-board.png" alt="Kólbítar Cork Board with freeform pinned scenes, notes and connected strings"></td>
+    <td width="50%"><img src="docs/images/storyscry.png" alt="StoryScry story analysis showing scenes, locations, characters and dialogue data"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Cork Board</strong><br>Move ideas freely. Connect scenes, notes, and references.</td>
+    <td align="center"><strong>StoryScry</strong><br>See what is happening across your script in exportable reports.</td>
+  </tr>
+</table>
+
+<p align="center"><img src="docs/images/editor-night.png" alt="Kólbítar screenplay editor in Night theme" width="850"></p>
+<p align="center"><sub>Work in Day, Night, Midnight, OLED, or High Contrast themes.</sub></p>
+
+## Download and install
+
+**[Get Kólbítar from GitHub Releases](https://github.com/electrichobo/cirthscribe/releases)**
+
+| Platform | Download | Requirements |
+| :--- | :--- | :--- |
+| **Windows** | [`Kolbítar_0.8.2_x64-setup.exe`](https://github.com/electrichobo/cirthscribe/releases) | Windows 10 or later, 64-bit |
+| **macOS** | [`Kolbítar_0.8.2_aarch64.dmg`](https://github.com/electrichobo/cirthscribe/releases) | macOS 11 or later, Apple silicon |
+| **Linux** | [Build from source](#build-from-source) | No packaged release yet |
+
+> [!NOTE]
+> **Unsigned installers.** Windows SmartScreen may flag the installer: use **More info > Run anyway** if you trust the file you downloaded. On macOS, Control-click the app and select **Open**, or permit it in **System Settings > Privacy & Security**. Windows signing and macOS notarization are planned. Verify the SHA-256 checksum published with the release before running downloaded files.
+
+<details>
+<summary><strong>Terminal downloads and update checks</strong></summary>
+
+With the [GitHub CLI](https://cli.github.com/), on Windows:
 
 ```bash
 gh release download --repo electrichobo/cirthscribe --pattern "*x64-setup.exe"
 ```
 
-On a Mac, use `--pattern "*aarch64.dmg"` instead. There's no package-manager install (winget, Homebrew) yet.
+For macOS, use `--pattern "*aarch64.dmg"` instead. There is no winget or Homebrew package yet.
 
-Kolbítar never checks for updates by itself. **Help > Check for Updates…** opens the releases page, and each release lists what changed.
+The app does not automatically check for updates. **Help > Check for Updates…** opens the releases page in your browser.
 
-## About
+</details>
 
-Kolbítar (say *KOHL-bee-tar*) is Old Norse for "coal-biters". In the sagas, the kolbítr is the youngest son who sits by the hearth while everyone writes him off, until he gets up and comes back the hero. It was also the name of the Oxford reading club where J. R. R. Tolkien read the Icelandic sagas with C. S. Lewis and Nevill Coghill.
+## Start writing in minutes
 
-The app is for the whole path from first idea to shooting script, and it's built on a few rules:
+1. **Explore the sample.** Open *The Obsidian Seal* from Home to see the writing and planning tools with a ready-made project.
+2. **Take the software tour.** Choose **Help > Software Tour** for a guided introduction.
+3. **Make it yours.** Create a project or import an existing Fountain, Final Draft, PDF, or plain-text screenplay.
+4. **Write and organize.** The editor handles formatting; the scene list and Notecard View keep the rest of the story close at hand.
+5. **Export when ready.** Make a PDF, Final Draft file, Fountain file, or another supported format.
 
-- **One script, many views.** The scene list, notecards, timeline, cork board, bible and reports all read the same script, so they can't drift out of sync. Moving a card never rewrites your pages unless you allow it.
-- **Your work stays on your computer.** There's no account, no cloud and no telemetry. The app makes no network requests.
-- **Your work is protected.** Autosave, rolling backups, crash recovery, undo, and an untouched copy of any project before its file format is upgraded.
-- **Free, with no catches.** No subscription, paywall or paid tier, and the source is open under the GPL.
+Projects are saved as a single `.cirth` file. Backups are available from each project's card on Home, and you can use **File > Save As** to keep a copy wherever you choose.
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/images/cork-board.png" alt="The Cork Board: scene cards and a note pinned to the board and joined by labelled red strings"></td>
-    <td width="50%"><img src="docs/images/storyscry.png" alt="StoryScry: a dashboard of scene lengths, character dialogue, locations and the action-to-dialogue balance"></td>
-  </tr>
-  <tr>
-    <td align="center">The Cork Board: pin scenes and notes anywhere and tie them together with string.</td>
-    <td align="center">StoryScry: reports on scenes, characters, locations and balance, each one exportable.</td>
-  </tr>
-</table>
+---
+
+<details>
+<summary><strong>Jump to detailed documentation</strong></summary>
+
+[Full feature list](#features) · [Getting started](#getting-started) · [Architecture](#how-its-built) · [Security and privacy](#security-and-privacy) · [Contributing](#contributing) · [Roadmap](#whats-next) · [Known issues](#known-issues) · [License](#license) · [Acknowledgements](#acknowledgements)
+
+</details>
+
+## The name behind the app
+
+*Kólbítar* (pronounced **KOHL-bee-tar**) comes from the Old Norse for “coal-biters.” In the sagas, the *kolbítr* sits by the hearth, underestimated, until the story calls on him. The name also recalls the Oxford reading circle where J. R. R. Tolkien, C. S. Lewis, and Nevill Coghill read Icelandic sagas together.
+
+A fitting name for an app built around stories and the people who make them.
 
 ## Features
 
@@ -88,10 +135,6 @@ The app is for the whole path from first idea to shooting script, and it's built
 | Spelling and style | US and UK English spell check with a personal dictionary, and offline grammar and style checks. |
 | Languages | Hebrew, Arabic, Devanagari, Chinese, Japanese and Korean show on screen. Hebrew, Arabic and Devanagari also print. |
 | Themes | Day, Night, Midnight, OLED and High Contrast. |
-
-<p align="center">
-  <img src="docs/images/editor-night.png" alt="The editor in the Night theme" width="800">
-</p>
 
 ### Plan
 
@@ -134,6 +177,7 @@ The app is for the whole path from first idea to shooting script, and it's built
 
 Every export tells you what the format can't carry, and every import reports what it changed or left out.
 
+
 ## Getting started
 
 1. **Open the sample.** Home has a sample script, *The Obsidian Seal*. Open it to see every view filled in.
@@ -144,6 +188,7 @@ Every export tells you what the format can't carry, and every import reports wha
 6. **Share it.** **File > Export…** makes a PDF or any other format. Projects save as a single `.cirth` file, and **File > Save As** keeps a copy anywhere you like.
 
 Projects live in the app's library folder until you save them elsewhere. Backups are kept for every project, and you can restore one from its card's menu on Home.
+
 
 ## How it's built
 
@@ -223,6 +268,7 @@ The app is `target/release/cirthscribe` (`cirthscribe.exe` on Windows). To build
 
 On Windows, `scripts/dev-env.ps1` puts a checkout-local toolchain on your PATH. On Linux and macOS, `scripts/setup-linux.sh` and `scripts/setup-mac.sh` install what the build needs. End-to-end tests run with `npm run e2e:cdp` (Windows) or `npm run e2e:webdriver` from `app/`.
 
+
 ## Security and privacy
 
 What protects you and your work today:
@@ -240,6 +286,7 @@ Two things to know in 0.8.2:
 
 If you find a security problem, please don't post the details in a public issue. Open an issue that asks for a private contact, and the maintainer will reply.
 
+
 ## Contributing
 
 This alpha exists to find problems before a wider release, so every report helps.
@@ -249,6 +296,7 @@ This alpha exists to find problems before a wider release, so every report helps
 - **Run a manual check.** [docs/testing/MANUAL_CHECKS.md](docs/testing/MANUAL_CHECKS.md) lists checks that need a person, many not yet run. Pick one for your system and post the result.
 - **Suggest improvements.** Describe what you were trying to do; that helps more than a specific solution.
 - **Send code.** Pull requests are welcome under the project's license (GPL-3.0-only). Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first, keep changes small, add tests, and run the core tests and both end-to-end drivers. New dependencies need the maintainer's agreement and a compatible license.
+
 
 ## What's next
 
@@ -279,6 +327,7 @@ Found in 0.8.2 and fixed for the next update:
 - Adding a card in the Notecard View right after adding feedback or an alternate take can say "Card not saved". Click again.
 - In PDFs, an Arabic phrase can have a little extra space on each side.
 
+
 ## License
 
 Kolbítar is free software under the [GNU General Public License, version 3 only](LICENSE), with one additional attribution term under section 7(b) ([NOTICE](NOTICE)).
@@ -294,6 +343,7 @@ In plain terms (the license text is what counts):
 The GPL doesn't forbid charging for copies, but anyone who sells Kolbítar or a version of it must give buyers the full source under the GPL. Kolbítar itself will always be free.
 
 Third-party components keep their own licenses, listed in [docs/m0/LICENSES.md](docs/m0/LICENSES.md) and shipped with the app in [assets/legal/THIRD-PARTY-NOTICES.txt](assets/legal/THIRD-PARTY-NOTICES.txt).
+
 
 ## Acknowledgements
 
